@@ -1,0 +1,14 @@
+Server=db69837.public.databaseasp.net;Port=5432;Database=db69837;User Id=db69837;Password=5Tq#_o3L9Zx!;Ssl Mode=Prefer;
+
+Public endpoint for pgAdmin, DBeaver or CI/CD.
+Server
+db69837.public.databaseasp.net
+EU
+S15
+Public hostname — reachable from anywhere once Remote access is enabled. Never use the IP address, it can change.
+Port
+5432 PostgreSQL
+Login
+db69837
+Password
+5Tq#_o3L9Zx!

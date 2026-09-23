@@ -1,0 +1,35 @@
+{
+  "name": "yoka-store",
+  "version": "1.0.0",
+  "description": "Yoka Store Enterprise Retail & E-Commerce Platform",
+  "main": "server/swm/app.js",
+  "scripts": {
+    "migrate": "knex migrate:latest",
+    "migrate:rollback": "knex migrate:rollback",
+    "seed": "node seeders/seed.js",
+    "dev:swm": "nodemon server/swm/app.js",
+    "start:swm": "node server/swm/app.js",
+    "dev:client": "npm --prefix client-swm run dev",
+    "build:client": "npm --prefix client-swm run build",
+    "install:all": "npm install && npm --prefix client-swm install"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
+    "mysql2": "^3.9.7",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "author": "Moustafa Maher",
+  "license": "ISC"
+}

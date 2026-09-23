@@ -1,0 +1,1767 @@
+# Yoka Store — Bulk 1 Full Implementation Plan
+### Moustafa Maher · Project Lead & Full-Stack Architect
+**Window:** Sep 25, 2026 (08:00 AM) → Sep 26, 2026 (02:00 PM) · **30 Allocated Hours**
+**Handoff Target:** Yassen Ahmed at Sep 26, 2026 02:00 PM
+
+---
+
+## 🌐 Testing Environment Strategy
+
+> [!IMPORTANT]
+> **Phase 1 (NOW — Dev/Testing):** Use the free Monster Server + free PostgreSQL DB instead of the Hostinger VPS. This lets you build and test all backend logic without any cost or infrastructure setup delay.
+>
+> **Phase 2 (Oct 01, Launch Day):** Migrate everything to Hostinger Ubuntu 24.04 VPS with MySQL 8.0.
+
+### Free Testing Server Details
+
+| Property | Value |
+|---|---|
+| **App URL** | http://yokastore.runasp.net/ |
+| **Deploy Method** | MSDeploy via `site93498.siteasp.net` |
+| **Site Name** | `site93498` |
+| **Username** | `site93498` |
+| **Password** | `2Wp@-q8SeE=7` |
+
+### Free Testing Database Details
+
+| Property | Value |
+|---|---|
+| **Type** | PostgreSQL (not MySQL — important!) |
+| **Host** | `db69837.public.databaseasp.net` |
+| **Port** | `5432` |
+| **Database** | `db69837` |
+| **User** | `db69837` |
+| **Password** | `5Tq#_o3L9Zx!` |
+| **SSL** | Prefer |
+
+> [!WARNING]
+> The free DB is **PostgreSQL**, not MySQL 8.0. Your SQL schema must be written to be portable between PostgreSQL (testing) and MySQL 8.0 (production). Use **Knex.js migrations** which abstract the SQL dialect — this is already in the tech stack. All raw SQL in migrations must use ANSI-compatible syntax.
+
+---
+
+## 🏗️ Monorepo Project Structure (To Be Created)
+
+```
+yoka-store/                         ← Root monorepo
+├── server/
+│   ├── shared/
+│   │   ├── db.js                   ← MySQL2/promise pool (prod) / pg pool (dev)
+│   │   ├── redis.js                ← ioredis client with auto-reconnect
+│   │   ├── activityLogger.js       ← Central logActivity() engine
+│   │   └── authMiddleware.js       ← JWT verify + RBAC requireRole()
+│   ├── swm/                        ← SWM Internal API (Port 3001)
+│   │   ├── app.js
+│   │   ├── routes/
+│   │   │   ├── auth.js
+│   │   │   ├── branches.js
+│   │   │   ├── users.js
+│   │   │   ├── categories.js
+│   │   │   ├── products.js
+│   │   │   └── variants.js
+│   │   └── controllers/
+│   ├── ecp/                        ← E-Commerce API (Port 3002) [Bulk 3]
+│   └── jobs/                       ← BullMQ Workers [Bulk 3/4]
+├── migrations/
+│   └── 001_initial_schema.js       ← Knex migration (dialect-agnostic)
+├── seeders/
+│   └── seed.js                     ← Initial data seeder
+├── client-swm/                     ← React + Vite Admin Dashboard (Port 5173)
+│   ├── src/
+│   │   ├── main.jsx
+│   │   ├── App.jsx
+│   │   ├── api.js                  ← Axios client with JWT auto-refresh
+│   │   ├── store/                  ← Zustand state stores
+│   │   ├── pages/
+│   │   │   ├── Login.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Users.jsx
+│   │   │   ├── Branches.jsx
+│   │   │   └── Products.jsx
+│   │   └── components/
+│   │       ├── VariantMatrix.jsx   ← Size × Color product variant generator
+│   │       ├── Modal.jsx
+│   │       └── DataTable.jsx
+│   └── vite.config.js
+├── client-ecp/                     ← Next.js 14 Storefront [Bulk 3]
+├── .env.example
+├── .env                            ← DO NOT COMMIT
+├── .gitignore
+├── knexfile.js                     ← Knex config for dev/prod environments
+├── package.json                    ← Root package.json with workspaces
+└── ecosystem.config.js             ← PM2 config (for production)
+```
+
+---
+
+## Sub-Task MM-1.1: VPS Provisioning & System Hardening
+**Domain:** DevOps & Infrastructure · **Time:** 4 Hours (Sep 25, 08:00 AM – 12:00 PM)
+**⚠️ NOTE: For testing, SKIP VPS setup. Execute this on Oct 01 Launch Day. Use the Monster free server for now.**
+
+### What to Prepare Locally (Do This First)
+
+Even though you'll skip the VPS for testing, prepare these scripts so they're ready for Launch Day:
+
+#### `scripts/provision-vps.sh`
+```bash
+#!/bin/bash
+# Run as root on Hostinger Ubuntu 24.04 LTS
+
+# 1. Update system
+apt update && apt upgrade -y
+
+# 2. Create non-root deploy user
+adduser yoka --gecos "" --disabled-password
+usermod -aG sudo yoka
+mkdir -p /home/yoka/.ssh
+cp ~/.ssh/authorized_keys /home/yoka/.ssh/
+chown -R yoka:yoka /home/yoka/.ssh
+
+# 3. Harden SSH
+sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+systemctl restart sshd
+
+# 4. UFW Firewall
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+
+# 5. Node.js 20 LTS
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
+npm install -g pm2 pnpm typescript
+
+# 6. MySQL 8.0
+apt install -y mysql-server
+mysql_secure_installation
+# Configure my.cnf (see below)
+
+# 7. Redis 7.2
+apt install -y redis-server
+# Configure redis.conf (see below)
+
+# 8. Nginx
+apt install -y nginx
+systemctl enable nginx
+```
+
+#### MySQL `my.cnf` Tuning (for 8GB VPS)
+```ini
+[mysqld]
+innodb_buffer_pool_size        = 4G
+innodb_buffer_pool_instances   = 4
+innodb_log_file_size           = 512M
+innodb_flush_log_at_trx_commit = 2
+max_connections                = 300
+slow_query_log                 = 1
+long_query_time                = 2
+default_time_zone              = '+03:00'
+character-set-server           = utf8mb4
+collation-server               = utf8mb4_unicode_ci
+```
+
+#### Redis `redis.conf` Tuning
+```
+requirepass YokaRedis2026!Strong
+maxmemory 1gb
+maxmemory-policy volatile-lru
+bind 127.0.0.1
+protected-mode yes
+```
+
+**✅ Acceptance Criteria (Production):** `systemctl status mysql redis-server nginx` → all `active (running)`
+
+---
+
+## Sub-Task MM-1.2: Complete Database Schema Migration (35+ Tables) & Seeding
+**Domain:** Database Engineering · **Time:** 8 Hours (Sep 25, 12:30 PM – 08:30 PM)
+**🔵 For Testing: Run migrations against PostgreSQL (`db69837.public.databaseasp.net`)**
+
+### Step 1: Root Project Setup
+
+```bash
+# In your project root (E:\WORK\FreeLance\Yoka Store)
+mkdir yoka-store && cd yoka-store
+git init
+npm init -y
+
+# Install core dependencies
+npm install knex mysql2 pg bcryptjs dotenv
+npm install -D nodemon
+
+# Create .gitignore
+echo "node_modules/\n.env\nuploads/" > .gitignore
+```
+
+### Step 2: `knexfile.js` (Dialect-Agnostic Config)
+
+```javascript
+// knexfile.js
+require('dotenv').config();
+
+module.exports = {
+  development: {
+    client: 'pg',                          // PostgreSQL for free testing
+    connection: {
+      host: 'db69837.public.databaseasp.net',
+      port: 5432,
+      database: 'db69837',
+      user: 'db69837',
+      password: '5Tq#_o3L9Zx!',
+      ssl: { rejectUnauthorized: false }
+    },
+    migrations: { directory: './migrations' },
+    seeds: { directory: './seeders' }
+  },
+  production: {
+    client: 'mysql2',                      // MySQL 8.0 for Hostinger VPS
+    connection: {
+      host: process.env.DB_HOST || '127.0.0.1',
+      port: 3306,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS
+    },
+    pool: { min: 2, max: 50 },
+    migrations: { directory: './migrations' },
+    seeds: { directory: './seeders' }
+  }
+};
+```
+
+### Step 3: `.env.example`
+
+```env
+# Environment
+NODE_ENV=development
+
+# Database (Testing — PostgreSQL)
+DB_CLIENT=pg
+DB_HOST=db69837.public.databaseasp.net
+DB_PORT=5432
+DB_NAME=db69837
+DB_USER=db69837
+DB_PASS=5Tq#_o3L9Zx!
+DB_SSL=true
+
+# Redis (Local for testing, real Redis in production)
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+
+# JWT
+JWT_SECRET=yoka-dev-secret-change-in-production
+JWT_EXPIRES_IN=1h
+JWT_REFRESH_EXPIRES_IN=7d
+
+# App
+PORT_SWM=3001
+PORT_ECP=3002
+NODE_ENV=development
+
+# Server
+SERVER_URL=http://yokastore.runasp.net
+```
+
+### Step 4: Migration File `migrations/001_initial_schema.js`
+
+The migration is split into logical groups, executed in dependency order:
+
+```javascript
+// migrations/001_initial_schema.js
+exports.up = async function(knex) {
+
+  // === GROUP 1: CORE ORG TABLES ===
+
+  await knex.schema.createTable('branches', (t) => {
+    t.increments('id').primary();
+    t.string('branch_code', 20).notNullable().unique();
+    t.string('branch_name', 255).notNullable();
+    t.enum('branch_type', ['main_warehouse', 'retail_branch', 'ecom_warehouse']).defaultTo('retail_branch');
+    t.text('address');
+    t.string('phone', 20);
+    t.integer('supervisor_id').unsigned();
+    t.json('working_hours');
+    t.enum('status', ['active', 'inactive', 'temporary_closed']).defaultTo('active');
+    t.timestamps(true, true);
+  });
+
+  await knex.schema.createTable('users', (t) => {
+    t.increments('id').primary();
+    t.string('username', 100).notNullable().unique();
+    t.string('email', 150).unique();
+    t.string('password_hash', 255).notNullable();
+    t.string('full_name', 255).notNullable();
+    t.string('phone', 25);
+    t.string('national_id', 20).unique();
+    t.enum('role', ['super_admin','admin','supervisor','salesperson',
+                    'content_manager','customer_service',
+                    'inventory_manager','data_analyst','system_admin']).notNullable();
+    t.integer('branch_id').unsigned().references('id').inTable('branches').onDelete('SET NULL');
+    t.json('permissions');
+    t.decimal('salary', 10, 2);
+    t.date('hire_date');
+    t.datetime('last_login');
+    t.tinyint('login_attempts').defaultTo(0);
+    t.datetime('locked_until');
+    t.string('refresh_token', 512);
+    t.enum('status', ['active', 'inactive', 'suspended']).defaultTo('active');
+    t.timestamps(true, true);
+    t.index('role');
+    t.index('branch_id');
+    t.index('status');
+  });
+
+  await knex.schema.createTable('product_categories', (t) => {
+    t.increments('id').primary();
+    t.integer('parent_id').unsigned().references('id').inTable('product_categories').onDelete('SET NULL');
+    t.string('category_name', 255).notNullable();
+    t.string('slug', 255).notNullable().unique();
+    t.text('description');
+    t.string('image_url', 512);
+    t.smallint('display_order').defaultTo(0);
+    t.boolean('is_ecom_visible').defaultTo(true);
+    t.enum('status', ['active', 'inactive']).defaultTo('active');
+    t.timestamps(true, true);
+    t.index('parent_id');
+  });
+
+  await knex.schema.createTable('products', (t) => {
+    t.increments('id').primary();
+    t.string('product_code', 100).notNullable().unique();
+    t.string('barcode', 255).unique();
+    t.string('product_name', 255).notNullable();
+    t.string('slug', 300).notNullable().unique();
+    t.string('brand', 100);
+    t.integer('category_id').unsigned().notNullable().references('id').inTable('product_categories');
+    t.integer('sub_category_id').unsigned().references('id').inTable('product_categories');
+    t.string('material', 100);
+    t.string('color', 50);
+    t.string('size', 50);
+    t.string('model_number', 100);
+    t.decimal('weight_grams', 10, 3);
+    t.json('dimensions');
+    t.decimal('cost_price', 12, 4).notNullable();
+    t.decimal('selling_price', 12, 4).notNullable();
+    t.decimal('wholesale_price', 12, 4);
+    t.decimal('sale_price', 12, 4);
+    t.datetime('sale_price_start');
+    t.datetime('sale_price_end');
+    t.decimal('tax_percentage', 5, 2).defaultTo(0);
+    t.json('alternative_prices');
+    t.string('featured_image', 512);
+    t.json('gallery_images');
+    t.string('meta_title', 255);
+    t.string('meta_description', 500);
+    t.string('meta_keywords', 300);
+    t.string('short_description', 1000);
+    t.text('description');
+    t.boolean('is_ecom_listed').defaultTo(false);
+    t.enum('ecom_visibility', ['public', 'private', 'draft']).defaultTo('public');
+    t.boolean('is_featured').defaultTo(false);
+    t.smallint('reorder_level').defaultTo(5);
+    t.smallint('low_stock_threshold').defaultTo(10);
+    t.decimal('average_rating', 3, 2).defaultTo(0);
+    t.integer('rating_count').defaultTo(0);
+    t.integer('total_sold').defaultTo(0);
+    t.enum('status', ['active', 'inactive', 'discontinued']).defaultTo('active');
+    t.timestamps(true, true);
+    t.index('category_id');
+    t.index('brand');
+    t.index('status');
+    t.index(['is_ecom_listed', 'ecom_visibility']);
+  });
+
+  await knex.schema.createTable('product_variants', (t) => {
+    t.increments('id').primary();
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products').onDelete('CASCADE');
+    t.string('variant_sku', 150).notNullable().unique();
+    t.string('color', 50);
+    t.string('size', 50);
+    t.string('material', 100);
+    t.json('additional_attrs');
+    t.decimal('price_modifier', 10, 4).defaultTo(0);
+    t.string('image_url', 512);
+    t.enum('status', ['active', 'inactive']).defaultTo('active');
+    t.index('product_id');
+  });
+
+  await knex.schema.createTable('inventory_balances', (t) => {
+    t.increments('id').primary();
+    t.integer('branch_id').unsigned().notNullable().references('id').inTable('branches');
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products');
+    t.integer('variant_id').unsigned().references('id').inTable('product_variants').onDelete('SET NULL');
+    t.integer('available_qty').defaultTo(0);
+    t.integer('reserved_qty').defaultTo(0);
+    t.integer('on_order_qty').defaultTo(0);
+    t.integer('sold_qty').defaultTo(0);
+    t.integer('returned_qty').defaultTo(0);
+    t.datetime('last_movement_at');
+    t.timestamp('last_updated').defaultTo(knex.fn.now());
+    t.unique(['branch_id', 'product_id', 'variant_id']);
+    t.index(['product_id', 'available_qty']);
+  });
+
+  // === GROUP 2: SWM PURCHASING ===
+
+  await knex.schema.createTable('suppliers', (t) => {
+    t.increments('id').primary();
+    t.string('supplier_code', 50).notNullable().unique();
+    t.string('supplier_name', 255).notNullable();
+    t.string('contact_person', 255);
+    t.string('phone', 25);
+    t.string('email', 150);
+    t.text('address');
+    t.string('tax_id', 50);
+    t.decimal('opening_balance', 14, 4).defaultTo(0);
+    t.decimal('current_balance', 14, 4).defaultTo(0);
+    t.decimal('credit_limit', 14, 4);
+    t.tinyint('payment_terms_days');
+    t.enum('status', ['active', 'inactive', 'blacklisted']).defaultTo('active');
+    t.text('notes');
+    t.timestamps(true, true);
+    t.index('status');
+  });
+
+  await knex.schema.createTable('purchase_invoices', (t) => {
+    t.increments('id').primary();
+    t.string('invoice_number', 50).notNullable().unique();
+    t.integer('supplier_id').unsigned().notNullable().references('id').inTable('suppliers');
+    t.integer('warehouse_branch_id').unsigned().notNullable().references('id').inTable('branches');
+    t.date('invoice_date').notNullable();
+    t.date('due_date');
+    t.decimal('subtotal', 14, 4).notNullable();
+    t.decimal('discount_amount', 12, 4).defaultTo(0);
+    t.decimal('tax_amount', 12, 4).defaultTo(0);
+    t.decimal('shipping_cost', 12, 4).defaultTo(0);
+    t.decimal('final_amount', 14, 4).notNullable();
+    t.decimal('paid_amount', 14, 4).defaultTo(0);
+    t.enum('payment_method', ['cash', 'credit', 'bank_transfer', 'mixed']).defaultTo('cash');
+    t.enum('payment_status', ['unpaid', 'partial', 'paid']).defaultTo('unpaid');
+    t.text('notes');
+    t.enum('status', ['draft', 'pending', 'completed', 'cancelled']).defaultTo('pending');
+    t.integer('created_by').unsigned().references('id').inTable('users');
+    t.timestamps(true, true);
+    t.index('supplier_id');
+    t.index('invoice_date');
+    t.index('status');
+  });
+
+  await knex.schema.createTable('purchase_invoice_items', (t) => {
+    t.increments('id').primary();
+    t.integer('invoice_id').unsigned().notNullable().references('id').inTable('purchase_invoices').onDelete('CASCADE');
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products');
+    t.integer('variant_id').unsigned().references('id').inTable('product_variants');
+    t.integer('quantity').notNullable();
+    t.decimal('unit_cost', 12, 4).notNullable();
+    t.decimal('discount_pct', 5, 2).defaultTo(0);
+    t.decimal('discount_amount', 12, 4).defaultTo(0);
+    t.decimal('final_unit_cost', 12, 4).notNullable();
+    t.decimal('line_total', 14, 4).notNullable();
+    t.string('product_name', 255);
+    t.string('product_code', 100);
+    t.index('invoice_id');
+    t.index('product_id');
+  });
+
+  await knex.schema.createTable('supplier_payments', (t) => {
+    t.increments('id').primary();
+    t.string('payment_ref', 50).notNullable().unique();
+    t.integer('supplier_id').unsigned().notNullable().references('id').inTable('suppliers');
+    t.integer('invoice_id').unsigned().references('id').inTable('purchase_invoices').onDelete('SET NULL');
+    t.decimal('amount', 14, 4).notNullable();
+    t.enum('payment_method', ['cash', 'bank_transfer', 'cheque']).notNullable();
+    t.date('payment_date').notNullable();
+    t.string('reference_no', 100);
+    t.enum('direction', ['payment', 'receipt']).defaultTo('payment');
+    t.text('notes');
+    t.integer('recorded_by').unsigned().notNullable().references('id').inTable('users');
+    t.timestamps(true, true);
+    t.index('supplier_id');
+    t.index('payment_date');
+  });
+
+  // === GROUP 3: SWM POS & SALES ===
+
+  await knex.schema.createTable('cash_registers', (t) => {
+    t.increments('id').primary();
+    t.string('register_code', 50).notNullable().unique();
+    t.integer('branch_id').unsigned().notNullable().references('id').inTable('branches');
+    t.string('register_name', 100).notNullable();
+    t.boolean('is_main').defaultTo(false);
+    t.decimal('current_balance', 14, 4).defaultTo(0);
+    t.decimal('opening_balance', 14, 4).defaultTo(0);
+    t.datetime('last_transfer_at');
+    t.enum('status', ['open', 'closed']).defaultTo('open');
+    t.timestamps(true, true);
+    t.index('branch_id');
+  });
+
+  await knex.schema.createTable('swm_sales_invoices', (t) => {
+    t.increments('id').primary();
+    t.string('invoice_number', 50).notNullable().unique();
+    t.integer('branch_id').unsigned().notNullable().references('id').inTable('branches');
+    t.integer('salesperson_id').unsigned().notNullable().references('id').inTable('users');
+    t.string('customer_name', 255);
+    t.string('customer_ref', 50);
+    t.string('customer_phone', 25);
+    t.text('customer_address');
+    t.datetime('invoice_date').notNullable();
+    t.decimal('subtotal', 14, 4).notNullable();
+    t.decimal('discount_amount', 12, 4).defaultTo(0);
+    t.decimal('tax_amount', 12, 4).defaultTo(0);
+    t.decimal('final_amount', 14, 4).notNullable();
+    t.json('payment_breakdown');
+    t.enum('payment_status', ['paid', 'partial', 'unpaid']).defaultTo('paid');
+    t.text('notes');
+    t.enum('status', ['completed', 'cancelled', 'returned']).defaultTo('completed');
+    t.timestamps(true, true);
+    t.index(['branch_id', 'invoice_date', 'status']);
+    t.index('salesperson_id');
+  });
+
+  await knex.schema.createTable('swm_sales_invoice_items', (t) => {
+    t.increments('id').primary();
+    t.integer('invoice_id').unsigned().notNullable().references('id').inTable('swm_sales_invoices').onDelete('CASCADE');
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products');
+    t.integer('variant_id').unsigned().references('id').inTable('product_variants');
+    t.integer('quantity').notNullable();
+    t.decimal('unit_price', 12, 4).notNullable();
+    t.decimal('discount_pct', 5, 2).defaultTo(0);
+    t.decimal('discount_amount', 12, 4).defaultTo(0);
+    t.decimal('final_unit_price', 12, 4).notNullable();
+    t.decimal('line_total', 14, 4).notNullable();
+    t.decimal('cost_at_sale', 12, 4);
+    t.string('product_name', 255);
+    t.string('product_code', 100);
+    t.index('invoice_id');
+    t.index('product_id');
+  });
+
+  await knex.schema.createTable('expenses', (t) => {
+    t.increments('id').primary();
+    t.string('expense_ref', 50).notNullable().unique();
+    t.integer('branch_id').unsigned().notNullable().references('id').inTable('branches');
+    t.enum('category', ['sales_expense','utility_bill','admin','payroll','maintenance','marketing','other']).notNullable();
+    t.string('subcategory', 100);
+    t.decimal('amount', 12, 4).notNullable();
+    t.text('description');
+    t.string('receipt_image', 512);
+    t.date('expense_date').notNullable();
+    t.integer('recorded_by').unsigned().notNullable().references('id').inTable('users');
+    t.enum('status', ['pending', 'approved', 'rejected']).defaultTo('pending');
+    t.integer('approved_by').unsigned().references('id').inTable('users');
+    t.datetime('approved_at');
+    t.timestamps(true, true);
+    t.index(['branch_id', 'expense_date']);
+  });
+
+  await knex.schema.createTable('inventory_counts', (t) => {
+    t.increments('id').primary();
+    t.string('count_session', 50).notNullable();
+    t.integer('branch_id').unsigned().notNullable().references('id').inTable('branches');
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products');
+    t.integer('variant_id').unsigned().references('id').inTable('product_variants');
+    t.integer('system_qty').notNullable();
+    t.integer('actual_qty').notNullable();
+    t.text('notes');
+    t.integer('counted_by').unsigned().notNullable().references('id').inTable('users');
+    t.date('count_date').notNullable();
+    t.enum('status', ['draft', 'submitted', 'verified', 'adjusted']).defaultTo('draft');
+    t.timestamps(true, true);
+    t.index(['count_session', 'branch_id']);
+    t.index('product_id');
+  });
+
+  await knex.schema.createTable('inventory_movements', (t) => {
+    t.bigIncrements('id').primary();
+    t.integer('branch_id').unsigned().notNullable().references('id').inTable('branches');
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products');
+    t.integer('variant_id').unsigned().references('id').inTable('product_variants');
+    t.enum('movement_type', [
+      'purchase_in', 'distribution_out', 'distribution_in',
+      'sale_out', 'ecom_sale_out', 'return_in',
+      'adjustment_in', 'adjustment_out', 'reserve', 'release'
+    ]).notNullable();
+    t.integer('quantity_change').notNullable();
+    t.integer('quantity_before').notNullable();
+    t.integer('quantity_after').notNullable();
+    t.string('reference_type', 50);
+    t.integer('reference_id').unsigned();
+    t.string('notes', 500);
+    t.integer('created_by').unsigned().references('id').inTable('users');
+    t.timestamps(true, true);
+    t.index(['branch_id', 'product_id']);
+    t.index('movement_type');
+    t.index(['reference_type', 'reference_id']);
+    t.index('created_at');
+  });
+
+  // === GROUP 4: E-COMMERCE TABLES ===
+
+  await knex.schema.createTable('ecp_customers', (t) => {
+    t.increments('id').primary();
+    t.string('customer_code', 50).notNullable().unique();
+    t.string('email', 150).notNullable().unique();
+    t.string('password_hash', 255).notNullable();
+    t.string('first_name', 100).notNullable();
+    t.string('last_name', 100).notNullable();
+    t.string('phone', 25);
+    t.enum('gender', ['male', 'female', 'other']);
+    t.date('date_of_birth');
+    t.integer('default_billing_addr').unsigned();
+    t.integer('default_shipping_addr').unsigned();
+    t.integer('loyalty_points').defaultTo(0);
+    t.enum('loyalty_level', ['bronze', 'silver', 'gold', 'platinum']).defaultTo('bronze');
+    t.decimal('lifetime_spend', 14, 4).defaultTo(0);
+    t.boolean('email_verified').defaultTo(false);
+    t.string('verify_token', 255);
+    t.string('reset_token', 255);
+    t.datetime('reset_token_expires');
+    t.datetime('last_login');
+    t.tinyint('login_attempts').defaultTo(0);
+    t.datetime('locked_until');
+    t.boolean('newsletter_subscribed').defaultTo(false);
+    t.enum('status', ['active', 'inactive', 'suspended']).defaultTo('active');
+    t.timestamps(true, true);
+    t.index('status');
+  });
+
+  await knex.schema.createTable('ecp_customer_addresses', (t) => {
+    t.increments('id').primary();
+    t.integer('customer_id').unsigned().notNullable().references('id').inTable('ecp_customers').onDelete('CASCADE');
+    t.string('label', 50);
+    t.string('first_name', 100);
+    t.string('last_name', 100);
+    t.string('phone', 25);
+    t.string('street_address', 300).notNullable();
+    t.string('apartment', 100);
+    t.string('city', 100).notNullable();
+    t.string('state_province', 100);
+    t.string('postal_code', 20);
+    t.string('country', 100).defaultTo('Egypt');
+    t.boolean('is_default_billing').defaultTo(false);
+    t.boolean('is_default_shipping').defaultTo(false);
+    t.timestamps(true, true);
+    t.index('customer_id');
+  });
+
+  await knex.schema.createTable('ecp_shopping_carts', (t) => {
+    t.increments('id').primary();
+    t.integer('customer_id').unsigned().references('id').inTable('ecp_customers').onDelete('CASCADE');
+    t.string('session_id', 255);
+    t.datetime('expires_at').notNullable();
+    t.string('coupon_code', 50);
+    t.text('notes');
+    t.timestamps(true, true);
+    t.index('customer_id');
+    t.index('session_id');
+    t.index('expires_at');
+  });
+
+  await knex.schema.createTable('ecp_cart_items', (t) => {
+    t.increments('id').primary();
+    t.integer('cart_id').unsigned().notNullable().references('id').inTable('ecp_shopping_carts').onDelete('CASCADE');
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products');
+    t.integer('variant_id').unsigned().references('id').inTable('product_variants');
+    t.integer('quantity').notNullable();
+    t.decimal('unit_price', 12, 4).notNullable();
+    t.timestamps(true, true);
+    t.unique(['cart_id', 'product_id', 'variant_id']);
+    t.index('product_id');
+  });
+
+  await knex.schema.createTable('ecp_orders', (t) => {
+    t.increments('id').primary();
+    t.string('order_number', 50).notNullable().unique();
+    t.integer('customer_id').unsigned().references('id').inTable('ecp_customers').onDelete('SET NULL');
+    t.string('guest_email', 150);
+    t.json('billing_address').notNullable();
+    t.json('shipping_address').notNullable();
+    t.decimal('subtotal', 14, 4).notNullable();
+    t.decimal('tax_amount', 12, 4).defaultTo(0);
+    t.decimal('shipping_cost', 12, 4).defaultTo(0);
+    t.decimal('discount_amount', 12, 4).defaultTo(0);
+    t.string('coupon_code', 50);
+    t.decimal('total_amount', 14, 4).notNullable();
+    t.enum('order_status', ['pending','processing','ready_to_ship','shipped',
+                            'in_transit','delivered','completed','cancelled','returned']).defaultTo('pending');
+    t.enum('payment_status', ['pending','paid','failed','refunded','partial_refund']).defaultTo('pending');
+    t.string('payment_method', 100);
+    t.string('payment_gateway', 50);
+    t.string('payment_gateway_txn', 255);
+    t.string('shipping_carrier', 100);
+    t.string('tracking_number', 255);
+    t.string('tracking_url', 512);
+    t.date('estimated_delivery');
+    t.datetime('shipped_at');
+    t.datetime('delivered_at');
+    t.integer('fulfilling_branch_id').unsigned().references('id').inTable('branches').onDelete('SET NULL');
+    t.text('customer_notes');
+    t.text('admin_notes');
+    t.string('swm_order_ref', 50);
+    t.timestamps(true, true);
+    t.index('customer_id');
+    t.index(['order_status', 'created_at']);
+    t.index('payment_status');
+  });
+
+  await knex.schema.createTable('ecp_order_items', (t) => {
+    t.increments('id').primary();
+    t.integer('order_id').unsigned().notNullable().references('id').inTable('ecp_orders').onDelete('CASCADE');
+    t.integer('product_id').unsigned().references('id').inTable('products').onDelete('SET NULL');
+    t.integer('variant_id').unsigned().references('id').inTable('product_variants');
+    t.string('product_name', 255).notNullable();
+    t.string('product_sku', 100).notNullable();
+    t.string('variant_desc', 255);
+    t.integer('quantity').notNullable();
+    t.decimal('unit_price', 12, 4).notNullable();
+    t.decimal('unit_cost', 12, 4);
+    t.decimal('discount_amount', 12, 4).defaultTo(0);
+    t.decimal('line_total', 14, 4).notNullable();
+    t.index('order_id');
+    t.index('product_id');
+  });
+
+  await knex.schema.createTable('ecp_payments', (t) => {
+    t.increments('id').primary();
+    t.integer('order_id').unsigned().notNullable().references('id').inTable('ecp_orders');
+    t.string('payment_ref', 50).notNullable().unique();
+    t.decimal('amount', 14, 4).notNullable();
+    t.string('currency', 3).defaultTo('EGP');
+    t.string('payment_method', 100).notNullable();
+    t.string('gateway', 50);
+    t.string('gateway_txn_id', 255);
+    t.json('gateway_response');
+    t.enum('status', ['pending','processing','completed','failed','refunded','partially_refunded']).defaultTo('pending');
+    t.decimal('refund_amount', 14, 4).defaultTo(0);
+    t.datetime('processed_at');
+    t.timestamps(true, true);
+    t.index('order_id');
+    t.index('status');
+  });
+
+  await knex.schema.createTable('ecp_coupons', (t) => {
+    t.increments('id').primary();
+    t.string('code', 50).notNullable().unique();
+    t.text('description');
+    t.enum('discount_type', ['percentage', 'fixed', 'free_shipping', 'bogo']).notNullable();
+    t.decimal('discount_value', 10, 4).notNullable();
+    t.decimal('max_discount_amount', 12, 4);
+    t.decimal('minimum_order', 12, 4).defaultTo(0);
+    t.integer('usage_limit');
+    t.tinyint('usage_per_customer').defaultTo(1);
+    t.integer('usage_count').defaultTo(0);
+    t.json('applicable_products');
+    t.json('applicable_categories');
+    t.json('excluded_products');
+    t.datetime('valid_from').notNullable();
+    t.datetime('valid_until');
+    t.enum('status', ['active', 'inactive', 'expired']).defaultTo('active');
+    t.integer('created_by').unsigned().references('id').inTable('users');
+    t.timestamps(true, true);
+    t.index(['status', 'valid_until']);
+  });
+
+  await knex.schema.createTable('ecp_reviews', (t) => {
+    t.increments('id').primary();
+    t.integer('product_id').unsigned().notNullable().references('id').inTable('products');
+    t.integer('customer_id').unsigned().notNullable().references('id').inTable('ecp_customers');
+    t.integer('order_id').unsigned().references('id').inTable('ecp_orders');
+    t.tinyint('rating').notNullable();
+    t.string('title', 255);
+    t.text('content');
+    t.json('images');
+    t.integer('helpful_count').defaultTo(0);
+    t.integer('unhelpful_count').defaultTo(0);
+    t.text('admin_reply');
+    t.datetime('admin_reply_at');
+    t.enum('status', ['pending', 'approved', 'rejected']).defaultTo('pending');
+    t.timestamps(true, true);
+    t.unique(['customer_id', 'product_id']);
+    t.index(['product_id', 'rating']);
+  });
+
+  // === GROUP 5: SYSTEM & CROSS-CUTTING TABLES ===
+
+  await knex.schema.createTable('sync_events', (t) => {
+    t.bigIncrements('id').primary();
+    t.string('event_type', 100).notNullable();
+    t.enum('source_system', ['swm', 'ecom', 'system']).notNullable();
+    t.json('payload').notNullable();
+    t.enum('status', ['pending', 'processing', 'completed', 'failed', 'retrying']).defaultTo('pending');
+    t.tinyint('retry_count').defaultTo(0);
+    t.text('error_message');
+    t.datetime('processed_at');
+    t.timestamps(true, true);
+    t.index('event_type');
+    t.index('status');
+    t.index('created_at');
+  });
+
+  await knex.schema.createTable('audit_logs', (t) => {
+    t.bigIncrements('id').primary();
+    t.integer('user_id').unsigned().references('id').inTable('users');
+    t.string('user_role', 50);
+    t.string('action', 100).notNullable();
+    t.string('resource_type', 50).notNullable();
+    t.string('resource_id', 50);
+    t.json('old_values');
+    t.json('new_values');
+    t.string('ip_address', 45);
+    t.string('user_agent', 500);
+    t.timestamps(true, true);
+    t.index('user_id');
+    t.index(['action', 'resource_type']);
+    t.index('created_at');
+  });
+
+  // activity_logs (Central Activity Logger table — detailed operational log)
+  await knex.schema.createTable('activity_logs', (t) => {
+    t.bigIncrements('id').primary();
+    t.integer('user_id').unsigned().references('id').inTable('users');
+    t.integer('branch_id').unsigned().references('id').inTable('branches');
+    t.string('action_type', 100).notNullable();  // 'POS_SALE', 'UPDATE_PRICE', etc.
+    t.string('entity_type', 100).notNullable();   // 'product', 'invoice', etc.
+    t.string('entity_id', 50);
+    t.json('old_value');
+    t.json('new_value');
+    t.string('ip_address', 45);
+    t.string('user_agent', 500);
+    t.text('notes');
+    t.timestamps(true, true);
+    t.index('user_id');
+    t.index('branch_id');
+    t.index('action_type');
+    t.index('entity_type');
+    t.index('created_at');
+  });
+
+  await knex.schema.createTable('notifications', (t) => {
+    t.increments('id').primary();
+    t.enum('recipient_type', ['user', 'customer']).notNullable();
+    t.integer('recipient_id').unsigned().notNullable();
+    t.enum('channel', ['in_app', 'email', 'sms']).defaultTo('in_app');
+    t.string('title', 255).notNullable();
+    t.text('message').notNullable();
+    t.string('action_url', 512);
+    t.boolean('is_read').defaultTo(false);
+    t.datetime('read_at');
+    t.datetime('sent_at');
+    t.enum('status', ['pending', 'sent', 'failed']).defaultTo('pending');
+    t.timestamps(true, true);
+    t.index(['recipient_type', 'recipient_id', 'is_read']);
+  });
+};
+
+exports.down = async function(knex) {
+  // Drop in reverse dependency order
+  const tables = [
+    'notifications', 'activity_logs', 'audit_logs', 'sync_events',
+    'ecp_reviews', 'ecp_coupons', 'ecp_payments', 'ecp_order_items',
+    'ecp_orders', 'ecp_cart_items', 'ecp_shopping_carts',
+    'ecp_customer_addresses', 'ecp_customers',
+    'inventory_movements', 'inventory_counts', 'expenses',
+    'swm_sales_invoice_items', 'swm_sales_invoices', 'cash_registers',
+    'supplier_payments', 'purchase_invoice_items', 'purchase_invoices', 'suppliers',
+    'inventory_balances', 'product_variants', 'products',
+    'product_categories', 'users', 'branches'
+  ];
+  for (const table of tables) {
+    await knex.schema.dropTableIfExists(table);
+  }
+};
+```
+
+### Step 5: `seeders/seed.js`
+
+```javascript
+// seeders/seed.js
+require('dotenv').config();
+const bcrypt = require('bcryptjs');
+const knex = require('knex')(require('../knexfile')[process.env.NODE_ENV || 'development']);
+
+async function seed() {
+  console.log('🌱 Running seeder...');
+
+  // 1. Main Branch
+  const [branchId] = await knex('branches').insert({
+    branch_code: 'BR-MAIN',
+    branch_name: 'الفرع الرئيسي',
+    branch_type: 'main_warehouse',
+    status: 'active'
+  }).onConflict('branch_code').ignore().returning('id');
+
+  const mainBranchId = branchId?.id || branchId;
+
+  // 2. Super Admin User
+  const passwordHash = await bcrypt.hash('Yoka@Admin2026!', 12);
+  await knex('users').insert({
+    username: 'admin',
+    email: 'admin@yokastore.com',
+    password_hash: passwordHash,
+    full_name: 'Super Administrator',
+    role: 'super_admin',
+    branch_id: null,
+    status: 'active'
+  }).onConflict('username').ignore();
+
+  // 3. Base Categories
+  const categories = [
+    { category_name: 'ملابس رجالي', slug: 'mens-clothing', display_order: 1 },
+    { category_name: 'ملابس نسائي', slug: 'womens-clothing', display_order: 2 },
+    { category_name: 'أطفال',       slug: 'kids',           display_order: 3 },
+    { category_name: 'إكسسوارات',   slug: 'accessories',    display_order: 4 },
+  ];
+  for (const cat of categories) {
+    await knex('product_categories').insert({ ...cat, status: 'active' })
+      .onConflict('slug').ignore();
+  }
+
+  // 4. E-Commerce Branch (online fulfillment)
+  await knex('branches').insert({
+    branch_code: 'BR-ECOM',
+    branch_name: 'مستودع المتجر الإلكتروني',
+    branch_type: 'ecom_warehouse',
+    status: 'active'
+  }).onConflict('branch_code').ignore();
+
+  console.log('✅ Seeding complete!');
+  await knex.destroy();
+}
+
+seed().catch((err) => {
+  console.error('❌ Seed failed:', err);
+  process.exit(1);
+});
+```
+
+### Step 6: Run Migrations & Seeder
+
+```bash
+# Add scripts to package.json
+npm pkg set scripts.migrate="knex migrate:latest"
+npm pkg set scripts.seed="node seeders/seed.js"
+npm pkg set scripts.rollback="knex migrate:rollback"
+
+# Run migrations against PostgreSQL testing DB
+npm run migrate
+
+# Run seeder
+npm run seed
+```
+
+**✅ Acceptance Criteria:** `\dt` (psql) shows 35+ tables; FK constraints enforce integrity; seed data exists.
+
+---
+
+## Sub-Task MM-1.3: Monorepo Setup, Shared DB/Redis Connectors & Activity Log Engine
+**Domain:** Core Backend Infrastructure · **Time:** 5 Hours (Sep 25, 09:00 PM – Sep 26, 02:00 AM)
+
+### `server/shared/db.js`
+
+```javascript
+// server/shared/db.js
+require('dotenv').config();
+const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
+
+let pool;
+
+if (process.env.DB_CLIENT === 'pg') {
+  // PostgreSQL for testing
+  pool = new Pool({
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    max: 50,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  });
+
+  pool.on('error', (err) => {
+    console.error('❌ PostgreSQL pool error:', err.message);
+  });
+
+  // Unified query interface
+  const query = async (sql, params) => {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(sql, params);
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  };
+
+  const transaction = async (callback) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await callback(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  };
+
+  module.exports = { query, transaction, pool };
+} else {
+  // MySQL2 for production
+  pool = mysql.createPool({
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    waitForConnections: true,
+    connectionLimit: 50,
+    queueLimit: 0,
+  });
+
+  const query = async (sql, params) => {
+    const [rows] = await pool.execute(sql, params);
+    return rows;
+  };
+
+  const transaction = async (callback) => {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const result = await callback(conn);
+      await conn.commit();
+      return result;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  };
+
+  module.exports = { query, transaction, pool };
+}
+```
+
+### `server/shared/redis.js`
+
+```javascript
+// server/shared/redis.js
+require('dotenv').config();
+const Redis = require('ioredis');
+
+const redis = new Redis({
+  host: process.env.REDIS_HOST || '127.0.0.1',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD || undefined,
+  retryStrategy: (times) => Math.min(times * 100, 3000),  // Auto-reconnect
+  maxRetriesPerRequest: 3,
+  lazyConnect: false,
+  enableOfflineQueue: true,
+});
+
+redis.on('connect', () => console.log('✅ Redis connected'));
+redis.on('error', (err) => console.error('❌ Redis error:', err.message));
+redis.on('reconnecting', () => console.log('🔄 Redis reconnecting...'));
+
+module.exports = redis;
+```
+
+### `server/shared/activityLogger.js`
+
+```javascript
+// server/shared/activityLogger.js
+const { query } = require('./db');
+
+/**
+ * Central Activity Logger — fire-and-forget, async, non-blocking
+ * @param {Object} params
+ */
+async function logActivity({
+  userId,
+  branchId,
+  actionType,
+  entityType,
+  entityId,
+  oldValue,
+  newValue,
+  ipAddress,
+  userAgent,
+  notes
+}) {
+  try {
+    const sql = `
+      INSERT INTO activity_logs
+        (user_id, branch_id, action_type, entity_type, entity_id, old_value, new_value, ip_address, user_agent, notes, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+    `;
+    // Fire and forget — do NOT await (prevents blocking the main request)
+    query(sql, [
+      userId || null,
+      branchId || null,
+      actionType,
+      entityType,
+      entityId ? String(entityId) : null,
+      oldValue ? JSON.stringify(oldValue) : null,
+      newValue ? JSON.stringify(newValue) : null,
+      ipAddress || null,
+      userAgent || null,
+      notes || null
+    ]).catch(err => console.error('ActivityLogger error:', err.message));
+  } catch (err) {
+    // Never throw — logging must never crash the main flow
+    console.error('ActivityLogger fatal:', err.message);
+  }
+}
+
+module.exports = { logActivity };
+```
+
+### `server/shared/authMiddleware.js`
+
+```javascript
+// server/shared/authMiddleware.js
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'yoka-dev-secret';
+
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'No token provided' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+}
+
+function requireRole(roles = []) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Insufficient permissions' });
+    }
+    next();
+  };
+}
+
+module.exports = { requireAuth, requireRole };
+```
+
+**✅ Acceptance Criteria:** Call `logActivity()` → row inserted in `activity_logs` within < 5ms (fire-and-forget, non-blocking).
+
+---
+
+## Sub-Task MM-1.4: Master Data Backend APIs
+**Domain:** Backend API Development · **Time:** 6 Hours (Sep 26, 08:00 AM – 02:00 PM)
+
+### `server/swm/app.js`
+
+```javascript
+// server/swm/app.js
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+
+const authRoutes = require('./routes/auth');
+const branchRoutes = require('./routes/branches');
+const userRoutes = require('./routes/users');
+const categoryRoutes = require('./routes/categories');
+const productRoutes = require('./routes/products');
+
+const app = express();
+app.use(helmet());
+app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
+app.use(express.json());
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/swm/branches',   branchRoutes);
+app.use('/api/swm/users',      userRoutes);
+app.use('/api/swm/categories', categoryRoutes);
+app.use('/api/swm/products',   productRoutes);
+
+// Health check
+app.get('/health', (_, res) => res.json({ status: 'ok', service: 'yoka-swm-api' }));
+
+const PORT = process.env.PORT_SWM || 3001;
+app.listen(PORT, () => console.log(`🚀 SWM API listening on port ${PORT}`));
+module.exports = app;
+```
+
+### `server/swm/routes/auth.js`
+
+```javascript
+// server/swm/routes/auth.js
+const router = require('express').Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const redis = require('../../shared/redis');
+const { query } = require('../../shared/db');
+const { logActivity } = require('../../shared/activityLogger');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'yoka-dev-secret';
+const ACCESS_EXPIRES = '1h';
+const REFRESH_EXPIRES = '7d';
+
+// POST /api/auth/login
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Username and password required' });
+    }
+
+    const [user] = await query(
+      `SELECT id, username, email, password_hash, full_name, role, branch_id, status
+       FROM users WHERE username = $1 OR email = $1 LIMIT 1`,
+      [username]
+    );
+
+    if (!user || user.status !== 'active') {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    const payload = { id: user.id, username: user.username, role: user.role, branchId: user.branch_id };
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES });
+    const refreshToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: REFRESH_EXPIRES });
+
+    // Store refresh token in Redis (7 days TTL)
+    await redis.setex(`refresh:${user.id}`, 7 * 24 * 3600, refreshToken);
+
+    // Update last login
+    await query(`UPDATE users SET last_login = NOW() WHERE id = $1`, [user.id]);
+
+    logActivity({
+      userId: user.id, branchId: user.branch_id,
+      actionType: 'LOGIN', entityType: 'users', entityId: user.id,
+      ipAddress: req.ip, userAgent: req.headers['user-agent']
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        accessToken, refreshToken,
+        user: { id: user.id, username: user.username, fullName: user.full_name, role: user.role, branchId: user.branch_id }
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/auth/refresh
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ success: false, message: 'Refresh token required' });
+
+    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    const stored = await redis.get(`refresh:${decoded.id}`);
+    if (!stored || stored !== refreshToken) {
+      return res.status(401).json({ success: false, message: 'Invalid refresh token' });
+    }
+
+    const [user] = await query(
+      `SELECT id, username, role, branch_id FROM users WHERE id = $1 AND status = 'active'`,
+      [decoded.id]
+    );
+    if (!user) return res.status(401).json({ success: false, message: 'User not found' });
+
+    const newAccessToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role, branchId: user.branch_id },
+      JWT_SECRET, { expiresIn: ACCESS_EXPIRES }
+    );
+    const newRefreshToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: REFRESH_EXPIRES });
+    await redis.setex(`refresh:${user.id}`, 7 * 24 * 3600, newRefreshToken);
+
+    return res.json({ success: true, data: { accessToken: newAccessToken, refreshToken: newRefreshToken } });
+  } catch {
+    return res.status(401).json({ success: false, message: 'Token error' });
+  }
+});
+
+// POST /api/auth/logout
+router.post('/logout', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      const decoded = jwt.decode(refreshToken);
+      if (decoded?.id) await redis.del(`refresh:${decoded.id}`);
+    }
+    return res.json({ success: true, message: 'Logged out' });
+  } catch {
+    return res.json({ success: true, message: 'Logged out' });
+  }
+});
+
+module.exports = router;
+```
+
+### `server/swm/routes/branches.js`
+
+```javascript
+// server/swm/routes/branches.js
+const router = require('express').Router();
+const { query } = require('../../shared/db');
+const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { logActivity } = require('../../shared/activityLogger');
+
+// GET /api/swm/branches
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const branches = await query(`SELECT * FROM branches ORDER BY id ASC`);
+    return res.json({ success: true, data: branches });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/swm/branches
+router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { branch_code, branch_name, branch_type, address, phone } = req.body;
+    if (!branch_code || !branch_name) {
+      return res.status(400).json({ success: false, message: 'branch_code and branch_name are required' });
+    }
+    const [result] = await query(
+      `INSERT INTO branches (branch_code, branch_name, branch_type, address, phone)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [branch_code, branch_name, branch_type || 'retail_branch', address, phone]
+    );
+    logActivity({
+      userId: req.user.id, branchId: result.id,
+      actionType: 'CREATE_BRANCH', entityType: 'branches', entityId: result.id,
+      newValue: { branch_code, branch_name },
+      ipAddress: req.ip, userAgent: req.headers['user-agent']
+    });
+    return res.status(201).json({ success: true, data: { id: result.id } });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/swm/branches/:id
+router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { branch_name, branch_type, address, phone, status } = req.body;
+    const [old] = await query(`SELECT * FROM branches WHERE id = $1`, [id]);
+    if (!old) return res.status(404).json({ success: false, message: 'Branch not found' });
+
+    await query(
+      `UPDATE branches SET branch_name=$1, branch_type=$2, address=$3, phone=$4, status=$5, updated_at=NOW() WHERE id=$6`,
+      [branch_name || old.branch_name, branch_type || old.branch_type,
+       address ?? old.address, phone ?? old.phone, status || old.status, id]
+    );
+    logActivity({
+      userId: req.user.id, branchId: parseInt(id),
+      actionType: 'UPDATE_BRANCH', entityType: 'branches', entityId: id,
+      oldValue: old, newValue: req.body,
+      ipAddress: req.ip, userAgent: req.headers['user-agent']
+    });
+    return res.json({ success: true, message: 'Branch updated' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+module.exports = router;
+```
+
+### `server/swm/routes/products.js` (Key Endpoints)
+
+```javascript
+// server/swm/routes/products.js
+const router = require('express').Router();
+const { query, transaction } = require('../../shared/db');
+const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { logActivity } = require('../../shared/activityLogger');
+
+// POST /api/swm/products — Create product + variants in single transaction
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+  try {
+    const { product_name, product_code, category_id, cost_price, selling_price, variants = [] } = req.body;
+    if (!product_name || !product_code || !category_id || !cost_price || !selling_price) {
+      return res.status(400).json({ success: false, message: 'Required fields missing' });
+    }
+
+    const slug = product_name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+
+    const result = await transaction(async (client) => {
+      // Insert product
+      const [prod] = await client.query(
+        `INSERT INTO products (product_code, product_name, slug, category_id, cost_price, selling_price, status)
+         VALUES ($1,$2,$3,$4,$5,$6,'active') RETURNING id`,
+        [product_code, product_name, `${slug}-${Date.now()}`, category_id, cost_price, selling_price]
+      );
+      const productId = prod.rows[0].id;
+
+      // Insert variants
+      for (const v of variants) {
+        const sku = `${product_code}-${v.color || ''}-${v.size || ''}`.toUpperCase();
+        await client.query(
+          `INSERT INTO product_variants (product_id, variant_sku, color, size, price_modifier, status)
+           VALUES ($1,$2,$3,$4,$5,'active')`,
+          [productId, sku, v.color, v.size, v.price_modifier || 0]
+        );
+      }
+      return productId;
+    });
+
+    logActivity({
+      userId: req.user.id, branchId: req.user.branchId,
+      actionType: 'CREATE_PRODUCT', entityType: 'products', entityId: result,
+      newValue: { product_code, product_name, variants_count: variants.length },
+      ipAddress: req.ip, userAgent: req.headers['user-agent']
+    });
+
+    return res.status(201).json({ success: true, data: { id: result } });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/swm/products — Paginated list with inventory joins
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search, category_id, branch_id } = req.query;
+    const offset = (page - 1) * limit;
+
+    let sql = `
+      SELECT p.id, p.product_code, p.product_name, p.selling_price, p.cost_price,
+             p.status, p.is_ecom_listed, p.category_id,
+             COALESCE(SUM(ib.available_qty), 0) AS total_stock
+      FROM products p
+      LEFT JOIN inventory_balances ib ON ib.product_id = p.id
+        ${branch_id ? `AND ib.branch_id = $3` : ''}
+      WHERE 1=1
+        ${search ? `AND (p.product_name ILIKE $1 OR p.product_code ILIKE $1)` : ''}
+        ${category_id ? `AND p.category_id = $2` : ''}
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    const params = [];
+    if (search) params.push(`%${search}%`);
+    if (category_id) params.push(category_id);
+    if (branch_id) params.push(branch_id);
+
+    const products = await query(sql, params);
+    return res.json({ success: true, data: products, meta: { page: parseInt(page), limit: parseInt(limit) } });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/swm/products/:id — Update product with price diff logging
+router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [old] = await query(`SELECT * FROM products WHERE id = $1`, [id]);
+    if (!old) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const { product_name, selling_price, cost_price, status, is_ecom_listed } = req.body;
+
+    await query(
+      `UPDATE products SET
+        product_name = COALESCE($1, product_name),
+        selling_price = COALESCE($2, selling_price),
+        cost_price = COALESCE($3, cost_price),
+        status = COALESCE($4, status),
+        is_ecom_listed = COALESCE($5, is_ecom_listed),
+        updated_at = NOW()
+       WHERE id = $6`,
+      [product_name, selling_price, cost_price, status, is_ecom_listed, id]
+    );
+
+    logActivity({
+      userId: req.user.id, branchId: req.user.branchId,
+      actionType: 'UPDATE_PRODUCT',
+      entityType: 'products', entityId: id,
+      oldValue: { price: old.selling_price, cost: old.cost_price, status: old.status },
+      newValue: { price: selling_price, cost: cost_price, status },
+      ipAddress: req.ip, userAgent: req.headers['user-agent'],
+      notes: `Price changed from ${old.selling_price} to ${selling_price}`
+    });
+
+    return res.json({ success: true, message: 'Product updated' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+module.exports = router;
+```
+
+---
+
+## Sub-Task MM-1.5: Master Data Admin UI (React + Vite)
+**Domain:** Frontend Web Development · **Time:** 7 Hours (Spread over Sep 25-26)
+
+### Step 1: Scaffold React + Vite
+
+```bash
+# From project root
+npm create vite@latest client-swm -- --template react
+cd client-swm
+npm install axios react-router-dom zustand antd @ant-design/icons recharts
+npm install -D tailwindcss
+```
+
+### Step 2: `client-swm/src/api.js` — Axios with JWT auto-refresh
+
+```javascript
+// client-swm/src/api.js
+import axios from 'axios';
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+const api = axios.create({ baseURL: BASE_URL });
+
+// Inject access token on every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// Auto-refresh on 401
+let isRefreshing = false;
+let queue = [];
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status !== 401) return Promise.reject(error);
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => queue.push({ resolve, reject }))
+        .then(token => { error.config.headers.Authorization = `Bearer ${token}`; return api(error.config); });
+    }
+    isRefreshing = true;
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      const { data } = await axios.post(`${BASE_URL}/api/auth/refresh`, { refreshToken });
+      localStorage.setItem('accessToken', data.data.accessToken);
+      localStorage.setItem('refreshToken', data.data.refreshToken);
+      queue.forEach(p => p.resolve(data.data.accessToken));
+      queue = [];
+      error.config.headers.Authorization = `Bearer ${data.data.accessToken}`;
+      return api(error.config);
+    } catch {
+      queue.forEach(p => p.reject());
+      queue = [];
+      localStorage.clear();
+      window.location.href = '/login';
+      return Promise.reject(error);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+);
+
+export default api;
+```
+
+### Step 3: Key Pages Structure
+
+The following pages must be built using **Ant Design** components:
+
+#### `client-swm/src/pages/Login.jsx`
+- Clean centered card with Yoka Store logo
+- Username + Password fields
+- Error state display
+- POST to `/api/auth/login` → stores tokens → redirects to `/dashboard`
+
+#### `client-swm/src/pages/Products.jsx`
+Key features:
+- **Product Table** (Ant Design `Table`): columns for Code, Name, Category, Price, Stock, Status
+- **Search bar** (debounced, queries `?search=`)
+- **Category filter** (dropdown)
+- **"New Product" Modal**:
+  - Form fields: Product Name, Code, Category, Cost Price, Selling Price
+  - **Variant Matrix Generator** (`VariantMatrix.jsx`):
+    - Select colors: `['Black', 'White', 'Navy', 'Red', 'Green']`
+    - Select sizes: `['XS', 'S', 'M', 'L', 'XL', 'XXL']`
+    - Auto-generates all combinations as SKUs
+    - Price modifier per variant
+  - Auto-generates barcode when Code entered
+- POST to `/api/swm/products`
+
+#### `client-swm/src/components/VariantMatrix.jsx`
+```jsx
+// client-swm/src/components/VariantMatrix.jsx
+import { useState } from 'react';
+import { Checkbox, InputNumber, Table, Tag } from 'antd';
+
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+const COLORS = ['Black', 'White', 'Navy', 'Red', 'Green', 'Beige'];
+
+export default function VariantMatrix({ onChange }) {
+  const [selectedSizes, setSelectedSizes] = useState(['M', 'L', 'XL']);
+  const [selectedColors, setSelectedColors] = useState(['Black', 'White']);
+
+  const variants = selectedColors.flatMap(color =>
+    selectedSizes.map(size => ({ color, size, price_modifier: 0 }))
+  );
+
+  // Call parent onChange with generated variants
+  const handleChange = (updated) => onChange(updated);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <strong>Sizes:</strong>
+        <Checkbox.Group options={SIZES} value={selectedSizes} onChange={setSelectedSizes} style={{ marginLeft: 8 }} />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <strong>Colors:</strong>
+        <Checkbox.Group options={COLORS} value={selectedColors} onChange={setSelectedColors} style={{ marginLeft: 8 }} />
+      </div>
+      <Table
+        size="small"
+        dataSource={variants.map((v, i) => ({ ...v, key: i }))}
+        columns={[
+          { title: 'Color', dataIndex: 'color', render: c => <Tag color="blue">{c}</Tag> },
+          { title: 'Size', dataIndex: 'size', render: s => <Tag color="green">{s}</Tag> },
+          { title: 'SKU', render: (_, r) => `SKU-${r.color.toUpperCase()}-${r.size}` },
+          { title: 'Price Modifier', dataIndex: 'price_modifier',
+            render: (v, r) => (
+              <InputNumber size="small" defaultValue={0} prefix="+" suffix="EGP"
+                onChange={val => { r.price_modifier = val; handleChange(variants); }} />
+            )
+          }
+        ]}
+        pagination={false}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## 📦 Package.json Setup (Root + SWM Server)
+
+```json
+// Root package.json
+{
+  "name": "yoka-store",
+  "version": "1.0.0",
+  "scripts": {
+    "migrate": "knex migrate:latest",
+    "rollback": "knex migrate:rollback",
+    "seed": "node seeders/seed.js",
+    "dev:swm": "nodemon server/swm/app.js",
+    "dev:client": "cd client-swm && npm run dev",
+    "install:all": "npm install && cd client-swm && npm install"
+  },
+  "dependencies": {
+    "knex": "^3.1.0",
+    "mysql2": "^3.9.7",
+    "pg": "^8.12.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "ioredis": "^5.3.2",
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
+```
+
+---
+
+## ✅ Hand-off Checklist to Yassen Ahmed
+
+At **2:00 PM, Sep 26, 2026**, the following must be verifiable:
+
+| # | Check | Verification Command / Test |
+|---|---|---|
+| 1 | PostgreSQL DB has 35+ tables | `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;` |
+| 2 | Foreign keys enforce integrity | Try INSERT with invalid FK → should fail |
+| 3 | Seeded admin user exists | `SELECT username, role FROM users;` |
+| 4 | `logActivity()` writes to `activity_logs` | Create a product, check `SELECT * FROM activity_logs LIMIT 5;` |
+| 5 | `POST /api/auth/login` returns tokens | Postman: `{"username":"admin","password":"Yoka@Admin2026!"}` |
+| 6 | `POST /api/swm/products` with variants creates records in single TX | Create product → check `products` + `product_variants` tables |
+| 7 | `PUT /api/swm/products/:id` logs old vs new price in `activity_logs` | Update price → check log diff |
+| 8 | React dashboard accessible at `http://localhost:5173` | Login works, products list shows |
+| 9 | Git repo with `main` branch pushed | `git log --oneline -5` |
+| 10 | `.env.example` committed with all required keys | `cat .env.example` |
+
+---
+
+## 🔄 Git Branch Strategy
+
+```bash
+# Initialize
+git init
+git checkout -b main
+
+# Development branch for Bulk 1
+git checkout -b feature/bulk-1-moustafa
+
+# After completing each sub-task, commit:
+git add -A && git commit -m "feat(MM-1.2): complete 35+ table schema migration"
+git add -A && git commit -m "feat(MM-1.3): implement shared db, redis, activityLogger"
+git add -A && git commit -m "feat(MM-1.4): add auth, branches, users, products APIs"
+git add -A && git commit -m "feat(MM-1.5): react admin dashboard with variant matrix"
+
+# Merge to main when done
+git checkout main && git merge feature/bulk-1-moustafa
+```
+
+---
+
+## ⏱️ Time Budget Summary
+
+| Sub-Task | Domain | Hours | Time Slot |
+|---|---|---|---|
+| MM-1.1 | VPS Setup (scripts only, deploy on Oct 01) | 1h prep | Sep 25, 08:00–09:00 AM |
+| MM-1.2 | DB Schema + Migrations + Seeder | 8h | Sep 25, 09:00 AM–05:00 PM |
+| MM-1.3 | Monorepo + Shared Connectors + ActivityLogger | 5h | Sep 25, 06:00 PM–11:00 PM |
+| MM-1.4 | Backend APIs (Auth + Branches + Users + Products) | 6h | Sep 26, 08:00 AM–02:00 PM |
+| MM-1.5 | React Admin UI (Login + Products + Variant Matrix) | 7h | Sep 25–26, parallel |
+| **Buffer** | Testing, debugging, hand-off meeting | 3h | Spread |
+| **Total** | | **30h** | |
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Q1 — Redis for Testing:** The Monster free server does not provide Redis. For Bulk 1 testing, do you want to:
+> - (A) Run Redis locally on your dev machine (localhost:6379) — **Recommended**, simplest option
+> - (B) Use Redis Cloud free tier (30MB) — requires account signup
+> - (C) Use in-memory mock for token storage during testing only
+>
+> **Q2 — Deploy to Monster Server:** The Monster server uses MSDeploy (IIS/ASP.NET). Node.js on IIS requires `iisnode`. Do you want to:
+> - (A) Run everything locally (localhost:3001 + 5173) during Bulk 1 & 2 — **Recommended** for speed
+> - (B) Deploy the Node.js server to Monster via iisnode configuration
+>
+> **Q3 — bcrypt Password for Seeded Admin:** What should the initial seeded admin password be? Default in plan: `Yoka@Admin2026!`

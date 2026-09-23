@@ -1,0 +1,78 @@
+name: Yoka Platform CI/CD & Automated Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # ==========================================================
+  # 1. Continuous Integration & Quality Gates
+  # ==========================================================
+  build_and_test:
+    name: Build & Verify Architecture
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: |
+          npm install
+          npm --prefix client-swm install
+
+      - name: Verify Code Quality & Automated Test Suite
+        env:
+          NODE_ENV: development
+          DB_CLIENT: pg
+          DB_HOST: db69837.public.databaseasp.net
+          DB_PORT: 5432
+          DB_NAME: db69837
+          DB_USER: db69837
+          DB_PASS: "5Tq#_o3L9Zx!"
+          DB_SSL: "true"
+          PORT_SWM: 3009
+          JWT_SECRET: yoka_jwt_secret_dev_key_2026_moustafa_maher
+        run: |
+          node scripts/test_bulk1.js
+
+      - name: Package Full-Stack Deployment (Frontend + Bundled Node.js + web.config)
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/package_monster.ps1
+
+      - name: Upload Full-Stack Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullstack-deploy
+          path: dist-deploy/
+
+  # ==========================================================
+  # 2. Automated Full-Stack MSDeploy to Live Monster Server
+  # ==========================================================
+  deploy_testing_server:
+    name: Deploy to Monster Test Server (http://yokastore.runasp.net)
+    needs: build_and_test
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download Full-Stack Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fullstack-deploy
+          path: dist-deploy
+
+      - name: Deploy Full-Stack to IIS via Web Deploy (MSDeploy)
+        shell: cmd
+        run: |
+          "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" -verb:sync -source:contentPath="%GITHUB_WORKSPACE%\dist-deploy" -dest:contentPath="site93498",computerName="https://site93498.siteasp.net:8172/msdeploy.axd?site=site93498",userName="site93498",password="2Wp@-q8SeE=7",authType="Basic" -enableRule:AppOffline -skip:objectName=filePath,absolutePath=".*\\logs\\.*" -skip:objectName=dirPath,absolutePath=".*\\logs.*" -allowUntrusted
+

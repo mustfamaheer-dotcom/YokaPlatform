@@ -1,0 +1,15 @@
+node_modules/
+.env
+uploads/
+dist/
+build/
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+client-swm/node_modules/
+client-swm/dist/
+dist-deploy/
+dist-server/

@@ -1,0 +1,5 @@
+git@github.com:mustfamaheer-dotcom/YokaPlatform.git
+
+git remote add origin git@github.com:mustfamaheer-dotcom/YokaPlatform.git
+git branch -M main
+git push -u origin main
