@@ -132,11 +132,13 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
+const { validate, createProductSchema } = require('../../shared/validators');
+
 /**
  * POST /api/swm/products
  * Create product + all variants in a SINGLE atomic database transaction
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), validate(createProductSchema), async (req, res) => {
   try {
     const {
       product_code,
@@ -157,17 +159,18 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
       variants = []
     } = req.body;
 
-    if (!product_code || !product_name || !category_id || cost_price === undefined || selling_price === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product code, name, category, cost price, and selling price are required'
-      });
-    }
+    // Auto-generate code & barcode if not explicitly supplied
+    const cleanCode = product_code
+      ? String(product_code).trim().toUpperCase()
+      : `PRD-${Date.now().toString().slice(-6)}`;
 
-    const cleanCode = String(product_code).trim().toUpperCase();
+    const cleanBarcode = barcode
+      ? String(barcode).trim()
+      : `622${Date.now().toString().slice(-10)}`;
+
     const existing = await query(`SELECT id FROM products WHERE product_code = $1`, [cleanCode]);
     if (existing.length) {
-      return res.status(409).json({ success: false, message: 'Product code already in use' });
+      return res.status(409).json({ success: false, message: 'كود المنتج مسجل مسبقاً' });
     }
 
     const slug = (product_name || cleanCode)

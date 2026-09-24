@@ -14,14 +14,17 @@ import {
   Card,
   Row,
   Col,
-  Switch
+  Switch,
+  Alert,
+  Tooltip
 } from 'antd';
 import {
   PlusOutlined,
   SearchOutlined,
   ReloadOutlined,
-  ShoppingOutlined,
-  CheckCircleOutlined
+  BarcodeOutlined,
+  CheckCircleOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import VariantMatrix from '../components/VariantMatrix';
@@ -39,9 +42,22 @@ export default function Products() {
   const [submitting, setSubmitting] = useState(false);
   const [generatedVariants, setGeneratedVariants] = useState([]);
 
+  // Auto-generated codes and dynamic constructed name state
+  const [autoCode, setAutoCode] = useState('');
+  const [autoBarcode, setAutoBarcode] = useState('');
+  const [constructedName, setConstructedName] = useState('');
+
   const [form] = Form.useForm();
-  const currentCode = Form.useWatch('product_code', form);
+  const currentCode = Form.useWatch('product_code', form) || autoCode;
   const currentPrice = Form.useWatch('selling_price', form);
+
+  // Generate unique product code and 13-digit EAN barcode
+  const generateCodes = () => {
+    const randNum = Math.floor(100000 + Math.random() * 900000);
+    const code = `PRD-${randNum}`;
+    const barcode = `622${Date.now().toString().slice(-9)}${Math.floor(Math.random() * 10)}`;
+    return { code, barcode };
+  };
 
   // Fetch products
   const fetchProducts = async () => {
@@ -79,15 +95,74 @@ export default function Products() {
     fetchCategories();
   }, [selectedCategory]);
 
+  const handleOpenCreate = () => {
+    form.resetFields();
+    const { code, barcode } = generateCodes();
+    setAutoCode(code);
+    setAutoBarcode(barcode);
+    setConstructedName('');
+    setGeneratedVariants([]);
+
+    form.setFieldsValue({
+      product_code: code,
+      barcode: barcode,
+      brand: 'Yoka Store',
+      cost_price: 150,
+      selling_price: 250,
+      is_ecom_listed: true,
+      base_name: '',
+      color: '',
+      size: '',
+      product_name: ''
+    });
+
+    setIsModalOpen(true);
+  };
+
+  const handleRegenerateCodes = () => {
+    const { code, barcode } = generateCodes();
+    setAutoCode(code);
+    setAutoBarcode(barcode);
+    form.setFieldsValue({
+      product_code: code,
+      barcode: barcode
+    });
+    message.info('تم توليد كود وباركود جديدين تلقائياً');
+  };
+
+  // Automatically construct descriptive product name: Base Name + Color + Size
+  const handleValuesChange = (changedValues, allValues) => {
+    if ('base_name' in changedValues || 'color' in changedValues || 'size' in changedValues) {
+      const base = allValues.base_name ? allValues.base_name.trim() : '';
+      const color = allValues.color ? allValues.color.trim() : '';
+      const size = allValues.size ? allValues.size.trim() : '';
+
+      const parts = [base];
+      if (color) parts.push(color);
+      if (size) parts.push(size);
+      const finalName = parts.filter(Boolean).join(' - ');
+
+      setConstructedName(finalName);
+      form.setFieldsValue({ product_name: finalName });
+    }
+  };
+
   const handleCreateProduct = async (values) => {
+    const finalProductName = constructedName.trim() || values.product_name?.trim() || values.base_name?.trim();
+    if (!finalProductName) {
+      return message.error('يرجى إدخال اسم الصنف الأساسي لتوليد اسم المنتج');
+    }
+
     setSubmitting(true);
     try {
       const payload = {
-        product_code: values.product_code,
-        product_name: values.product_name,
-        barcode: values.barcode || values.product_code,
+        product_code: autoCode || values.product_code,
+        barcode: autoBarcode || values.barcode,
+        product_name: finalProductName,
         category_id: values.category_id,
         brand: values.brand || 'Yoka Store',
+        color: values.color || null,
+        size: values.size || null,
         cost_price: values.cost_price,
         selling_price: values.selling_price,
         is_ecom_listed: Boolean(values.is_ecom_listed),
@@ -100,7 +175,7 @@ export default function Products() {
 
       const res = await api.post('/api/swm/products', payload);
       if (res.data.success) {
-        message.success('تم إضافة المنتج والمتغيرات بنجاح في معاملة واحدة!');
+        message.success('تم حفظ المنتج وتوليد الكود والمتغيرات بنجاح!');
         setIsModalOpen(false);
         form.resetFields();
         setGeneratedVariants([]);
@@ -115,13 +190,20 @@ export default function Products() {
 
   const columns = [
     {
-      title: 'كود المنتج',
-      dataIndex: 'product_code',
-      key: 'product_code',
-      render: (code) => <Text strong code>{code}</Text>
+      title: 'كود المنتج / الباركود',
+      key: 'codes',
+      render: (_, record) => (
+        <div>
+          <div><Text strong code>{record.product_code}</Text></div>
+          <div style={{ fontSize: 11, color: '#64748b' }}>
+            <BarcodeOutlined style={{ marginLeft: 4 }} />
+            {record.barcode || record.product_code}
+          </div>
+        </div>
+      )
     },
     {
-      title: 'اسم المنتج',
+      title: 'اسم المنتج الوصفي (الاسم + المقاس + اللون)',
       dataIndex: 'product_name',
       key: 'product_name',
       render: (name, record) => (
@@ -192,14 +274,14 @@ export default function Products() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <Title level={4} style={{ margin: 0 }}>كتالوج المنتجات والمخزون (Products Master)</Title>
-          <Text type="secondary">إدارة الأصناف، الأسعار، ومصفوفات المقاسات والألوان</Text>
+          <Title level={4} style={{ margin: 0 }}>كتالوج المنتجات والمخزون (Product Catalog & Inventory)</Title>
+          <Text type="secondary">توليد الأكواد آلياً، بناء الأسماء الوصفية الشاملة، وإدارة مصفوفات الأصناف</Text>
         </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => setIsModalOpen(true)}
-          style={{ backgroundColor: '#4f46e5', height: 40 }}
+          onClick={handleOpenCreate}
+          style={{ backgroundColor: '#2563eb', height: 40 }}
         >
           إضافة منتج جديد
         </Button>
@@ -249,51 +331,116 @@ export default function Products() {
         bordered
       />
 
-      {/* Modal: New Product with Variant Matrix */}
+      {/* Modal: New Product with Auto-Generated Codes & Auto-Constructed Descriptive Name */}
       <Modal
-        title="إضافة منتج جديد مع مصفوفة المتغيرات"
+        title={
+          <Space>
+            <ThunderboltOutlined style={{ color: '#2563eb' }} />
+            <span>إضافة منتج جديد (توليد آلي للأكواد وبناء الاسم الوصفي)</span>
+          </Space>
+        }
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
-        width={780}
+        width={800}
         destroyOnClose
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleCreateProduct}
-          initialValues={{
-            brand: 'Yoka Store',
-            cost_price: 150,
-            selling_price: 250,
-            is_ecom_listed: true
-          }}
+          onValuesChange={handleValuesChange}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="كود المنتج (Product Code)"
-                name="product_code"
-                rules={[{ required: true, message: 'يرجى إدخال كود المنتج' }]}
-              >
-                <Input placeholder="مثال: TSH-001" style={{ textTransform: 'uppercase' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="اسم المنتج"
-                name="product_name"
-                rules={[{ required: true, message: 'يرجى إدخال اسم المنتج' }]}
-              >
-                <Input placeholder="مثال: تيشيرت قطن أوفر سايز" />
-              </Form.Item>
-            </Col>
-          </Row>
+          {/* Requirement 3.1: Auto-generated Product Code & Barcode (No typing required) */}
+          <Alert
+            type="info"
+            showIcon
+            icon={<BarcodeOutlined />}
+            style={{ marginBottom: 16, backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}
+            message={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Text strong style={{ color: '#1e40af' }}>تم توليد الأكواد تلقائياً للنظام:</Text>
+                  <div style={{ marginTop: 4 }}>
+                    <Tag color="blue" style={{ fontSize: 13, padding: '3px 8px' }}>
+                      كود الصنف: <strong>{autoCode}</strong>
+                    </Tag>
+                    <Tag color="cyan" style={{ fontSize: 13, padding: '3px 8px' }}>
+                      الباركود الدولي: <strong>{autoBarcode}</strong>
+                    </Tag>
+                  </div>
+                </div>
+                <Tooltip title="توليد كود وباركود جديدين">
+                  <Button size="small" icon={<ReloadOutlined />} onClick={handleRegenerateCodes}>
+                    توليد جديد
+                  </Button>
+                </Tooltip>
+              </div>
+            }
+          />
+
+          {/* Hidden fields storing the auto-generated code and barcode */}
+          <Form.Item name="product_code" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="barcode" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="product_name" hidden>
+            <Input />
+          </Form.Item>
+
+          {/* Requirement 3.2: Automatically construct Product Name by concatenating Base Name + Size + Color */}
+          <Card size="small" style={{ marginBottom: 16, background: '#f8fafc', borderColor: '#e2e8f0' }}>
+            <Text strong style={{ display: 'block', marginBottom: 10, color: '#1e293b' }}>
+              تفاصيل الصنف الأساسية (تُدمج تلقائياً لتوليد الاسم الكامل في الفواتير):
+            </Text>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="اسم الصنف الأساسي (Base Name) *"
+                  name="base_name"
+                  rules={[{ required: true, message: 'يرجى إدخال اسم الصنف الأساسي' }]}
+                >
+                  <Input placeholder="مثال: تيشيرت أوفر سايز / قميص كتان" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="اللون الأساسي (Color)" name="color">
+                  <Input placeholder="مثال: أسود / White" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item label="المقاس (Size)" name="size">
+                  <Input placeholder="مثال: L / XL / 42" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* Live Preview of the Auto-Constructed Product Name */}
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px dashed #cbd5e1',
+                padding: '10px 14px',
+                borderRadius: 6,
+                marginTop: 2
+              }}
+            >
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 2 }}>
+                معاينة الاسم الوصفي المعتمد في الفواتير وكشوف الحساب (Product Full Name):
+              </Text>
+              <Text strong style={{ fontSize: 16, color: constructedName ? '#1e40af' : '#94a3b8' }}>
+                {constructedName || 'سيظهر الاسم الكامل هنا بمجرد كتابة التفاصيل...'}
+              </Text>
+            </div>
+          </Card>
 
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
-                label="القسم (Category)"
+                label="القسم (Category) *"
                 name="category_id"
                 rules={[{ required: true, message: 'يرجى اختيار القسم' }]}
               >
@@ -316,20 +463,20 @@ export default function Products() {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
-                label="سعر التكلفة (ج.م)"
+                label="سعر التكلفة (ج.م) *"
                 name="cost_price"
                 rules={[{ required: true, message: 'يرجى تحديد سعر التكلفة' }]}
               >
-                <InputNumber style={{ width: '100%' }} min={0} step={1} />
+                <InputNumber style={{ width: '100%' }} min={0} step={1} addonAfter="ج.م" />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item
-                label="سعر البيع الأساسي (ج.م)"
+                label="سعر البيع الأساسي (ج.م) *"
                 name="selling_price"
                 rules={[{ required: true, message: 'يرجى تحديد سعر البيع' }]}
               >
-                <InputNumber style={{ width: '100%' }} min={0} step={1} />
+                <InputNumber style={{ width: '100%' }} min={0} step={1} addonAfter="ج.م" />
               </Form.Item>
             </Col>
           </Row>
@@ -352,7 +499,7 @@ export default function Products() {
                 type="primary"
                 htmlType="submit"
                 loading={submitting}
-                style={{ backgroundColor: '#4f46e5' }}
+                style={{ backgroundColor: '#2563eb' }}
               >
                 حفظ المنتج والمتغيرات (Single Transaction)
               </Button>

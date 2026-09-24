@@ -6,13 +6,19 @@ import {
   ShopOutlined,
   TeamOutlined,
   LogoutOutlined,
-  UserOutlined
+  UserOutlined,
+  ContactsOutlined,
+  FileTextOutlined,
+  ScanOutlined
 } from '@ant-design/icons';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Branches from './pages/Branches';
 import Users from './pages/Users';
+import Suppliers from './pages/Suppliers';
+import Purchases from './pages/Purchases';
+import POS from './pages/POS';
 import api from './api';
 
 const { Header, Content, Sider } = Layout;
@@ -53,6 +59,9 @@ export default function App() {
 
   const menuItems = [
     { key: 'dashboard', icon: <DashboardOutlined />, label: 'لوحة التحكم' },
+    { key: 'pos', icon: <ScanOutlined />, label: 'نقطة البيع الكاشير (POS)' },
+    { key: 'purchases', icon: <FileTextOutlined />, label: 'فواتير المشتريات والتوريد' },
+    { key: 'suppliers', icon: <ContactsOutlined />, label: 'الموردين والحسابات' },
     { key: 'products', icon: <ShoppingOutlined />, label: 'كتالوج المنتجات والمخزون' },
     { key: 'branches', icon: <ShopOutlined />, label: 'الفروع والمستودعات' },
     { key: 'users', icon: <TeamOutlined />, label: 'إدارة المستخدمين والموظفين' }
@@ -139,6 +148,9 @@ export default function App() {
 
         <Content style={{ margin: '24px', minHeight: 280 }}>
           {activeTab === 'dashboard' && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'pos' && <POS />}
+          {activeTab === 'purchases' && <Purchases />}
+          {activeTab === 'suppliers' && <Suppliers />}
           {activeTab === 'products' && <Products />}
           {activeTab === 'branches' && <Branches />}
           {activeTab === 'users' && <Users />}

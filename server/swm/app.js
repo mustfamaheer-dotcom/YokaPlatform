@@ -10,6 +10,9 @@ const branchRoutes = require('./routes/branches');
 const userRoutes = require('./routes/users');
 const categoryRoutes = require('./routes/categories');
 const productRoutes = require('./routes/products');
+const supplierRoutes = require('./routes/suppliers');
+const purchaseRoutes = require('./routes/purchases');
+const posRoutes = require('./routes/pos');
 
 const app = express();
 
@@ -56,6 +59,9 @@ app.use('/api/swm/branches', branchRoutes);
 app.use('/api/swm/users', userRoutes);
 app.use('/api/swm/categories', categoryRoutes);
 app.use('/api/swm/products', productRoutes);
+app.use('/api/swm/suppliers', supplierRoutes);
+app.use('/api/swm/purchases', purchaseRoutes);
+app.use('/api/swm/pos', posRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
