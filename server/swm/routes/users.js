@@ -6,17 +6,26 @@ const { logActivity } = require('../../shared/activityLogger');
 
 /**
  * GET /api/swm/users
- * Paginated user list with branch name joins
+ * Paginated staff list with branch name joins
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'branch_account']), async (req, res) => {
   try {
-    const { role, branch_id, status, search, page = 1, limit = 50 } = req.query;
+    const { role, branch_id, status, search, page = 1, limit = 100 } = req.query;
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
+    // If requester is a supervisor or retail branch account, restrict strictly to their own branch
+    const isAdmin = ['super_admin', 'admin'].includes(req.user.role) || req.user.isMainWarehouse;
+    const isSupervisor = req.user.role === 'supervisor';
+    const isRetailBranch = req.user.isBranchAccount && !isAdmin;
+
+    const effectiveBranchId = (!isAdmin && (isSupervisor || isRetailBranch))
+      ? req.user.branchId
+      : (branch_id && branch_id !== 'all' && branch_id !== 'unassigned' ? parseInt(branch_id, 10) : null);
+
     let sql = `
-      SELECT u.id, u.username, u.email, u.full_name, u.phone, u.role, u.branch_id,
-             u.salary, u.hire_date, u.last_login, u.status, u.created_at,
-             b.branch_name, b.branch_code
+      SELECT u.id, u.username, u.email, u.full_name, u.phone, u.national_id, u.role, u.branch_id,
+             u.salary, u.hire_date, u.last_login, u.status, u.created_at, u.password_plain,
+             b.branch_name, b.branch_code, b.branch_type
       FROM users u
       LEFT JOIN branches b ON b.id = u.branch_id
       WHERE 1=1
@@ -24,15 +33,17 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor'])
     const params = [];
     let pIdx = 1;
 
-    if (role) {
+    if (role && role !== 'all') {
       sql += ` AND u.role = $${pIdx++}`;
       params.push(role);
     }
-    if (branch_id) {
+    if (isAdmin && branch_id === 'unassigned') {
+      sql += ` AND u.branch_id IS NULL`;
+    } else if (effectiveBranchId) {
       sql += ` AND u.branch_id = $${pIdx++}`;
-      params.push(branch_id);
+      params.push(effectiveBranchId);
     }
-    if (status) {
+    if (status && status !== 'all') {
       sql += ` AND u.status = $${pIdx++}`;
       params.push(status);
     }
@@ -59,7 +70,7 @@ router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'supervisor
     const { id } = req.params;
     const rows = await query(
       `SELECT u.id, u.username, u.email, u.full_name, u.phone, u.national_id, u.role,
-              u.branch_id, u.salary, u.hire_date, u.last_login, u.status, u.created_at,
+              u.branch_id, u.salary, u.hire_date, u.last_login, u.status, u.created_at, u.password_plain,
               b.branch_name
        FROM users u
        LEFT JOIN branches b ON b.id = u.branch_id
@@ -99,7 +110,16 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
     if (!username || !password || !full_name || !role) {
       return res.status(400).json({
         success: false,
-        message: 'Username, password, full_name, and role are required'
+        message: 'اسم المستخدم، كلمة المرور، الاسم الكامل، والدور الوظيفي حقول مطلوبة'
+      });
+    }
+
+    // Role elevation guard: only super_admin can create super_admin or admin accounts
+    const ELEVATED_ROLES = ['super_admin', 'admin'];
+    if (ELEVATED_ROLES.includes(role) && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'فقط المدير العام (Super Admin) يملك صلاحية إنشاء حسابات إدارية جديدة.'
       });
     }
 
@@ -108,21 +128,22 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
       [username.trim(), email ? email.trim() : null]
     );
     if (existing.length) {
-      return res.status(409).json({ success: false, message: 'Username or email already in use' });
+      return res.status(409).json({ success: false, message: 'اسم المستخدم أو البريد الإلكتروني مستخدم بالفعل' });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
 
     const rows = await query(
       `INSERT INTO users (
-        username, email, password_hash, full_name, phone, national_id,
+        username, email, password_hash, password_plain, full_name, phone, national_id,
         role, branch_id, salary, hire_date, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', NOW(), NOW())
-      RETURNING id, username, full_name, role`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', NOW(), NOW())
+      RETURNING id, username, full_name, role, branch_id, password_plain`,
       [
         username.trim(),
         email ? email.trim() : null,
         passwordHash,
+        password.trim(),
         full_name.trim(),
         phone || null,
         national_id || null,
@@ -147,7 +168,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
       notes: `Staff user ${username} created with role ${role}`
     });
 
-    return res.status(201).json({ success: true, data: newUser });
+    return res.status(201).json({ success: true, data: newUser, message: 'تم إنشاء حساب الموظف بنجاح' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -155,59 +176,81 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
 
 /**
  * PUT /api/swm/users/:id
- * Update user profile or status
+ * Update staff profile, branch, role, or active status
  */
 router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const [old] = await query(`SELECT * FROM users WHERE id = $1`, [id]);
     if (!old) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(404).json({ success: false, message: 'حساب المستخدم غير موجود' });
     }
 
-    const { full_name, phone, role, branch_id, salary, status, password } = req.body;
+    // Protection: only super_admin can modify another admin or super_admin
+    if (['super_admin', 'admin'].includes(old.role) && req.user.role !== 'super_admin' && req.user.id !== old.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'لا تملك صلاحية تعديل بيانات حساب إداري.'
+      });
+    }
+
+    const { full_name, phone, national_id, role, branch_id, salary, status, password } = req.body;
 
     let newHash = old.password_hash;
+    let newPlain = old.password_plain;
     if (password && password.trim()) {
       newHash = await bcrypt.hash(password.trim(), 12);
+      newPlain = password.trim();
     }
+
+    const updatedRole = role !== undefined ? role : old.role;
+    const updatedBranchId = branch_id !== undefined ? (branch_id ? parseInt(branch_id, 10) : null) : old.branch_id;
+    const updatedFullName = full_name !== undefined ? full_name : old.full_name;
+    const updatedPhone = phone !== undefined ? phone : old.phone;
+    const updatedNationalId = national_id !== undefined ? national_id : old.national_id;
+    const updatedSalary = salary !== undefined ? (salary ? parseFloat(salary) : null) : old.salary;
+    const updatedStatus = status !== undefined ? status : old.status;
 
     await query(
       `UPDATE users
-       SET full_name = COALESCE($1, full_name),
-           phone = COALESCE($2, phone),
-           role = COALESCE($3, role),
-           branch_id = COALESCE($4, branch_id),
-           salary = COALESCE($5, salary),
-           status = COALESCE($6, status),
-           password_hash = $7,
+       SET full_name = $1,
+           phone = $2,
+           national_id = $3,
+           role = $4,
+           branch_id = $5,
+           salary = $6,
+           status = $7,
+           password_hash = $8,
+           password_plain = $9,
            updated_at = NOW()
-       WHERE id = $8`,
+       WHERE id = $10`,
       [
-        full_name || null,
-        phone || null,
-        role || null,
-        branch_id !== undefined ? branch_id : null,
-        salary !== undefined ? salary : null,
-        status || null,
+        updatedFullName,
+        updatedPhone,
+        updatedNationalId,
+        updatedRole,
+        updatedBranchId,
+        updatedSalary,
+        updatedStatus,
         newHash,
+        newPlain,
         id
       ]
     );
 
     logActivity({
       userId: req.user.id,
-      branchId: branch_id ? parseInt(branch_id, 10) : old.branch_id,
+      branchId: updatedBranchId,
       actionType: 'UPDATE_USER',
       entityType: 'users',
       entityId: id,
       oldValue: { role: old.role, branch_id: old.branch_id, status: old.status },
-      newValue: { role, branch_id, status },
+      newValue: { role: updatedRole, branch_id: updatedBranchId, status: updatedStatus },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
 
-    return res.json({ success: true, message: 'User updated successfully' });
+    return res.json({ success: true, message: 'تم تحديث بيانات المستخدم بنجاح' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

@@ -17,6 +17,9 @@ function requireAuth(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    // Normalize branch id property across camelCase and snake_case
+    decoded.branch_id = decoded.branch_id || decoded.branchId || null;
+    decoded.branchId = decoded.branchId || decoded.branch_id || null;
     req.user = decoded;
     next();
   } catch (err) {
@@ -56,4 +59,43 @@ function requireRole(allowedRoles = []) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+/**
+ * Branch Scoping Guard:
+ * Ensures branch users can only query/mutate their own branch data.
+ * Admins have cross-branch visibility.
+ */
+function requireBranchScope(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Unauthenticated.' });
+  }
+
+  const ADMIN_ROLES = ['super_admin', 'admin'];
+  if (ADMIN_ROLES.includes(req.user.role)) {
+    // Admin has global access; can optionally filter by query/body branch_id
+    const rawBranch = req.query.branch_id || req.body.branch_id;
+    if (rawBranch === 'all' || rawBranch === 'retail') {
+      req.scopedBranchId = rawBranch;
+    } else if (rawBranch) {
+      req.scopedBranchId = parseInt(rawBranch, 10);
+    } else {
+      req.scopedBranchId = req.user.branchId || 'all';
+    }
+    req.isCrossBranchAdmin = true;
+    return next();
+  }
+
+  // Branch staff must have a valid branch assigned
+  if (!req.user.branchId) {
+    return res.status(403).json({
+      success: false,
+      message: 'هذا الحساب غير مرتبط بأي فرع مصرح به.'
+    });
+  }
+
+  req.scopedBranchId = req.user.branchId;
+  req.isCrossBranchAdmin = false;
+  next();
+}
+
+module.exports = { requireAuth, requireRole, requireBranchScope };
+

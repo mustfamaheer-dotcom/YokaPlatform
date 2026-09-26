@@ -5,7 +5,6 @@ import {
   Card,
   Input,
   Button,
-  Table,
   Tag,
   Typography,
   Space,
@@ -32,6 +31,10 @@ import {
   UnlockOutlined,
   SwapOutlined,
   UserOutlined,
+  PhoneOutlined,
+  HomeOutlined,
+  CreditCardOutlined,
+  QrcodeOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
 import api from '../api';
@@ -45,17 +48,26 @@ export default function POS() {
   const [sessionData, setSessionData] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
+  // Staff / Salesperson State
+  const [staff, setStaff] = useState([]);
+  const [selectedSalesperson, setSelectedSalesperson] = useState(null);
+
   // Cart State
   const [cart, setCart] = useState([]);
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const [invoiceDiscount, setInvoiceDiscount] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash', 'card', 'split'
-  const [cashTendered, setCashTendered] = useState(0);
-  const [cardTendered, setCardTendered] = useState(0);
+
+  // Customer Information
   const [customerName, setCustomerName] = useState('عميل نقدي');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [saleNotes, setSaleNotes] = useState('');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
+
+  // Multi-Payment State (Cash, Card, Transfer)
+  const [cashTendered, setCashTendered] = useState(0);
+  const [cardTendered, setCardTendered] = useState(0);
+  const [transferTendered, setTransferTendered] = useState(0);
 
   // Product Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,13 +102,51 @@ export default function POS() {
     }
   };
 
+  // Fetch Staff for Salesperson selector
+  const fetchStaff = async () => {
+    try {
+      const res = await api.get('/api/swm/users');
+      if (res.data.success) {
+        const staffList = res.data.data || [];
+        setStaff(staffList);
+        if (staffList.length > 0 && !selectedSalesperson) {
+          // Default to first salesperson or user
+          setSelectedSalesperson(staffList[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Fetch staff error:', err);
+    }
+  };
+
   useEffect(() => {
     fetchSession();
-    // Auto-focus search input
+    fetchStaff();
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
   }, []);
+
+  // Keyboard Shortcuts: F1 (Search), F11 (Add Line / Search Focus), F4 (Submit)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        message.info('F1: تم التركيز على حقل البحث عن صنف');
+      } else if (e.key === 'F11') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select?.();
+        message.info('F11: إضافة سطر جديد / مسح الباركود');
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        handleCompleteSale();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   // Live Barcode / Catalog Search
   const handleSearch = async (val) => {
@@ -113,7 +163,10 @@ export default function POS() {
         setSearchResults(res.data.data);
 
         // If exact barcode match with 1 item, auto add to cart!
-        if (res.data.data.length === 1 && (res.data.data[0].barcode === val.trim() || res.data.data[0].product_code === val.trim())) {
+        if (
+          res.data.data.length === 1 &&
+          (res.data.data[0].barcode === val.trim() || res.data.data[0].product_code === val.trim())
+        ) {
           addToCart(res.data.data[0]);
           setSearchQuery('');
           setSearchResults([]);
@@ -132,22 +185,26 @@ export default function POS() {
       return message.warning(`عذراً، الصنف "${product.display_name}" غير متوفر في مخزون الفرع حالياً!`);
     }
 
-    setCart(prev => {
+    setCart((prev) => {
       const itemKey = `${product.product_id}-${product.variant_id || 'base'}`;
-      const existing = prev.find(item => item.key === itemKey);
+      const existing = prev.find((item) => item.key === itemKey);
 
       if (existing) {
         if (existing.quantity >= product.available_qty) {
           message.warning(`الكمية المتاحة في المخزون (${product.available_qty}) فقط!`);
           return prev;
         }
-        return prev.map(item =>
-          item.key === itemKey
-            ? { ...item, quantity: item.quantity + 1, line_total: (item.quantity + 1) * item.unit_price }
-            : item
-        );
+        return prev.map((item) => {
+          if (item.key === itemKey) {
+            const newQty = item.quantity + 1;
+            const lineTotal = Math.max(0, newQty * item.unit_price - (item.discount_amount || 0));
+            return { ...item, quantity: newQty, line_total: lineTotal };
+          }
+          return item;
+        });
       }
 
+      const unitPrice = parseFloat(product.unit_price);
       return [
         ...prev,
         {
@@ -157,10 +214,11 @@ export default function POS() {
           product_name: product.display_name,
           product_code: product.product_code,
           barcode: product.barcode,
-          unit_price: parseFloat(product.unit_price),
+          unit_price: unitPrice,
           available_qty: product.available_qty,
           quantity: 1,
-          line_total: parseFloat(product.unit_price)
+          discount_amount: 0,
+          line_total: unitPrice
         }
       ];
     });
@@ -170,47 +228,99 @@ export default function POS() {
     }
   };
 
+  // Update item quantity
   const updateCartQty = (key, delta) => {
-    setCart(prev => prev.map(item => {
-      if (item.key !== key) return item;
-      const newQty = item.quantity + delta;
-      if (newQty <= 0) return null;
-      if (newQty > item.available_qty) {
-        message.warning(`الكمية المتاحة في المخزون (${item.available_qty}) فقط!`);
-        return item;
-      }
-      return { ...item, quantity: newQty, line_total: newQty * item.unit_price };
-    }).filter(Boolean));
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.key !== key) return item;
+          const newQty = item.quantity + delta;
+          if (newQty <= 0) return null;
+          if (newQty > item.available_qty) {
+            message.warning(`الكمية المتاحة في المخزون (${item.available_qty}) فقط!`);
+            return item;
+          }
+          const lineTotal = Math.max(0, newQty * item.unit_price - (item.discount_amount || 0));
+          return { ...item, quantity: newQty, line_total: lineTotal };
+        })
+        .filter(Boolean)
+    );
+  };
+
+  // Update item line discount
+  const updateLineDiscount = (key, discountVal) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.key !== key) return item;
+        const discount = Math.max(0, parseFloat(discountVal || 0));
+        const lineTotal = Math.max(0, item.quantity * item.unit_price - discount);
+        return { ...item, discount_amount: discount, line_total: lineTotal };
+      })
+    );
   };
 
   const removeFromCart = (key) => {
-    setCart(prev => prev.filter(item => item.key !== key));
+    setCart((prev) => prev.filter((item) => item.key !== key));
   };
 
   const clearCart = () => {
     setCart([]);
-    setDiscountAmount(0);
+    setInvoiceDiscount(0);
     setTaxAmount(0);
     setCashTendered(0);
     setCardTendered(0);
+    setTransferTendered(0);
     setCustomerName('عميل نقدي');
     setCustomerPhone('');
+    setCustomerAddress('');
+    setSaleNotes('');
   };
 
   // Cart calculations
   const subtotal = cart.reduce((sum, item) => sum + item.line_total, 0);
-  const netTotal = Math.max(0, subtotal - parseFloat(discountAmount || 0) + parseFloat(taxAmount || 0));
+  const netTotal = Math.max(
+    0,
+    subtotal - parseFloat(invoiceDiscount || 0) + parseFloat(taxAmount || 0)
+  );
 
-  // Auto-set tender amounts when total changes
+  // Multi-Payment calculations
+  const totalTendered =
+    parseFloat(cashTendered || 0) +
+    parseFloat(cardTendered || 0) +
+    parseFloat(transferTendered || 0);
+
+  const remainingDue = Math.max(0, netTotal - totalTendered);
+  const changeDue = Math.max(0, totalTendered - netTotal);
+
+  // Quick payment presets
+  const handleQuickPayCash = () => {
+    setCashTendered(netTotal);
+    setCardTendered(0);
+    setTransferTendered(0);
+  };
+
+  const handleQuickPayCard = () => {
+    setCardTendered(netTotal);
+    setCashTendered(0);
+    setTransferTendered(0);
+  };
+
+  const handleQuickPayTransfer = () => {
+    setTransferTendered(netTotal);
+    setCashTendered(0);
+    setCardTendered(0);
+  };
+
+  // Auto-fill cash when cart updates if no payment has been typed yet
   useEffect(() => {
-    if (paymentMethod === 'cash') {
+    if (netTotal > 0 && totalTendered === 0) {
       setCashTendered(netTotal);
-    } else {
+    } else if (netTotal === 0) {
       setCashTendered(0);
+      setCardTendered(0);
+      setTransferTendered(0);
     }
-  }, [netTotal, paymentMethod]);
-
-  const changeDue = paymentMethod === 'cash' ? Math.max(0, (parseFloat(cashTendered || 0)) - netTotal) : 0;
+  }, [netTotal]);
 
   // Submit Fast Sale
   const handleCompleteSale = async () => {
@@ -218,30 +328,36 @@ export default function POS() {
       return message.error('سلة المشتريات فارغة');
     }
 
-    if (paymentMethod === 'cash' && !sessionData?.is_open) {
-      return message.error('الخزينة مغلقة! يرجى فتح الوردية أولاً لقبول المدفوعات النقدية.');
+    if (totalTendered < netTotal) {
+      return message.error(
+        `المبلغ المدفوع (${totalTendered.toFixed(2)} ج.م) أقل من إجمالي الفاتورة (${netTotal.toFixed(2)} ج.م). المتبقي: ${remainingDue.toFixed(2)} ج.م`
+      );
     }
 
     setIsSubmittingSale(true);
     try {
       const payload = {
+        salesperson_id: selectedSalesperson,
         customer_name: customerName || 'عميل نقدي',
         customer_phone: customerPhone || undefined,
-        discount_amount: parseFloat(discountAmount) || 0,
+        customer_address: customerAddress || undefined,
+        discount_amount: parseFloat(invoiceDiscount) || 0,
         tax_amount: parseFloat(taxAmount) || 0,
-        payment_method: paymentMethod,
+        payment_method: 'multi',
         payment_breakdown: {
-          cash: paymentMethod === 'cash' ? netTotal : 0,
-          bank_transfer: paymentMethod === 'bank_transfer' ? netTotal : 0,
-          e_wallet: paymentMethod === 'e_wallet' ? netTotal : 0
+          cash: parseFloat(cashTendered || 0),
+          card: parseFloat(cardTendered || 0),
+          transfer: parseFloat(transferTendered || 0)
         },
         notes: saleNotes || undefined,
-        items: cart.map(item => ({
+        items: cart.map((item) => ({
           product_id: item.product_id,
           variant_id: item.variant_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          product_name: item.product_name
+          discount_amount: item.discount_amount || 0,
+          product_name: item.product_name,
+          product_code: item.product_code
         }))
       };
 
@@ -310,24 +426,24 @@ export default function POS() {
 
   return (
     <div style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
-      {/* Top POS Status Bar */}
+      {/* Top POS Status Bar & Shortcuts Badges */}
       <Card
         size="small"
         style={{
-          marginBottom: 12,
+          marginBottom: 8,
           background: '#0f172a',
           borderColor: '#1e293b',
           color: '#fff'
         }}
         styles={{ body: { padding: '8px 16px' } }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Space size="large">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <Space size="middle" wrap>
             <div>
               <Text style={{ color: '#94a3b8', fontSize: 12 }}>حالة الخزينة: </Text>
               {sessionData?.is_open ? (
                 <Tag icon={<UnlockOutlined />} color="success" style={{ fontWeight: 'bold' }}>
-                  مفتوحة للبيع
+                  مفتوحة
                 </Tag>
               ) : (
                 <Tag icon={<LockOutlined />} color="error" style={{ fontWeight: 'bold' }}>
@@ -337,8 +453,8 @@ export default function POS() {
             </div>
 
             <div>
-              <Text style={{ color: '#94a3b8', fontSize: 12 }}>رصيد الدرج النقدي: </Text>
-              <Text strong style={{ color: '#38bdf8', fontSize: 16 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 12 }}>رصيد الدرج: </Text>
+              <Text strong style={{ color: '#38bdf8', fontSize: 15 }}>
                 {(sessionData?.current_balance || 0).toLocaleString()} ج.م
               </Text>
             </div>
@@ -349,12 +465,26 @@ export default function POS() {
                 {sessionData?.today_sales_count || 0} عملية ({(sessionData?.today_sales_total || 0).toLocaleString()} ج.م)
               </Text>
             </div>
+
+            {/* Keyboard Shortcuts Visual Guide */}
+            <Space size={4}>
+              <Tag color="#1e3a8a" style={{ border: '1px solid #3b82f6', color: '#93c5fd' }}>
+                F1: بحث عن صنف
+              </Tag>
+              <Tag color="#4c1d95" style={{ border: '1px solid #8b5cf6', color: '#c4b5fd' }}>
+                F11: إضافة سطر جديد
+              </Tag>
+              <Tag color="#064e3b" style={{ border: '1px solid #10b981', color: '#6ee7b7' }}>
+                F4: إتمام البيع
+              </Tag>
+            </Space>
           </Space>
 
-          <Space>
+          <Space size="small">
             {!sessionData?.is_open ? (
               <Button
                 type="primary"
+                size="small"
                 icon={<UnlockOutlined />}
                 style={{ backgroundColor: '#16a34a' }}
                 onClick={() => {
@@ -367,6 +497,7 @@ export default function POS() {
             ) : (
               <>
                 <Button
+                  size="small"
                   icon={<SwapOutlined />}
                   style={{ color: '#e2e8f0', borderColor: '#475569', background: '#1e293b' }}
                   onClick={() => {
@@ -374,9 +505,10 @@ export default function POS() {
                     setCashMovModalVisible(true);
                   }}
                 >
-                  حركة نقدية (سحب/إيداع)
+                  حركة نقدية
                 </Button>
                 <Button
+                  size="small"
                   danger
                   icon={<LockOutlined />}
                   onClick={() => {
@@ -391,6 +523,7 @@ export default function POS() {
             <Button
               icon={<ReloadOutlined />}
               shape="circle"
+              size="small"
               type="text"
               style={{ color: '#94a3b8' }}
               onClick={fetchSession}
@@ -399,26 +532,31 @@ export default function POS() {
         </div>
       </Card>
 
-      {/* Main Terminal Grid: Right = Search & Catalog, Left = Cart & Checkout */}
-      <Row gutter={12} style={{ flex: 1, minHeight: 0 }}>
-        {/* Right Section: Product Search & Fast Catalog */}
-        <Col xs={24} lg={14} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Main Terminal Grid: Right = Search & Catalog, Left = Active Invoice & Multi-Payment */}
+      <Row gutter={10} style={{ flex: 1, minHeight: 0 }}>
+        {/* Right Section: Product Search & Quick Catalog */}
+        <Col xs={24} lg={13} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card
             style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            styles={{ body: { padding: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+            styles={{ body: { padding: 10, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
           >
             {/* Fast Barcode / Keyword input */}
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 10 }}>
               <Input
                 ref={searchInputRef}
                 size="large"
                 prefix={<BarcodeOutlined style={{ fontSize: 20, color: '#2563eb' }} />}
-                placeholder="امسح الباركود بجهاز المسح الضوئي أو اكتب اسم الصنف / الكود (Enter)..."
+                suffix={
+                  <Tag color="blue" style={{ cursor: 'pointer' }} onClick={() => searchInputRef.current?.focus()}>
+                    F1 / F11
+                  </Tag>
+                }
+                placeholder="امسح الباركود أو ابحث باسم الصنف / الكود (اضغط F1 للبحث أو F11 لإضافة سطر)..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 allowClear
                 autoFocus
-                style={{ borderRadius: 8, fontSize: 15 }}
+                style={{ borderRadius: 8, fontSize: 14 }}
               />
             </div>
 
@@ -445,7 +583,12 @@ export default function POS() {
                           <Badge
                             count={`${item.available_qty} متاح`}
                             style={{
-                              backgroundColor: item.available_qty > 5 ? '#52c41a' : (item.available_qty > 0 ? '#fa8c16' : '#f5222d'),
+                              backgroundColor:
+                                item.available_qty > 5
+                                  ? '#52c41a'
+                                  : item.available_qty > 0
+                                  ? '#fa8c16'
+                                  : '#f5222d',
                               fontSize: 10
                             }}
                           />
@@ -464,10 +607,10 @@ export default function POS() {
                   ))}
                 </Row>
               ) : (
-                <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-                  <BarcodeOutlined style={{ fontSize: 48, marginBottom: 12, display: 'block' }} />
-                  <Text type="secondary" style={{ fontSize: 15 }}>
-                    جاهز لمسح الباركود أو البحث عن المنتجات لإضافتها للفاتورة
+                <div style={{ textAlign: 'center', padding: '50px 0', color: '#94a3b8' }}>
+                  <BarcodeOutlined style={{ fontSize: 44, marginBottom: 10, display: 'block', color: '#cbd5e1' }} />
+                  <Text type="secondary" style={{ fontSize: 14 }}>
+                    جاهز لمسح الباركود أو البحث لإضافة المنتجات للفاتورة (اضغط F1 للبحث أو F11 لإضافة سطر)
                   </Text>
                 </div>
               )}
@@ -475,17 +618,44 @@ export default function POS() {
           </Card>
         </Col>
 
-        {/* Left Section: Active Invoice Cart & Fast Checkout */}
-        <Col xs={24} lg={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Left Section: Active Invoice Header, Item Details Table & Multi-Payment */}
+        <Col xs={24} lg={11} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card
             style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            styles={{ body: { padding: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+            styles={{ body: { padding: 10, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
           >
-            {/* Customer Details Row */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {/* Salesperson Selector */}
+            <div style={{ marginBottom: 8, background: '#f8fafc', padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+              <Row gutter={8} align="middle">
+                <Col span={7}>
+                  <Text strong style={{ fontSize: 12, color: '#334155' }}>
+                    <UserOutlined style={{ marginLeft: 4, color: '#2563eb' }} />
+                    البائع المسؤول:
+                  </Text>
+                </Col>
+                <Col span={17}>
+                  <Select
+                    size="small"
+                    placeholder="اختر البائع صاحب الفاتورة"
+                    value={selectedSalesperson}
+                    onChange={setSelectedSalesperson}
+                    style={{ width: '100%' }}
+                  >
+                    {staff.map((u) => (
+                      <Option key={u.id} value={u.id}>
+                        {u.full_name || u.username} ({u.role === 'supervisor' ? 'مشرف' : 'بائع / كاشير'})
+                      </Option>
+                    ))}
+                  </Select>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Customer Details Row: Name, Phone, Address */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
               <Input
                 size="small"
-                prefix={<UserOutlined />}
+                prefix={<UserOutlined style={{ color: '#94a3b8' }} />}
                 placeholder="اسم العميل"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
@@ -493,22 +663,32 @@ export default function POS() {
               />
               <Input
                 size="small"
+                prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />}
                 placeholder="رقم الهاتف"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                style={{ width: 140 }}
+                style={{ width: 120 }}
+              />
+              <Input
+                size="small"
+                prefix={<HomeOutlined style={{ color: '#94a3b8' }} />}
+                placeholder="العنوان (اختياري)"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                style={{ flex: 1 }}
               />
             </div>
 
-            {/* Cart Items Table */}
-            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: 6, marginBottom: 10 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
+            {/* Cart Items Table (كود، كمية، سعر تلقائي، خصم، سعر نهائي) */}
+            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: 6, marginBottom: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 12 }}>
                 <thead style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '6px 8px' }}>الصنف</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'center' }}>الكمية</th>
-                    <th style={{ padding: '6px 8px' }}>السعر</th>
-                    <th style={{ padding: '6px 8px' }}>الإجمالي</th>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
+                    <th style={{ padding: '6px 8px' }}>كود / اسم الصنف</th>
+                    <th style={{ padding: '6px 6px', textAlign: 'center' }}>الكمية</th>
+                    <th style={{ padding: '6px 6px', textAlign: 'center' }}>السعر</th>
+                    <th style={{ padding: '6px 6px', textAlign: 'center', width: 75 }}>الخصم</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'center' }}>النهائي</th>
                     <th style={{ padding: '6px 4px', width: 24 }}></th>
                   </tr>
                 </thead>
@@ -516,36 +696,50 @@ export default function POS() {
                   {cart.map((item) => (
                     <tr key={item.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '6px 8px' }}>
-                        <div style={{ fontWeight: 'bold' }}>{item.product_name}</div>
-                        <Text type="secondary" style={{ fontSize: 11 }}>{item.product_code}</Text>
+                        <div style={{ fontWeight: 600, fontSize: 12 }}>{item.product_name}</div>
+                        <Text code style={{ fontSize: 10 }}>{item.product_code}</Text>
                       </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'center' }}>
-                        <Space size={2}>
+                      <td style={{ padding: '6px 6px', textAlign: 'center' }}>
+                        <Space size={1}>
                           <Button
                             size="small"
                             type="text"
-                            icon={<MinusOutlined style={{ fontSize: 10 }} />}
+                            icon={<MinusOutlined style={{ fontSize: 9 }} />}
                             onClick={() => updateCartQty(item.key, -1)}
                           />
-                          <Text strong style={{ minWidth: 20, textAlign: 'center', display: 'inline-block' }}>
+                          <Text strong style={{ minWidth: 18, textAlign: 'center', display: 'inline-block' }}>
                             {item.quantity}
                           </Text>
                           <Button
                             size="small"
                             type="text"
-                            icon={<PlusOutlined style={{ fontSize: 10 }} />}
+                            icon={<PlusOutlined style={{ fontSize: 9 }} />}
                             onClick={() => updateCartQty(item.key, 1)}
                           />
                         </Space>
                       </td>
-                      <td style={{ padding: '6px 8px' }}>{item.unit_price}</td>
-                      <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{item.line_total} ج.م</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'center', color: '#334155' }}>
+                        {item.unit_price}
+                      </td>
+                      <td style={{ padding: '6px 6px', textAlign: 'center' }}>
+                        <InputNumber
+                          size="small"
+                          min={0}
+                          max={item.quantity * item.unit_price}
+                          value={item.discount_amount || 0}
+                          onChange={(v) => updateLineDiscount(item.key, v)}
+                          style={{ width: 65, fontSize: 11 }}
+                        />
+                      </td>
+                      <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', color: '#16a34a' }}>
+                        {item.line_total.toFixed(2)}
+                      </td>
                       <td style={{ padding: '6px 4px' }}>
                         <Button
                           type="text"
                           danger
                           size="small"
-                          icon={<DeleteOutlined />}
+                          icon={<DeleteOutlined style={{ fontSize: 11 }} />}
                           onClick={() => removeFromCart(item.key)}
                         />
                       </td>
@@ -553,8 +747,8 @@ export default function POS() {
                   ))}
                   {cart.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8' }}>
-                        السلة فارغة
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '25px 0', color: '#94a3b8' }}>
+                        الفاتورة فارغة - استخدم الباركود أو اضغط F1/F11 للإضافة
                       </td>
                     </tr>
                   )}
@@ -562,127 +756,149 @@ export default function POS() {
               </table>
             </div>
 
-            {/* Financial Summary & Payment Options */}
-            <div style={{ background: '#f8fafc', padding: 10, borderRadius: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text type="secondary">المجموع الفرعي:</Text>
-                <Text strong>{subtotal.toFixed(2)} ج.م</Text>
-              </div>
-
-              <Row gutter={8} style={{ marginBottom: 6 }}>
-                <Col span={12}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>خصم:</Text>
-                    <InputNumber
-                      size="small"
-                      min={0}
-                      value={discountAmount}
-                      onChange={setDiscountAmount}
-                      style={{ width: '100%' }}
-                    />
-                  </div>
-                </Col>
-                <Col span={12}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>ضريبة:</Text>
-                    <InputNumber
-                      size="small"
-                      min={0}
-                      value={taxAmount}
-                      onChange={setTaxAmount}
-                      style={{ width: '100%' }}
-                    />
-                  </div>
-                </Col>
-              </Row>
-
+            {/* Financial Summary & Multi-Payment Section */}
+            <div style={{ background: '#f8fafc', padding: 8, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              {/* Totals Header */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: '#1e293b',
+                  background: '#0f172a',
                   color: '#fff',
-                  padding: '8px 12px',
+                  padding: '6px 12px',
                   borderRadius: 6,
                   marginBottom: 8
                 }}
               >
-                <span style={{ fontSize: 14 }}>الصافي النهائي:</span>
-                <span style={{ fontSize: 22, fontWeight: 'bold', color: '#4ade80' }}>
-                  {netTotal.toFixed(2)} ج.م
-                </span>
-              </div>
-
-              {/* Payment Method Selector (Cash, Bank Transfer, E-Wallet, Split) */}
-              <div style={{ marginBottom: 8 }}>
-                <Radio.Group
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  style={{ width: '100%', display: 'flex' }}
-                >
-                  <Radio.Button value="cash" style={{ flex: 1, textAlign: 'center' }}>كاش (نقدي)</Radio.Button>
-                  <Radio.Button value="bank_transfer" style={{ flex: 1, textAlign: 'center' }}>تحويل بنكي</Radio.Button>
-                  <Radio.Button value="e_wallet" style={{ flex: 1, textAlign: 'center' }}>محفظة ذكية</Radio.Button>
-                  <Radio.Button value="split" style={{ flex: 1, textAlign: 'center' }}>مقسم (Split)</Radio.Button>
-                </Radio.Group>
-              </div>
-
-              {/* Tender & Change Calculator for Cash */}
-              {paymentMethod === 'cash' && (
-                <div style={{ marginBottom: 8, background: '#fff', padding: 6, borderRadius: 6, border: '1px solid #e2e8f0' }}>
-                  <Row gutter={8} align="middle">
-                    <Col span={12}>
-                      <Text style={{ fontSize: 12 }}>المبلغ المدفوع (Tendered):</Text>
-                      <InputNumber
-                        size="small"
-                        min={0}
-                        style={{ width: '100%' }}
-                        value={cashTendered}
-                        onChange={setCashTendered}
-                      />
-                    </Col>
-                    <Col span={12}>
-                      <Text style={{ fontSize: 12 }}>المتبقي للعميل (Change):</Text>
-                      <div style={{ fontSize: 16, fontWeight: 'bold', color: '#16a34a' }}>
-                        {changeDue.toFixed(2)} ج.م
-                      </div>
-                    </Col>
-                  </Row>
+                <div>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>إجمالي الفاتورة: </span>
+                  <span style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>
+                    {netTotal.toFixed(2)} ج.م
+                  </span>
                 </div>
-              )}
 
-              {/* Action Buttons */}
-              <Space style={{ width: '100%' }} direction="vertical" size={6}>
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<CheckCircleOutlined />}
-                  loading={isSubmittingSale}
-                  disabled={cart.length === 0}
-                  onClick={handleCompleteSale}
+                <Space size="small">
+                  <Button size="small" type="dashed" ghost onClick={handleQuickPayCash}>
+                    كاش كامل
+                  </Button>
+                  <Button size="small" type="dashed" ghost onClick={handleQuickPayCard}>
+                    فيزا كاملة
+                  </Button>
+                  <Button size="small" type="dashed" ghost onClick={handleQuickPayTransfer}>
+                    تحويل كامل
+                  </Button>
+                </Space>
+              </div>
+
+              {/* Multi-Payment Inputs Row (Cash, Visa, Transfers) */}
+              <div style={{ marginBottom: 8, background: '#fff', padding: 8, borderRadius: 6, border: '1px solid #cbd5e1' }}>
+                <div style={{ fontSize: 11, fontWeight: 'bold', color: '#475569', marginBottom: 6 }}>
+                  الدفع المتعدد (Multi-Payment) - حدد المبالغ المدفوعة:
+                </div>
+                <Row gutter={6}>
+                  <Col span={8}>
+                    <Text style={{ fontSize: 11, color: '#16a34a', display: 'block', marginBottom: 2 }}>
+                      💵 نقدًا (كاش):
+                    </Text>
+                    <InputNumber
+                      size="middle"
+                      min={0}
+                      precision={2}
+                      value={cashTendered}
+                      onChange={(v) => setCashTendered(v || 0)}
+                      style={{ width: '100%' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Text style={{ fontSize: 11, color: '#2563eb', display: 'block', marginBottom: 2 }}>
+                      💳 فيزا / بطاقة:
+                    </Text>
+                    <InputNumber
+                      size="middle"
+                      min={0}
+                      precision={2}
+                      value={cardTendered}
+                      onChange={(v) => setCardTendered(v || 0)}
+                      style={{ width: '100%' }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Text style={{ fontSize: 11, color: '#9333ea', display: 'block', marginBottom: 2 }}>
+                      📱 تحويل / محفظة:
+                    </Text>
+                    <InputNumber
+                      size="middle"
+                      min={0}
+                      precision={2}
+                      value={transferTendered}
+                      onChange={(v) => setTransferTendered(v || 0)}
+                      style={{ width: '100%' }}
+                    />
+                  </Col>
+                </Row>
+
+                {/* Tender Balance Indicators */}
+                <div
                   style={{
-                    width: '100%',
-                    backgroundColor: '#16a34a',
-                    borderColor: '#16a34a',
-                    fontWeight: 'bold',
-                    fontSize: 16,
-                    height: 44
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: 6,
+                    paddingTop: 6,
+                    borderTop: '1px dashed #e2e8f0',
+                    fontSize: 12
                   }}
                 >
-                  إتمام البيع وطباعة الفاتورة (F4)
-                </Button>
-                <Button
-                  danger
-                  type="dashed"
-                  size="small"
-                  onClick={clearCart}
-                  disabled={cart.length === 0}
-                  style={{ width: '100%' }}
-                >
-                  إلغاء السلة (مسح)
-                </Button>
-              </Space>
+                  <span>
+                    المدفوع: <strong>{totalTendered.toFixed(2)} ج.م</strong>
+                  </span>
+                  {remainingDue > 0 ? (
+                    <span style={{ color: '#dc2626', fontWeight: 'bold' }}>
+                      المتبقي: {remainingDue.toFixed(2)} ج.م
+                    </span>
+                  ) : (
+                    <span style={{ color: '#16a34a', fontWeight: 'bold' }}>
+                      الباقي للعميل: {changeDue.toFixed(2)} ج.م
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <Row gutter={6}>
+                <Col span={18}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<CheckCircleOutlined />}
+                    loading={isSubmittingSale}
+                    disabled={cart.length === 0 || remainingDue > 0}
+                    onClick={handleCompleteSale}
+                    style={{
+                      width: '100%',
+                      backgroundColor: remainingDue > 0 ? '#94a3b8' : '#16a34a',
+                      borderColor: remainingDue > 0 ? '#94a3b8' : '#16a34a',
+                      fontWeight: 'bold',
+                      fontSize: 15,
+                      height: 42
+                    }}
+                  >
+                    إتمام البيع وطباعة الفاتورة (F4)
+                  </Button>
+                </Col>
+                <Col span={6}>
+                  <Button
+                    danger
+                    type="dashed"
+                    size="large"
+                    onClick={clearCart}
+                    disabled={cart.length === 0}
+                    style={{ width: '100%', height: 42 }}
+                  >
+                    مسح
+                  </Button>
+                </Col>
+              </Row>
             </div>
           </Card>
         </Col>
@@ -694,10 +910,11 @@ export default function POS() {
         onCancel={() => setReceiptModalVisible(false)}
         footer={null}
         width={380}
-        destroyOnHidden
+        destroyOnClose
       >
         <ThermalReceipt
           invoice={lastInvoice}
+          items={lastInvoice?.items || []}
           onClose={() => setReceiptModalVisible(false)}
         />
       </Modal>

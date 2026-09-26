@@ -10,9 +10,12 @@ const { logActivity } = require('../../shared/activityLogger');
 router.get('/', requireAuth, async (req, res) => {
   try {
     const categories = await query(
-      `SELECT c.*, p.category_name AS parent_name
+      `SELECT c.*, p.category_name AS parent_name,
+              COUNT(pr.id)::int AS products_count
        FROM product_categories c
        LEFT JOIN product_categories p ON p.id = c.parent_id
+       LEFT JOIN products pr ON pr.category_id = c.id
+       GROUP BY c.id, p.category_name
        ORDER BY c.display_order ASC, c.id ASC`
     );
     return res.json({ success: true, data: categories });
@@ -125,6 +128,45 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_ma
     });
 
     return res.json({ success: true, message: 'Category updated successfully' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * DELETE /api/swm/categories/:id
+ */
+router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [cat] = await query(`SELECT * FROM product_categories WHERE id = $1`, [id]);
+    if (!cat) {
+      return res.status(404).json({ success: false, message: 'المجموعة غير موجودة' });
+    }
+
+    const [prodCount] = await query(`SELECT COUNT(*)::int AS cnt FROM products WHERE category_id = $1`, [id]);
+    if (prodCount?.cnt > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `لا يمكن حذف المجموعة لأنها تحتوي على (${prodCount.cnt}) صنف. يرجى نقل الأصناف لمجموعة أخرى أولاً.`
+      });
+    }
+
+    await query(`DELETE FROM product_categories WHERE id = $1`, [id]);
+
+    logActivity({
+      userId: req.user.id,
+      branchId: req.user.branchId,
+      actionType: 'DELETE_CATEGORY',
+      entityType: 'product_categories',
+      entityId: id,
+      oldValue: cat,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `Category ${cat.category_name} deleted`
+    });
+
+    return res.json({ success: true, message: 'تم حذف المجموعة بنجاح' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

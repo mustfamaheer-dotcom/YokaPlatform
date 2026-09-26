@@ -1,16 +1,19 @@
 const router = require('express').Router();
+const bcrypt = require('bcryptjs');
 const { query } = require('../../shared/db');
 const { requireAuth, requireRole } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 
 /**
  * GET /api/swm/branches
- * List all active/configured branches
+ * List all active/configured branches with login_username, login_password_plain, and staff count
  */
 router.get('/', requireAuth, async (req, res) => {
   try {
     const branches = await query(
-      `SELECT b.*,
+      `SELECT b.id, b.branch_code, b.branch_name, b.branch_type,
+              b.login_username, b.login_password_plain,
+              b.address, b.phone, b.supervisor_id, b.status, b.created_at, b.updated_at,
               u.full_name AS supervisor_name,
               COUNT(DISTINCT u2.id) AS staff_count
        FROM branches b
@@ -31,7 +34,12 @@ router.get('/', requireAuth, async (req, res) => {
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const rows = await query(`SELECT * FROM branches WHERE id = $1`, [id]);
+    const rows = await query(
+      `SELECT id, branch_code, branch_name, branch_type, login_username, login_password_plain,
+              address, phone, supervisor_id, status, working_hours, created_at, updated_at
+       FROM branches WHERE id = $1`,
+      [id]
+    );
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Branch not found' });
     }
@@ -43,34 +51,69 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 /**
  * POST /api/swm/branches
- * Create a new branch / warehouse
+ * Create a new branch / warehouse with login credentials
  */
 router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
   try {
-    const { branch_code, branch_name, branch_type, address, phone, working_hours } = req.body;
+    const {
+      branch_code,
+      branch_name,
+      branch_type,
+      address,
+      phone,
+      working_hours,
+      login_username,
+      username,
+      password
+    } = req.body;
+
     if (!branch_code || !branch_name) {
       return res.status(400).json({
         success: false,
-        message: 'Branch code and branch name are required'
+        message: 'كود الفرع واسم الفرع حقول مطلوبة'
       });
     }
 
-    const existing = await query(`SELECT id FROM branches WHERE branch_code = $1`, [branch_code]);
-    if (existing.length) {
-      return res.status(409).json({ success: false, message: 'Branch code already in use' });
+    const branchCodeClean = branch_code.trim().toUpperCase();
+    const branchUserClean = (login_username || username || '').trim();
+    const branchPasswordClean = (password || '').trim();
+
+    // Check branch_code uniqueness
+    const existingCode = await query(`SELECT id FROM branches WHERE branch_code = $1`, [branchCodeClean]);
+    if (existingCode.length) {
+      return res.status(409).json({ success: false, message: 'كود الفرع مستخدم بالفعل' });
+    }
+
+    // Check login_username uniqueness if provided
+    if (branchUserClean) {
+      const existingUser = await query(`SELECT id FROM branches WHERE login_username = $1`, [branchUserClean]);
+      if (existingUser.length) {
+        return res.status(409).json({ success: false, message: 'اسم مستخدم الفرع مستخدم بالفعل لفرع آخر' });
+      }
+    }
+
+    let passwordHash = null;
+    if (branchPasswordClean) {
+      passwordHash = await bcrypt.hash(branchPasswordClean, 12);
     }
 
     const rows = await query(
-      `INSERT INTO branches (branch_code, branch_name, branch_type, address, phone, working_hours, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())
-       RETURNING id, branch_code, branch_name`,
+      `INSERT INTO branches (
+        branch_code, branch_name, branch_type, address, phone, working_hours,
+        login_username, login_password_hash, login_password_plain, status, created_at, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', NOW(), NOW())
+      RETURNING id, branch_code, branch_name, login_username, login_password_plain`,
       [
-        branch_code.trim().toUpperCase(),
+        branchCodeClean,
         branch_name.trim(),
         branch_type || 'retail_branch',
         address || null,
         phone || null,
-        working_hours ? JSON.stringify(working_hours) : null
+        working_hours ? JSON.stringify(working_hours) : null,
+        branchUserClean || null,
+        passwordHash,
+        branchPasswordClean || null
       ]
     );
 
@@ -82,13 +125,13 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
       actionType: 'CREATE_BRANCH',
       entityType: 'branches',
       entityId: newBranch.id,
-      newValue: { branch_code, branch_name, branch_type },
+      newValue: { branch_code: branchCodeClean, branch_name, branch_type, login_username: branchUserClean },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-      notes: `Branch ${branch_name} created`
+      notes: `Branch ${branch_name} created with login username: ${branchUserClean || 'None'}`
     });
 
-    return res.status(201).json({ success: true, data: newBranch });
+    return res.status(201).json({ success: true, data: newBranch, message: 'تم إنشاء الفرع وبيانات تسجيل الدخول بنجاح' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -96,17 +139,47 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
 
 /**
  * PUT /api/swm/branches/:id
- * Update branch details
+ * Update branch details and login credentials
  */
 router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const [old] = await query(`SELECT * FROM branches WHERE id = $1`, [id]);
     if (!old) {
-      return res.status(404).json({ success: false, message: 'Branch not found' });
+      return res.status(404).json({ success: false, message: 'الفرع غير موجود' });
     }
 
-    const { branch_name, branch_type, address, phone, supervisor_id, status } = req.body;
+    const {
+      branch_name,
+      branch_type,
+      address,
+      phone,
+      supervisor_id,
+      status,
+      login_username,
+      username,
+      password
+    } = req.body;
+
+    const newUsername = login_username !== undefined ? login_username : (username !== undefined ? username : old.login_username);
+
+    // Validate login_username uniqueness if changed
+    if (newUsername && newUsername.trim() && newUsername.trim() !== old.login_username) {
+      const existingUser = await query(
+        `SELECT id FROM branches WHERE login_username = $1 AND id != $2`,
+        [newUsername.trim(), id]
+      );
+      if (existingUser.length) {
+        return res.status(409).json({ success: false, message: 'اسم مستخدم الفرع مستخدم بالفعل لفرع آخر' });
+      }
+    }
+
+    let newHash = old.login_password_hash;
+    let newPlain = old.login_password_plain;
+    if (password && password.trim()) {
+      newHash = await bcrypt.hash(password.trim(), 12);
+      newPlain = password.trim();
+    }
 
     await query(
       `UPDATE branches
@@ -114,17 +187,23 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (re
            branch_type = COALESCE($2, branch_type),
            address = COALESCE($3, address),
            phone = COALESCE($4, phone),
-           supervisor_id = COALESCE($5, supervisor_id),
+           supervisor_id = $5,
            status = COALESCE($6, status),
+           login_username = $7,
+           login_password_hash = $8,
+           login_password_plain = $9,
            updated_at = NOW()
-       WHERE id = $7`,
+       WHERE id = $10`,
       [
         branch_name || null,
         branch_type || null,
         address || null,
         phone || null,
-        supervisor_id || null,
+        supervisor_id !== undefined ? (supervisor_id ? parseInt(supervisor_id, 10) : null) : old.supervisor_id,
         status || null,
+        newUsername ? newUsername.trim() : null,
+        newHash,
+        newPlain,
         id
       ]
     );
@@ -135,14 +214,14 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (re
       actionType: 'UPDATE_BRANCH',
       entityType: 'branches',
       entityId: id,
-      oldValue: old,
-      newValue: req.body,
+      oldValue: { login_username: old.login_username, status: old.status },
+      newValue: { login_username: newUsername, status },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-      notes: `Branch ${id} details updated`
+      notes: `Branch ${id} details and credentials updated`
     });
 
-    return res.json({ success: true, message: 'Branch updated successfully' });
+    return res.json({ success: true, message: 'تم تحديث بيانات الفرع وبيانات تسجيل الدخول بنجاح' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

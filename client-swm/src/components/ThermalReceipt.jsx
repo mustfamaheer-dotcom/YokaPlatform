@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Typography, Divider } from 'antd';
 import { PrinterOutlined } from '@ant-design/icons';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Text } = Typography;
 
@@ -47,6 +48,11 @@ export default function ThermalReceipt({ invoice, onClose }) {
       >
         {/* Receipt Header */}
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <img
+            src={yokaLogo}
+            alt="Yoka Store"
+            style={{ height: '36px', maxWidth: '120px', objectFit: 'contain', marginBottom: '4px' }}
+          />
           <div style={{ fontSize: '18px', fontWeight: 'bold' }}>YOKA STORE</div>
           <div style={{ fontSize: '14px', fontWeight: 'bold' }}>يوكا ستور لملابس المحجبات</div>
           <div style={{ fontSize: '11px', color: '#333' }}>

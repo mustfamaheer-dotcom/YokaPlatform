@@ -41,6 +41,7 @@ router.get('/', requireAuth, async (req, res) => {
              o.subtotal, o.shipping_cost, o.total_amount,
              o.order_status, o.payment_status, o.payment_method,
              o.shipping_carrier, o.tracking_number, o.parcel_count,
+             o.packed_by_id, o.packed_by_name,
              o.shipped_at, o.delivered_at,
              o.fulfilling_branch_id, o.customer_notes, o.transfer_receipt_url, o.transfer_reference, o.created_at,
              COUNT(oi.id) AS items_count
@@ -179,6 +180,42 @@ router.get('/shipping-carriers', requireAuth, async (req, res) => {
     return res.json({ success: true, data: carriers });
   } catch (err) {
     console.error('SWM fetch shipping carriers error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/swm/orders/staff-preparers
+ * Retrieve active staff list from staff directory for shipping preparation
+ */
+router.get('/staff-preparers', requireAuth, async (req, res) => {
+  try {
+    const staff = await query(`
+      SELECT u.id, u.username, u.full_name, u.role, u.branch_id,
+             b.branch_name, b.branch_code, b.branch_type
+      FROM users u
+      JOIN branches b ON b.id = u.branch_id
+      WHERE u.status = 'active'
+        AND (b.branch_type = 'ecom_warehouse' OR b.branch_code = 'BR-ECOM' OR b.id = 2)
+      ORDER BY COALESCE(u.full_name, u.username) ASC
+    `);
+
+    const roleLabels = {
+      super_admin: 'مدير عام',
+      admin: 'مدير إداري',
+      supervisor: 'مشرف',
+      salesperson: 'مسؤول تجهيز / بائع',
+      branch_account: 'حساب فرع'
+    };
+
+    const formatted = staff.map(u => ({
+      ...u,
+      role_label: roleLabels[u.role] || u.role
+    }));
+
+    return res.json({ success: true, data: formatted });
+  } catch (err) {
+    console.error('SWM fetch staff preparers error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -433,12 +470,12 @@ router.delete('/payment-methods/:id', requireAuth, async (req, res) => {
 
 /**
  * PUT /api/swm/orders/:id/ship
- * Mark order as shipped with tracking number (بوليصة الشحن) and parcel count (عدد الطرود)
+ * Mark order as shipped with tracking number (بوليصة الشحن), parcel count (عدد الطرود), and staff preparer (الموظف المجهز)
  */
 router.put('/:id/ship', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { tracking_number, parcel_count = 1, shipping_carrier, shipping_notes } = req.body;
+    const { tracking_number, parcel_count = 1, shipping_carrier, shipping_notes, packed_by_id } = req.body;
 
     if (!tracking_number || !String(tracking_number).trim()) {
       return res.status(400).json({ success: false, message: 'يرجى إدخال رقم بوليصة الشحن' });
@@ -449,20 +486,33 @@ router.put('/:id/ship', requireAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
     }
 
+    let packedByName = null;
+    let resolvedPackerId = packed_by_id ? parseInt(packed_by_id, 10) : null;
+    if (resolvedPackerId) {
+      const [packer] = await query(`SELECT full_name, username FROM users WHERE id = $1`, [resolvedPackerId]);
+      if (packer) {
+        packedByName = packer.full_name || packer.username;
+      }
+    }
+
     await query(
       `UPDATE ecp_orders SET
         order_status = 'shipped',
         tracking_number = $1,
         parcel_count = $2,
         shipping_carrier = $3,
-        admin_notes = COALESCE($4, admin_notes),
+        packed_by_id = COALESCE($4, packed_by_id),
+        packed_by_name = COALESCE($5, packed_by_name),
+        admin_notes = COALESCE($6, admin_notes),
         shipped_at = NOW(),
         updated_at = NOW()
-       WHERE id = $5`,
+       WHERE id = $7`,
       [
         String(tracking_number).trim(),
         parseInt(parcel_count, 10) || 1,
         shipping_carrier || 'مندوب الشحن',
+        resolvedPackerId,
+        packedByName,
         shipping_notes || null,
         id
       ]
@@ -474,18 +524,73 @@ router.put('/:id/ship', requireAuth, async (req, res) => {
       actionType: 'SHIP_ORDER',
       entityType: 'ecp_orders',
       entityId: id,
-      newValue: { tracking_number, parcel_count, shipping_carrier },
+      newValue: { tracking_number, parcel_count, shipping_carrier, packed_by_id: resolvedPackerId, packed_by_name: packedByName },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-      notes: `Order ${existing.order_number} shipped with waybill ${tracking_number} (${parcel_count} parcels)`
+      notes: `Order ${existing.order_number} shipped with waybill ${tracking_number} (${parcel_count} parcels), packed by ${packedByName || 'N/A'}`
     });
 
     return res.json({
       success: true,
-      message: 'تم شحن الطلب بنجاح وتسجيل بوليصة الشحن وعدد الطرود'
+      message: 'تم شحن الطلب بنجاح وتسجيل بوليصة الشحن وموظف التجهيز وعدد الطرود'
     });
   } catch (err) {
     console.error('SWM ship order error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * PUT /api/swm/orders/:id/preparer
+ * Assign or update staff preparer while order is in processing
+ */
+router.put('/:id/preparer', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { packed_by_id } = req.body;
+
+    const [existing] = await query(`SELECT * FROM ecp_orders WHERE id = $1`, [id]);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'الطلب غير موجود' });
+    }
+
+    let packedByName = null;
+    const resolvedPackerId = packed_by_id ? parseInt(packed_by_id, 10) : null;
+    if (resolvedPackerId) {
+      const [packer] = await query(`SELECT full_name, username FROM users WHERE id = $1`, [resolvedPackerId]);
+      if (packer) {
+        packedByName = packer.full_name || packer.username;
+      }
+    }
+
+    await query(
+      `UPDATE ecp_orders SET
+        packed_by_id = $1,
+        packed_by_name = $2,
+        updated_at = NOW()
+       WHERE id = $3`,
+      [resolvedPackerId, packedByName, id]
+    );
+
+    logActivity({
+      userId: req.user.id,
+      branchId: req.user.branchId,
+      actionType: 'ASSIGN_ORDER_PREPARER',
+      entityType: 'ecp_orders',
+      entityId: id,
+      newValue: { packed_by_id: resolvedPackerId, packed_by_name: packedByName },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `Assigned preparer ${packedByName || 'none'} to order ${existing.order_number}`
+    });
+
+    return res.json({
+      success: true,
+      message: 'تم تعيين موظف تحضير الشحنة بنجاح',
+      data: { packed_by_id: resolvedPackerId, packed_by_name: packedByName }
+    });
+  } catch (err) {
+    console.error('SWM assign preparer error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -497,7 +602,7 @@ router.put('/:id/ship', requireAuth, async (req, res) => {
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
-    if (id === 'payment-methods' || id === 'shipping-rates' || id === 'shipping-carriers') {
+    if (id === 'payment-methods' || id === 'shipping-rates' || id === 'shipping-carriers' || id === 'staff-preparers') {
       return next();
     }
     const isNumeric = /^\d+$/.test(String(id).trim());

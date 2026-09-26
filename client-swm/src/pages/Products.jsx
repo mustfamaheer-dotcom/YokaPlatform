@@ -34,6 +34,7 @@ import {
 } from '@ant-design/icons';
 import api from '../api';
 import VariantMatrix from '../components/VariantMatrix';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -322,7 +323,7 @@ export default function Products() {
         <Avatar
           shape="square"
           size={44}
-          src={record.featured_image || '/yokaStoreTransparent.png'}
+          src={record.featured_image || yokaLogo}
           icon={<PictureOutlined />}
           style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', objectFit: 'contain' }}
         />

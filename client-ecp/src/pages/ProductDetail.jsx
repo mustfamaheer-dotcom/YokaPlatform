@@ -14,6 +14,7 @@ import {
   CheckOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -221,7 +222,7 @@ export default function ProductDetail({ onAddToCart }) {
             }}
           >
             <img
-              src={product.featured_image || '/yokaStoreTransparent.png'}
+              src={product.featured_image || yokaLogo}
               alt={product.product_name || 'صورة المنتج'}
               style={{
                 width: '100%',

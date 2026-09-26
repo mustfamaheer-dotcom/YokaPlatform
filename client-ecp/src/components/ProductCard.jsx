@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Tag, Typography } from 'antd';
 import { ShoppingCartOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Text, Title } = Typography;
 
@@ -32,7 +33,7 @@ export default function ProductCard({ product, onAddToCart }) {
       {/* Product Image Area */}
       <Link to={`/product/${product.slug || product.id}`} style={{ position: 'relative', display: 'block', overflow: 'hidden', background: '#FAFAF8', paddingTop: '100%' }}>
         <img
-          src={product.featured_image || '/yokaStoreTransparent.png'}
+          src={product.featured_image || yokaLogo}
           alt={product.product_name || 'صورة المنتج'}
           loading="lazy"
           style={{
@@ -46,7 +47,7 @@ export default function ProductCard({ product, onAddToCart }) {
             transition: 'transform 0.3s ease'
           }}
           onError={(e) => {
-            e.target.src = '/yokaStoreTransparent.png';
+            e.target.src = yokaLogo;
             e.target.style.objectFit = 'contain';
             e.target.style.padding = '24px';
           }}

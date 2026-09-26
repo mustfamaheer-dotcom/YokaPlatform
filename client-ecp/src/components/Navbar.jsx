@@ -9,6 +9,7 @@ import {
   SafetyCertificateOutlined,
   PhoneOutlined
 } from '@ant-design/icons';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { useBreakpoint } = Grid;
 
@@ -49,7 +50,7 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
         {/* Logo */}
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <img
-            src="/yokaStoreTransparent.png"
+            src={yokaLogo}
             alt="Yoka Store Logo"
             style={{ height: isMobile ? 38 : 46, objectFit: 'contain' }}
           />

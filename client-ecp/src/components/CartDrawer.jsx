@@ -10,6 +10,7 @@ import {
   CarOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Text, Title } = Typography;
 const { useBreakpoint } = Grid;
@@ -174,7 +175,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
                 }}
               >
                 <img
-                  src={item.featured_image || '/yokaStoreTransparent.png'}
+                  src={item.featured_image || yokaLogo}
                   alt={item.product_name || 'صورة المنتج'}
                   style={{
                     width: '100%',

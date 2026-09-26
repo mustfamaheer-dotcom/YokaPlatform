@@ -1098,7 +1098,7 @@ export default function Purchases() {
                     filterOption={(input, opt) => (opt?.label || '').toLowerCase().includes(input.toLowerCase())}
                     options={productsList.map(p => ({
                       value: p.id,
-                      label: `${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
+                      label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
                     }))}
                   />
                 )
@@ -1389,7 +1389,7 @@ export default function Purchases() {
                     filterOption={(input, opt) => (opt?.label || '').toLowerCase().includes(input.toLowerCase())}
                     options={productsList.map(p => ({
                       value: p.id,
-                      label: `${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
+                      label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
                     }))}
                   />
                 )

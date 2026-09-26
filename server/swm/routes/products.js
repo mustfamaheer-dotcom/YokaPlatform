@@ -217,15 +217,43 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
       // Insert product variants if supplied
       if (Array.isArray(variants) && variants.length > 0) {
-        for (const v of variants) {
-          const sku = v.sku || `${cleanCode}-${(v.color || 'STD').toUpperCase()}-${(v.size || 'STD').toUpperCase()}`;
+        const usedSkusInBatch = new Set();
+        for (let i = 0; i < variants.length; i++) {
+          const v = variants[i];
+          let candidateSku = v.sku ? String(v.sku).trim().toUpperCase() : null;
+          if (!candidateSku) {
+            const rawColor = String(v.color || '').trim();
+            const rawSize = String(v.size || '').trim();
+            const cClean = rawColor.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || `C${i + 1}`;
+            const sClean = rawSize.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || `S${i + 1}`;
+            candidateSku = `${cleanCode}-${cClean}-${sClean}`;
+          }
+
+          // Ensure unique within current batch
+          let finalSku = candidateSku;
+          let counter = 1;
+          while (usedSkusInBatch.has(finalSku)) {
+            finalSku = `${candidateSku}-${++counter}`;
+          }
+
+          // Check if already exists in product_variants table across the entire database
+          const existingVariant = await client.query(
+            `SELECT id FROM product_variants WHERE variant_sku = $1 LIMIT 1`,
+            [finalSku]
+          );
+          if (existingVariant.rows.length > 0) {
+            finalSku = `${finalSku}-${Math.floor(Math.random() * 900 + 100)}`;
+          }
+
+          usedSkusInBatch.add(finalSku);
+
           await client.query(
             `INSERT INTO product_variants (
               product_id, variant_sku, color, size, material, price_modifier, status, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())`,
             [
               productId,
-              sku,
+              finalSku,
               v.color || null,
               v.size || null,
               v.material || null,

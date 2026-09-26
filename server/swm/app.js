@@ -13,6 +13,7 @@ const productRoutes = require('./routes/products');
 const supplierRoutes = require('./routes/suppliers');
 const purchaseRoutes = require('./routes/purchases');
 const posRoutes = require('./routes/pos');
+const attributeRoutes = require('./routes/attributes');
 
 const app = express();
 
@@ -56,15 +57,24 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // 6. Security: Stricter Limiter for Authentication Endpoints (Brute Force Protection)
+const isDev = process.env.NODE_ENV !== 'production';
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30, // 30 login/token attempts per 15 mins
+  max: isDev ? 3000 : 100, // Generous limit in dev to prevent blocking valid user testing
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many authentication attempts. Please try again after 15 minutes.' }
+  skip: (req) => {
+    // Never throttle session check or read queries
+    if (req.method === 'GET') return true;
+    if (req.path === '/logout') return true;
+    return false;
+  },
+  message: { success: false, message: 'Too many authentication attempts. Please try again after a few minutes.' }
 });
 
 const orderRoutes = require('./routes/orders');
+const expenseRoutes = require('./routes/expenses');
+const transferRoutes = require('./routes/transfers');
 
 // SWM API Routes
 app.use('/api/auth', authLimiter, authRoutes);
@@ -76,6 +86,21 @@ app.use('/api/swm/suppliers', supplierRoutes);
 app.use('/api/swm/purchases', purchaseRoutes);
 app.use('/api/swm/pos', posRoutes);
 app.use('/api/swm/orders', orderRoutes);
+app.use('/api/swm/expenses', expenseRoutes);
+app.use('/api/swm/transfers', transferRoutes);
+app.use('/api/swm/attributes', attributeRoutes);
+const branchesDailyRoutes = require('./routes/branchesDaily');
+app.use('/api/swm/branches-daily', branchesDailyRoutes);
+const stockAuditRoutes = require('./routes/stockAudit');
+app.use('/api/swm/stock-audit', stockAuditRoutes);
+const stockAdjustmentRoutes = require('./routes/stockAdjustments');
+app.use('/api/swm/stock-adjustments', stockAdjustmentRoutes);
+const adminJournalsRoutes = require('./routes/adminJournals');
+app.use('/api/swm/admin-journals', adminJournalsRoutes);
+const treasuryRoutes = require('./routes/treasury');
+app.use('/api/swm/treasury', treasuryRoutes);
+const analyticsRoutes = require('./routes/analytics');
+app.use('/api/swm/analytics', analyticsRoutes);
 
 // ECP (E-Commerce Platform) Public API Routes
 const ecpCatalogRoutes = require('../ecp/routes/catalog');

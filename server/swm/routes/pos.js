@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth } = require('../../shared/authMiddleware');
+const { requireAuth, requireBranchScope } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 
 /**
@@ -32,9 +32,9 @@ async function getOrCreateBranchRegister(branchId) {
  * GET /api/swm/pos/session/current
  * Return active session state and today's cash metrics for cashier
  */
-router.get('/session/current', requireAuth, async (req, res) => {
+router.get('/session/current', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.user.branch_id || 1;
+    const branchId = req.scopedBranchId;
     const register = await getOrCreateBranchRegister(branchId);
 
     // Get today's total sales and transaction count
@@ -69,9 +69,9 @@ router.get('/session/current', requireAuth, async (req, res) => {
  * POST /api/swm/pos/session/open
  * Open cash drawer with initial cash
  */
-router.post('/session/open', requireAuth, async (req, res) => {
+router.post('/session/open', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.user.branch_id || 1;
+    const branchId = req.scopedBranchId;
     const { opening_balance = 0, notes } = req.body;
     const initialCash = Math.max(0, parseFloat(opening_balance) || 0);
 
@@ -122,9 +122,9 @@ router.post('/session/open', requireAuth, async (req, res) => {
  * POST /api/swm/pos/session/close
  * Close cash drawer with actual cash counted & calculate discrepancy
  */
-router.post('/session/close', requireAuth, async (req, res) => {
+router.post('/session/close', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.user.branch_id || 1;
+    const branchId = req.scopedBranchId;
     const { actual_cash, notes } = req.body;
 
     if (actual_cash === undefined || isNaN(parseFloat(actual_cash))) {
@@ -192,9 +192,9 @@ router.post('/session/close', requireAuth, async (req, res) => {
  * POST /api/swm/pos/session/cash-in-out
  * Petty cash movements (Cash Drop, Petty Expense, Change Add)
  */
-router.post('/session/cash-in-out', requireAuth, async (req, res) => {
+router.post('/session/cash-in-out', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.user.branch_id || 1;
+    const branchId = req.scopedBranchId;
     const { type, amount, reason } = req.body;
 
     if (!['cash_in', 'cash_out'].includes(type)) {
@@ -263,9 +263,9 @@ router.post('/session/cash-in-out', requireAuth, async (req, res) => {
  * GET /api/swm/pos/search
  * High-speed catalog & barcode search for cashier terminal
  */
-router.get('/search', requireAuth, async (req, res) => {
+router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.user.branch_id || 1;
+    const branchId = req.scopedBranchId;
     const { query: searchQuery } = req.query;
 
     if (!searchQuery || !searchQuery.trim()) {
@@ -346,16 +346,18 @@ router.get('/search', requireAuth, async (req, res) => {
  * POST /api/swm/pos/sale
  * Execute atomic retail sale with stock deduction and receipt generation
  */
-router.post('/sale', requireAuth, async (req, res) => {
+router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.user.branch_id || 1;
+    const branchId = req.scopedBranchId;
     const {
       customer_name = 'Walk-in Customer',
       customer_phone,
+      customer_address,
+      salesperson_id,
       discount_amount = 0,
       tax_amount = 0,
-      payment_method = 'cash', // 'cash', 'card', 'split'
-      payment_breakdown = { cash: 0, card: 0 },
+      payment_method = 'cash', // 'cash', 'card', 'transfer', 'multi', 'split'
+      payment_breakdown = { cash: 0, card: 0, transfer: 0 },
       notes,
       items
     } = req.body;
@@ -366,16 +368,28 @@ router.post('/sale', requireAuth, async (req, res) => {
 
     // Check cash register if cash is part of the sale
     const register = await getOrCreateBranchRegister(branchId);
-    const cashPortion = payment_method === 'cash'
-      ? null // will be full final_amount
-      : (payment_method === 'split' ? parseFloat(payment_breakdown.cash || 0) : 0);
+    let cashPortion = 0;
+    if (payment_method === 'cash') {
+      cashPortion = null; // full amount
+    } else if (payment_method === 'card' || payment_method === 'transfer') {
+      cashPortion = 0;
+    } else {
+      cashPortion = parseFloat(payment_breakdown?.cash || 0);
+    }
 
+    // Auto-open cash register if it's closed so cashier is never blocked
     if (payment_method === 'cash' || cashPortion > 0) {
       if (register.status !== 'open') {
-        return res.status(400).json({
-          success: false,
-          message: 'Cash drawer must be OPEN to accept cash sales. Please open the session first.'
-        });
+        await query(
+          `UPDATE cash_registers
+           SET status = 'open',
+               opening_balance = COALESCE(opening_balance, 0),
+               current_balance = COALESCE(current_balance, 0),
+               updated_at = NOW()
+           WHERE id = $1`,
+          [register.id]
+        );
+        register.status = 'open';
       }
     }
 
@@ -475,28 +489,58 @@ router.post('/sale', requireAuth, async (req, res) => {
       const finalAmount = Math.max(0, subtotal - discTotal + taxTotal);
 
       // Structure payment breakdown
-      let finalBreakdown = payment_breakdown;
+      let finalBreakdown = {
+        cash: parseFloat(payment_breakdown?.cash || 0),
+        card: parseFloat(payment_breakdown?.card || 0),
+        transfer: parseFloat(payment_breakdown?.transfer || 0)
+      };
+
       if (payment_method === 'cash') {
-        finalBreakdown = { cash: finalAmount, card: 0 };
+        finalBreakdown = { cash: finalAmount, card: 0, transfer: 0 };
       } else if (payment_method === 'card') {
-        finalBreakdown = { cash: 0, card: finalAmount };
+        finalBreakdown = { cash: 0, card: finalAmount, transfer: 0 };
+      } else if (payment_method === 'transfer') {
+        finalBreakdown = { cash: 0, card: 0, transfer: finalAmount };
+      }
+
+      // Resolve valid salesperson / user ID for relational constraints
+      let effectiveUserId = salesperson_id ? parseInt(salesperson_id, 10) : null;
+      if (!effectiveUserId) {
+        if (!req.user.isBranchAccount) {
+          effectiveUserId = req.user.id;
+        } else {
+          // If branch account, find active user in this branch or fallback to admin
+          const userRows = (await client.query(
+            `SELECT id FROM users WHERE branch_id = $1 AND status = 'active' ORDER BY id ASC LIMIT 1`,
+            [branchId]
+          )).rows;
+          if (userRows.length > 0) {
+            effectiveUserId = userRows[0].id;
+          } else {
+            const adminRows = (await client.query(
+              `SELECT id FROM users WHERE role = 'super_admin' LIMIT 1`
+            )).rows;
+            effectiveUserId = adminRows.length > 0 ? adminRows[0].id : 1;
+          }
+        }
       }
 
       // 2. Insert into swm_sales_invoices
       const [invoice] = (await client.query(
         `INSERT INTO swm_sales_invoices (
           invoice_number, branch_id, salesperson_id, customer_name,
-          customer_phone, invoice_date, subtotal, discount_amount,
+          customer_phone, customer_address, invoice_date, subtotal, discount_amount,
           tax_amount, final_amount, payment_breakdown, payment_status,
           notes, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10, 'paid', $11, 'completed', NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 'paid', $12, 'completed', NOW(), NOW())
         RETURNING *`,
         [
           invNumber,
           branchId,
-          req.user.id,
+          effectiveUserId,
           customer_name || 'Walk-in Customer',
           customer_phone || null,
+          customer_address || null,
           subtotal,
           discTotal,
           taxTotal,
@@ -560,7 +604,7 @@ router.post('/sale', requireAuth, async (req, res) => {
             pItem.stock_after,
             invoice.id,
             `POS Sale #${invNumber}`,
-            req.user.id
+            effectiveUserId
           ]
         );
       }
@@ -612,9 +656,9 @@ router.post('/sale', requireAuth, async (req, res) => {
  * GET /api/swm/pos/invoices
  * List recent sales invoices for reprint or refund
  */
-router.get('/invoices', requireAuth, async (req, res) => {
+router.get('/invoices', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.user.branch_id || 1;
+    const branchId = req.scopedBranchId;
     const { page = 1, limit = 20, search } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
@@ -711,6 +755,276 @@ router.get('/invoices/:id', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('POS invoice detail error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/swm/pos/shift/summary
+ * Daily shift summary: timeline log of sales invoices and expenses, shift KPIs
+ */
+router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) => {
+  try {
+    const branchId = req.scopedBranchId;
+    const { date, salesperson_id } = req.query;
+
+    const targetDate = date ? date : new Date().toISOString().split('T')[0];
+
+    // Build filter for sales invoices
+    let invWhere = `si.branch_id = $1 AND DATE(si.invoice_date) = $2 AND si.status = 'completed'`;
+    const invParams = [branchId, targetDate];
+
+    if (salesperson_id) {
+      invWhere += ` AND si.salesperson_id = $${invParams.length + 1}`;
+      invParams.push(parseInt(salesperson_id, 10));
+    }
+
+    const invoices = await query(
+      `SELECT si.*,
+              u.full_name AS cashier_name,
+              u.username AS cashier_username
+       FROM swm_sales_invoices si
+       LEFT JOIN users u ON u.id = si.salesperson_id
+       WHERE ${invWhere}
+       ORDER BY si.invoice_date DESC`,
+      invParams
+    );
+
+    // Build filter for expenses
+    let expWhere = `e.branch_id = $1 AND DATE(e.expense_date) = $2 AND e.status = 'approved'`;
+    const expParams = [branchId, targetDate];
+
+    if (salesperson_id) {
+      expWhere += ` AND e.recorded_by = $${expParams.length + 1}`;
+      expParams.push(parseInt(salesperson_id, 10));
+    }
+
+    const expenses = await query(
+      `SELECT e.*,
+              u.full_name AS created_by_name,
+              u.username AS created_by_username
+       FROM expenses e
+       LEFT JOIN users u ON u.id = e.recorded_by
+       WHERE ${expWhere}
+       ORDER BY e.expense_date DESC, e.id DESC`,
+      expParams
+    );
+
+    // Fetch completed/delivered ECP (Online Store) orders for this branch/warehouse on targetDate
+    const ecpWhere = `((o.fulfilling_branch_id = $1) OR ($1 IN (1, 2) AND (o.fulfilling_branch_id IS NULL OR o.fulfilling_branch_id IN (1, 2))))
+                      AND o.order_status IN ('delivered', 'completed')
+                      AND DATE(COALESCE(o.delivered_at, o.updated_at, o.created_at)) = $2`;
+    const ecpOrders = await query(
+      `SELECT o.id, o.order_number, o.guest_email, o.shipping_address,
+              o.subtotal, o.shipping_cost, o.total_amount,
+              o.order_status, o.payment_status, o.payment_method,
+              o.shipping_carrier, o.tracking_number, o.parcel_count,
+              o.shipped_at, o.delivered_at, o.created_at, o.updated_at,
+              o.customer_notes
+       FROM ecp_orders o
+       WHERE ${ecpWhere}
+       ORDER BY COALESCE(o.delivered_at, o.created_at) DESC`,
+      [branchId, targetDate]
+    );
+
+    // Also fetch recent delivered ECP orders (up to 25) so users can inspect them anytime
+    const recentEcpOrders = await query(
+      `SELECT o.id, o.order_number, o.guest_email, o.shipping_address,
+              o.subtotal, o.shipping_cost, o.total_amount,
+              o.order_status, o.payment_status, o.payment_method,
+              o.shipping_carrier, o.tracking_number, o.parcel_count,
+              o.shipped_at, o.delivered_at, o.created_at, o.updated_at,
+              o.customer_notes
+       FROM ecp_orders o
+       WHERE ((o.fulfilling_branch_id = $1) OR ($1 IN (1, 2) AND (o.fulfilling_branch_id IS NULL OR o.fulfilling_branch_id IN (1, 2))))
+         AND o.order_status IN ('delivered', 'completed')
+       ORDER BY COALESCE(o.delivered_at, o.created_at) DESC
+       LIMIT 25`,
+      [branchId]
+    );
+
+    // Calculate aggregated sales KPIs for POS invoices
+    let posSales = 0;
+    let cashSales = 0;
+    let cardSales = 0;
+    let transferSales = 0;
+
+    for (const inv of invoices) {
+      const amt = parseFloat(inv.final_amount || 0);
+      posSales += amt;
+
+      let bd = inv.payment_breakdown;
+      if (typeof bd === 'string') {
+        try { bd = JSON.parse(bd); } catch (e) { bd = {}; }
+      }
+      if (bd && typeof bd === 'object') {
+        cashSales += parseFloat(bd.cash || 0);
+        cardSales += parseFloat(bd.card || 0);
+        transferSales += parseFloat(bd.transfer || 0);
+      } else {
+        cashSales += amt;
+      }
+    }
+
+    // Calculate aggregated sales KPIs for ECP orders
+    let ecpSales = 0;
+    for (const ord of ecpOrders) {
+      const amt = parseFloat(ord.total_amount || 0);
+      ecpSales += amt;
+      const pm = (ord.payment_method || '').toLowerCase();
+      if (pm === 'cod' || pm.includes('cash') || pm.includes('استلام')) {
+        cashSales += amt;
+      } else if (pm.includes('card') || pm.includes('visa')) {
+        cardSales += amt;
+      } else {
+        transferSales += amt;
+      }
+    }
+
+    // Calculate expenses KPIs
+    let totalExpenses = 0;
+    for (const exp of expenses) {
+      totalExpenses += parseFloat(exp.amount || 0);
+    }
+
+    // Get register opening & current balance
+    const register = await getOrCreateBranchRegister(branchId);
+    const openingBalance = parseFloat(register.opening_balance || 0);
+    const expectedDrawerCash = Math.max(0, openingBalance + cashSales - totalExpenses);
+
+    const totalSales = posSales + ecpSales;
+    const completedCount = invoices.length + ecpOrders.length;
+    const averageOrderValue = completedCount > 0 ? (totalSales / completedCount) : 0;
+    const netRevenue = totalSales - totalExpenses;
+
+    // Helper to format an ECP order for the completed orders table
+    const formatEcpOrder = (o) => {
+      let addr = {};
+      if (typeof o.shipping_address === 'string') {
+        try { addr = JSON.parse(o.shipping_address || '{}'); } catch (e) { addr = {}; }
+      } else if (o.shipping_address) {
+        addr = o.shipping_address;
+      }
+      return {
+        id: `ecp_${o.id}`,
+        rawId: o.id,
+        orderType: 'ecp',
+        typeLabel: 'طلب متجر إلكتروني (ECP)',
+        orderNumber: o.order_number,
+        time: o.delivered_at || o.created_at,
+        customerName: addr.recipient_name || o.guest_email || 'عميل المتجر',
+        customerPhone: addr.phone || '-',
+        city: addr.city || 'متجر إلكتروني',
+        amount: parseFloat(o.total_amount || 0),
+        paymentMethod: o.payment_method || 'الدفع عند الاستلام',
+        carrier: o.shipping_carrier || 'مندوب المتجر',
+        trackingNumber: o.tracking_number || '-',
+        parcelCount: o.parcel_count || 1,
+        status: o.order_status,
+        salesperson: 'المتجر الإلكتروني',
+        details: o
+      };
+    };
+
+    // Combine POS invoices & ECP orders into unified completed_orders
+    const completedOrders = [
+      ...invoices.map(inv => ({
+        id: `pos_${inv.id}`,
+        rawId: inv.id,
+        orderType: 'pos',
+        typeLabel: 'فاتورة صالة (POS)',
+        orderNumber: inv.invoice_number,
+        time: inv.invoice_date,
+        customerName: inv.customer_name || 'عميل نقدي',
+        customerPhone: inv.customer_phone || '-',
+        city: 'الفرع مباشرة',
+        amount: parseFloat(inv.final_amount || 0),
+        paymentMethod: inv.payment_breakdown ? 'تفصيل متعدد' : 'كاش / نقدية',
+        paymentBreakdown: inv.payment_breakdown,
+        status: inv.status,
+        salesperson: inv.cashier_name || inv.cashier_username || 'الفرع',
+        details: inv
+      })),
+      ...ecpOrders.map(formatEcpOrder)
+    ].sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    const recentCompletedEcp = recentEcpOrders.map(formatEcpOrder);
+
+    // Combine into unified chronological timeline
+    const timeline = [
+      ...invoices.map(inv => ({
+        type: 'sale',
+        id: inv.id,
+        number: inv.invoice_number,
+        time: inv.invoice_date,
+        amount: parseFloat(inv.final_amount || 0),
+        customer_name: inv.customer_name,
+        customer_phone: inv.customer_phone,
+        salesperson_name: inv.cashier_name || inv.cashier_username,
+        payment_breakdown: inv.payment_breakdown,
+        notes: inv.notes,
+        source: 'pos'
+      })),
+      ...ecpOrders.map(o => ({
+        type: 'sale',
+        id: o.id,
+        number: o.order_number,
+        time: o.delivered_at || o.created_at,
+        amount: parseFloat(o.total_amount || 0),
+        customer_name: (typeof o.shipping_address === 'string' ? JSON.parse(o.shipping_address || '{}').recipient_name : o.shipping_address?.recipient_name) || o.guest_email || 'عميل أونلاين',
+        customer_phone: (typeof o.shipping_address === 'string' ? JSON.parse(o.shipping_address || '{}').phone : o.shipping_address?.phone) || '-',
+        salesperson_name: 'شحن أونلاين',
+        payment_breakdown: o.payment_method,
+        notes: `شركة الشحن: ${o.shipping_carrier || 'مندوب'} - بوليصة: ${o.tracking_number || '-'}`,
+        source: 'ecp'
+      })),
+      ...expenses.map(exp => ({
+        type: 'expense',
+        id: exp.id,
+        number: exp.expense_ref,
+        time: exp.created_at || exp.expense_date,
+        amount: parseFloat(exp.amount || 0),
+        category: exp.category,
+        subcategory: exp.subcategory,
+        description: exp.description,
+        salesperson_name: exp.created_by_name || exp.created_by_username
+      }))
+    ].sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    return res.json({
+      success: true,
+      data: {
+        date: targetDate,
+        sales_count: completedCount,
+        pos_count: invoices.length,
+        ecp_count: ecpOrders.length,
+        expenses_count: expenses.length,
+        total_transactions: completedCount + expenses.length,
+        kpi: {
+          total_sales: totalSales,
+          pos_sales: posSales,
+          ecp_sales: ecpSales,
+          completed_count: completedCount,
+          average_order_value: averageOrderValue,
+          cash_sales: cashSales,
+          card_sales: cardSales,
+          transfer_sales: transferSales,
+          total_expenses: totalExpenses,
+          net_revenue: netRevenue,
+          opening_balance: openingBalance,
+          expected_drawer_cash: expectedDrawerCash,
+          register_current_balance: parseFloat(register.current_balance || 0)
+        },
+        invoices,
+        ecp_orders: ecpOrders,
+        completed_orders: completedOrders,
+        recent_completed_ecp: recentCompletedEcp,
+        expenses,
+        timeline
+      }
+    });
+  } catch (err) {
+    console.error('Shift summary error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });

@@ -44,7 +44,9 @@ import {
   CopyOutlined,
   PictureOutlined,
   CreditCardOutlined,
-  QrcodeOutlined
+  QrcodeOutlined,
+  UserOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import api from '../api';
 
@@ -62,6 +64,10 @@ export default function Orders() {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Staff Preparers Directory State
+  const [staffPreparers, setStaffPreparers] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
 
   // Detail Modal
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -115,7 +121,23 @@ export default function Orders() {
     fetchShippingRates();
     fetchShippingCarriers();
     fetchPaymentMethods();
+    fetchStaffPreparers();
   }, [statusFilter]);
+
+  // Fetch staff preparers directory
+  const fetchStaffPreparers = async () => {
+    setLoadingStaff(true);
+    try {
+      const res = await api.get('/api/swm/orders/staff-preparers');
+      if (res.data.success) {
+        setStaffPreparers(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Fetch staff preparers error:', err);
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
 
   // Fetch orders
   const fetchOrders = async () => {
@@ -199,6 +221,7 @@ export default function Orders() {
       tracking_number: `WAYBILL-${Date.now().toString().slice(-6)}`,
       parcel_count: 1,
       shipping_carrier: defaultCarrier,
+      packed_by_id: record.packed_by_id || undefined,
       shipping_notes: ''
     });
     setIsShipModalOpen(true);
@@ -657,6 +680,12 @@ export default function Orders() {
             <div style={{ fontSize: 11, color: '#0891b2', marginTop: 2 }}>
               <BarcodeOutlined style={{ marginLeft: 4 }} />
               بوليصة: <strong>{r.tracking_number}</strong> ({r.parcel_count || 1} طرد)
+            </div>
+          )}
+          {r.packed_by_name && (
+            <div style={{ fontSize: 11, color: '#059669', marginTop: 2 }}>
+              <TeamOutlined style={{ marginLeft: 4 }} />
+              تجهيز: <strong>{r.packed_by_name}</strong>
             </div>
           )}
         </div>
@@ -1217,6 +1246,55 @@ export default function Orders() {
                 </>
               )}
 
+              {/* Staff Preparer (الموظف الذي حضر طرود الشحن) */}
+              <Descriptions.Item label="الموظف محضر الطرود (مستودع المتجر)" span={2}>
+                {selectedOrder.order_status === 'processing' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <Select
+                      placeholder="اختر موظف تجهيز الطرود من مستودع المتجر..."
+                      value={selectedOrder.packed_by_id || undefined}
+                      onChange={async (val) => {
+                        try {
+                          const res = await api.put(`/api/swm/orders/${selectedOrder.id}/preparer`, { packed_by_id: val });
+                          if (res.data.success) {
+                            message.success('تم تعيين موظف تجهيز الطرود بنجاح');
+                            setSelectedOrder(prev => ({
+                              ...prev,
+                              packed_by_id: res.data.data.packed_by_id,
+                              packed_by_name: res.data.data.packed_by_name
+                            }));
+                            fetchOrders();
+                          }
+                        } catch (err) {
+                          message.error('فشل تعيين موظف التجهيز');
+                        }
+                      }}
+                      style={{ minWidth: 260 }}
+                      showSearch
+                      optionFilterProp="label"
+                      loading={loadingStaff}
+                      options={staffPreparers.map((s) => ({
+                        value: s.id,
+                        label: `${s.full_name || s.username} (${s.role_label || s.role})`
+                      }))}
+                    />
+                    {selectedOrder.packed_by_name && (
+                      <Tag color="green" icon={<CheckCircleOutlined />}>
+                        تم التعيين: {selectedOrder.packed_by_name}
+                      </Tag>
+                    )}
+                  </div>
+                ) : (
+                  selectedOrder.packed_by_name ? (
+                    <Tag color="green" icon={<TeamOutlined />} style={{ fontSize: 13, padding: '3px 10px', fontWeight: 600 }}>
+                      {selectedOrder.packed_by_name}
+                    </Tag>
+                  ) : (
+                    <Text type="secondary">لم يُحدد</Text>
+                  )
+                )}
+              </Descriptions.Item>
+
               {selectedOrder.customer_notes && (
                 <Descriptions.Item label="ملاحظات العميل" span={2}>
                   {selectedOrder.customer_notes}
@@ -1413,6 +1491,23 @@ export default function Orders() {
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            label="الموظف الذي حضر طرود الشحن (فريق عمل مستودع المتجر) *"
+            name="packed_by_id"
+            rules={[{ required: true, message: 'يرجى اختيار الموظف الذي قام بتحضير وتجهيز الطرد' }]}
+          >
+            <Select
+              showSearch
+              placeholder="اختر موظف التجهيز من فريق عمل مستودع المتجر الإلكتروني..."
+              optionFilterProp="label"
+              loading={loadingStaff}
+              options={staffPreparers.map((s) => ({
+                value: s.id,
+                label: `${s.full_name || s.username} (${s.role_label || s.role})`
+              }))}
+            />
+          </Form.Item>
 
           <Form.Item label="ملاحظات الشحن ومتابعة المندوب" name="shipping_notes">
             <Input.TextArea rows={2} placeholder="أي تعليمات أو ملاحظات خاصة بشركة الشحن..." />
