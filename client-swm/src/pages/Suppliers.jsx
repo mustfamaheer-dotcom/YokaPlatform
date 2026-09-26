@@ -326,7 +326,7 @@ export default function Suppliers() {
         </Row>
       </Card>
 
-      <Card bodyStyle={{ padding: 0 }}>
+      <Card styles={{ body: { padding: 0 } }}>
         <Table
           columns={columns}
           dataSource={suppliers}
@@ -353,7 +353,7 @@ export default function Suppliers() {
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={560}
       >
         <Form form={form} layout="vertical" onFinish={handleSaveSupplier}>
@@ -656,7 +656,7 @@ export default function Suppliers() {
         open={payModalOpen}
         onCancel={() => setPayModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={560}
       >
         <Form form={payForm} layout="vertical" onFinish={handleExecutePayment}>

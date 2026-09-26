@@ -11,7 +11,9 @@
     "start:swm": "node server/swm/app.js",
     "dev:client": "npm --prefix client-swm run dev",
     "build:client": "npm --prefix client-swm run build",
-    "install:all": "npm install && npm --prefix client-swm install"
+    "dev:ecp": "npm --prefix client-ecp run dev",
+    "build:ecp": "npm --prefix client-ecp run build",
+    "install:all": "npm install && npm --prefix client-swm install && npm --prefix client-ecp install"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

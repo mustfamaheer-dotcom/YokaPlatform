@@ -16,15 +16,21 @@ import {
   Col,
   Switch,
   Alert,
-  Tooltip
+  Tooltip,
+  Popconfirm,
+  Upload,
+  Avatar
 } from 'antd';
 import {
   PlusOutlined,
   SearchOutlined,
   ReloadOutlined,
   BarcodeOutlined,
-  CheckCircleOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  UploadOutlined,
+  PictureOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import VariantMatrix from '../components/VariantMatrix';
@@ -38,9 +44,18 @@ export default function Products() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(undefined);
+  
+  // Create Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [generatedVariants, setGeneratedVariants] = useState([]);
+  const [createImageUrl, setCreateImageUrl] = useState('');
+
+  // Edit Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editImageUrl, setEditImageUrl] = useState('');
 
   // Auto-generated codes and dynamic constructed name state
   const [autoCode, setAutoCode] = useState('');
@@ -48,6 +63,7 @@ export default function Products() {
   const [constructedName, setConstructedName] = useState('');
 
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const currentCode = Form.useWatch('product_code', form) || autoCode;
   const currentPrice = Form.useWatch('selling_price', form);
 
@@ -57,6 +73,44 @@ export default function Products() {
     const code = `PRD-${randNum}`;
     const barcode = `622${Date.now().toString().slice(-9)}${Math.floor(Math.random() * 10)}`;
     return { code, barcode };
+  };
+
+  // Helper to handle local file upload to Base64 data URI with canvas compression
+  const handleFileUpload = (file, setUrlFunc, formInstance) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800; // Optimal size for e-commerce product cards
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG 82% quality (typically ~40-90KB)
+        const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        setUrlFunc(optimizedDataUrl);
+        formInstance.setFieldsValue({ featured_image: optimizedDataUrl });
+        message.success('تم تحسين ورفع الصورة بنجاح!');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    return false; // prevent automatic HTTP post by upload component
   };
 
   // Fetch products
@@ -102,6 +156,7 @@ export default function Products() {
     setAutoBarcode(barcode);
     setConstructedName('');
     setGeneratedVariants([]);
+    setCreateImageUrl('');
 
     form.setFieldsValue({
       product_code: code,
@@ -113,7 +168,8 @@ export default function Products() {
       base_name: '',
       color: '',
       size: '',
-      product_name: ''
+      product_name: '',
+      featured_image: ''
     });
 
     setIsModalOpen(true);
@@ -130,7 +186,6 @@ export default function Products() {
     message.info('تم توليد كود وباركود جديدين تلقائياً');
   };
 
-  // Automatically construct descriptive product name: Base Name + Color + Size
   const handleValuesChange = (changedValues, allValues) => {
     if ('base_name' in changedValues || 'color' in changedValues || 'size' in changedValues) {
       const base = allValues.base_name ? allValues.base_name.trim() : '';
@@ -144,6 +199,10 @@ export default function Products() {
 
       setConstructedName(finalName);
       form.setFieldsValue({ product_name: finalName });
+    }
+
+    if ('featured_image' in changedValues) {
+      setCreateImageUrl(changedValues.featured_image || '');
     }
   };
 
@@ -166,6 +225,7 @@ export default function Products() {
         cost_price: values.cost_price,
         selling_price: values.selling_price,
         is_ecom_listed: Boolean(values.is_ecom_listed),
+        featured_image: values.featured_image || createImageUrl || null,
         variants: generatedVariants.map((v) => ({
           color: v.color,
           size: v.size,
@@ -175,10 +235,11 @@ export default function Products() {
 
       const res = await api.post('/api/swm/products', payload);
       if (res.data.success) {
-        message.success('تم حفظ المنتج وتوليد الكود والمتغيرات بنجاح!');
+        message.success('تم حفظ المنتج وتوليد الكود والصورة بنجاح!');
         setIsModalOpen(false);
         form.resetFields();
         setGeneratedVariants([]);
+        setCreateImageUrl('');
         fetchProducts();
       }
     } catch (err) {
@@ -188,7 +249,85 @@ export default function Products() {
     }
   };
 
+  const handleToggleEcom = async (record, checked) => {
+    try {
+      const res = await api.put(`/api/swm/products/${record.id}`, { is_ecom_listed: checked });
+      if (res.data.success) {
+        message.success(checked ? 'تم تفعيل عرض المنتج في المتجر (ECP)' : 'تم إخفاء المنتج من المتجر (ECP)');
+        fetchProducts();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل تغيير حالة عرض المنتج');
+    }
+  };
+
+  const handleOpenEdit = (record) => {
+    setEditingProduct(record);
+    setEditImageUrl(record.featured_image || '');
+    editForm.setFieldsValue({
+      product_name: record.product_name,
+      category_id: record.category_id,
+      brand: record.brand,
+      cost_price: record.cost_price,
+      selling_price: record.selling_price,
+      sale_price: record.sale_price,
+      status: record.status,
+      is_ecom_listed: record.is_ecom_listed,
+      featured_image: record.featured_image || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditProduct = async (values) => {
+    if (!editingProduct) return;
+    setEditSubmitting(true);
+    try {
+      const payload = {
+        ...values,
+        featured_image: values.featured_image || editImageUrl || null
+      };
+      const res = await api.put(`/api/swm/products/${editingProduct.id}`, payload);
+      if (res.data.success) {
+        message.success('تم تحديث بيانات وصورة المنتج بنجاح!');
+        setIsEditModalOpen(false);
+        setEditingProduct(null);
+        setEditImageUrl('');
+        fetchProducts();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في تحديث بيانات المنتج');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id) => {
+    try {
+      const res = await api.delete(`/api/swm/products/${id}`);
+      if (res.data.success) {
+        message.success('تم إيقاف المنتج وتحويل حالته إلى غير نشط');
+        fetchProducts();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في حذف/إيقاف المنتج');
+    }
+  };
+
   const columns = [
+    {
+      title: 'صورة المنتج',
+      key: 'photo',
+      width: 70,
+      render: (_, record) => (
+        <Avatar
+          shape="square"
+          size={44}
+          src={record.featured_image || '/yokaStoreTransparent.png'}
+          icon={<PictureOutlined />}
+          style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', objectFit: 'contain' }}
+        />
+      )
+    },
     {
       title: 'كود المنتج / الباركود',
       key: 'codes',
@@ -203,7 +342,7 @@ export default function Products() {
       )
     },
     {
-      title: 'اسم المنتج الوصفي (الاسم + المقاس + اللون)',
+      title: 'اسم المنتج',
       dataIndex: 'product_name',
       key: 'product_name',
       render: (name, record) => (
@@ -259,6 +398,18 @@ export default function Products() {
       }
     },
     {
+      title: 'عرض بالمتجر (ECP)',
+      key: 'is_ecom_listed',
+      render: (_, record) => (
+        <Switch
+          checkedChildren="معروض"
+          unCheckedChildren="مخفي"
+          checked={Boolean(record.is_ecom_listed)}
+          onChange={(checked) => handleToggleEcom(record, checked)}
+        />
+      )
+    },
+    {
       title: 'الحالة',
       dataIndex: 'status',
       key: 'status',
@@ -266,6 +417,36 @@ export default function Products() {
         <Tag color={status === 'active' ? 'green' : 'default'}>
           {status === 'active' ? 'نشط' : status}
         </Tag>
+      )
+    },
+    {
+      title: 'الإجراءات',
+      key: 'actions',
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            type="primary"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleOpenEdit(record)}
+            style={{ backgroundColor: '#2563eb' }}
+          >
+            تعديل
+          </Button>
+
+          <Popconfirm
+            title="حذف المنتج؟"
+            description="سيتم تحويل حالة المنتج إلى غير نشط (Discontinued)."
+            onConfirm={() => handleDeleteProduct(record.id)}
+            okText="نعم، احذف"
+            cancelText="إلغاء"
+            okButtonProps={{ danger: true }}
+          >
+            <Button size="small" danger icon={<DeleteOutlined />}>
+              حذف
+            </Button>
+          </Popconfirm>
+        </Space>
       )
     }
   ];
@@ -275,7 +456,7 @@ export default function Products() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <Title level={4} style={{ margin: 0 }}>كتالوج المنتجات والمخزون (Product Catalog & Inventory)</Title>
-          <Text type="secondary">توليد الأكواد آلياً، بناء الأسماء الوصفية الشاملة، وإدارة مصفوفات الأصناف</Text>
+          <Text type="secondary">توليد الأكواد آلياً، تخصيص صور المنتجات، وتحديد الأسعار والعرض بالمتجر (ECP)</Text>
         </div>
         <Button
           type="primary"
@@ -331,19 +512,19 @@ export default function Products() {
         bordered
       />
 
-      {/* Modal: New Product with Auto-Generated Codes & Auto-Constructed Descriptive Name */}
+      {/* Modal: New Product */}
       <Modal
         title={
           <Space>
             <ThunderboltOutlined style={{ color: '#2563eb' }} />
-            <span>إضافة منتج جديد (توليد آلي للأكواد وبناء الاسم الوصفي)</span>
+            <span>إضافة منتج جديد مع تخصيص الصورة والتفاصيل</span>
           </Space>
         }
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         width={800}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={form}
@@ -351,7 +532,6 @@ export default function Products() {
           onFinish={handleCreateProduct}
           onValuesChange={handleValuesChange}
         >
-          {/* Requirement 3.1: Auto-generated Product Code & Barcode (No typing required) */}
           <Alert
             type="info"
             showIcon
@@ -379,21 +559,47 @@ export default function Products() {
             }
           />
 
-          {/* Hidden fields storing the auto-generated code and barcode */}
-          <Form.Item name="product_code" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item name="barcode" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item name="product_name" hidden>
-            <Input />
-          </Form.Item>
+          <Form.Item name="product_code" hidden><Input /></Form.Item>
+          <Form.Item name="barcode" hidden><Input /></Form.Item>
+          <Form.Item name="product_name" hidden><Input /></Form.Item>
 
-          {/* Requirement 3.2: Automatically construct Product Name by concatenating Base Name + Size + Color */}
+          {/* Product Image Section */}
           <Card size="small" style={{ marginBottom: 16, background: '#f8fafc', borderColor: '#e2e8f0' }}>
             <Text strong style={{ display: 'block', marginBottom: 10, color: '#1e293b' }}>
-              تفاصيل الصنف الأساسية (تُدمج تلقائياً لتوليد الاسم الكامل في الفواتير):
+              صورة المنتج الرئيسية (Featured Photo):
+            </Text>
+            <Row gutter={16} align="middle">
+              <Col span={16}>
+                <Form.Item label="رابط الصورة المباشر (Image URL or Path)" name="featured_image" style={{ marginBottom: 8 }}>
+                  <Input
+                    placeholder="https://... أو /yokaStoreTransparent.png"
+                    onChange={(e) => setCreateImageUrl(e.target.value)}
+                  />
+                </Form.Item>
+                <Upload
+                  beforeUpload={(file) => handleFileUpload(file, setCreateImageUrl, form)}
+                  showUploadList={false}
+                  accept="image/*"
+                >
+                  <Button icon={<UploadOutlined />}>رفع صورة من الجهاز (Upload File)</Button>
+                </Upload>
+              </Col>
+              <Col span={8} style={{ textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>معاينة الصورة:</Text>
+                <div style={{ width: 80, height: 80, border: '1px dashed #cbd5e1', borderRadius: 8, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#fff' }}>
+                  {createImageUrl ? (
+                    <img src={createImageUrl} alt="معاينة" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <PictureOutlined style={{ fontSize: 28, color: '#94a3b8' }} />
+                  )}
+                </div>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card size="small" style={{ marginBottom: 16, background: '#f8fafc', borderColor: '#e2e8f0' }}>
+            <Text strong style={{ display: 'block', marginBottom: 10, color: '#1e293b' }}>
+              تفاصيل الصنف الأساسية:
             </Text>
 
             <Row gutter={16}>
@@ -418,21 +624,12 @@ export default function Products() {
               </Col>
             </Row>
 
-            {/* Live Preview of the Auto-Constructed Product Name */}
-            <div
-              style={{
-                background: '#ffffff',
-                border: '1px dashed #cbd5e1',
-                padding: '10px 14px',
-                borderRadius: 6,
-                marginTop: 2
-              }}
-            >
+            <div style={{ background: '#ffffff', border: '1px dashed #cbd5e1', padding: '10px 14px', borderRadius: 6, marginTop: 2 }}>
               <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 2 }}>
-                معاينة الاسم الوصفي المعتمد في الفواتير وكشوف الحساب (Product Full Name):
+                معاينة الاسم الوصفي المعتمد:
               </Text>
               <Text strong style={{ fontSize: 16, color: constructedName ? '#1e40af' : '#94a3b8' }}>
-                {constructedName || 'سيظهر الاسم الكامل هنا بمجرد كتابة التفاصيل...'}
+                {constructedName || 'سيظهر الاسم الكامل هنا...'}
               </Text>
             </div>
           </Card>
@@ -446,9 +643,7 @@ export default function Products() {
               >
                 <Select placeholder="اختر القسم">
                   {categories.map((c) => (
-                    <Option key={c.id} value={c.id}>
-                      {c.category_name}
-                    </Option>
+                    <Option key={c.id} value={c.id}>{c.category_name}</Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -462,21 +657,13 @@ export default function Products() {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item
-                label="سعر التكلفة (ج.م) *"
-                name="cost_price"
-                rules={[{ required: true, message: 'يرجى تحديد سعر التكلفة' }]}
-              >
-                <InputNumber style={{ width: '100%' }} min={0} step={1} addonAfter="ج.م" />
+              <Form.Item label="سعر التكلفة (ج.م) *" name="cost_price" rules={[{ required: true, message: 'حدد التكلفة' }]}>
+                <InputNumber style={{ width: '100%' }} min={0} step={1} prefix="ج.م " />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item
-                label="سعر البيع الأساسي (ج.م) *"
-                name="selling_price"
-                rules={[{ required: true, message: 'يرجى تحديد سعر البيع' }]}
-              >
-                <InputNumber style={{ width: '100%' }} min={0} step={1} addonAfter="ج.م" />
+              <Form.Item label="سعر البيع الأساسي (ج.م) *" name="selling_price" rules={[{ required: true, message: 'حدد سعر البيع' }]}>
+                <InputNumber style={{ width: '100%' }} min={0} step={1} prefix="ج.م " />
               </Form.Item>
             </Col>
           </Row>
@@ -485,7 +672,6 @@ export default function Products() {
             <Switch defaultChecked />
           </Form.Item>
 
-          {/* Variant Matrix Generator Component */}
           <VariantMatrix
             productCode={currentCode}
             basePrice={currentPrice}
@@ -495,13 +681,135 @@ export default function Products() {
           <div style={{ textAlign: 'left', marginTop: 24 }}>
             <Space>
               <Button onClick={() => setIsModalOpen(false)}>إلغاء</Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={submitting}
-                style={{ backgroundColor: '#2563eb' }}
-              >
-                حفظ المنتج والمتغيرات (Single Transaction)
+              <Button type="primary" htmlType="submit" loading={submitting} style={{ backgroundColor: '#2563eb' }}>
+                حفظ المنتج والمتغيرات والصورة
+              </Button>
+            </Space>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* Modal: Edit Existing Product */}
+      <Modal
+        title={
+          <Space>
+            <EditOutlined style={{ color: '#2563eb' }} />
+            <span>تعديل بيانات وصورة المنتج ({editingProduct?.product_code})</span>
+          </Space>
+        }
+        open={isEditModalOpen}
+        onCancel={() => {
+          setIsEditModalOpen(false);
+          setEditingProduct(null);
+        }}
+        footer={null}
+        destroyOnHidden
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleEditProduct}
+          onValuesChange={(changed) => {
+            if ('featured_image' in changed) {
+              setEditImageUrl(changed.featured_image || '');
+            }
+          }}
+        >
+          <Form.Item
+            label="اسم المنتج"
+            name="product_name"
+            rules={[{ required: true, message: 'يرجى إدخال اسم المنتج' }]}
+          >
+            <Input />
+          </Form.Item>
+
+          {/* Edit Photo Section */}
+          <Card size="small" style={{ marginBottom: 16, background: '#f8fafc', borderColor: '#e2e8f0' }}>
+            <Text strong style={{ display: 'block', marginBottom: 10, color: '#1e293b' }}>
+              صورة المنتج الرئيسية (Product Image):
+            </Text>
+            <Row gutter={16} align="middle">
+              <Col span={16}>
+                <Form.Item label="رابط الصورة (Image URL / Data URI)" name="featured_image" style={{ marginBottom: 8 }}>
+                  <Input placeholder="https://... أو /yokaStoreTransparent.png" />
+                </Form.Item>
+                <Upload
+                  beforeUpload={(file) => handleFileUpload(file, setEditImageUrl, editForm)}
+                  showUploadList={false}
+                  accept="image/*"
+                >
+                  <Button icon={<UploadOutlined />}>تغيير الصورة من الجهاز (Upload File)</Button>
+                </Upload>
+              </Col>
+              <Col span={8} style={{ textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>معاينة الصورة الحالية:</Text>
+                <div style={{ width: 80, height: 80, border: '1px dashed #cbd5e1', borderRadius: 8, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#fff' }}>
+                  {editImageUrl ? (
+                    <img src={editImageUrl} alt="معاينة" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <PictureOutlined style={{ fontSize: 28, color: '#94a3b8' }} />
+                  )}
+                </div>
+              </Col>
+            </Row>
+          </Card>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="القسم" name="category_id">
+                <Select placeholder="اختر القسم">
+                  {categories.map((c) => (
+                    <Option key={c.id} value={c.id}>{c.category_name}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="الماركة / البراند" name="brand">
+                <Input />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="سعر التكلفة (ج.م)" name="cost_price">
+                <InputNumber style={{ width: '100%' }} min={0} prefix="ج.م " />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="سعر البيع (ج.م)" name="selling_price">
+                <InputNumber style={{ width: '100%' }} min={0} prefix="ج.م " />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="سعر التخفيض / الخصم (Sale Price)" name="sale_price">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="اختياري" prefix="ج.م " />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="حالة المنتج" name="status">
+                <Select>
+                  <Option value="active">نشط (Active)</Option>
+                  <Option value="inactive">غير نشط (Inactive)</Option>
+                  <Option value="discontinued">متوقف (Discontinued)</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item label="العرض في المتجر الإلكتروني (ECP Listing)" name="is_ecom_listed" valuePropName="checked">
+            <Switch checkedChildren="مفعل" unCheckedChildren="معطل" />
+          </Form.Item>
+
+          <div style={{ textAlign: 'left', marginTop: 24 }}>
+            <Space>
+              <Button onClick={() => setIsEditModalOpen(false)}>إلغاء</Button>
+              <Button type="primary" htmlType="submit" loading={editSubmitting} style={{ backgroundColor: '#2563eb' }}>
+                حفظ التعديلات والصورة
               </Button>
             </Space>
           </div>

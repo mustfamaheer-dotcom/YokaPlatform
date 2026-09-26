@@ -887,7 +887,7 @@ export default function Purchases() {
                   </Row>
                 </Card>
 
-                <Card bodyStyle={{ padding: 0 }}>
+                <Card styles={{ body: { padding: 0 } }}>
                   <Table
                     columns={invoiceColumns}
                     dataSource={invoices}
@@ -972,7 +972,7 @@ export default function Purchases() {
                   </Row>
                 </Card>
 
-                <Card bodyStyle={{ padding: 0 }}>
+                <Card styles={{ body: { padding: 0 } }}>
                   <Table
                     columns={returnColumns}
                     dataSource={returnsList}

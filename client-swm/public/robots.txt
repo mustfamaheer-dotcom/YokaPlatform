@@ -1,0 +1,3 @@
+# Disallow all indexing for private SWM Portal & POS
+User-agent: *
+Disallow: /

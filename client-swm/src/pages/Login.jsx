@@ -42,7 +42,7 @@ export default function Login({ onLoginSuccess }) {
 
   return (
     <div className="auth-container">
-      <Card className="auth-card" bordered={false}>
+      <Card className="auth-card" variant="borderless">
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <img
             src="/yokaStoreTransparent.png"

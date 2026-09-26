@@ -9,7 +9,8 @@ import {
   UserOutlined,
   ContactsOutlined,
   FileTextOutlined,
-  ScanOutlined
+  ScanOutlined,
+  InboxOutlined
 } from '@ant-design/icons';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -19,6 +20,7 @@ import Users from './pages/Users';
 import Suppliers from './pages/Suppliers';
 import Purchases from './pages/Purchases';
 import POS from './pages/POS';
+import Orders from './pages/Orders';
 import api from './api';
 
 const { Header, Content, Sider } = Layout;
@@ -59,6 +61,7 @@ export default function App() {
 
   const menuItems = [
     { key: 'dashboard', icon: <DashboardOutlined />, label: 'لوحة التحكم' },
+    { key: 'orders', icon: <InboxOutlined />, label: 'طلبات المتجر الإلكتروني (ECP)' },
     { key: 'pos', icon: <ScanOutlined />, label: 'نقطة البيع الكاشير (POS)' },
     { key: 'purchases', icon: <FileTextOutlined />, label: 'فواتير المشتريات والتوريد' },
     { key: 'suppliers', icon: <ContactsOutlined />, label: 'الموردين والحسابات' },
@@ -148,6 +151,7 @@ export default function App() {
 
         <Content style={{ margin: '24px', minHeight: 280 }}>
           {activeTab === 'dashboard' && <Dashboard onNavigate={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'orders' && <Orders />}
           {activeTab === 'pos' && <POS />}
           {activeTab === 'purchases' && <Purchases />}
           {activeTab === 'suppliers' && <Suppliers />}

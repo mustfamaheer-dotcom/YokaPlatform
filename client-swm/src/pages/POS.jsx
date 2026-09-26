@@ -319,7 +319,7 @@ export default function POS() {
           borderColor: '#1e293b',
           color: '#fff'
         }}
-        bodyStyle={{ padding: '8px 16px' }}
+        styles={{ body: { padding: '8px 16px' } }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space size="large">
@@ -405,7 +405,7 @@ export default function POS() {
         <Col xs={24} lg={14} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card
             style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            bodyStyle={{ padding: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            styles={{ body: { padding: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
           >
             {/* Fast Barcode / Keyword input */}
             <div style={{ marginBottom: 12 }}>
@@ -438,7 +438,7 @@ export default function POS() {
                           borderColor: item.available_qty > 0 ? '#e2e8f0' : '#fecaca',
                           background: item.available_qty > 0 ? '#fff' : '#fff1f2'
                         }}
-                        bodyStyle={{ padding: 10 }}
+                        styles={{ body: { padding: 10 } }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                           <Text code style={{ fontSize: 11 }}>{item.barcode || item.product_code}</Text>
@@ -479,7 +479,7 @@ export default function POS() {
         <Col xs={24} lg={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Card
             style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            bodyStyle={{ padding: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            styles={{ body: { padding: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
           >
             {/* Customer Details Row */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -694,7 +694,7 @@ export default function POS() {
         onCancel={() => setReceiptModalVisible(false)}
         footer={null}
         width={380}
-        destroyOnClose
+        destroyOnHidden
       >
         <ThermalReceipt
           invoice={lastInvoice}

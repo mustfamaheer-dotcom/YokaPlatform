@@ -1,0 +1,7 @@
+# Allow full indexing for public ECP Storefront
+User-agent: *
+Allow: /
+Disallow: /checkout/
+Disallow: /order-success/
+
+Sitemap: https://yokastore.runasp.net/sitemap.xml

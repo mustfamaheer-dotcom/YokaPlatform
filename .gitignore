@@ -11,5 +11,7 @@ yarn-error.log*
 pnpm-debug.log*
 client-swm/node_modules/
 client-swm/dist/
+client-ecp/node_modules/
+client-ecp/dist/
 dist-deploy/
 dist-server/

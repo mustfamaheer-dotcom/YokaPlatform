@@ -25,8 +25,19 @@ app.use(helmet({
 }));
 
 // 3. Security: CORS configuration
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  process.env.ECP_ORIGIN || 'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Allow during dev
+  },
   credentials: true
 }));
 
@@ -53,6 +64,8 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many authentication attempts. Please try again after 15 minutes.' }
 });
 
+const orderRoutes = require('./routes/orders');
+
 // SWM API Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/swm/branches', branchRoutes);
@@ -62,6 +75,16 @@ app.use('/api/swm/products', productRoutes);
 app.use('/api/swm/suppliers', supplierRoutes);
 app.use('/api/swm/purchases', purchaseRoutes);
 app.use('/api/swm/pos', posRoutes);
+app.use('/api/swm/orders', orderRoutes);
+
+// ECP (E-Commerce Platform) Public API Routes
+const ecpCatalogRoutes = require('../ecp/routes/catalog');
+const ecpCartRoutes = require('../ecp/routes/cart');
+const ecpCheckoutRoutes = require('../ecp/routes/checkout');
+
+app.use('/api/ecp/catalog', ecpCatalogRoutes);
+app.use('/api/ecp/cart', ecpCartRoutes);
+app.use('/api/ecp/checkout', ecpCheckoutRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -78,27 +101,30 @@ app.get('/health', (req, res) => {
 // Static frontend serving (Full-Stack single deployment)
 const path = require('path');
 const fs = require('fs');
-const possibleStaticDirs = [
-  __dirname,
-  path.join(__dirname, '../../client-swm/dist'),
-  path.join(__dirname, 'client-swm/dist')
-];
 
-let activeStaticDir = null;
-for (const dir of possibleStaticDirs) {
-  if (fs.existsSync(path.join(dir, 'index.html'))) {
-    activeStaticDir = dir;
-    break;
-  }
+// Serve images and public assets
+app.use(express.static(path.join(__dirname, '../../img')));
+app.use(express.static(path.join(__dirname, '../../client-swm/public')));
+app.use(express.static(path.join(__dirname, '../../client-ecp/public')));
+
+const ecpStaticDir = path.join(__dirname, '../../client-ecp/dist');
+const swmStaticDir = path.join(__dirname, '../../client-swm/dist');
+
+// Serve SWM (Admin Panel) on /swm-admin
+if (fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
+  app.use('/swm-admin', express.static(swmStaticDir));
+  app.get('/swm-admin/*', (req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path === '/health') return next();
+    res.sendFile(path.join(swmStaticDir, 'index.html'));
+  });
 }
 
-if (activeStaticDir) {
-  app.use(express.static(activeStaticDir));
+// Serve ECP (Public Customer Store) on Root '/'
+if (fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
+  app.use('/', express.static(ecpStaticDir));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path === '/health') {
-      return next();
-    }
-    res.sendFile(path.join(activeStaticDir, 'index.html'));
+    if (req.path.startsWith('/api/') || req.path === '/health' || req.path.startsWith('/swm-admin')) return next();
+    res.sendFile(path.join(ecpStaticDir, 'index.html'));
   });
 }
 

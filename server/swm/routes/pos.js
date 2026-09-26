@@ -280,6 +280,7 @@ router.get('/search', requireAuth, async (req, res) => {
              p.product_code,
              p.barcode AS product_barcode,
              p.product_name,
+             p.brand,
              p.selling_price,
              p.sale_price,
              p.cost_price,
@@ -288,18 +289,22 @@ router.get('/search', requireAuth, async (req, res) => {
              pv.color,
              pv.size,
              pv.price_modifier,
-             COALESCE(ib.available_qty, 0) AS available_qty
+             COALESCE(ib_var.available_qty, ib_base.available_qty, 0) AS available_qty
       FROM products p
       LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.status = 'active'
-      LEFT JOIN inventory_balances ib ON ib.product_id = p.id
-                                      AND (ib.variant_id = pv.id OR (pv.id IS NULL AND ib.variant_id IS NULL))
-                                      AND ib.branch_id = $1
+      LEFT JOIN inventory_balances ib_var ON ib_var.product_id = p.id
+                                         AND ib_var.variant_id = pv.id
+                                         AND ib_var.branch_id = $1
+      LEFT JOIN inventory_balances ib_base ON ib_base.product_id = p.id
+                                          AND ib_base.variant_id IS NULL
+                                          AND ib_base.branch_id = $1
       WHERE p.status = 'active'
         AND (
           p.barcode = $2
           OR pv.variant_sku = $2
           OR p.product_code ILIKE $3
           OR p.product_name ILIKE $3
+          OR p.brand ILIKE $3
           OR pv.variant_sku ILIKE $3
         )
       ORDER BY p.id DESC, pv.id ASC
@@ -399,7 +404,22 @@ router.post('/sale', requireAuth, async (req, res) => {
              FOR UPDATE`,
             [branchId, item.product_id, item.variant_id]
           );
-          balanceRow = res.rows[0];
+          if (res.rows.length > 0 && parseInt(res.rows[0].available_qty, 10) >= qty) {
+            balanceRow = res.rows[0];
+          } else {
+            // Fallback to base product inventory if variant-specific balance is unseeded or insufficient
+            const baseRes = await client.query(
+              `SELECT * FROM inventory_balances
+               WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL
+               FOR UPDATE`,
+              [branchId, item.product_id]
+            );
+            if (baseRes.rows.length > 0 && parseInt(baseRes.rows[0].available_qty, 10) >= qty) {
+              balanceRow = baseRes.rows[0];
+            } else {
+              balanceRow = res.rows[0] || baseRes.rows[0];
+            }
+          }
         } else {
           const res = await client.query(
             `SELECT * FROM inventory_balances

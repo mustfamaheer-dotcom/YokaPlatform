@@ -19,7 +19,7 @@ router.get('/', requireAuth, async (req, res) => {
     let pIdx = 1;
 
     if (search && search.trim()) {
-      whereClauses.push(`(p.product_name ILIKE $${pIdx} OR p.product_code ILIKE $${pIdx} OR p.barcode ILIKE $${pIdx})`);
+      whereClauses.push(`(p.product_name ILIKE $${pIdx} OR p.product_code ILIKE $${pIdx} OR p.barcode ILIKE $${pIdx} OR p.brand ILIKE $${pIdx})`);
       params.push(`%${search.trim()}%`);
       pIdx++;
     }
@@ -54,7 +54,7 @@ router.get('/', requireAuth, async (req, res) => {
     const dataSql = `
       SELECT p.id, p.product_code, p.barcode, p.product_name, p.slug, p.brand,
              p.cost_price, p.selling_price, p.wholesale_price, p.sale_price,
-             p.status, p.is_ecom_listed, p.is_featured, p.category_id,
+             p.status, p.is_ecom_listed, p.is_featured, p.category_id, p.featured_image,
              c.category_name,
              COALESCE(SUM(ib.available_qty), 0) AS total_stock,
              COUNT(DISTINCT v.id) AS variant_count
@@ -156,6 +156,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
       sale_price,
       reorder_level = 5,
       is_ecom_listed = false,
+      featured_image = null,
       variants = []
     } = req.body;
 
@@ -186,10 +187,10 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           product_code, barcode, product_name, slug, brand,
           category_id, sub_category_id, material, color, size,
           cost_price, selling_price, wholesale_price, sale_price,
-          reorder_level, is_ecom_listed, status, created_at, updated_at
+          reorder_level, is_ecom_listed, featured_image, status, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, 'active', NOW(), NOW()
+          $11, $12, $13, $14, $15, $16, $17, 'active', NOW(), NOW()
         ) RETURNING id`,
         [
           cleanCode,
@@ -207,7 +208,8 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           wholesale_price ? parseFloat(wholesale_price) : null,
           sale_price ? parseFloat(sale_price) : null,
           parseInt(reorder_level, 10) || 5,
-          Boolean(is_ecom_listed)
+          Boolean(is_ecom_listed),
+          featured_image || null
         ]
       );
 
@@ -286,7 +288,8 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
       sale_price,
       status,
       is_ecom_listed,
-      reorder_level
+      reorder_level,
+      featured_image
     } = req.body;
 
     await query(
@@ -302,8 +305,9 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
         status = COALESCE($9, status),
         is_ecom_listed = COALESCE($10, is_ecom_listed),
         reorder_level = COALESCE($11, reorder_level),
+        featured_image = COALESCE($12, featured_image),
         updated_at = NOW()
-       WHERE id = $12`,
+       WHERE id = $13`,
       [
         product_name || null,
         category_id || null,
@@ -316,6 +320,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
         status || null,
         is_ecom_listed !== undefined ? Boolean(is_ecom_listed) : null,
         reorder_level !== undefined ? parseInt(reorder_level, 10) : null,
+        featured_image !== undefined ? featured_image : null,
         id
       ]
     );

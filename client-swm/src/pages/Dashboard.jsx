@@ -55,7 +55,7 @@ export default function Dashboard({ onNavigate }) {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
+          <Card variant="borderless" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
             <Statistic
               title="إجمالي المنتجات المسجلة"
               value={stats.productsCount}
@@ -66,7 +66,7 @@ export default function Dashboard({ onNavigate }) {
         </Col>
 
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
+          <Card variant="borderless" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
             <Statistic
               title="الفروع والمستودعات العاملة"
               value={stats.branchesCount}
@@ -77,7 +77,7 @@ export default function Dashboard({ onNavigate }) {
         </Col>
 
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
+          <Card variant="borderless" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
             <Statistic
               title="فريق العمل والموظفين"
               value={stats.usersCount}
@@ -88,7 +88,7 @@ export default function Dashboard({ onNavigate }) {
         </Col>
 
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
+          <Card variant="borderless" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 12 }}>
             <Statistic
               title="حالة اتصال قاعدة البيانات"
               value={systemHealth ? 'متصلة (OK)' : 'جارٍ الفحص'}
@@ -101,7 +101,7 @@ export default function Dashboard({ onNavigate }) {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} md={14}>
-          <Card title="الإجراءات السريعة" bordered={false} style={{ borderRadius: 12 }}>
+          <Card title="الإجراءات السريعة" variant="borderless" style={{ borderRadius: 12 }}>
             <Space wrap size="middle">
               <Button type="primary" size="large" onClick={() => onNavigate('products')} style={{ backgroundColor: '#4f46e5' }}>
                 إدارة المنتجات والمتغيرات
@@ -129,7 +129,7 @@ export default function Dashboard({ onNavigate }) {
         </Col>
 
         <Col xs={24} md={10}>
-          <Card title="بيانات الخادم النشط" bordered={false} style={{ borderRadius: 12 }}>
+          <Card title="بيانات الخادم النشط" variant="borderless" style={{ borderRadius: 12 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <Text type="secondary">البيئة الحالية: </Text>
