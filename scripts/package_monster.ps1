@@ -1,6 +1,11 @@
-# Build frontend with updated API URL
-Write-Host ">>> [1/4] Building client-swm..."
+# Build frontends
+Write-Host ">>> [1/5] Building client-swm (Admin Panel)..."
 npm --prefix client-swm run build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host ">>> [2/5] Building client-ecp (Storefront)..."
+npm --prefix client-ecp run build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Prepare deployment folder
 $deployDir = "dist-deploy"
@@ -8,17 +13,28 @@ if (Test-Path $deployDir) {
     Remove-Item -Recurse -Force $deployDir
 }
 New-Item -ItemType Directory -Path $deployDir | Out-Null
+New-Item -ItemType Directory -Path "$deployDir\logs" | Out-Null
 
-# Copy frontend static build into deployDir
-Write-Host ">>> [2/4] Copying frontend static assets..."
-Copy-Item -Recurse -Force "client-swm\dist\*" $deployDir
+# Copy frontend static builds into deployDir maintaining folder hierarchy
+Write-Host ">>> [3/5] Copying frontend static assets..."
+New-Item -ItemType Directory -Path "$deployDir\client-swm\dist" -Force | Out-Null
+Copy-Item -Recurse -Force "client-swm\dist\*" "$deployDir\client-swm\dist"
+
+New-Item -ItemType Directory -Path "$deployDir\client-ecp\dist" -Force | Out-Null
+Copy-Item -Recurse -Force "client-ecp\dist\*" "$deployDir\client-ecp\dist"
+
+if (Test-Path "img") {
+    New-Item -ItemType Directory -Path "$deployDir\img" -Force | Out-Null
+    Copy-Item -Recurse -Force "img\*" "$deployDir\img"
+}
 
 # Bundle server into single standalone server.js
-Write-Host ">>> [3/4] Bundling backend server.js with esbuild..."
+Write-Host ">>> [4/5] Bundling backend server.js with esbuild..."
 npx -y esbuild server/swm/app.js --bundle --platform=node --target=node20 --outfile="$deployDir\server.js"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Write IIS web.config with httpPlatformHandler
-Write-Host ">>> [4/4] Writing production web.config..."
+Write-Host ">>> [5/5] Writing production web.config..."
 $webConfig = @"
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>

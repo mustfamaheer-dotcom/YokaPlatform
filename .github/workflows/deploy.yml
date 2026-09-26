@@ -28,6 +28,7 @@ jobs:
         run: |
           npm install
           npm --prefix client-swm install
+          npm --prefix client-ecp install
 
       - name: Verify Code Quality & Automated Test Suite
         env:

@@ -67,7 +67,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (!refreshToken) {
         localStorage.clear();
-        window.location.href = '/login';
+        window.location.href = window.location.pathname.startsWith('/swm-admin') ? '/swm-admin' : '/';
         return Promise.reject(error);
       }
 
@@ -91,7 +91,7 @@ api.interceptors.response.use(
       } catch (refreshErr) {
         processQueue(refreshErr, null);
         localStorage.clear();
-        window.location.href = '/login';
+        window.location.href = window.location.pathname.startsWith('/swm-admin') ? '/swm-admin' : '/';
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;

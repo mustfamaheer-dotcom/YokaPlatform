@@ -33,7 +33,7 @@ if (dbClient === 'pg') {
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     max: 30,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 30000,
   });
 
   pool.on('error', (err) => {

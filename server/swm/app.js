@@ -127,25 +127,64 @@ app.get('/health', (req, res) => {
 const path = require('path');
 const fs = require('fs');
 
-// Serve images and public assets
-app.use(express.static(path.join(__dirname, '../../img')));
-app.use(express.static(path.join(__dirname, '../../client-swm/public')));
-app.use(express.static(path.join(__dirname, '../../client-ecp/public')));
+// Helper to resolve first existing directory across development and production
+function resolveFirstExisting(candidatePaths) {
+  for (const candidate of candidatePaths) {
+    if (candidate && fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
 
-const ecpStaticDir = path.join(__dirname, '../../client-ecp/dist');
-const swmStaticDir = path.join(__dirname, '../../client-swm/dist');
+const ecpStaticDir = resolveFirstExisting([
+  path.join(__dirname, 'client-ecp/dist'),
+  path.join(__dirname, 'dist-ecp'),
+  path.join(__dirname, '../../client-ecp/dist'),
+  path.join(process.cwd(), 'client-ecp/dist'),
+  path.join(process.cwd(), 'dist-deploy/client-ecp/dist')
+]);
+
+const swmStaticDir = resolveFirstExisting([
+  path.join(__dirname, 'client-swm/dist'),
+  path.join(__dirname, 'dist-swm'),
+  path.join(__dirname, '../../client-swm/dist'),
+  path.join(process.cwd(), 'client-swm/dist'),
+  path.join(process.cwd(), 'dist-deploy/client-swm/dist')
+]);
+
+const imgDir = resolveFirstExisting([
+  path.join(__dirname, 'img'),
+  path.join(__dirname, '../../img'),
+  path.join(process.cwd(), 'img')
+]);
+
+const swmPublicDir = resolveFirstExisting([
+  path.join(__dirname, 'client-swm/public'),
+  path.join(__dirname, '../../client-swm/public'),
+  path.join(process.cwd(), 'client-swm/public')
+]);
+
+const ecpPublicDir = resolveFirstExisting([
+  path.join(__dirname, 'client-ecp/public'),
+  path.join(__dirname, '../../client-ecp/public'),
+  path.join(process.cwd(), 'client-ecp/public')
+]);
+
+// Serve public static images & assets
+if (imgDir) app.use(express.static(imgDir));
+if (swmPublicDir) app.use(express.static(swmPublicDir));
+if (ecpPublicDir) app.use(express.static(ecpPublicDir));
 
 // Serve SWM (Admin Panel) on /swm-admin
-if (fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
+if (swmStaticDir && fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
   app.use('/swm-admin', express.static(swmStaticDir));
-  app.get('/swm-admin/*', (req, res, next) => {
+  app.get(['/swm-admin', '/swm-admin/*'], (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path === '/health') return next();
     res.sendFile(path.join(swmStaticDir, 'index.html'));
   });
 }
 
 // Serve ECP (Public Customer Store) on Root '/'
-if (fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
+if (ecpStaticDir && fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
   app.use('/', express.static(ecpStaticDir));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path === '/health' || req.path.startsWith('/swm-admin')) return next();
