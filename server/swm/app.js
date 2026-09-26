@@ -126,6 +126,24 @@ if (fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
     if (req.path.startsWith('/api/') || req.path === '/health' || req.path.startsWith('/swm-admin')) return next();
     res.sendFile(path.join(ecpStaticDir, 'index.html'));
   });
+} else {
+  // Graceful API root handler when frontend has not been compiled yet
+  app.get('/', (req, res) => {
+    res.json({
+      success: true,
+      service: 'Yoka Store Enterprise Platform API',
+      status: 'online',
+      timestamp: new Date().toISOString(),
+      note: 'Frontend dist not found. Run "npm run build:ecp" or "npm run build" to compile the storefront.',
+      endpoints: {
+        health: '/health',
+        ecp_catalog: '/api/ecp/catalog',
+        ecp_cart: '/api/ecp/cart',
+        ecp_checkout: '/api/ecp/checkout',
+        swm_api: '/api/swm/products'
+      }
+    });
+  });
 }
 
 // 404 handler
