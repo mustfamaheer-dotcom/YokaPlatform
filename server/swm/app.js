@@ -32,7 +32,31 @@ app.use(compression());
 
 // 2. Security: Hardened HTTP Headers via Helmet
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      connectSrc: [
+        "'self'",
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://*.runasp.net",
+        "http://*.runasp.net",
+        "https://yokastore.runasp.net",
+        "http://yokastore.runasp.net",
+        "ws:",
+        "wss:"
+      ],
+      manifestSrc: ["'self'"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: null
+    }
+  }
 }));
 
 // 3. Security: CORS configuration

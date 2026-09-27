@@ -3,6 +3,11 @@ Write-Host ">>> [1/5] Building client-swm (Admin Panel)..."
 npm --prefix client-swm run build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# Ensure icons exist
+if (-not (Test-Path "client-ecp\public\icons\icon-192.png") -or ((Get-Item "client-ecp\public\icons\icon-192.png").Length -lt 100)) {
+    powershell -ExecutionPolicy Bypass -File scripts\generate_icons.ps1
+}
+
 Write-Host ">>> [2/5] Building client-ecp (Storefront)..."
 npm --prefix client-ecp run build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

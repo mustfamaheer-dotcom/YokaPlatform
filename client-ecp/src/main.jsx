@@ -3,9 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider, App as AntApp } from 'antd';
 import arEG from 'antd/locale/ar_EG';
+import App from './App';
 import { registerSW } from 'virtual:pwa-register';
 
-if (process.env.NODE_ENV === 'production') {
+if (import.meta.env.PROD) {
   registerSW({ immediate: true });
 }
 import './index.css';
