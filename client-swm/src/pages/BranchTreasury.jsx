@@ -22,7 +22,7 @@ const STATUS_MAP = {
   cancelled: { label: 'ملغى',             color: 'red',    icon: <CloseCircleOutlined /> }
 };
 
-export default function BranchTreasury() {
+export default function BranchTreasury({ currentUser, autoOpenCreate, onResetAction }) {
   const [register, setRegister]         = useState(null);
   const [transfers, setTransfers]       = useState([]);
   const [loading, setLoading]           = useState(false);
@@ -50,6 +50,14 @@ export default function BranchTreasury() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      form.resetFields();
+      setModalVisible(true);
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   const handleSubmitTransfer = async (values) => {
     setSubmitting(true);
@@ -165,7 +173,12 @@ export default function BranchTreasury() {
   ];
 
   if (loading && !register) {
-    return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" tip="جاري تحميل بيانات الخزنة..." /></div>;
+    return (
+      <div style={{ textAlign: 'center', padding: 80 }}>
+        <Spin size="large" />
+        <div style={{ marginTop: 12, color: '#64748b' }}>جاري تحميل بيانات الخزنة...</div>
+      </div>
+    );
   }
 
   return (
@@ -291,7 +304,7 @@ export default function BranchTreasury() {
         open={modalVisible}
         onCancel={() => { setModalVisible(false); form.resetFields(); }}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={520}
       >
         <Alert

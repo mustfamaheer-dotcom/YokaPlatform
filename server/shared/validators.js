@@ -118,12 +118,15 @@ const createProductSchema = z.object({
   sale_price: z.coerce.number().min(0).optional().nullable(),
   reorder_level: z.coerce.number().int().min(0).default(5),
   is_ecom_listed: z.boolean().default(false),
+  featured_image: z.string().optional().nullable(),
+  gallery_images: z.any().optional().nullable(),
   variants: z.array(z.object({
     sku: z.string().optional(),
     color: z.string().optional().nullable(),
     size: z.string().optional().nullable(),
     material: z.string().optional().nullable(),
-    price_modifier: z.coerce.number().optional().default(0)
+    price_modifier: z.coerce.number().optional().default(0),
+    image_url: z.string().optional().nullable()
   })).optional().default([])
 });
 

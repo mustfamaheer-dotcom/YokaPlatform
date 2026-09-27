@@ -294,4 +294,72 @@ a {
   }
 }
 
+/* ========================================================= */
+/* UNIVERSAL MODERN PRINT STYLES FOR ECP STORE              */
+/* ========================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 12px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    direction: rtl !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide navigation, footers, buttons, banners */
+  header,
+  nav,
+  footer,
+  .no-print,
+  .ant-result-extra,
+  .ant-result-icon,
+  button,
+  .ant-btn,
+  .ant-pagination {
+    display: none !important;
+  }
+
+  /* Printable invoice card */
+  .customer-invoice-print {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  table {
+    page-break-inside: auto !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+}
+
+.print-only {
+  display: none;
+}
+
+
 

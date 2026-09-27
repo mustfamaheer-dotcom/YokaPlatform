@@ -552,14 +552,14 @@ export default function RetailAnalytics({ currentUser, onNavigate }) {
       {/* ========================================================= */}
       <Row gutter={[12, 12]}>
         {/* KPI 1: Retail Revenue */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
               title="إجمالي مبيعات فروع التجزئة"
               value={kpi.total_revenue || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<DollarOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -569,13 +569,13 @@ export default function RetailAnalytics({ currentUser, onNavigate }) {
         </Col>
 
         {/* KPI 2: Total Invoices */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #2563eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #2563eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
               title="إجمالي عدد الفواتير"
               value={kpi.total_orders || 0}
               suffix="فاتورة"
-              valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<ShoppingCartOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -585,14 +585,14 @@ export default function RetailAnalytics({ currentUser, onNavigate }) {
         </Col>
 
         {/* KPI 3: Average Ticket Value */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
               title="متوسط قيمة الفاتورة"
               value={kpi.average_order_value || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#0284c7', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#0284c7', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<RiseOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -602,13 +602,13 @@ export default function RetailAnalytics({ currentUser, onNavigate }) {
         </Col>
 
         {/* KPI 4: Units Sold */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
               title="القطع والوحدات المباعة"
               value={kpi.total_units_sold || 0}
               suffix="قطعة"
-              valueStyle={{ color: '#8b5cf6', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#8b5cf6', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<TagsOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -618,29 +618,29 @@ export default function RetailAnalytics({ currentUser, onNavigate }) {
         </Col>
 
         {/* KPI 5: Top Retail Product */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, background: '#fffbeb', borderTop: '4px solid #f59e0b', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, background: '#fffbeb', borderTop: '4px solid #f59e0b', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>
               <TrophyOutlined style={{ color: '#f59e0b', marginLeft: 4 }} />
-              المنتج البطل في الصالات
+              المنتج الأكثر طلباً بالصالات
             </div>
-            <Text strong ellipsis style={{ fontSize: 15, color: '#b45309', display: 'block' }}>
+            <Text strong ellipsis style={{ fontSize: 14, color: '#b45309', display: 'block' }}>
               {kpi.top_product_name || 'لا يوجد'}
             </Text>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
-              الأعلى تحقيقاً للإيرادات في المعارض
+              الأعلى مبيعاً في المعارض
             </div>
           </Card>
         </Col>
 
         {/* KPI 6: Top Performing Branch */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #059669', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #059669', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>
               <ShopOutlined style={{ color: '#059669', marginLeft: 4 }} />
               أفضل فرع تجزئة أداءً
             </div>
-            <Text strong ellipsis style={{ fontSize: 15, color: '#059669', display: 'block' }}>
+            <Text strong ellipsis style={{ fontSize: 14, color: '#059669', display: 'block' }}>
               {topBranchPerformer?.branch_name || 'الفرع المحدد'}
             </Text>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
@@ -739,6 +739,7 @@ export default function RetailAnalytics({ currentUser, onNavigate }) {
               pagination={{ pageSize: 6 }}
               size="middle"
               bordered
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>
@@ -827,6 +828,7 @@ export default function RetailAnalytics({ currentUser, onNavigate }) {
             pagination={false}
             size="middle"
             bordered
+            scroll={{ x: 'max-content' }}
             columns={[
               {
                 title: 'فرع التجزئة',

@@ -617,30 +617,30 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
       {/* ========================================================= */}
       <Row gutter={[12, 12]}>
         {/* KPI 1: E-Commerce Revenue */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
-              title="إجمالي مبيعات المتجر الإلكتروني"
+              title="إجمالي مبيعات المتجر"
               value={kpi.total_revenue || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#8b5cf6', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#8b5cf6', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<DollarOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-              صافي قيمة طلبات الأونلاين (ECP)
+              صافي قيمة طلبات الأونلاين
             </div>
           </Card>
         </Col>
 
         {/* KPI 2: Total Online Orders */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #2563eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #2563eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
-              title="إجمالي عدد طلبات المتجر"
+              title="إجمالي عدد الطلبات"
               value={kpi.total_orders || 0}
               suffix="طلب"
-              valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<ShoppingCartOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -650,14 +650,14 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
         </Col>
 
         {/* KPI 3: Average Order Value (AOV) */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
-              title="متوسط سلة المشتريات (AOV)"
+              title="متوسط سلة المشتريات"
               value={kpi.average_order_value || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#0284c7', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#0284c7', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<RiseOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -666,31 +666,31 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
           </Card>
         </Col>
 
-        {/* KPI 4: Units Sold Online */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #059669', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        {/* KPI 4: Fulfillment Rate */}
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #059669', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
-              title="نسبة تسليم وإتمام الشحنات"
+              title="نسبة إتمام الشحنات"
               value={kpi.fulfillment_rate || 100}
               suffix="%"
-              valueStyle={{ color: '#059669', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#059669', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<CheckCircleOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-              معدل نجاح تسليم الطلبات للعملاء
+              معدل نجاح تسليم الطلبات
             </div>
           </Card>
         </Col>
 
         {/* KPI 5: Shipping Revenue */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #0d9488', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #0d9488', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <Statistic
               title="رسوم الشحن المحصلة"
               value={kpi.total_shipping_revenue || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#0d9488', fontWeight: 'bold', fontSize: 20 }}
+              valueStyle={{ color: '#0d9488', fontWeight: 'bold', fontSize: 'clamp(16px, 3.8vw, 20px)' }}
               prefix={<CarOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
@@ -700,17 +700,17 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
         </Col>
 
         {/* KPI 6: Top Online Product */}
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card size="small" style={{ borderRadius: 10, background: '#fffbeb', borderTop: '4px solid #f59e0b', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={12} sm={12} md={8} lg={4}>
+          <Card size="small" style={{ borderRadius: 10, background: '#fffbeb', borderTop: '4px solid #f59e0b', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>
               <TrophyOutlined style={{ color: '#f59e0b', marginLeft: 4 }} />
-              المنتج البطل أونلاين
+              المنتج الأكثر طلباً أونلاين
             </div>
-            <Text strong ellipsis style={{ fontSize: 15, color: '#b45309', display: 'block' }}>
+            <Text strong ellipsis style={{ fontSize: 14, color: '#b45309', display: 'block' }}>
               {kpi.top_product_name || 'لا يوجد'}
             </Text>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
-              الأعلى طلباً على الموقع
+              الأعلى مبيعاً على الموقع
             </div>
           </Card>
         </Col>
@@ -805,6 +805,7 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
               pagination={{ pageSize: 6 }}
               size="middle"
               bordered
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>
@@ -996,6 +997,7 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
           pagination={false}
           size="middle"
           bordered
+          scroll={{ x: 'max-content' }}
         />
       </Card>
 
@@ -1029,6 +1031,7 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
           pagination={{ pageSize: 8 }}
           size="small"
           bordered
+          scroll={{ x: 'max-content' }}
           columns={[
             {
               title: 'المدينة / المحافظة',

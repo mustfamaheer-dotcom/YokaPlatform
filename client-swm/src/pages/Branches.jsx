@@ -12,7 +12,7 @@ const BRANCH_TYPES = {
   ecom_warehouse: { label: 'مستودع المتجر الإلكتروني (E-Com Warehouse)', color: 'purple' }
 };
 
-export default function Branches() {
+export default function Branches({ autoOpenCreate, onResetAction }) {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -47,6 +47,14 @@ export default function Branches() {
   useEffect(() => {
     fetchBranches();
   }, []);
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      createForm.resetFields();
+      setIsCreateModalOpen(true);
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   const handleCreate = async (values) => {
     try {
@@ -239,7 +247,7 @@ export default function Branches() {
         open={isCreateModalOpen}
         onCancel={() => setIsCreateModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreate}>
           <Form.Item
@@ -319,7 +327,7 @@ export default function Branches() {
           setEditingBranch(null);
         }}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
           <Form.Item

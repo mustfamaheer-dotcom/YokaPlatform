@@ -71,7 +71,7 @@ export default function SupervisorUnlockModal({ open, onCancel, onSuccess, curre
       open={open}
       onCancel={onCancel}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
       width={460}
       centered
     >

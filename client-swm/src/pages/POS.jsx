@@ -910,7 +910,7 @@ export default function POS() {
         onCancel={() => setReceiptModalVisible(false)}
         footer={null}
         width={380}
-        destroyOnClose
+        destroyOnHidden
       >
         <ThermalReceipt
           invoice={lastInvoice}

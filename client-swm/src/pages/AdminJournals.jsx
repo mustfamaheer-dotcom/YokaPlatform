@@ -52,6 +52,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../api';
+import { printHtmlContent } from '../utils/printUtils';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -208,36 +210,11 @@ export default function AdminJournals() {
   // Print Window Execution
   const handleExecutePrint = () => {
     if (printAreaRef.current) {
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
-        <html dir="rtl">
-          <head>
-            <title>تقرير اليومية الإدارية والمالية الشاملة</title>
-            <style>
-              body { font-family: sans-serif; padding: 25px; direction: rtl; font-size: 13px; color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-              th, td { border: 1px solid #94a3b8; padding: 8px 10px; text-align: right; }
-              th { background: #f1f5f9; font-weight: bold; }
-              .header-box { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
-              .kpi-row { display: flex; gap: 12px; margin-bottom: 20px; }
-              .kpi-card { flex: 1; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; background: #f8fafc; text-align: center; }
-              .signatures { margin-top: 45px; display: flex; justify-content: space-between; }
-              .sign-box { width: 30%; text-align: center; border-top: 1px solid #475569; padding-top: 8px; font-weight: bold; }
-              @media print {
-                @page { size: A4 landscape; margin: 10mm; }
-                button { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            ${printAreaRef.current.innerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
+      printHtmlContent({
+        title: 'تقرير اليومية الإدارية والمالية الشاملة - يوكا ستور',
+        htmlContent: printAreaRef.current.innerHTML,
+        pageType: 'a4-landscape'
+      });
     }
   };
 
@@ -1281,91 +1258,105 @@ export default function AdminJournals() {
           </Button>
         ]}
       >
-        <div ref={printAreaRef} style={{ padding: '10px' }}>
-          {/* Header */}
-          <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: '12px', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div ref={printAreaRef} style={{ padding: '6px', direction: 'rtl', color: '#0f172a' }}>
+          {/* Branded Header */}
+          <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+            <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
               <div>
-                <h2 style={{ margin: 0, color: '#0f172a' }}>Yoka Store — تقرير اليومية الإدارية والمالية الشاملة</h2>
-                <div style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
+                <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
+                <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>تقرير اليومية الإدارية والمالية الشاملة وتحليل أداء الفروع</div>
+                <div style={{ fontSize: 10.5, color: '#64748b' }}>
                   النطاق: <strong>{selectedBranch === 'all' ? 'كافة الفروع والمستودعات' : branchesList.find(b => b.id === parseInt(selectedBranch, 10))?.branch_name}</strong>
-                  {' | '}الفترة من: <strong>{dateRange[0]?.format('YYYY-MM-DD')}</strong> إلى: <strong>{dateRange[1]?.format('YYYY-MM-DD')}</strong>
+                  {' • '}الفترة: من <strong>{dateRange[0]?.format('YYYY-MM-DD')}</strong> إلى <strong>{dateRange[1]?.format('YYYY-MM-DD')}</strong>
                 </div>
               </div>
-              <div style={{ textAlign: 'left', fontSize: 12, color: '#475569' }}>
-                <div>تاريخ التقرير: <strong>{dayjs().format('YYYY-MM-DD hh:mm A')}</strong></div>
-                <div>الإدارة المسؤولة: <strong>إدارة المستودع الرئيسي والإدارة المالية</strong></div>
+            </div>
+            <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+              <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                اليومية الإدارية والمالية (A4)
+              </div>
+              <div style={{ marginTop: 5, fontSize: 11, color: '#64748b' }}>
+                تاريخ الاستخراج: {dayjs().format('YYYY-MM-DD HH:mm')}
               </div>
             </div>
           </div>
 
           {/* KPI Summary Row */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-            <div style={{ flex: 1, border: '1px solid #cbd5e1', padding: '8px', borderRadius: '4px', textAlign: 'center', background: '#f8fafc' }}>
-              <div style={{ fontSize: 11, color: '#64748b' }}>إجمالي الإيرادات</div>
-              <div style={{ fontSize: 15, fontWeight: 'bold', color: '#1d4ed8' }}>{profitability.revenue?.toLocaleString()} ج.م</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي الإيرادات</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#1d4ed8', fontFamily: 'monospace', marginTop: 2 }}>{profitability.revenue?.toLocaleString()} ج.م</div>
             </div>
-            <div style={{ flex: 1, border: '1px solid #cbd5e1', padding: '8px', borderRadius: '4px', textAlign: 'center', background: '#f8fafc' }}>
-              <div style={{ fontSize: 11, color: '#64748b' }}>تكلفة البضاعة (COGS)</div>
-              <div style={{ fontSize: 15, fontWeight: 'bold', color: '#dc2626' }}>{profitability.cogs?.toLocaleString()} ج.م</div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>تكلفة البضاعة (COGS)</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#dc2626', fontFamily: 'monospace', marginTop: 2 }}>{profitability.cogs?.toLocaleString()} ج.م</div>
             </div>
-            <div style={{ flex: 1, border: '1px solid #cbd5e1', padding: '8px', borderRadius: '4px', textAlign: 'center', background: '#f8fafc' }}>
-              <div style={{ fontSize: 11, color: '#64748b' }}>إجمالي الربح</div>
-              <div style={{ fontSize: 15, fontWeight: 'bold', color: '#047857' }}>{profitability.grossProfit?.toLocaleString()} ج.م</div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي الربح</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>{profitability.grossProfit?.toLocaleString()} ج.م</div>
             </div>
-            <div style={{ flex: 1, border: '1px solid #cbd5e1', padding: '8px', borderRadius: '4px', textAlign: 'center', background: '#f8fafc' }}>
-              <div style={{ fontSize: 11, color: '#64748b' }}>مصاريف التشغيل</div>
-              <div style={{ fontSize: 15, fontWeight: 'bold', color: '#c2410c' }}>{profitability.operatingExpenses?.toLocaleString()} ج.م</div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>مصاريف التشغيل</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#c2410c', fontFamily: 'monospace', marginTop: 2 }}>{profitability.operatingExpenses?.toLocaleString()} ج.م</div>
             </div>
-            <div style={{ flex: 1, border: '2px solid #059669', padding: '8px', borderRadius: '4px', textAlign: 'center', background: '#ecfdf5' }}>
-              <div style={{ fontSize: 11, color: '#065f46', fontWeight: 'bold' }}>المكسب الفعلي (صافي الربح)</div>
-              <div style={{ fontSize: 16, fontWeight: 'bold', color: '#047857' }}>{profitability.netProfit?.toLocaleString()} ج.م</div>
+            <div style={{ border: '2px solid #059669', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#ecfdf5' }}>
+              <div style={{ fontSize: 10.5, color: '#065f46', fontWeight: 800 }}>صافي الربح الفعلي</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>{profitability.netProfit?.toLocaleString()} ج.م</div>
             </div>
           </div>
 
           {/* Printable Branches Net Inflow Table */}
-          <h4 style={{ margin: '12px 0 6px 0', color: '#0f172a' }}>ملخص صافي الوارد من الفروع (بعد خصم المصاريف):</h4>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
+            ملخص صافي الوارد والتدفقات النقدية للفروع (بعد خصم المصاريف):
+          </div>
+          <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 14 }}>
             <thead>
-              <tr style={{ background: '#f1f5f9' }}>
-                <th style={{ border: '1px solid #94a3b8', padding: '6px' }}>الفرع</th>
-                <th style={{ border: '1px solid #94a3b8', padding: '6px', textAlign: 'center' }}>مبيعات الوارد</th>
-                <th style={{ border: '1px solid #94a3b8', padding: '6px', textAlign: 'center' }}>مصروفات الفرع</th>
-                <th style={{ border: '1px solid #94a3b8', padding: '6px', textAlign: 'center' }}>صافي الوارد</th>
-                <th style={{ border: '1px solid #94a3b8', padding: '6px', textAlign: 'center' }}>صافي الكاش</th>
-                <th style={{ border: '1px solid #94a3b8', padding: '6px', textAlign: 'center' }}>فيزا</th>
-                <th style={{ border: '1px solid #94a3b8', padding: '6px', textAlign: 'center' }}>تحويلات</th>
+              <tr style={{ background: '#0f172a', color: '#ffffff' }}>
+                <th style={{ border: '1px solid #0f172a', padding: '6px 8px' }}>الفرع / المعرض</th>
+                <th style={{ border: '1px solid #0f172a', padding: '6px 8px', textAlign: 'center' }}>مبيعات الوارد</th>
+                <th style={{ border: '1px solid #0f172a', padding: '6px 8px', textAlign: 'center' }}>مصروفات الفرع</th>
+                <th style={{ border: '1px solid #0f172a', padding: '6px 8px', textAlign: 'center' }}>صافي الوارد</th>
+                <th style={{ border: '1px solid #0f172a', padding: '6px 8px', textAlign: 'center' }}>صافي الكاش</th>
+                <th style={{ border: '1px solid #0f172a', padding: '6px 8px', textAlign: 'center' }}>بطاقات / فيزا</th>
+                <th style={{ border: '1px solid #0f172a', padding: '6px 8px', textAlign: 'center' }}>تحويلات بنكية / إنستاباي</th>
               </tr>
             </thead>
             <tbody>
-              {operations.branchInflows?.map((b) => (
-                <tr key={b.branch_id}>
-                  <td style={{ border: '1px solid #cbd5e1', padding: '6px', fontWeight: 'bold' }}>{b.branch_name}</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: '6px', textAlign: 'center' }}>{b.sales_revenue?.toLocaleString()}</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: '6px', textAlign: 'center', color: '#dc2626' }}>{b.branch_expenses?.toLocaleString()}</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: '6px', textAlign: 'center', fontWeight: 'bold' }}>{b.net_inflow?.toLocaleString()} ج.م</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: '6px', textAlign: 'center' }}>{b.net_cash?.toLocaleString()}</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: '6px', textAlign: 'center' }}>{b.card_sales?.toLocaleString()}</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: '6px', textAlign: 'center' }}>{b.transfer_sales?.toLocaleString()}</td>
+              {operations.branchInflows?.map((b, idx) => (
+                <tr key={b.branch_id || idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', fontWeight: 700 }}>{b.branch_name}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>{b.sales_revenue?.toLocaleString()} ج.م</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', color: '#dc2626', fontFamily: 'monospace', fontWeight: 600 }}>{b.branch_expenses?.toLocaleString()} ج.م</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{b.net_inflow?.toLocaleString()} ج.م</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', color: '#16a34a', fontFamily: 'monospace', fontWeight: 700 }}>{b.net_cash?.toLocaleString()} ج.م</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace' }}>{b.card_sales?.toLocaleString()} ج.م</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace' }}>{b.transfer_sales?.toLocaleString()} ج.م</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           {/* Printable Signatures */}
-          <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-            <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-              <div>المحاسب المالي</div>
-              <div style={{ marginTop: '20px', color: '#64748b' }}>..........................................</div>
+          <div style={{ marginTop: 32, display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px dashed #94a3b8', paddingTop: 14 }}>
+            <div style={{ width: '28%', textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, color: '#334155', marginBottom: 26 }}>المحاسب المالي</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
             </div>
-            <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-              <div>مدير المستودع الرئيسي</div>
-              <div style={{ marginTop: '20px', color: '#64748b' }}>..........................................</div>
+            <div style={{ width: '28%', textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, color: '#334155', marginBottom: 26 }}>مدير إدارة العمليات والمستودعات</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
             </div>
-            <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-              <div>اعتماد الإدارة العليا</div>
-              <div style={{ marginTop: '20px', color: '#64748b' }}>..........................................</div>
+            <div style={{ width: '28%', textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, color: '#334155', marginBottom: 26 }}>اعتماد الإدارة العليا والمراجعة العامة</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
             </div>
+          </div>
+
+          {/* Verification Footer */}
+          <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+            <span>تقرير إداري ومالي رسمي صادر عن منظومة Yoka SWM</span>
+            <span>تاريخ الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}</span>
           </div>
         </div>
       </Modal>

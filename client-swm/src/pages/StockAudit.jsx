@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
+import { printHtmlContent } from '../utils/printUtils';
 import {
   Card,
   Row,
@@ -202,35 +204,11 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
   // Execute browser printing of the A4 Stocktaking Sheet
   const handleExecutePrint = () => {
     if (printAreaRef.current) {
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
-        <html dir="rtl">
-          <head>
-            <title>كشف الجرد الفعلي الميداني</title>
-            <style>
-              body { font-family: sans-serif; padding: 20px; direction: rtl; font-size: 13px; color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-              th, td { border: 1px solid #94a3b8; padding: 8px 10px; text-align: right; }
-              th { background: #f1f5f9; font-weight: bold; }
-              .header-box { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-              .actual-box { min-width: 60px; height: 26px; border: 1.5px dashed #475569; border-radius: 4px; }
-              .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
-              .sign-box { width: 30%; text-align: center; border-top: 1px solid #64748b; padding-top: 8px; font-weight: bold; }
-              @media print {
-                @page { size: A4 landscape; margin: 10mm; }
-                button { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            ${printAreaRef.current.innerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
+      printHtmlContent({
+        title: `كشف الجرد الفعلي الميداني - ${currentBranchObj ? currentBranchObj.branch_name : 'الكل'}`,
+        htmlContent: printAreaRef.current.innerHTML,
+        pageType: 'a4-landscape'
+      });
     }
   };
 
@@ -703,75 +681,94 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             </div>
 
             {/* Print Area Preview */}
-            <div ref={printAreaRef} style={{ padding: '10px', border: '1px solid #cbd5e1', borderRadius: 8, background: '#fff' }}>
-              {/* Printable Header */}
-              <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: '12px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div ref={printAreaRef} className="printable-sheet" style={{ padding: '4px', color: '#0f172a', direction: 'rtl' }}>
+              {/* Header */}
+              <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+                <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <img src={yokaLogo} alt="Yoka Store" style={{ height: 46, maxWidth: 110, objectFit: 'contain' }} />
                   <div>
-                    <h2 style={{ margin: 0, color: '#0f172a' }}>
-                      Yoka Store — كشف الجرد الفعلي الميداني للمخزون
-                      {printScope === 'in_stock' && ' (الأصناف المتوفرة بالرصيد)'}
-                      {printScope === 'zero_stock' && ' (حصر الأصناف منعدمة الرصيد)'}
-                      {printScope === 'all' && ' (كشف شامل لكافة الأصناف)'}
-                    </h2>
-                    <div style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
-                      المستودع / الفرع: <strong>{currentBranchObj ? currentBranchObj.branch_name : 'كافة الفروع والمستودعات'}</strong>
-                    </div>
+                    <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>شركة يوكا ستور (YOKA STORE)</h2>
+                    <div style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>منظومة إدارة المخازن المركزية والفرعية • كشف الجرد الفعلي الميداني</div>
                   </div>
-                  <div style={{ textAlign: 'left', fontSize: 12, color: '#475569' }}>
-                    <div>تاريخ الطباعة: <strong>{dayjs().format('YYYY-MM-DD hh:mm A')}</strong></div>
-                    <div>إجمالي الأصناف: <strong>{printableItems.length} صنف</strong></div>
-                    <div>نوع الكشف: <strong>{printScope === 'in_stock' ? 'أصناف متوفرة' : printScope === 'zero_stock' ? 'أصناف رصيدها صفر' : 'شامل'}</strong></div>
+                </div>
+                <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+                  <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 6 }}>
+                    كشف الجرد الفعلي للمخزون (A4)
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 11.5, color: '#334155', fontWeight: 600 }}>
+                    تاريخ ووقت الكشف: {dayjs().format('YYYY-MM-DD HH:mm')}
                   </div>
                 </div>
               </div>
 
+              {/* Meta Card */}
+              <div className="meta-card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 14px' }}>
+                <div>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>المستودع / الفرع المستهدف:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                    {currentBranchObj ? `${currentBranchObj.branch_name} (${currentBranchObj.branch_code})` : 'كافة الفروع والمستودعات'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>نطاق الأصناف المطبوعة:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                    {printScope === 'in_stock' ? 'الأصناف المتوفرة برصيد (> 0)' : printScope === 'zero_stock' ? 'الأصناف الصفرية (= 0)' : 'كشف شامل لكافة الأصناف'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>إجمالي بنود الجرد:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>{printableItems.length} صنف مسجل</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>تعليمات الجرد:</div>
+                  <div style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>كتابة العدد الفعلي بدقة بالقلم الجاف</div>
+                </div>
+              </div>
+
               {/* Printable Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 14 }}>
                 <thead>
-                  <tr style={{ background: '#f1f5f9' }}>
-                    <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '35px', textAlign: 'center' }}>#</th>
-                    <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '130px' }}>كود الصنف / الباركود</th>
-                    <th style={{ border: '1px solid #94a3b8', padding: '6px 8px' }}>اسم الصنف / المنتج</th>
-                    <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '90px' }}>المجموعة</th>
-                    <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '90px' }}>المقاس / اللون</th>
-                    <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '90px', textAlign: 'center' }}>الرصيد بالدفتر</th>
-                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '90px', textAlign: 'center', background: '#e2e8f0' }}>الرصيد الفعلي</th>
-                    <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '120px' }}>ملاحظات الجرد</th>
+                  <tr style={{ background: '#0f172a', color: '#fff' }}>
+                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '30px', textAlign: 'center' }}>م</th>
+                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '130px', textAlign: 'center' }}>كود الصنف / الباركود</th>
+                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px' }}>اسم الصنف والوصف</th>
+                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '90px' }}>المجموعة</th>
+                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '90px', textAlign: 'center' }}>المقاس / اللون</th>
+                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '85px', textAlign: 'center' }}>رصيد الدفتر</th>
+                    <th style={{ border: '1.5px solid #0f172a', padding: '6px 8px', width: '95px', textAlign: 'center', background: '#334155' }}>العدد الفعلي</th>
+                    <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '110px' }}>ملاحظات الجرد</th>
                   </tr>
                 </thead>
                 <tbody>
                   {printableItems.map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', textAlign: 'center' }}>{idx + 1}</td>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', fontFamily: 'monospace' }}>
+                    <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center' }}>{idx + 1}</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
                         {item.variant_sku || item.product_code}
                       </td>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', fontWeight: 'bold' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', fontWeight: 600 }}>
                         {item.product_name}
                       </td>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', color: '#475569' }}>
                         {item.category_name || '—'}
                       </td>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center' }}>
                         {[item.size, item.color].filter(Boolean).join(' / ') || '—'}
                       </td>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold' }}>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontWeight: 700 }}>
                         {item.system_qty}
                       </td>
-                      <td style={{ border: '1px solid #0f172a', padding: '6px 8px', textAlign: 'center', background: '#f8fafc' }}>
-                        {/* Blank box for manual pen writing */}
+                      <td style={{ border: '1.5px solid #0f172a', padding: '5px 8px', textAlign: 'center', background: '#fff' }}>
                         <div style={{ height: '22px' }}></div>
                       </td>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px' }}>
-                        {/* Notes line */}
+                      <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px' }}>
                       </td>
                     </tr>
                   ))}
                   {printableItems.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>
-                        لا توجد أصناف مطابقة لهذا النطاق
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
+                        لا توجد أصناف مطابقة لهذا النطاق المحدد
                       </td>
                     </tr>
                   )}
@@ -779,19 +776,30 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
               </table>
 
               {/* Printable Signatures */}
-              <div style={{ marginTop: '35px', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-                  <div>توقيع أمين المخزن / الفرع</div>
-                  <div style={{ marginTop: '20px', color: '#64748b' }}>..........................................</div>
+              <div className="signatures-grid" style={{ marginTop: 28, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, paddingTop: 14, borderTop: '1px dashed #94a3b8' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 28, fontSize: 12 }}>أمين المخزن / الفرع المستهدف</div>
+                  <div style={{ borderTop: '1px solid #334155', width: '80%', margin: '0 auto', paddingTop: 4, fontSize: 11, color: '#475569' }}>
+                    التوقيع: .....................
+                  </div>
                 </div>
-                <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-                  <div>توقيع عضو لجنة الجرد</div>
-                  <div style={{ marginTop: '20px', color: '#64748b' }}>..........................................</div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 28, fontSize: 12 }}>عضو ومسؤول لجنة الجرد الميداني</div>
+                  <div style={{ borderTop: '1px solid #334155', width: '80%', margin: '0 auto', paddingTop: 4, fontSize: 11, color: '#475569' }}>
+                    التوقيع: .....................
+                  </div>
                 </div>
-                <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-                  <div>اعتماد مدير المستودع الرئيسي</div>
-                  <div style={{ marginTop: '20px', color: '#64748b' }}>..........................................</div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 28, fontSize: 12 }}>اعتماد الإدارة العامة والمستودعات</div>
+                  <div style={{ borderTop: '1px solid #334155', width: '80%', margin: '0 auto', paddingTop: 4, fontSize: 11, color: '#475569' }}>
+                    الختم والاعتماد: .....................
+                  </div>
                 </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ marginTop: 16, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6 }}>
+                كشف رسمي صادر من منظومة Yoka SWM • تاريخ ووقت الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}
               </div>
             </div>
           </div>

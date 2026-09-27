@@ -41,7 +41,7 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-export default function Transfers() {
+export default function Transfers({ currentUser, autoOpenCreate, onResetAction }) {
   const [loading, setLoading] = useState(false);
   const [transfers, setTransfers] = useState([]);
   const [metrics, setMetrics] = useState(null);
@@ -167,6 +167,13 @@ export default function Transfers() {
     setTransferItems([]);
     setCreateModalVisible(true);
   };
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      handleOpenCreateModal();
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   // Add Item to Transfer
   const handleAddItem = (productId) => {
@@ -509,7 +516,7 @@ export default function Transfers() {
         onCancel={() => setCreateModalVisible(false)}
         footer={null}
         width={850}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={createForm}
@@ -714,7 +721,7 @@ export default function Transfers() {
         onCancel={() => setPrintModalVisible(false)}
         footer={null}
         width={850}
-        destroyOnClose
+        destroyOnHidden
       >
         <DispatchNoteA4
           transfer={selectedTransfer}

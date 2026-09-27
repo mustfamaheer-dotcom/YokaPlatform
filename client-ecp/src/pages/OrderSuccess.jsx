@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Result, Button, Card, Descriptions, Table, Typography, Space, Spin } from 'antd';
 import { CheckCircleFilled, ShoppingOutlined, PrinterOutlined, HomeOutlined, MessageOutlined } from '@ant-design/icons';
 import api from '../api';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text } = Typography;
 
@@ -111,7 +112,32 @@ export default function OrderSuccess() {
       />
 
       {order && (
-        <Card style={{ borderRadius: 12, marginTop: 24, border: '1px solid #E8E4DB' }}>
+        <Card className="customer-invoice-print" style={{ borderRadius: 12, marginTop: 24, border: '1px solid #E8E4DB' }}>
+          {/* Print-Only Branded Header */}
+          <div className="print-only" style={{ borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 120, objectFit: 'contain' }} />
+                <div>
+                  <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
+                  <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>أرقى ملابس المحجبات والأزياء الراقية • متجر أونلاين</div>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>خدمة العملاء: 01000000000 • الموقع: yokastore.com</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                  فاتورة شراء إلكترونية
+                </div>
+                <div style={{ marginTop: 5, fontSize: 12, color: '#334155', fontWeight: 700 }}>
+                  رقم الطلب: <strong style={{ fontFamily: 'monospace', color: '#0f172a', fontSize: 13.5 }}>#{orderNumber}</strong>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  تاريخ الطلب: {new Date(order.created_at || Date.now()).toLocaleDateString('ar-EG')}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Descriptions title={<span style={{ fontWeight: 700 }}>بيانات الشحن والفاتورة</span>} bordered size="small" column={{ xs: 1, sm: 2 }}>
             <Descriptions.Item label="اسم العميل">
               {order.shipping_address?.recipient_name || 'عميل المتجر'}
@@ -163,6 +189,12 @@ export default function OrderSuccess() {
                 <Text strong style={{ color: '#C8A45C', fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>{parseFloat(order.total_amount).toLocaleString()} ج.م</Text>
               </div>
             </Space>
+          </div>
+
+          {/* Print-Only Footer Notice */}
+          <div className="print-only" style={{ marginTop: 20, paddingTop: 10, borderTop: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '10.5px', color: '#64748b' }}>
+            <div>شكراً لتسوقكم من متجر YOKA STORE • الاستبدال والاسترجاع متاح خلال 14 يوماً وفقاً للشروط والأحكام.</div>
+            <div style={{ marginTop: 4, color: '#94a3b8' }}>تم استخراج هذه الفاتورة إلكترونياً من متجر Yoka Store</div>
           </div>
         </Card>
       )}

@@ -5,6 +5,16 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
+// Process-level resilience against unexpected remote DB/socket drops
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [Process Uncaught Exception Handled]:', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ [Process Unhandled Rejection Handled]:', reason);
+});
+
+
 const authRoutes = require('./routes/auth');
 const branchRoutes = require('./routes/branches');
 const userRoutes = require('./routes/users');

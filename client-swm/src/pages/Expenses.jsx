@@ -797,7 +797,7 @@ export default function Expenses({ currentUser }) {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={520}
       >
         <Form

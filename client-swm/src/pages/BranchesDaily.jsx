@@ -46,6 +46,8 @@ import {
 import dayjs from 'dayjs';
 import api from '../api';
 import ThermalReceipt from '../components/ThermalReceipt';
+import { printHtmlContent } from '../utils/printUtils';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -60,6 +62,7 @@ export default function BranchesDaily() {
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [dateMode, setDateMode] = useState('today'); // 'today' | 'yesterday' | 'range'
   const [singleDate, setSingleDate] = useState(dayjs());
+  const selectedDate = singleDate || dayjs();
   const [dateRange, setDateRange] = useState([dayjs(), dayjs()]);
   const [timeRange, setTimeRange] = useState(null); // [startTime, endTime]
   const [paymentFilter, setPaymentFilter] = useState('all');
@@ -69,7 +72,10 @@ export default function BranchesDaily() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [invoiceModalVisible, setInvoiceModalVisible] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [summaryModalVisible, setSummaryModalVisible] = useState(false);
+  const [thermalModalVisible, setThermalModalVisible] = useState(false);
   const printAreaRef = useRef(null);
+  const summaryPrintRef = useRef(null);
 
   // Fetch Branches List
   const fetchBranches = async () => {
@@ -166,7 +172,7 @@ export default function BranchesDaily() {
 
   // Print Daily Summary Page
   const handlePrintSummary = () => {
-    window.print();
+    setSummaryModalVisible(true);
   };
 
   const kpi = data?.kpi || {
@@ -577,102 +583,110 @@ export default function BranchesDaily() {
       </Card>
 
       {/* 3. High-Level Financial KPI Overview Cards (الوارد، المنصرف، الصافي) */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         {/* Total Inflow (المبيعات / الوارد) */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={12} sm={12} lg={6}>
           <Card
             variant="borderless"
             style={{
               borderRadius: 12,
               backgroundColor: '#ecfdf5',
               border: '1px solid #a7f3d0',
-              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.08)'
+              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.08)',
+              height: '100%'
             }}
+            styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#047857', fontSize: 15 }}>📥 إجمالي الوارد (المبيعات المحصلة)</Text>}
+              title={<Text strong style={{ color: '#047857', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>📥 إجمالي الوارد (المبيعات)</Text>}
               value={kpi.totalInflow}
               precision={2}
               suffix="ج.م"
               prefix={<ArrowUpOutlined style={{ color: '#10b981' }} />}
-              valueStyle={{ color: '#065f46', fontWeight: 800, fontSize: 24 }}
+              valueStyle={{ color: '#065f46', fontWeight: 800, fontSize: 'clamp(17px, 4vw, 22px)' }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#047857' }}>
-              مجموع مبيعات الفواتير المعتمدة خلال الفترة
+            <div style={{ marginTop: 6, fontSize: 11, color: '#047857' }}>
+              مبيعات الفواتير المعتمدة
             </div>
           </Card>
         </Col>
 
         {/* Total Outflow (المصروفات / المنصرف) */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={12} sm={12} lg={6}>
           <Card
             variant="borderless"
             style={{
               borderRadius: 12,
               backgroundColor: '#fef2f2',
               border: '1px solid #fecaca',
-              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.08)'
+              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.08)',
+              height: '100%'
             }}
+            styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#b91c1c', fontSize: 15 }}>📤 إجمالي المنصرف (المصروفات)</Text>}
+              title={<Text strong style={{ color: '#b91c1c', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>📤 إجمالي المنصرف</Text>}
               value={kpi.totalOutflow}
               precision={2}
               suffix="ج.م"
               prefix={<ArrowDownOutlined style={{ color: '#ef4444' }} />}
-              valueStyle={{ color: '#991b1b', fontWeight: 800, fontSize: 24 }}
+              valueStyle={{ color: '#991b1b', fontWeight: 800, fontSize: 'clamp(17px, 4vw, 22px)' }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#b91c1c' }}>
-              مجموع المصروفات المعتمدة من الفروع
+            <div style={{ marginTop: 6, fontSize: 11, color: '#b91c1c' }}>
+              مصروفات الفروع المعتمدة
             </div>
           </Card>
         </Col>
 
         {/* Net Cashflow (الصافي) */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={12} sm={12} lg={6}>
           <Card
             variant="borderless"
             style={{
               borderRadius: 12,
               backgroundColor: kpi.netCashflow >= 0 ? '#eff6ff' : '#fff1f2',
               border: `1px solid ${kpi.netCashflow >= 0 ? '#bfdbfe' : '#fecdd3'}`,
-              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.08)'
+              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.08)',
+              height: '100%'
             }}
+            styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: kpi.netCashflow >= 0 ? '#1d4ed8' : '#be123c', fontSize: 15 }}>💎 الصافي المتبقي (Net Flow)</Text>}
+              title={<Text strong style={{ color: kpi.netCashflow >= 0 ? '#1d4ed8' : '#be123c', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>💎 الصافي المتبقي</Text>}
               value={kpi.netCashflow}
               precision={2}
               suffix="ج.م"
               prefix={<DollarCircleOutlined style={{ color: kpi.netCashflow >= 0 ? '#2563eb' : '#e11d48' }} />}
-              valueStyle={{ color: kpi.netCashflow >= 0 ? '#1e40af' : '#9f1239', fontWeight: 800, fontSize: 24 }}
+              valueStyle={{ color: kpi.netCashflow >= 0 ? '#1e40af' : '#9f1239', fontWeight: 800, fontSize: 'clamp(17px, 4vw, 22px)' }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: kpi.netCashflow >= 0 ? '#1d4ed8' : '#be123c' }}>
-              الوارد - المنصرف = {kpi.netCashflow >= 0 ? 'فائض نقدي متاح' : 'عجز في اليومية'}
+            <div style={{ marginTop: 6, fontSize: 11, color: kpi.netCashflow >= 0 ? '#1d4ed8' : '#be123c' }}>
+              {kpi.netCashflow >= 0 ? 'فائض نقدي متاح' : 'عجز في اليومية'}
             </div>
           </Card>
         </Col>
 
         {/* Total Invoices Count & Items Sold */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={12} sm={12} lg={6}>
           <Card
             variant="borderless"
             style={{
               borderRadius: 12,
               backgroundColor: '#f8fafc',
               border: '1px solid #e2e8f0',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+              height: '100%'
             }}
+            styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#475569', fontSize: 15 }}>🧾 الفواتير والقطع المباعة</Text>}
+              title={<Text strong style={{ color: '#475569', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>🧾 الفواتير والعمليات</Text>}
               value={kpi.invoicesCount}
               suffix="فاتورة"
               prefix={<ShoppingOutlined style={{ color: '#6366f1' }} />}
-              valueStyle={{ color: '#1e293b', fontWeight: 800, fontSize: 24 }}
+              valueStyle={{ color: '#1e293b', fontWeight: 800, fontSize: 'clamp(17px, 4vw, 22px)' }}
             />
-            <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>
-              إجمالي القطع المباعة: <strong>{kpi.totalItemsSold || 0} قطعة</strong>
+            <div style={{ marginTop: 6, fontSize: 11, color: '#64748b' }}>
+              القطع المباعة: <strong>{kpi.totalItemsSold || 0} قطعة</strong>
             </div>
           </Card>
         </Col>
@@ -802,6 +816,7 @@ export default function BranchesDaily() {
             rowKey="branch_id"
             pagination={false}
             size="middle"
+            scroll={{ x: 'max-content' }}
           />
         </Card>
       )}
@@ -825,6 +840,7 @@ export default function BranchesDaily() {
           columns={invoiceColumns}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
@@ -851,146 +867,358 @@ export default function BranchesDaily() {
             إغلاق
           </Button>,
           <Button
+            key="thermal"
+            icon={<PrinterOutlined />}
+            onClick={() => setThermalModalVisible(true)}
+            style={{ backgroundColor: '#0f172a', color: '#fff' }}
+          >
+            طباعة إيصال حراري (80mm)
+          </Button>,
+          <Button
             key="print"
             type="primary"
             icon={<PrinterOutlined />}
             onClick={() => {
               if (printAreaRef.current) {
-                const printWindow = window.open('', '_blank');
-                printWindow.document.write(`
-                  <html dir="rtl">
-                    <head>
-                      <title>فاتورة ${selectedInvoice?.invoice_number}</title>
-                      <style>
-                        body { font-family: sans-serif; padding: 20px; direction: rtl; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-                        th { background: #f3f4f6; }
-                      </style>
-                    </head>
-                    <body>
-                      ${printAreaRef.current.innerHTML}
-                    </body>
-                  </html>
-                `);
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
+                printHtmlContent({
+                  title: `فاتورة مبيعات - ${selectedInvoice?.invoice_number}`,
+                  htmlContent: printAreaRef.current.innerHTML,
+                  pageType: 'a4'
+                });
               }
             }}
             style={{ backgroundColor: '#16a34a' }}
           >
-            طباعة الفاتورة
+            طباعة الفاتورة (A4)
           </Button>
         ]}
-        width={750}
+        width={780}
       >
         {invoiceLoading || !selectedInvoice ? (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <Spin size="large" />
           </div>
         ) : (
-          <div ref={printAreaRef}>
-            {/* Header info */}
-            <div style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderRadius: 8, marginBottom: 16 }}>
+          <div ref={printAreaRef} className="printable-invoice" style={{ padding: '6px', direction: 'rtl', color: '#0f172a' }}>
+            {/* Branded Header */}
+            <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+              <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
+                <div>
+                  <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
+                  <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>فاتورة مبيعات نقطة البيع والمعارض • قسم الحسابات</div>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>الفرع: <strong>{selectedInvoice.branch_name || selectedInvoice.branch_code}</strong></div>
+                </div>
+              </div>
+              <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+                <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                  فاتورة مبيعات نقدية
+                </div>
+                <div style={{ marginTop: 5, fontSize: 12, color: '#334155', fontWeight: 700 }}>
+                  رقم الفاتورة: <strong style={{ fontFamily: 'monospace', color: '#0f172a', fontSize: 13.5 }}>{selectedInvoice.invoice_number}</strong>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  التاريخ: {dayjs(selectedInvoice.invoice_date).format('YYYY-MM-DD hh:mm A')}
+                </div>
+              </div>
+            </div>
+
+            {/* Metadata Card */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
               <Row gutter={[16, 8]}>
-                <Col span={12}>
-                  <Text type="secondary">الفرع: </Text>
-                  <Text strong>{selectedInvoice.branch_name || selectedInvoice.branch_code}</Text>
+                <Col span={6}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>الفرع:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{selectedInvoice.branch_name || selectedInvoice.branch_code}</div>
                 </Col>
-                <Col span={12}>
-                  <Text type="secondary">التاريخ: </Text>
-                  <Text strong>{dayjs(selectedInvoice.invoice_date).format('YYYY-MM-DD hh:mm A')}</Text>
+                <Col span={6}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>الكاشير / البائع:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{selectedInvoice.cashier_name || 'كاشير الفرع'}</div>
                 </Col>
-                <Col span={12}>
-                  <Text type="secondary">الكاشير / البائع: </Text>
-                  <Text strong>{selectedInvoice.cashier_name || 'كاشير الفرع'}</Text>
+                <Col span={6}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>العميل:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{selectedInvoice.customer_name || 'عميل مباشر'}</div>
                 </Col>
-                <Col span={12}>
-                  <Text type="secondary">العميل: </Text>
-                  <Text strong>{selectedInvoice.customer_name || 'عميل مباشر'}</Text>
+                <Col span={6}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>طريقة السداد:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#16a34a', marginTop: 1 }}>
+                    {selectedInvoice.payment_method === 'cash' ? 'نقداً (كاش)' : (selectedInvoice.payment_method === 'card' ? 'بطاقة بنكية' : (selectedInvoice.payment_method === 'split' ? 'دفع مقسم' : selectedInvoice.payment_method))}
+                  </div>
                 </Col>
               </Row>
             </div>
 
             {/* Items Table */}
-            <Table
-              size="small"
-              pagination={false}
-              dataSource={selectedInvoice.items || []}
-              rowKey="id"
-              columns={[
-                {
-                  title: 'الصنف / الكود',
-                  key: 'prod',
-                  render: (_, r) => (
-                    <div>
-                      <Text strong>{r.product_name}</Text>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>{r.product_code}</div>
-                    </div>
-                  )
-                },
-                {
-                  title: 'اللون / المقاس',
-                  key: 'variant',
-                  render: (_, r) => (
-                    <Space size="small">
-                      {r.color && <Tag color="blue">{r.color}</Tag>}
-                      {r.size && <Tag color="cyan">{r.size}</Tag>}
-                      {!r.color && !r.size && <Text type="secondary">—</Text>}
-                    </Space>
-                  )
-                },
-                {
-                  title: 'الكمية',
-                  dataIndex: 'quantity',
-                  key: 'quantity',
-                  align: 'center',
-                  render: (qty) => <Tag color="geekblue">{qty}</Tag>
-                },
-                {
-                  title: 'سعر الوحدة',
-                  dataIndex: 'unit_price',
-                  key: 'unit_price',
-                  align: 'right',
-                  render: (p) => `${parseFloat(p || 0).toLocaleString()} ج.م`
-                },
-                {
-                  title: 'الإجمالي',
-                  dataIndex: 'line_total',
-                  key: 'line_total',
-                  align: 'right',
-                  render: (t) => <strong>{parseFloat(t || 0).toLocaleString()} ج.م</strong>
-                }
-              ]}
-            />
+            <table
+              className="print-table"
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'right',
+                fontSize: '11px',
+                marginBottom: 12
+              }}
+            >
+              <thead>
+                <tr style={{ background: '#0f172a', color: '#ffffff' }}>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '30px', textAlign: 'center' }}>م</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '120px', textAlign: 'center' }}>كود الصنف</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a' }}>اسم المنتج والمواصفات</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'center' }}>اللون والمقاس</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '60px', textAlign: 'center' }}>الكمية</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '90px', textAlign: 'left' }}>سعر الوحدة</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '100px', textAlign: 'left' }}>الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(selectedInvoice.items || []).map((item, idx) => (
+                  <tr
+                    key={item.id || idx}
+                    style={{
+                      background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                      borderBottom: '1px solid #cbd5e1'
+                    }}
+                  >
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
+                      {item.product_code || '-'}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product_name}</div>
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+                      {[item.color, item.size].filter(Boolean).join(' • ') || '—'}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, fontFamily: 'monospace' }}>
+                      {item.quantity}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace' }}>
+                      {parseFloat(item.unit_price || 0).toLocaleString()} ج.م
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 800, fontFamily: 'monospace' }}>
+                      {parseFloat(item.line_total || 0).toLocaleString()} ج.م
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
             {/* Totals & Breakdown */}
-            <Divider style={{ margin: '16px 0' }} />
-            <Row justify="space-between" align="bottom">
-              <Col span={12}>
-                <Text strong style={{ display: 'block', marginBottom: 6 }}>تفصيل طرق السداد:</Text>
-                {renderPaymentTags(selectedInvoice.payment_breakdown, selectedInvoice.final_amount)}
-              </Col>
-              <Col span={12} style={{ textAlign: 'left' }}>
-                <div style={{ marginBottom: 4 }}>
-                  <Text type="secondary">المجموع الفرعي: </Text>
-                  <Text>{parseFloat(selectedInvoice.subtotal || 0).toLocaleString()} ج.م</Text>
-                </div>
-                {parseFloat(selectedInvoice.discount_amount || 0) > 0 && (
-                  <div style={{ marginBottom: 4, color: '#dc2626' }}>
-                    <Text type="secondary" style={{ color: '#dc2626' }}>الخصم: </Text>
-                    <Text>-{parseFloat(selectedInvoice.discount_amount).toLocaleString()} ج.م</Text>
+            <Row gutter={16}>
+              <Col span={14}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#334155', marginBottom: 4 }}>تفصيل سداد الفاتورة:</div>
+                  {renderPaymentTags(selectedInvoice.payment_breakdown, selectedInvoice.final_amount)}
+                  <div style={{ marginTop: 8, fontSize: 10, color: '#64748b', borderTop: '1px dashed #cbd5e1', paddingTop: 6 }}>
+                    الاستبدال والاسترجاع خلال 14 يوماً مع إحضار أصل الفاتورة والباركود بحالته الأصلية.
                   </div>
-                )}
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#16a34a', marginTop: 8 }}>
-                  الإجمالي النهائي: {parseFloat(selectedInvoice.final_amount || 0).toLocaleString()} ج.م
+                </div>
+              </Col>
+              <Col span={10}>
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', color: '#475569' }}>
+                    <span>المجموع الفرعي:</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{parseFloat(selectedInvoice.subtotal || 0).toLocaleString()} ج.م</span>
+                  </div>
+                  {parseFloat(selectedInvoice.discount_amount || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', color: '#dc2626' }}>
+                      <span>قيمة الخصم:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>-{parseFloat(selectedInvoice.discount_amount).toLocaleString()} ج.م</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '2px solid #0f172a', marginTop: 6, paddingTop: 6, fontSize: 14, fontWeight: 900, color: '#16a34a' }}>
+                    <span>الصافي المطلوب:</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 16 }}>{parseFloat(selectedInvoice.final_amount || 0).toLocaleString()} ج.م</span>
+                  </div>
                 </div>
               </Col>
             </Row>
+
+            {/* Footer */}
+            <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <span>شكراً لزيارتكم متجر Yoka Store</span>
+              <span>تاريخ الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}</span>
+            </div>
           </div>
         )}
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* THERMAL RECEIPT MODAL (80mm)                             */}
+      {/* ========================================================= */}
+      <Modal
+        open={thermalModalVisible}
+        onCancel={() => setThermalModalVisible(false)}
+        footer={null}
+        width={380}
+        destroyOnHidden
+      >
+        <ThermalReceipt
+          invoice={selectedInvoice}
+          onClose={() => setThermalModalVisible(false)}
+        />
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* DAILY SUMMARY PRINT MODAL (A4)                          */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '96%' }}>
+            <span style={{ fontWeight: 800, fontSize: 16 }}>معاينة وطباعة تقرير اليومية الشامل للفرع (A4)</span>
+            <Button
+              type="primary"
+              icon={<PrinterOutlined />}
+              onClick={() => {
+                if (summaryPrintRef.current) {
+                  printHtmlContent({
+                    title: 'تقرير اليومية الشامل للفرع - يوكا ستور',
+                    htmlContent: summaryPrintRef.current.innerHTML,
+                    pageType: 'a4-landscape'
+                  });
+                }
+              }}
+              style={{ backgroundColor: '#0f172a' }}
+            >
+              طباعة التقرير (A4 Landscape)
+            </Button>
+          </div>
+        }
+        open={summaryModalVisible}
+        onCancel={() => setSummaryModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setSummaryModalVisible(false)}>إغلاق</Button>,
+          <Button
+            key="print"
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              if (summaryPrintRef.current) {
+                printHtmlContent({
+                  title: 'تقرير اليومية الشامل للفرع - يوكا ستور',
+                  htmlContent: summaryPrintRef.current.innerHTML,
+                  pageType: 'a4-landscape'
+                });
+              }
+            }}
+            style={{ backgroundColor: '#0f172a' }}
+          >
+            طباعة التقرير
+          </Button>
+        ]}
+        width={920}
+        destroyOnHidden
+      >
+        <div ref={summaryPrintRef} style={{ padding: '6px', direction: 'rtl', color: '#0f172a' }}>
+          {/* Header */}
+          <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+            <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
+              <div>
+                <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
+                <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>تقرير إغلاق اليومية والتدفقات النقدية للفروع والمعارض</div>
+                <div style={{ fontSize: 10.5, color: '#64748b' }}>
+                  الفرع: <strong>{selectedBranch === 'all' ? 'جميع الفروع مجمعة' : branchesList.find(b => b.id === selectedBranch)?.branch_name}</strong>
+                  {' • '}التاريخ: <strong>{dateMode === 'today' ? dayjs().format('YYYY-MM-DD') : dateMode === 'yesterday' ? dayjs().subtract(1, 'day').format('YYYY-MM-DD') : (dateMode === 'range' && dateRange?.[0] && dateRange?.[1]) ? `${dateRange[0].format('YYYY-MM-DD')} إلى ${dateRange[1].format('YYYY-MM-DD')}` : (singleDate ? singleDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'))}</strong>
+                </div>
+              </div>
+            </div>
+            <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+              <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                تقرير اليومية للفرع
+              </div>
+              <div style={{ marginTop: 5, fontSize: 11, color: '#64748b' }}>
+                تاريخ الاستخراج: {dayjs().format('YYYY-MM-DD HH:mm')}
+              </div>
+            </div>
+          </div>
+
+          {/* KPIs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي الوارد (مبيعات)</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.totalInflow || 0).toLocaleString()} ج.م
+              </div>
+            </div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>المصروفات المنصرفة</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#dc2626', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.totalOutflow || 0).toLocaleString()} ج.م
+              </div>
+            </div>
+            <div style={{ border: '2px solid #0f172a', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f1f5f9' }}>
+              <div style={{ fontSize: 10.5, color: '#0f172a', fontWeight: 800 }}>صافي التدفق النقدي</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#0f172a', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.netCashflow || 0).toLocaleString()} ج.م
+              </div>
+            </div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>عدد الفواتير المنفذة</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
+                {kpi.invoicesCount || 0} فاتورة
+              </div>
+            </div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي القطع المباعة</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#7c3aed', fontFamily: 'monospace', marginTop: 2 }}>
+                {kpi.totalItemsSold || 0} قطعة
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Breakdown Cards */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>تفصيل المتحصلات بحسب وسيلة الدفع:</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+              <div style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                <span style={{ fontSize: 10.5, color: '#64748b' }}>نقداً (كاش بالدرج):</span>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#16a34a', fontFamily: 'monospace' }}>
+                  {parseFloat(paymentBreakdown.cash || 0).toLocaleString()} ج.م
+                </div>
+              </div>
+              <div style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                <span style={{ fontSize: 10.5, color: '#64748b' }}>بطاقات / فيزا:</span>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#2563eb', fontFamily: 'monospace' }}>
+                  {parseFloat(paymentBreakdown.card || 0).toLocaleString()} ج.م
+                </div>
+              </div>
+              <div style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                <span style={{ fontSize: 10.5, color: '#64748b' }}>تحويل إنستاباي / بنكي:</span>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#7c3aed', fontFamily: 'monospace' }}>
+                  {parseFloat(paymentBreakdown.bank_transfer || 0).toLocaleString()} ج.م
+                </div>
+              </div>
+              <div style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                <span style={{ fontSize: 10.5, color: '#64748b' }}>محافظ إلكترونية:</span>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#d97706', fontFamily: 'monospace' }}>
+                  {parseFloat(paymentBreakdown.wallet || 0).toLocaleString()} ج.م
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Signatures */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, paddingTop: 14, borderTop: '1px dashed #94a3b8' }}>
+            <div style={{ textAlign: 'center', width: '30%' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 26 }}>مسؤول الكاشير / البائع</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
+            </div>
+            <div style={{ textAlign: 'center', width: '30%' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 26 }}>مدير الفرع / المعرض</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
+            </div>
+            <div style={{ textAlign: 'center', width: '30%' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 26 }}>اعتماد الإدارة المالية</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
+            </div>
+          </div>
+
+          {/* Verification Footer */}
+          <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+            <span>تقرير يومية رسمي معتمد صادر من منظومة Yoka SWM</span>
+            <span>تاريخ الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}</span>
+          </div>
+        </div>
       </Modal>
     </div>
   );

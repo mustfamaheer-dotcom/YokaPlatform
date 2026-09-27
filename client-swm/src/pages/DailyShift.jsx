@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   Row,
@@ -46,6 +46,8 @@ import {
 import dayjs from 'dayjs';
 import api from '../api';
 import ThermalReceipt from '../components/ThermalReceipt';
+import { printHtmlContent } from '../utils/printUtils';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -55,6 +57,7 @@ export default function DailyShift({ currentUser }) {
   const [data, setData] = useState(null);
   const [staff, setStaff] = useState([]);
   const [selectedSalesperson, setSelectedSalesperson] = useState(null);
+  const selectedStaffId = selectedSalesperson;
 
   // Filter for Completed Orders Tab (POS vs ECP)
   const [orderFilterType, setOrderFilterType] = useState('all'); // 'all' | 'pos' | 'ecp'
@@ -66,6 +69,9 @@ export default function DailyShift({ currentUser }) {
   // ECP Order detail modal
   const [selectedEcpOrder, setSelectedEcpOrder] = useState(null);
   const [ecpModalVisible, setEcpModalVisible] = useState(false);
+  const [shiftPrintModalVisible, setShiftPrintModalVisible] = useState(false);
+  const shiftPrintRef = useRef(null);
+  const ecpPrintRef = useRef(null);
 
   // Fetch branch staff
   const fetchStaff = async () => {
@@ -128,7 +134,7 @@ export default function DailyShift({ currentUser }) {
 
   // Print shift closing summary
   const handlePrintShift = () => {
-    window.print();
+    setShiftPrintModalVisible(true);
   };
 
   const kpi = data?.kpi || {};
@@ -823,7 +829,7 @@ export default function DailyShift({ currentUser }) {
         onCancel={() => setReceiptModalVisible(false)}
         footer={null}
         width={380}
-        destroyOnClose
+        destroyOnHidden
       >
         <ThermalReceipt
           invoice={selectedInvoice}
@@ -850,18 +856,45 @@ export default function DailyShift({ currentUser }) {
             key="print"
             type="primary"
             icon={<PrinterOutlined />}
-            onClick={() => window.print()}
+            onClick={() => {
+              if (ecpPrintRef.current) {
+                printHtmlContent({
+                  title: `تفاصيل الطلب - ${selectedEcpOrder?.order_number || selectedEcpOrder?.orderNumber}`,
+                  htmlContent: ecpPrintRef.current.innerHTML,
+                  pageType: 'a4'
+                });
+              }
+            }}
             style={{ backgroundColor: '#7c3aed' }}
           >
-            طباعة تفاصيل الطلب
+            طباعة تفاصيل الطلب (A4)
           </Button>
         ]}
-        width={650}
-        destroyOnClose
+        width={680}
+        destroyOnHidden
       >
         {selectedEcpOrder && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Descriptions bordered size="small" column={2}>
+          <div ref={ecpPrintRef} className="printable-order" style={{ padding: '6px', direction: 'rtl', color: '#0f172a' }}>
+            {/* Header */}
+            <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 10, marginBottom: 12 }}>
+              <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <img src={yokaLogo} alt="Yoka Store" style={{ height: 44, maxWidth: 110, objectFit: 'contain' }} />
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h2>
+                  <div style={{ fontSize: 11, color: '#475569' }}>تفاصيل طلب شحن وتوصيل متجر أونلاين</div>
+                </div>
+              </div>
+              <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+                <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 6 }}>
+                  طلب متجر إلكتروني
+                </div>
+                <div style={{ marginTop: 4, fontSize: 11.5, fontFamily: 'monospace', fontWeight: 700 }}>
+                  #{selectedEcpOrder.order_number || selectedEcpOrder.orderNumber}
+                </div>
+              </div>
+            </div>
+
+            <Descriptions bordered size="small" column={2} style={{ marginBottom: 12 }}>
               <Descriptions.Item label="رقم الطلب">
                 <Text strong code>{selectedEcpOrder.order_number || selectedEcpOrder.orderNumber}</Text>
               </Descriptions.Item>
@@ -893,22 +926,186 @@ export default function DailyShift({ currentUser }) {
                 <Tag color="purple">{selectedEcpOrder.payment_method || selectedEcpOrder.paymentMethod || 'الدفع عند الاستلام'}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="إجمالي الطلب" span={2}>
-                <Text strong style={{ color: '#16a34a', fontSize: 17 }}>
+                <Text strong style={{ color: '#16a34a', fontSize: 16, fontFamily: 'monospace' }}>
                   {parseFloat(selectedEcpOrder.total_amount || selectedEcpOrder.amount || 0).toFixed(2)} ج.م
                 </Text>
               </Descriptions.Item>
             </Descriptions>
 
             {selectedEcpOrder.customer_notes && (
-              <Card size="small" style={{ background: '#f8fafc', borderRadius: 8 }}>
-                <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-                  ملاحظات العميل:
-                </Text>
-                <Text>{selectedEcpOrder.customer_notes}</Text>
-              </Card>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px' }}>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>ملاحظات العميل:</div>
+                <div style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>{selectedEcpOrder.customer_notes}</div>
+              </div>
             )}
           </div>
         )}
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* SHIFT CLOSING SUMMARY PRINT MODAL (A4)                   */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '96%' }}>
+            <span style={{ fontWeight: 800, fontSize: 16 }}>معاينة وطباعة تقرير تقفيل الوردية والكاشير (A4)</span>
+            <Button
+              type="primary"
+              icon={<PrinterOutlined />}
+              onClick={() => {
+                if (shiftPrintRef.current) {
+                  printHtmlContent({
+                    title: 'تقرير تقفيل وردية الكاشير - يوكا ستور',
+                    htmlContent: shiftPrintRef.current.innerHTML,
+                    pageType: 'a4'
+                  });
+                }
+              }}
+              style={{ backgroundColor: '#0f172a' }}
+            >
+              طباعة التقرير (A4)
+            </Button>
+          </div>
+        }
+        open={shiftPrintModalVisible}
+        onCancel={() => setShiftPrintModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setShiftPrintModalVisible(false)}>إغلاق</Button>,
+          <Button
+            key="print"
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => {
+              if (shiftPrintRef.current) {
+                printHtmlContent({
+                  title: 'تقرير تقفيل وردية الكاشير - يوكا ستور',
+                  htmlContent: shiftPrintRef.current.innerHTML,
+                  pageType: 'a4'
+                });
+              }
+            }}
+            style={{ backgroundColor: '#0f172a' }}
+          >
+            طباعة تقرير الشيفت
+          </Button>
+        ]}
+        width={850}
+        destroyOnHidden
+      >
+        <div ref={shiftPrintRef} style={{ padding: '6px', direction: 'rtl', color: '#0f172a' }}>
+          {/* Header */}
+          <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+            <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
+              <div>
+                <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
+                <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>تقرير تقفيل الوردية وجرد النقدية وحركة المبيعات اليومية</div>
+                <div style={{ fontSize: 10.5, color: '#64748b' }}>
+                  المسؤول / الكاشير: <strong>{selectedSalesperson ? staff.find(s => s.id === selectedSalesperson)?.full_name || 'موظف محدد' : 'كافة كاشيرات الفرع'}</strong>
+                </div>
+              </div>
+            </div>
+            <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+              <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                إغلاق وردية كاشير
+              </div>
+              <div style={{ marginTop: 5, fontSize: 11, color: '#64748b' }}>
+                تاريخ الشيفت: {dayjs().format('YYYY-MM-DD')}
+              </div>
+            </div>
+          </div>
+
+          {/* Operational KPIs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي مبيعات الوردية</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.total_sales || 0).toLocaleString()} ج.م
+              </div>
+            </div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>عدد المعاملات والطلبات</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
+                {kpi.completed_count || 0} معاملة
+              </div>
+            </div>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>متوسط قيمة المعاملة</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#0284c7', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.average_order_value || 0).toLocaleString()} ج.م
+              </div>
+            </div>
+            <div style={{ border: '2px solid #059669', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#ecfdf5' }}>
+              <div style={{ fontSize: 10.5, color: '#065f46', fontWeight: 800 }}>صافي إيراد الوردية</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.net_revenue || 0).toLocaleString()} ج.م
+              </div>
+            </div>
+          </div>
+
+          {/* Cash Drawer Reconciliation Box */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+              مطابقة وتسوية درج الكاش والمتحصلات المالية (Cashier Drawer Reconciliation):
+            </div>
+            <Row gutter={[16, 10]}>
+              <Col span={6}>
+                <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>النقدية المستلمة (كاش بالدرج):</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
+                    {parseFloat(kpi.cash_sales || 0).toLocaleString()} ج.م
+                  </div>
+                </div>
+              </Col>
+              <Col span={6}>
+                <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>مدفوعات البطاقات والفيزا:</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
+                    {parseFloat(kpi.card_sales || 0).toLocaleString()} ج.م
+                  </div>
+                </div>
+              </Col>
+              <Col span={6}>
+                <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>إنستاباي والتحويلات:</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#7c3aed', fontFamily: 'monospace', marginTop: 2 }}>
+                    {parseFloat(kpi.transfer_sales || 0).toLocaleString()} ج.م
+                  </div>
+                </div>
+              </Col>
+              <Col span={6}>
+                <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>محافظ إلكترونية:</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#d97706', fontFamily: 'monospace', marginTop: 2 }}>
+                    {parseFloat(kpi.wallet_sales || 0).toLocaleString()} ج.م
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Signatures */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, paddingTop: 14, borderTop: '1px dashed #94a3b8' }}>
+            <div style={{ textAlign: 'center', width: '30%' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 26 }}>توقيع الكاشير المسلّم للوردية</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
+            </div>
+            <div style={{ textAlign: 'center', width: '30%' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 26 }}>توقيع مشرف الوردية / مدير الفرع</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
+            </div>
+            <div style={{ textAlign: 'center', width: '30%' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginBottom: 26 }}>المراجع المالي واستلام النقدية</div>
+              <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10.5, color: '#64748b' }}>..........................................</div>
+            </div>
+          </div>
+
+          {/* Verification Footer */}
+          <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+            <span>تقرير تقفيل وردية رسمي صادر من منظومة Yoka SWM</span>
+            <span>وقت وتاريخ الاستخراج: {dayjs().format('YYYY-MM-DD HH:mm:ss')}</span>
+          </div>
+        </div>
       </Modal>
     </div>
   );

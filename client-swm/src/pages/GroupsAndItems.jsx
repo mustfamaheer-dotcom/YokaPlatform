@@ -21,7 +21,10 @@ import {
   Badge,
   Statistic,
   Radio,
-  Alert
+  Alert,
+  Upload,
+  Avatar,
+  Popover
 } from 'antd';
 import {
   AppstoreOutlined,
@@ -40,9 +43,16 @@ import {
   FolderOpenOutlined,
   BgColorsOutlined,
   ColumnWidthOutlined,
-  CheckOutlined
+  CheckOutlined,
+  UploadOutlined,
+  PictureOutlined,
+  CameraOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
+import BarcodeImage from '../components/BarcodeImage';
+import { generateValidEAN13 } from '../utils/barcode';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -89,7 +99,7 @@ function buildVariantSku(productCode, colorName, sizeName, colorIndex = 0, sizeI
   return `${code}-${cCode}-${sCode}`;
 }
 
-export default function GroupsAndItems() {
+export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
   const [activeTab, setActiveTab] = useState('groups'); // 'groups' | 'attributes' | 'items'
 
   // ==========================================
@@ -145,11 +155,21 @@ export default function GroupsAndItems() {
   const [editingItem, setEditingItem] = useState(null);
   const [itemSubmitting, setItemSubmitting] = useState(false);
   const [itemForm] = Form.useForm();
+  const watchedItemColor = Form.useWatch('color', itemForm);
+  const watchedItemBarcode = Form.useWatch('barcode', itemForm);
 
   // Multi-variant (Multiple colors & Multiple sizes) State
   const [isMultiVariant, setIsMultiVariant] = useState(false);
   const [selectedMultiColors, setSelectedMultiColors] = useState([]);
   const [selectedMultiSizes, setSelectedMultiSizes] = useState([]);
+
+  // Color-specific images map (colorName -> imageUrl data URI / link)
+  const [colorImages, setColorImages] = useState({});
+  const [featuredImageUrl, setFeaturedImageUrl] = useState('');
+
+  const activeColors = isMultiVariant
+    ? selectedMultiColors
+    : (watchedItemColor ? [watchedItemColor] : []);
 
   // ==========================================
   // FETCHING DATA
@@ -235,6 +255,14 @@ export default function GroupsAndItems() {
     });
     setIsGroupModalOpen(true);
   };
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      setActiveTab('groups');
+      handleOpenCreateGroup();
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   const handleOpenEditGroup = (cat) => {
     setEditingCategory(cat);
@@ -442,20 +470,66 @@ export default function GroupsAndItems() {
   };
 
   // ==========================================
-  // ITEMS HANDLERS
+  // ITEMS HANDLERS & COLOR IMAGES
   // ==========================================
   const generateCodes = () => {
     const randNum = Math.floor(100000 + Math.random() * 900000);
     const code = `ITM-${randNum}`;
-    const barcode = `622${Date.now().toString().slice(-9)}${Math.floor(Math.random() * 10)}`;
+    const barcode = generateValidEAN13('622');
     return { code, barcode };
   };
+
+  // Helper to handle client-side canvas compression for color images
+  const handleCompressFile = (file, callback) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800; // Optimal size for e-commerce cards
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG 82% quality (typically ~40-80KB)
+        const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        callback(optimizedDataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    return false; // Prevent automatic post
+  };
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      setActiveTab('items');
+      handleOpenCreateItem();
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   const handleOpenCreateItem = () => {
     setEditingItem(null);
     setIsMultiVariant(false);
     setSelectedMultiColors([]);
     setSelectedMultiSizes([]);
+    setColorImages({});
+    setFeaturedImageUrl('');
     itemForm.resetFields();
     const { code, barcode } = generateCodes();
     itemForm.setFieldsValue({
@@ -468,30 +542,77 @@ export default function GroupsAndItems() {
       material: '',
       color: colors[0]?.name || 'أسود',
       size: sizes[0]?.name || 'L',
-      is_ecom_listed: false
+      is_ecom_listed: true
     });
     setIsItemModalOpen(true);
   };
 
-  const handleOpenEditItem = (item) => {
+  const handleOpenEditItem = async (item) => {
     setEditingItem(item);
-    setIsMultiVariant(false);
-    setSelectedMultiColors([]);
-    setSelectedMultiSizes([]);
     itemForm.resetFields();
+
+    const initialColorImages = {};
+    if (item.featured_image) {
+      setFeaturedImageUrl(item.featured_image);
+    } else {
+      setFeaturedImageUrl('');
+    }
+
+    if (item.color_variants && Array.isArray(item.color_variants)) {
+      item.color_variants.forEach(cv => {
+        if (cv.color && cv.image_url) {
+          initialColorImages[cv.color] = cv.image_url;
+        }
+      });
+    }
+
+    try {
+      const res = await api.get(`/api/swm/products/${item.id}`);
+      if (res.data.success && Array.isArray(res.data.variants)) {
+        res.data.variants.forEach(v => {
+          if (v.color && v.image_url && !initialColorImages[v.color]) {
+            initialColorImages[v.color] = v.image_url;
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Could not fetch full variants for item', e);
+    }
+
+    setColorImages(initialColorImages);
+
+    const isMulti = Boolean(
+      (item.variant_count && item.variant_count > 1) ||
+      (item.color && item.color.includes('/')) ||
+      (item.size && item.size.includes('/'))
+    );
+    setIsMultiVariant(isMulti);
+
+    if (isMulti) {
+      const multiColors = item.color ? item.color.split('/').map(s => s.trim()).filter(Boolean) : [];
+      const multiSizes = item.size ? item.size.split('/').map(s => s.trim()).filter(Boolean) : [];
+      setSelectedMultiColors(multiColors);
+      setSelectedMultiSizes(multiSizes);
+    } else {
+      setSelectedMultiColors([]);
+      setSelectedMultiSizes([]);
+    }
+
     itemForm.setFieldsValue({
       product_name: item.product_name,
       product_code: item.product_code,
       barcode: item.barcode,
       category_id: item.category_id,
-      brand: item.brand || '',
+      brand: item.brand || 'Yoka Store',
       color: item.color || '',
       size: item.size || '',
       material: item.material || '',
       cost_price: parseFloat(item.cost_price) || 0,
       selling_price: parseFloat(item.selling_price) || 0,
       wholesale_price: parseFloat(item.wholesale_price) || 0,
-      status: item.status || 'active'
+      status: item.status || 'active',
+      is_ecom_listed: Boolean(item.is_ecom_listed),
+      featured_image: item.featured_image || ''
     });
     setIsItemModalOpen(true);
   };
@@ -500,6 +621,18 @@ export default function GroupsAndItems() {
     try {
       const values = await itemForm.validateFields();
       setItemSubmitting(true);
+
+      // Determine active colors list
+      let activeColorsList = [];
+      if (isMultiVariant) {
+        activeColorsList = selectedMultiColors;
+      } else if (values.color) {
+        activeColorsList = [values.color];
+      }
+
+      // First color image or explicit featured image becomes the product's primary photo
+      const firstColorWithImg = activeColorsList.find(c => colorImages[c]);
+      const defaultFeatured = (firstColorWithImg && colorImages[firstColorWithImg]) || featuredImageUrl || values.featured_image || null;
 
       let variantsPayload = [];
       if (isMultiVariant && selectedMultiColors.length > 0 && selectedMultiSizes.length > 0) {
@@ -517,31 +650,44 @@ export default function GroupsAndItems() {
               color: c,
               size: s,
               sku: finalSku,
-              price_modifier: 0
+              price_modifier: 0,
+              image_url: colorImages[c] || defaultFeatured || null
             };
           })
         );
         values.color = selectedMultiColors.join(' / ');
         values.size = selectedMultiSizes.join(' / ');
+      } else if (values.color || values.size) {
+        variantsPayload = [{
+          color: values.color || null,
+          size: values.size || null,
+          sku: values.product_code,
+          price_modifier: 0,
+          image_url: (values.color && colorImages[values.color]) || defaultFeatured || null
+        }];
       }
 
+      const payload = {
+        ...values,
+        featured_image: defaultFeatured,
+        color_images: colorImages,
+        variants: variantsPayload
+      };
+
       if (editingItem) {
-        const res = await api.put(`/api/swm/products/${editingItem.id}`, values);
+        const res = await api.put(`/api/swm/products/${editingItem.id}`, payload);
         if (res.data.success) {
-          message.success('تم تحديث بيانات الصنف بنجاح');
+          message.success('تم تحديث بيانات الصنف وصور الألوان بنجاح');
           setIsItemModalOpen(false);
           fetchItems(itemsPagination.current);
           fetchCategories();
         }
       } else {
-        const res = await api.post('/api/swm/products', {
-          ...values,
-          variants: variantsPayload
-        });
+        const res = await api.post('/api/swm/products', payload);
         if (res.data.success) {
           message.success(
             variantsPayload.length > 0
-              ? `تمت إضافة الصنف وتوليد (${variantsPayload.length}) تركيبة مقاس ولون بنجاح!`
+              ? `تمت إضافة الصنف وتعيين صور الألوان وتوليد (${variantsPayload.length}) تركيبة بنجاح!`
               : 'تمت إضافة الصنف وربطه بالمجموعة والصفات بنجاح'
           );
           setIsItemModalOpen(false);
@@ -804,21 +950,57 @@ export default function GroupsAndItems() {
   // 4. Items Table Columns
   const itemColumns = [
     {
+      title: 'صورة الصنف',
+      key: 'photo',
+      width: 75,
+      render: (_, record) => (
+        <Avatar
+          shape="square"
+          size={46}
+          src={record.featured_image || yokaLogo}
+          icon={<PictureOutlined />}
+          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', objectFit: 'contain' }}
+        />
+      )
+    },
+    {
       title: 'كود الصنف / الباركود',
       key: 'codes',
       width: 150,
-      render: (_, record) => (
-        <div>
-          <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-            {record.product_code}
-          </Tag>
-          {record.barcode && (
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-              <BarcodeOutlined /> {record.barcode}
-            </div>
-          )}
-        </div>
-      )
+      render: (_, record) => {
+        const barcodeVal = record.barcode || record.product_code;
+        return (
+          <div>
+            <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+              {record.product_code}
+            </Tag>
+            {barcodeVal && (
+              <Popover
+                title={
+                  <div style={{ fontSize: 12, fontWeight: 700, textAlign: 'center' }}>
+                    باركود الصنف الدولي (Barcode)
+                  </div>
+                }
+                content={
+                  <div style={{ textAlign: 'center', padding: '6px 4px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#1e293b' }}>
+                      {record.product_name}
+                    </div>
+                    <BarcodeImage value={barcodeVal} height={50} width={1.7} />
+                  </div>
+                }
+                placement="topLeft"
+              >
+                <div style={{ fontSize: 11, color: '#4f46e5', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <BarcodeOutlined />
+                  <span style={{ textDecoration: 'underline' }}>{barcodeVal}</span>
+                  <EyeOutlined style={{ fontSize: 10, color: '#6366f1' }} />
+                </div>
+              </Popover>
+            )}
+          </div>
+        );
+      }
     },
     {
       title: 'اسم الصنف والماركة',
@@ -859,30 +1041,58 @@ export default function GroupsAndItems() {
       }
     },
     {
-      title: 'اللون والمقاس',
+      title: 'الألوان وصورها والمقاسات',
       key: 'color_size',
-      width: 170,
+      width: 220,
       render: (_, record) => {
         const isMultiple = (record.variant_count && record.variant_count > 1) || (record.color && record.color.includes('/')) || (record.size && record.size.includes('/'));
+        const colorVariants = Array.isArray(record.color_variants) ? record.color_variants : [];
+        const rawColors = record.color ? record.color.split('/').map(c => c.trim()).filter(Boolean) : [];
+
         return (
           <Space size="small" direction="vertical" style={{ width: '100%' }}>
             {isMultiple && (
               <Tag color="purple" style={{ fontWeight: 600, fontSize: 11, margin: 0 }}>
-                ✨ متعدد ({record.variant_count || 'عدة خيارات'})
+                ✨ صنف متعدد ({record.variant_count || rawColors.length || 'خيارات متعددة'})
               </Tag>
             )}
-            <Space size="small" wrap>
-              {record.color && (
-                <Tag color="geekblue" style={{ margin: 0 }}>
-                  <BgColorsOutlined /> {record.color}
-                </Tag>
-              )}
+            <Space size={4} wrap>
+              {rawColors.map((colName) => {
+                const cv = colorVariants.find(v => v.color === colName);
+                const img = cv?.image_url;
+                const colObj = colors.find(c => c.name === colName);
+                return img ? (
+                  <Popover
+                    key={colName}
+                    title={<span style={{ fontSize: 12, fontWeight: 700 }}>صورة اللون: {colName}</span>}
+                    content={
+                      <div style={{ width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img src={img} alt={colName} style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 6, objectFit: 'contain' }} />
+                      </div>
+                    }
+                  >
+                    <Tag
+                      color="blue"
+                      style={{ cursor: 'pointer', margin: '2px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: colObj?.code || '#000', display: 'inline-block' }} />
+                      <span>{colName}</span>
+                      <PictureOutlined style={{ color: '#2563eb' }} />
+                    </Tag>
+                  </Popover>
+                ) : (
+                  <Tag key={colName} style={{ margin: '2px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: colObj?.code || '#000', display: 'inline-block' }} />
+                    <span>{colName}</span>
+                  </Tag>
+                );
+              })}
               {record.size && (
-                <Tag color="cyan" style={{ margin: 0 }}>
+                <Tag color="cyan" style={{ margin: '2px' }}>
                   <ColumnWidthOutlined /> {record.size}
                 </Tag>
               )}
-              {!record.color && !record.size && <Text type="secondary">—</Text>}
+              {rawColors.length === 0 && !record.size && <Text type="secondary">—</Text>}
             </Space>
           </Space>
         );
@@ -1271,6 +1481,7 @@ export default function GroupsAndItems() {
                   columns={itemColumns}
                   rowKey="id"
                   loading={itemsLoading}
+                  scroll={{ x: 'max-content' }}
                   pagination={{
                     current: itemsPagination.current,
                     pageSize: itemsPagination.pageSize,
@@ -1297,7 +1508,7 @@ export default function GroupsAndItems() {
         confirmLoading={groupSubmitting}
         okText={editingCategory ? 'تحديث المجموعة' : 'إضافة المجموعة'}
         cancelText="إلغاء"
-        destroyOnClose
+        destroyOnHidden
         width={560}
       >
         <Form form={groupForm} layout="vertical" style={{ marginTop: 16 }}>
@@ -1352,7 +1563,7 @@ export default function GroupsAndItems() {
         confirmLoading={attrSubmitting}
         okText="حفظ"
         cancelText="إلغاء"
-        destroyOnClose
+        destroyOnHidden
         width={460}
       >
         <Form form={attrForm} layout="vertical" style={{ marginTop: 16 }}>
@@ -1407,11 +1618,80 @@ export default function GroupsAndItems() {
         confirmLoading={itemSubmitting}
         okText={editingItem ? 'تحديث الصنف' : 'إضافة الصنف'}
         cancelText="إلغاء"
-        destroyOnClose
-        width={720}
+        destroyOnHidden
+        width={820}
       >
-        <Form form={itemForm} layout="vertical" style={{ marginTop: 16 }}>
-          {/* Group Linking with ON-THE-FLY Quick Add */}
+        <Form form={itemForm} layout="vertical" style={{ marginTop: 12 }}>
+          {/* 1. ID & Barcode & Brand (matching user sketch top row) */}
+          <Row gutter={16}>
+            <Col xs={24} sm={9}>
+              <Form.Item
+                name="product_code"
+                label="كود الصنف (Item Code)"
+                rules={[{ required: true, message: 'يرجى إدخال أو توليد كود الصنف' }]}
+              >
+                <Input
+                  placeholder="PRD-123456"
+                  addonAfter={
+                    <Tooltip title="توليد كود وباركود جديدين">
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<ReloadOutlined />}
+                        onClick={() => {
+                          const { code, barcode } = generateCodes();
+                          itemForm.setFieldsValue({ product_code: code, barcode: barcode });
+                          message.info('تم توليد كود وباركود جديدين');
+                        }}
+                        style={{ padding: 0, height: 'auto', color: '#2563eb' }}
+                      />
+                    </Tooltip>
+                  }
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item name="barcode" label="الباركود الدولي (Barcode EAN)">
+                <Input
+                  placeholder="622XXXXXXXXXX"
+                  addonAfter={
+                    <Tooltip title="توليد باركود EAN-13 حقيقي متوافق دولياً">
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={() => itemForm.setFieldsValue({ barcode: generateValidEAN13('622') })}
+                        style={{ padding: 0, height: 'auto', fontWeight: 600, color: '#4f46e5' }}
+                      >
+                        توليد EAN
+                      </Button>
+                    </Tooltip>
+                  }
+                />
+              </Form.Item>
+              {watchedItemBarcode && (
+                <div style={{ marginTop: -4, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+                  <BarcodeImage value={watchedItemBarcode} height={38} width={1.4} />
+                </div>
+              )}
+            </Col>
+            <Col xs={24} sm={7}>
+              <Form.Item name="brand" label="الماركة / البراند (Brand)">
+                <Input placeholder="Yoka Store" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* 2. Name (اسم الصنف) */}
+          <Form.Item
+            name="product_name"
+            label="اسم الصنف الأساسي (Item Name)"
+            rules={[{ required: true, message: 'يرجى إدخال اسم الصنف' }]}
+            style={{ marginBottom: 14 }}
+          >
+            <Input placeholder="مثال: قميص أكسفورد كلاسيك رجالي..." size="large" />
+          </Form.Item>
+
+          {/* 3. Group / Category with ON-THE-FLY Quick Add (matching Image 2) */}
           <div style={{ backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', padding: '12px 16px', borderRadius: 8, marginBottom: 16 }}>
             <Form.Item
               name="category_id"
@@ -1462,32 +1742,7 @@ export default function GroupsAndItems() {
             </Text>
           </div>
 
-          <Form.Item
-            name="product_name"
-            label="اسم الصنف"
-            rules={[{ required: true, message: 'يرجى إدخال اسم الصنف' }]}
-          >
-            <Input placeholder="مثال: قميص أكسفورد كلاسيك أبيض..." size="large" />
-          </Form.Item>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="product_code"
-                label="كود الصنف (Item Code)"
-                rules={[{ required: true, message: 'يرجى إدخال كود الصنف' }]}
-              >
-                <Input placeholder="PRD-123456" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="barcode" label="الباركود (Barcode)">
-                <Input placeholder="6220000000000" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          {/* Variant Mode Selection: Single Item vs Multi-variant */}
+          {/* 4. Variant Mode Selection: Single Item vs Multi-variant */}
           {!editingItem && (
             <div style={{ marginBottom: 16, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px' }}>
               <Text strong style={{ display: 'block', marginBottom: 8, color: '#1e293b' }}>
@@ -1518,10 +1773,8 @@ export default function GroupsAndItems() {
             </div>
           )}
 
+          {/* 5. Colors & Sizes Selectors */}
           {isMultiVariant ? (
-            /* ==========================================
-               MULTI-VARIANT SECTION (Multiple Colors & Sizes)
-               ========================================== */
             <div style={{ backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: '14px', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                 <TagsOutlined style={{ color: '#6d28d9', fontSize: 16 }} />
@@ -1532,7 +1785,7 @@ export default function GroupsAndItems() {
 
               <Row gutter={16}>
                 {/* Multi-Colors */}
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     label={
                       <Space>
@@ -1604,7 +1857,7 @@ export default function GroupsAndItems() {
                 </Col>
 
                 {/* Multi-Sizes */}
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     label={
                       <Space>
@@ -1656,71 +1909,10 @@ export default function GroupsAndItems() {
                   </Form.Item>
                 </Col>
               </Row>
-
-              {/* Combinations Matrix Preview */}
-              {selectedMultiColors.length > 0 && selectedMultiSizes.length > 0 && (
-                <div style={{ marginTop: 6 }}>
-                  <Alert
-                    type="info"
-                    showIcon
-                    message={
-                      <span>
-                        سيتم توليد <strong>{selectedMultiColors.length * selectedMultiSizes.length}</strong> تركيبة صنف تلقائياً ({selectedMultiColors.length} ألوان × {selectedMultiSizes.length} مقاسات)
-                      </span>
-                    }
-                    style={{ marginBottom: 8 }}
-                  />
-                  <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid #c7d2fe', borderRadius: 6, background: '#fff' }}>
-                    <Table
-                      size="small"
-                      pagination={false}
-                      dataSource={selectedMultiColors.flatMap((c, cIdx) =>
-                        selectedMultiSizes.map((s, sIdx) => ({
-                          key: `${c}-${s}`,
-                          color: c,
-                          size: s,
-                          sku: buildVariantSku(itemForm.getFieldValue('product_code'), c, s, cIdx, sIdx)
-                        }))
-                      )}
-                      columns={[
-                        {
-                          title: 'اللون',
-                          dataIndex: 'color',
-                          key: 'color',
-                          render: (col) => {
-                            const cObj = colors.find(c => c.name === col);
-                            return (
-                              <Space>
-                                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', backgroundColor: cObj?.code || '#000' }} />
-                                <span>{col}</span>
-                              </Space>
-                            );
-                          }
-                        },
-                        {
-                          title: 'المقاس',
-                          dataIndex: 'size',
-                          key: 'size',
-                          render: (s) => <Tag color="blue">{s}</Tag>
-                        },
-                        {
-                          title: 'كود الصنف الفرعي (SKU)',
-                          dataIndex: 'sku',
-                          key: 'sku',
-                          render: (sku) => <code style={{ fontSize: 11 }}>{sku}</code>
-                        }
-                      ]}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
-            /* ==========================================
-               SINGLE-VARIANT SECTION (Single Color & Size)
-               ========================================== */
             <Row gutter={16}>
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Form.Item
                   name="color"
                   label={
@@ -1789,7 +1981,7 @@ export default function GroupsAndItems() {
                 </Form.Item>
               </Col>
 
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Form.Item
                   name="size"
                   label={
@@ -1841,11 +2033,221 @@ export default function GroupsAndItems() {
             </Row>
           )}
 
+          {/* 6. DEDICATED IMAGE FOR EACH COLOR SECTION */}
+          {activeColors.length > 0 && (
+            <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '14px', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Space align="middle">
+                  <PictureOutlined style={{ color: '#16a34a', fontSize: 18 }} />
+                  <Text strong style={{ color: '#15803d', fontSize: 14 }}>
+                    صور ألوان الصنف (صورة مخصصة لكل لون):
+                  </Text>
+                </Space>
+                <Tag color={activeColors.every(c => colorImages[c]) ? 'green' : 'blue'}>
+                  {activeColors.filter(c => colorImages[c]).length} من {activeColors.length} ألوان تم تحديد صورها
+                </Tag>
+              </div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12, color: '#166534' }}>
+                💡 يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
+              </Text>
+
+              <Row gutter={[12, 12]}>
+                {activeColors.map((colName) => {
+                  const colObj = colors.find(c => c.name === colName);
+                  const hasImg = Boolean(colorImages[colName]);
+                  return (
+                    <Col xs={24} sm={12} key={colName}>
+                      <div
+                        style={{
+                          background: '#ffffff',
+                          border: hasImg ? '1.5px solid #22c55e' : '1px dashed #cbd5e1',
+                          borderRadius: 8,
+                          padding: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          boxShadow: hasImg ? '0 2px 6px rgba(34,197,94,0.1)' : 'none'
+                        }}
+                      >
+                        {/* Thumbnail */}
+                        <div
+                          style={{
+                            width: 66,
+                            height: 66,
+                            borderRadius: 6,
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: '#f8fafc',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            flexShrink: 0
+                          }}
+                        >
+                          {hasImg ? (
+                            <img
+                              src={colorImages[colName]}
+                              alt={colName}
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            />
+                          ) : (
+                            <CameraOutlined style={{ fontSize: 24, color: '#94a3b8' }} />
+                          )}
+                        </div>
+
+                        {/* Details and Upload */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <Space align="middle" size={6}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  width: 14,
+                                  height: 14,
+                                  borderRadius: '50%',
+                                  backgroundColor: colObj?.code || '#000',
+                                  border: '1px solid #cbd5e1'
+                                }}
+                              />
+                              <Text strong style={{ fontSize: 13 }}>{colName}</Text>
+                            </Space>
+                            {hasImg ? (
+                              <Button
+                                type="text"
+                                danger
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                onClick={() => {
+                                  setColorImages(prev => {
+                                    const next = { ...prev };
+                                    delete next[colName];
+                                    return next;
+                                  });
+                                }}
+                                style={{ padding: '0 4px', height: 20 }}
+                              >
+                                مسح
+                              </Button>
+                            ) : (
+                              <Text type="secondary" style={{ fontSize: 11 }}>بدون صورة</Text>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <Upload
+                              beforeUpload={(file) => {
+                                handleCompressFile(file, (dataUrl) => {
+                                  setColorImages(prev => ({ ...prev, [colName]: dataUrl }));
+                                  message.success(`تم رفع وتجهيز صورة اللون (${colName})!`);
+                                });
+                                return false;
+                              }}
+                              showUploadList={false}
+                              accept="image/*"
+                            >
+                              <Button size="small" icon={<UploadOutlined />} style={{ fontSize: 11 }}>
+                                {hasImg ? 'تغيير' : 'رفع صورة'}
+                              </Button>
+                            </Upload>
+
+                            <Input
+                              size="small"
+                              placeholder="أو رابط..."
+                              value={hasImg && colorImages[colName].startsWith('data:') ? 'صورة مرفوعة' : (colorImages[colName] || '')}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setColorImages(prev => ({ ...prev, [colName]: val }));
+                              }}
+                              style={{ fontSize: 11, flex: 1 }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </Col>
+                  );
+                })}
+              </Row>
+            </div>
+          )}
+
+          {/* Combinations Matrix Preview for Multi-Variants */}
+          {isMultiVariant && selectedMultiColors.length > 0 && selectedMultiSizes.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <Alert
+                type="info"
+                showIcon
+                message={
+                  <span>
+                    سيتم توليد <strong>{selectedMultiColors.length * selectedMultiSizes.length}</strong> تركيبة صنف تلقائياً مع ربط صورة كل لون ({selectedMultiColors.length} ألوان × {selectedMultiSizes.length} مقاسات)
+                  </span>
+                }
+                style={{ marginBottom: 8 }}
+              />
+              <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #c7d2fe', borderRadius: 6, background: '#fff' }}>
+                <Table
+                  size="small"
+                  pagination={false}
+                  dataSource={selectedMultiColors.flatMap((c, cIdx) =>
+                    selectedMultiSizes.map((s, sIdx) => ({
+                      key: `${c}-${s}`,
+                      color: c,
+                      size: s,
+                      sku: buildVariantSku(itemForm.getFieldValue('product_code'), c, s, cIdx, sIdx)
+                    }))
+                  )}
+                  columns={[
+                    {
+                      title: 'صورة اللون',
+                      key: 'img',
+                      width: 70,
+                      render: (_, row) => (
+                        <Avatar
+                          shape="square"
+                          size={28}
+                          src={colorImages[row.color] || yokaLogo}
+                          icon={<PictureOutlined />}
+                          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', objectFit: 'contain' }}
+                        />
+                      )
+                    },
+                    {
+                      title: 'اللون',
+                      dataIndex: 'color',
+                      key: 'color',
+                      render: (col) => {
+                        const cObj = colors.find(c => c.name === col);
+                        return (
+                          <Space>
+                            <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', backgroundColor: cObj?.code || '#000' }} />
+                            <span>{col}</span>
+                          </Space>
+                        );
+                      }
+                    },
+                    {
+                      title: 'المقاس',
+                      dataIndex: 'size',
+                      key: 'size',
+                      render: (s) => <Tag color="blue">{s}</Tag>
+                    },
+                    {
+                      title: 'كود الصنف الفرعي (SKU)',
+                      dataIndex: 'sku',
+                      key: 'sku',
+                      render: (sku) => <code style={{ fontSize: 11 }}>{sku}</code>
+                    }
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* 7. Prices (Purchase & Sell Price - matching Image 1) */}
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item
                 name="cost_price"
-                label="سعر التكلفة الافتراضي"
+                label="سعر التكلفة الافتراضي (الشراء)"
                 rules={[{ required: true, message: 'مطلوب' }]}
                 tooltip="سعر التكلفة الأساسي الذي يُعتمد افتراضياً عند إنشاء أوامر التوريد والمشتريات"
               >
@@ -1858,7 +2260,7 @@ export default function GroupsAndItems() {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item
                 name="selling_price"
                 label="سعر البيع (قطاعي)"
@@ -1873,21 +2275,42 @@ export default function GroupsAndItems() {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item name="brand" label="الماركة / البراند">
-                <Input placeholder="Yoka Store" />
+            <Col xs={24} sm={8}>
+              <Form.Item
+                name="wholesale_price"
+                label="سعر البيع (جملة)"
+              >
+                <InputNumber
+                  min={0}
+                  step={5}
+                  style={{ width: '100%' }}
+                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  addonAfter="ج.م"
+                />
               </Form.Item>
             </Col>
           </Row>
 
-          {editingItem && (
-            <Form.Item name="status" label="حالة الصنف">
-              <Select>
-                <Option value="active">نشط (Active)</Option>
-                <Option value="discontinued">معطل (Discontinued)</Option>
-              </Select>
-            </Form.Item>
-          )}
+          <Row gutter={16}>
+            <Col xs={24} sm={14}>
+              <Form.Item name="is_ecom_listed" label="إتاحة في المتجر الإلكتروني (ECP Sync)" valuePropName="checked">
+                <Radio.Group buttonStyle="solid">
+                  <Radio.Button value={true}>متاح في المتجر الإلكتروني</Radio.Button>
+                  <Radio.Button value={false}>مخزن داخلي فقط</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+            </Col>
+            {editingItem && (
+              <Col xs={24} sm={10}>
+                <Form.Item name="status" label="حالة الصنف">
+                  <Select>
+                    <Option value="active">نشط (Active)</Option>
+                    <Option value="discontinued">معطل (Discontinued)</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            )}
+          </Row>
         </Form>
       </Modal>
     </div>

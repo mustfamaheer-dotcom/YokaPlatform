@@ -28,11 +28,13 @@ import {
 } from '@ant-design/icons';
 import api from '../api';
 import SplitPayment from '../components/SplitPayment';
+import { printHtmlContent } from '../utils/printUtils';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function Suppliers() {
+export default function Suppliers({ autoOpenCreate, onResetAction }) {
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -98,6 +100,13 @@ export default function Suppliers() {
     });
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      handleOpenCreate();
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   const handleOpenEdit = (record) => {
     setEditingSupplier(record);
@@ -194,7 +203,15 @@ export default function Suppliers() {
   };
 
   const handlePrintStatement = () => {
-    window.print();
+    if (printAreaRef.current) {
+      printHtmlContent({
+        title: `كشف حساب مورد - ${selectedSupplierLedger?.supplier?.supplier_name || ''}`,
+        htmlContent: printAreaRef.current.innerHTML,
+        pageType: 'a4'
+      });
+    } else {
+      window.print();
+    }
   };
 
   const columns = [
@@ -566,80 +583,169 @@ export default function Suppliers() {
         ]}
       >
         {selectedSupplierLedger && (
-          <div ref={printAreaRef} className="printable-statement" style={{ padding: 20, direction: 'rtl', color: '#000' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: 12, marginBottom: 16 }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 'bold' }}>منصة يوكا ستور — Yoka Store</h2>
-                <div style={{ fontSize: 13, color: '#475569' }}>قسم الحسابات والمخازن (SWM)</div>
+          <div ref={printAreaRef} className="printable-statement" style={{ padding: '6px', direction: 'rtl', color: '#0f172a' }}>
+            {/* Branded Header */}
+            <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+              <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
+                <div>
+                  <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
+                  <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>الإدارة المالية والمحاسبية • قسم حسابات الموردين والدائنين</div>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>منظومة إدارة المخازن المركزية وسلاسل الإمداد (SWM)</div>
+                </div>
               </div>
-              <div style={{ textAlign: 'left' }}>
-                <h3 style={{ margin: 0, fontSize: 18, color: '#1e293b' }}>كشف حساب مورد تفصيلي</h3>
-                <div style={{ fontSize: 12 }}>تاريخ الطباعة: {new Date().toLocaleDateString('ar-EG')}</div>
+              <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+                <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                  كشف حساب مورد تفصيلي
+                </div>
+                <div style={{ marginTop: 5, fontSize: 12, color: '#334155', fontWeight: 700 }}>
+                  كود المورد: <strong style={{ fontFamily: 'monospace', color: '#0f172a', fontSize: 13.5 }}>{selectedSupplierLedger.supplier.supplier_code}</strong>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  تاريخ الاستخراج: {new Date().toLocaleDateString('ar-EG')}
+                </div>
               </div>
             </div>
 
-            <Row gutter={16} style={{ marginBottom: 16, background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}>
-              <Col span={12}>
-                <div><strong>اسم المورد:</strong> {selectedSupplierLedger.supplier.supplier_name}</div>
-                <div><strong>كود المورد:</strong> {selectedSupplierLedger.supplier.supplier_code}</div>
-                <div><strong>المسؤول:</strong> {selectedSupplierLedger.supplier.contact_person || '—'}</div>
-              </Col>
-              <Col span={12}>
-                <div><strong>الهاتف:</strong> {selectedSupplierLedger.supplier.phone || '—'}</div>
-                <div><strong>العنوان:</strong> {selectedSupplierLedger.supplier.address || '—'}</div>
-                <div><strong>الرصيد المستحق الحالي:</strong> <span style={{ color: '#b91c1c', fontWeight: 'bold', fontSize: 15 }}>{selectedSupplierLedger.current_balance.toLocaleString()} ج.م</span></div>
-              </Col>
-            </Row>
+            {/* Supplier Information Card */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+              <Row gutter={[16, 10]}>
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>اسم المورد / الشركة:</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', marginTop: 2 }}>
+                    {selectedSupplierLedger.supplier.supplier_name}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+                    المسؤول: {selectedSupplierLedger.supplier.contact_person || '—'}
+                  </div>
+                </Col>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', marginBottom: 20, fontSize: 12 }}>
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>بيانات الاتصال والعنوان:</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
+                    هاتف: {selectedSupplierLedger.supplier.phone || '—'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>
+                    العنوان: {selectedSupplierLedger.supplier.address || '—'}
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>الرصيد المستحق الحالي للمورد:</div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: '#b91c1c', marginTop: 2, fontFamily: 'monospace' }}>
+                    {selectedSupplierLedger.current_balance.toLocaleString()} ج.م
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 1 }}>
+                    رصيد المورد التراكمي حتى تاريخه
+                  </div>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Ledger Table */}
+            <table
+              className="print-table"
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'right',
+                fontSize: '11px',
+                marginBottom: 14
+              }}
+            >
               <thead>
-                <tr style={{ background: '#e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
-                  <th style={{ padding: '8px 10px', border: '1px solid #cbd5e1' }}>التاريخ</th>
-                  <th style={{ padding: '8px 10px', border: '1px solid #cbd5e1' }}>رقم السند / المرجع</th>
-                  <th style={{ padding: '8px 10px', border: '1px solid #cbd5e1' }}>البيان وتفصيل السداد</th>
-                  <th style={{ padding: '8px 10px', border: '1px solid #cbd5e1' }}>مدين (فواتير)</th>
-                  <th style={{ padding: '8px 10px', border: '1px solid #cbd5e1' }}>دائن (مدفوعات)</th>
-                  <th style={{ padding: '8px 10px', border: '1px solid #cbd5e1' }}>الرصيد</th>
+                <tr style={{ background: '#0f172a', color: '#ffffff' }}>
+                  <th style={{ padding: '7px 8px', border: '1px solid #0f172a', width: '90px', textAlign: 'center' }}>التاريخ</th>
+                  <th style={{ padding: '7px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'center' }}>رقم السند / المرجع</th>
+                  <th style={{ padding: '7px 8px', border: '1px solid #0f172a' }}>البيان وتفصيل السداد</th>
+                  <th style={{ padding: '7px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'left' }}>مدين (فواتير)</th>
+                  <th style={{ padding: '7px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'left' }}>دائن (مدفوعات)</th>
+                  <th style={{ padding: '7px 8px', border: '1px solid #0f172a', width: '120px', textAlign: 'left' }}>الرصيد التراكمي</th>
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ background: '#f8fafc', fontWeight: 'bold' }}>
-                  <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>—</td>
-                  <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>OPENING</td>
-                  <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>الرصيد الافتتاحي</td>
-                  <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>—</td>
-                  <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>—</td>
-                  <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>{selectedSupplierLedger.opening_balance.toLocaleString()} ج.م</td>
+                <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
+                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>—</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace' }}>OPENING</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1' }}>الرصيد الافتتاحي السابق</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1', textAlign: 'left' }}>—</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1', textAlign: 'left' }}>—</td>
+                  <td style={{ padding: '6px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', fontWeight: 800 }}>
+                    {selectedSupplierLedger.opening_balance.toLocaleString()} ج.م
+                  </td>
                 </tr>
                 {selectedSupplierLedger.ledger.map((row, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>{new Date(row.date).toLocaleDateString('ar-EG')}</td>
-                    <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>{row.ref}</td>
-                    <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}>
-                      {row.type === 'invoice' ? 'فاتورة مشتريات' : 'سداد للمورد'}
+                  <tr
+                    key={idx}
+                    style={{
+                      background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                      borderBottom: '1px solid #cbd5e1'
+                    }}
+                  >
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace' }}>
+                      {new Date(row.date).toLocaleDateString('ar-EG')}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', fontWeight: 700 }}>
+                      {row.ref}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
+                      <span style={{ fontWeight: 600 }}>{row.type === 'invoice' ? 'فاتورة مشتريات وتوريد' : 'سند صرف ودفع للمورد'}</span>
                       {row.payment_breakdown && Array.isArray(row.payment_breakdown) && row.payment_breakdown.length > 0 && (
-                        <div style={{ fontSize: 11, color: '#2563eb', marginTop: 2 }}>
+                        <div style={{ fontSize: '10px', color: '#2563eb', marginTop: 2 }}>
                           {row.payment_breakdown.map(b => `${b.method_name || b.method}: ${parseFloat(b.amount).toLocaleString()} ج.م`).join(' + ')}
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1', color: row.debit > 0 ? '#b91c1c' : undefined }}>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', color: row.debit > 0 ? '#b91c1c' : '#94a3b8', fontWeight: row.debit > 0 ? 700 : 400 }}>
                       {row.debit > 0 ? `${row.debit.toLocaleString()} ج.م` : '—'}
                     </td>
-                    <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1', color: row.credit > 0 ? '#15803d' : undefined }}>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', color: row.credit > 0 ? '#15803d' : '#94a3b8', fontWeight: row.credit > 0 ? 700 : 400 }}>
                       {row.credit > 0 ? `${row.credit.toLocaleString()} ج.م` : '—'}
                     </td>
-                    <td style={{ padding: '6px 10px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 800, fontFamily: 'monospace' }}>
                       {row.balance_after.toLocaleString()} ج.م
                     </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr style={{ background: '#f1f5f9', fontWeight: 800 }}>
+                  <td colSpan={3} style={{ padding: '8px 10px', border: '1px solid #cbd5e1', textAlign: 'left' }}>
+                    صافي الرصيد المستحق النهائي:
+                  </td>
+                  <td style={{ padding: '8px 10px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', color: '#b91c1c' }}>
+                    {selectedSupplierLedger.ledger.reduce((acc, r) => acc + (parseFloat(r.debit) || 0), 0).toLocaleString()} ج.م
+                  </td>
+                  <td style={{ padding: '8px 10px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', color: '#15803d' }}>
+                    {selectedSupplierLedger.ledger.reduce((acc, r) => acc + (parseFloat(r.credit) || 0), 0).toLocaleString()} ج.م
+                  </td>
+                  <td style={{ padding: '8px 10px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', fontSize: '13px', color: '#0f172a' }}>
+                    {selectedSupplierLedger.current_balance.toLocaleString()} ج.م
+                  </td>
+                </tr>
+              </tfoot>
             </table>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 40, paddingTop: 16, borderTop: '1px dashed #94a3b8' }}>
-              <div><strong>توقيع المحاسب المسئول:</strong> _______________________</div>
-              <div><strong>ختم واعتماد الإدارة المالية:</strong> _______________________</div>
+            {/* Official Signatures & Stamp */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32, paddingTop: 14, borderTop: '1px dashed #94a3b8' }}>
+              <div style={{ textAlign: 'center', width: '30%' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: 26 }}>المحاسب المسؤول</div>
+                <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: '10.5px', color: '#64748b' }}>........................</div>
+              </div>
+              <div style={{ textAlign: 'center', width: '30%' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: 26 }}>المدير المالي والاعتماد</div>
+                <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: '10.5px', color: '#64748b' }}>........................</div>
+              </div>
+              <div style={{ textAlign: 'center', width: '30%' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: 26 }}>ختم الإدارة المالية</div>
+                <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: '10.5px', color: '#64748b' }}>[ خـتـم مـعـتـمـد ]</div>
+              </div>
+            </div>
+
+            {/* Verification Footer */}
+            <div style={{ marginTop: 14, textAlign: 'center', fontSize: '10px', color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <span>كشف حساب إلكتروني رسمي مستخرج من نظام Yoka SWM</span>
+              <span>تاريخ الطباعة: {new Date().toLocaleDateString('ar-EG')}</span>
             </div>
           </div>
         )}

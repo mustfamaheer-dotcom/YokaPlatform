@@ -49,6 +49,7 @@ import {
   TeamOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import ShippingWaybillA4 from '../components/ShippingWaybillA4';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -73,6 +74,7 @@ export default function Orders() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [waybillModalOpen, setWaybillModalOpen] = useState(false);
 
   // Ship Order Modal
   const [isShipModalOpen, setIsShipModalOpen] = useState(false);
@@ -1199,7 +1201,9 @@ export default function Orders() {
               <Text strong style={{ fontSize: 16 }}>تفاصيل الطلب: {selectedOrder?.order_number}</Text>
               {selectedOrder && getStatusTag(selectedOrder.order_status)}
             </Space>
-            <Button icon={<PrinterOutlined />} onClick={() => window.print()}>طباعة بوليصة الشحن</Button>
+            <Button icon={<PrinterOutlined />} type="primary" onClick={() => setWaybillModalOpen(true)} style={{ backgroundColor: '#0f172a' }}>
+              معاينة وطباعة بوليصة الشحن (A4)
+            </Button>
           </div>
         }
         open={isDetailModalOpen}
@@ -1212,7 +1216,8 @@ export default function Orders() {
       >
         {detailLoading ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <Spin size="large" tip="جارٍ تحميل تفاصيل الطلب..." />
+            <Spin size="large" />
+            <div style={{ marginTop: 12, color: '#64748b' }}>جارٍ تحميل تفاصيل الطلب...</div>
           </div>
         ) : selectedOrder ? (
           <div>
@@ -1791,6 +1796,22 @@ export default function Orders() {
             style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 4 }}
           />
         </div>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* 7. SHIPPING WAYBILL PRINT MODAL (A4)                    */}
+      {/* ========================================================= */}
+      <Modal
+        open={waybillModalOpen}
+        onCancel={() => setWaybillModalOpen(false)}
+        footer={null}
+        width={880}
+        destroyOnHidden
+      >
+        <ShippingWaybillA4
+          order={selectedOrder}
+          onClose={() => setWaybillModalOpen(false)}
+        />
       </Modal>
     </div>
   );

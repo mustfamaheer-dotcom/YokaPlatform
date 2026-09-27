@@ -221,7 +221,8 @@ export default function TreasuryAdmin() {
 
       {loading && !kpis ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
-          <Spin size="large" tip="جاري تحميل بيانات الخزائن..." />
+          <Spin size="large" />
+          <div style={{ marginTop: 12, color: '#64748b' }}>جاري تحميل بيانات الخزائن...</div>
         </div>
       ) : (
         <>

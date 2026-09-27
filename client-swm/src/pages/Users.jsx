@@ -48,7 +48,7 @@ const ROLES = [
   { value: 'salesperson', label: 'بائع / كاشير (Salesperson)', color: 'blue', portal: 'branch' }
 ];
 
-export default function Users({ currentUser }) {
+export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -88,6 +88,15 @@ export default function Users({ currentUser }) {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      createForm.resetFields();
+      createForm.setFieldsValue({ role: 'salesperson', status: 'active' });
+      setIsCreateModalOpen(true);
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   const handleCreate = async (values) => {
     try {
@@ -565,7 +574,7 @@ export default function Users({ currentUser }) {
         open={isCreateModalOpen}
         onCancel={() => setIsCreateModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreate}>
           <Form.Item
@@ -651,7 +660,7 @@ export default function Users({ currentUser }) {
           setEditingUser(null);
         }}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={editForm} layout="vertical" onFinish={handleUpdate}>
           <Form.Item

@@ -57,7 +57,12 @@ router.get('/', requireAuth, async (req, res) => {
              p.status, p.is_ecom_listed, p.is_featured, p.category_id, p.featured_image,
              c.category_name,
              COALESCE(SUM(ib.available_qty), 0) AS total_stock,
-             COUNT(DISTINCT v.id) AS variant_count
+             COUNT(DISTINCT v.id) AS variant_count,
+             COALESCE(
+               JSON_AGG(DISTINCT JSONB_BUILD_OBJECT('color', v.color, 'image_url', v.image_url))
+               FILTER (WHERE v.id IS NOT NULL AND v.color IS NOT NULL),
+               '[]'::json
+             ) AS color_variants
       FROM products p
       LEFT JOIN product_categories c ON c.id = p.category_id
       LEFT JOIN product_variants v ON v.product_id = p.id
@@ -249,15 +254,16 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
           await client.query(
             `INSERT INTO product_variants (
-              product_id, variant_sku, color, size, material, price_modifier, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())`,
+              product_id, variant_sku, color, size, material, price_modifier, image_url, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', NOW(), NOW())`,
             [
               productId,
               finalSku,
               v.color || null,
               v.size || null,
               v.material || null,
-              v.price_modifier ? parseFloat(v.price_modifier) : 0
+              v.price_modifier ? parseFloat(v.price_modifier) : 0,
+              v.image_url || null
             ]
           );
         }
@@ -377,6 +383,17 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
         ? `Selling price modified from ${old.selling_price} to ${selling_price}`
         : `Product ${id} updated`
     });
+
+    if (req.body.color_images && typeof req.body.color_images === 'object') {
+      for (const [colorName, img] of Object.entries(req.body.color_images)) {
+        if (img) {
+          await query(
+            `UPDATE product_variants SET image_url = $1, updated_at = NOW() WHERE product_id = $2 AND color = $3`,
+            [img, id, colorName]
+          );
+        }
+      }
+    }
 
     return res.json({ success: true, message: 'Product updated successfully' });
   } catch (err) {

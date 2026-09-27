@@ -35,11 +35,13 @@ import {
 } from '@ant-design/icons';
 import api from '../api';
 import SplitPayment from '../components/SplitPayment';
+import { printHtmlContent } from '../utils/printUtils';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function Purchases() {
+export default function Purchases({ autoOpenCreate, onResetAction }) {
   const [activeTab, setActiveTab] = useState('invoices');
 
   // Invoices List State
@@ -283,6 +285,13 @@ export default function Purchases() {
     setIsCreateOpen(true);
   };
 
+  useEffect(() => {
+    if (autoOpenCreate) {
+      handleOpenCreateDrawer();
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
+
   const handleCreateInvoice = async () => {
     if (!selectedSupplier) return message.error('يرجى اختيار المورد');
     if (!selectedBranch) return message.error('يرجى اختيار مستودع الاستلام');
@@ -354,7 +363,15 @@ export default function Purchases() {
   };
 
   const handlePrintInvoice = () => {
-    window.print();
+    if (printAreaRef.current) {
+      printHtmlContent({
+        title: `فاتورة توريد - ${selectedInvoice?.invoice_number || ''}`,
+        htmlContent: printAreaRef.current.innerHTML,
+        pageType: 'a4'
+      });
+    } else {
+      window.print();
+    }
   };
 
   // ==============================================================
@@ -627,7 +644,15 @@ export default function Purchases() {
   };
 
   const handlePrintReturn = () => {
-    window.print();
+    if (printReturnAreaRef.current) {
+      printHtmlContent({
+        title: `إشعار مرتجع مشتريات - ${selectedReturn?.return_number || ''}`,
+        htmlContent: printReturnAreaRef.current.innerHTML,
+        pageType: 'a4'
+      });
+    } else {
+      window.print();
+    }
   };
 
   // Table Columns
@@ -1804,147 +1829,241 @@ export default function Purchases() {
         width={880}
       >
         {selectedInvoice && (
-          <div ref={printAreaRef} className="printable-invoice" style={{ direction: 'rtl' }}>
-            <div style={{ borderBottom: '2px solid #000', paddingBottom: 10, marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div ref={printAreaRef} className="printable-invoice" style={{ direction: 'rtl', padding: '6px' }}>
+            {/* Branded Header */}
+            <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+              <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
                 <div>
-                  <h2 style={{ margin: 0, fontSize: 22, fontWeight: 'bold' }}>منصة يوكا ستور — Yoka Store</h2>
-                  <div style={{ fontSize: 13, color: '#475569' }}>سند استلام وتوريد بضاعة مخازن</div>
+                  <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
+                  <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>إدارة المستودعات وسلاسل الإمداد • قسم المشتريات والتوريدات</div>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>منظومة إدارة سلاسل التوريد والمخازن (Yoka SWM)</div>
                 </div>
-                <div style={{ textAlign: 'left' }}>
-                  <h3 style={{ margin: 0, fontSize: 18, color: '#1e293b' }}>فاتورة توريد #{selectedInvoice.invoice_number}</h3>
-                  <div style={{ fontSize: 12 }}>تاريخ التوريد: {new Date(selectedInvoice.invoice_date).toLocaleDateString('ar-EG')}</div>
+              </div>
+              <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+                <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                  فاتورة استلام وتوريد بضاعة
+                </div>
+                <div style={{ marginTop: 5, fontSize: 12, color: '#334155', fontWeight: 700 }}>
+                  رقم الفاتورة: <strong style={{ fontFamily: 'monospace', color: '#0f172a', fontSize: 13.5 }}>{selectedInvoice.invoice_number}</strong>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  تاريخ التوريد: {new Date(selectedInvoice.invoice_date).toLocaleDateString('ar-EG')}
                 </div>
               </div>
             </div>
 
-            <Row gutter={16} style={{ marginBottom: 16, background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}>
-              <Col span={8}>
-                <div><strong>المورد:</strong> {selectedInvoice.supplier_name} ({selectedInvoice.supplier_code})</div>
-                <div><strong>الهاتف:</strong> {selectedInvoice.supplier_phone || '—'}</div>
-                <div><strong>العنوان:</strong> {selectedInvoice.supplier_address || '—'}</div>
-              </Col>
-              <Col span={8}>
-                <div><strong>المستودع المستلم:</strong> {selectedInvoice.warehouse_name}</div>
-                <div><strong>المسجل / المستلم:</strong> {selectedInvoice.created_by_name || 'مسؤول المشتريات'}</div>
-                <div><strong>الحالة:</strong> <Tag color="green">معتمدة وموردة للمخزون</Tag></div>
-              </Col>
-              <Col span={8}>
-                <div>
-                  <strong>حالة السداد:</strong>{' '}
-                  <Tag color={selectedInvoice.payment_status === 'paid' ? 'green' : selectedInvoice.payment_status === 'partial' ? 'orange' : 'red'}>
-                    {selectedInvoice.payment_status === 'paid' ? 'مسدد بالكامل' : selectedInvoice.payment_status === 'partial' ? 'مسدد جزئياً' : 'آجل'}
-                  </Tag>
-                </div>
-                <div>
-                  <strong>طريقة السداد:</strong>{' '}
-                  <Tag color="purple">{selectedInvoice.payment_method === 'split' ? 'دفع مقسم (Multi-tender)' : selectedInvoice.payment_method}</Tag>
-                </div>
-              </Col>
-            </Row>
+            {/* Metadata Card */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+              <Row gutter={[16, 10]}>
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>بيانات المورد:</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+                    {selectedInvoice.supplier_name} ({selectedInvoice.supplier_code})
+                  </div>
+                  {selectedInvoice.supplier_phone && (
+                    <div style={{ fontSize: 11, color: '#475569' }}>هاتف: {selectedInvoice.supplier_phone}</div>
+                  )}
+                  {selectedInvoice.supplier_address && (
+                    <div style={{ fontSize: 10.5, color: '#64748b' }}>العنوان: {selectedInvoice.supplier_address}</div>
+                  )}
+                </Col>
 
-            <Table
-              size="small"
-              loading={detailsLoading}
-              dataSource={selectedInvoice.items || []}
-              rowKey="id"
-              pagination={false}
-              bordered
-              columns={[
-                { title: 'كود المنتج', dataIndex: 'product_code', key: 'product_code', width: 120 },
-                { title: 'اسم الصنف', dataIndex: 'product_name', key: 'product_name' },
-                { title: 'الكمية الموردة', dataIndex: 'quantity', key: 'quantity', width: 90 },
-                {
-                  title: 'سابق إرجاعه',
-                  dataIndex: 'returned_quantity',
-                  key: 'returned_quantity',
-                  width: 90,
-                  render: (v) => parseInt(v, 10) > 0 ? <Tag color="orange">{v} قطعة</Tag> : '0'
-                },
-                {
-                  title: 'سعر التكلفة',
-                  dataIndex: 'unit_cost',
-                  key: 'unit_cost',
-                  width: 110,
-                  render: (v) => `${parseFloat(v).toLocaleString()} ج.م`
-                },
-                {
-                  title: 'سعر البيع النهائي',
-                  dataIndex: 'selling_price',
-                  key: 'selling_price',
-                  width: 120,
-                  render: (v) => v ? <Text strong style={{ color: '#059669' }}>{parseFloat(v).toLocaleString()} ج.م</Text> : '—'
-                },
-                {
-                  title: 'إجمالي السطر',
-                  dataIndex: 'line_total',
-                  key: 'line_total',
-                  width: 110,
-                  render: (v) => <Text strong>{parseFloat(v).toLocaleString()} ج.م</Text>
-                }
-              ]}
-            />
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>المستودع والاستلام:</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+                    {selectedInvoice.warehouse_name || 'المستودع الرئيسي'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#475569' }}>
+                    المستلم / المسؤول: {selectedInvoice.created_by_name || 'مسؤول المشتريات'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 700, marginTop: 2 }}>
+                    الحالة: معتمدة وموردة للمخزون
+                  </div>
+                </Col>
 
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>حالة وطريقة السداد:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: selectedInvoice.payment_status === 'paid' ? '#16a34a' : (selectedInvoice.payment_status === 'partial' ? '#d97706' : '#dc2626'), marginTop: 2 }}>
+                    {selectedInvoice.payment_status === 'paid' ? 'مسدد بالكامل' : (selectedInvoice.payment_status === 'partial' ? 'مسدد جزئياً' : 'آجل بالكامل')}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+                    طريقة السداد: {selectedInvoice.payment_method === 'split' ? 'سداد مقسم (Multi-tender)' : (selectedInvoice.payment_method || 'نقدي')}
+                  </div>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Items Table */}
+            <table
+              className="print-table"
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'right',
+                fontSize: '11px',
+                marginBottom: 12
+              }}
+            >
+              <thead>
+                <tr style={{ background: '#0f172a', color: '#ffffff' }}>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '30px', textAlign: 'center' }}>م</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'center' }}>كود الصنف</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a' }}>اسم المنتج والمواصفات</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '75px', textAlign: 'center' }}>الكمية</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '70px', textAlign: 'center' }}>مرتجع</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '90px', textAlign: 'left' }}>سعر التكلفة</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '90px', textAlign: 'left' }}>سعر البيع</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '100px', textAlign: 'left' }}>إجمالي السطر</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(selectedInvoice.items || []).map((item, idx) => (
+                  <tr
+                    key={item.id || idx}
+                    style={{
+                      background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                      borderBottom: '1px solid #cbd5e1'
+                    }}
+                  >
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
+                      {item.product_code || item.variant_sku || '-'}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product_name}</div>
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, fontFamily: 'monospace' }}>
+                      {item.quantity}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', color: parseInt(item.returned_quantity, 10) > 0 ? '#dc2626' : '#94a3b8', fontWeight: 600 }}>
+                      {parseInt(item.returned_quantity, 10) > 0 ? `${item.returned_quantity}` : '—'}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace' }}>
+                      {parseFloat(item.unit_cost).toLocaleString()} ج.م
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', color: '#059669', fontWeight: 600 }}>
+                      {item.selling_price ? `${parseFloat(item.selling_price).toLocaleString()} ج.م` : '—'}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 800, fontFamily: 'monospace' }}>
+                      {parseFloat(item.line_total).toLocaleString()} ج.م
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: '#f1f5f9', fontWeight: 800 }}>
+                  <td colSpan={3} style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'left' }}>
+                    إجمالي الكميات الموردة:
+                  </td>
+                  <td style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', color: '#16a34a' }}>
+                    {(selectedInvoice.items || []).reduce((acc, curr) => acc + (parseInt(curr.quantity, 10) || 0), 0)} قطعة
+                  </td>
+                  <td colSpan={3} style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'left' }}>
+                    المجموع قبل الضرائب والخصم:
+                  </td>
+                  <td style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace' }}>
+                    {parseFloat(selectedInvoice.subtotal).toLocaleString()} ج.م
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Split Payment Breakdown if available */}
             {selectedInvoice.payment_breakdown && (
-              <Card size="small" style={{ marginTop: 14, background: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                <Text strong style={{ display: 'block', marginBottom: 6, color: '#166534' }}>
-                  <DollarCircleOutlined style={{ marginLeft: 6 }} />
-                  تفاصيل السداد المقسم (Multi-Tender Payment Breakdown):
-                </Text>
-                <Space size={[6, 6]} wrap>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '8px 12px', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', marginBottom: 4 }}>
+                  تفاصيل السداد المقسم (Multi-Tender Payments):
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {(Array.isArray(selectedInvoice.payment_breakdown)
                     ? selectedInvoice.payment_breakdown
                     : typeof selectedInvoice.payment_breakdown === 'string'
                     ? JSON.parse(selectedInvoice.payment_breakdown)
                     : []
                   ).map((b, idx) => (
-                    <Tag key={idx} color="green" style={{ fontSize: 13, padding: '4px 10px' }}>
+                    <span key={idx} style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '2px 8px', borderRadius: 4, fontSize: 11, color: '#15803d' }}>
                       {b.method_name || b.method}: <strong>{parseFloat(b.amount).toLocaleString()} ج.م</strong>
-                    </Tag>
+                    </span>
                   ))}
-                </Space>
-              </Card>
+                </div>
+              </div>
             )}
 
-            <Divider style={{ margin: '16px 0' }} />
-
+            {/* Financial Summary & Signatures Row */}
             <Row gutter={16}>
-              <Col span={12}>
+              <Col span={14}>
                 {selectedInvoice.notes && (
-                  <div style={{ background: '#f8fafc', padding: 8, borderRadius: 4 }}>
-                    <Text type="secondary">ملاحظات الفاتورة: </Text>
-                    <div>{selectedInvoice.notes}</div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', marginBottom: 12 }}>
+                    <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>ملاحظات الفاتورة:</div>
+                    <div style={{ fontSize: 11.5, color: '#334155', marginTop: 2 }}>{selectedInvoice.notes}</div>
                   </div>
                 )}
+                <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px', background: '#f8fafc' }}>
+                  <div style={{ fontSize: 10.5, color: '#475569' }}>
+                    <strong>إقرار استلام:</strong> يُقر المستلم بأن البضاعة المذكورة قد تم فحصها واستلامها وإضافتها إلى رصيد المخزن بموجب هذا السند.
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, paddingTop: 8, borderTop: '1px dashed #94a3b8' }}>
+                    <div style={{ textAlign: 'center', width: '45%' }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#334155', marginBottom: 20 }}>توقيع أمين المستودع</div>
+                      <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10, color: '#64748b' }}>........................</div>
+                    </div>
+                    <div style={{ textAlign: 'center', width: '45%' }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#334155', marginBottom: 20 }}>اعتماد إدارة المشتريات</div>
+                      <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10, color: '#64748b' }}>........................</div>
+                    </div>
+                  </div>
+                </div>
               </Col>
-              <Col span={12} style={{ textAlign: 'left' }}>
-                <div>المجموع الفرعي: {parseFloat(selectedInvoice.subtotal).toLocaleString()} ج.م</div>
-                {parseFloat(selectedInvoice.discount_amount) > 0 && (
-                  <div>الخصم: -{parseFloat(selectedInvoice.discount_amount).toLocaleString()} ج.م</div>
-                )}
-                {parseFloat(selectedInvoice.shipping_cost) > 0 && (
-                  <div>الشحن: +{parseFloat(selectedInvoice.shipping_cost).toLocaleString()} ج.م</div>
-                )}
-                {parseFloat(selectedInvoice.tax_amount) > 0 && (
-                  <div>الضريبة: +{parseFloat(selectedInvoice.tax_amount).toLocaleString()} ج.م</div>
-                )}
-                <div style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginTop: 6 }}>
-                  الإجمالي النهائي: {parseFloat(selectedInvoice.final_amount).toLocaleString()} ج.م
-                </div>
-                <div style={{ color: '#16a34a', marginTop: 4, fontWeight: 'bold' }}>
-                  المسدد: {parseFloat(selectedInvoice.paid_amount || 0).toLocaleString()} ج.م
-                </div>
-                {parseFloat(selectedInvoice.final_amount) - parseFloat(selectedInvoice.paid_amount || 0) > 0 && (
-                  <div style={{ color: '#dc2626', marginTop: 2, fontWeight: 'bold' }}>
-                    المتبقي آجل: {(parseFloat(selectedInvoice.final_amount) - parseFloat(selectedInvoice.paid_amount || 0)).toLocaleString()} ج.م
+
+              <Col span={10}>
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', color: '#475569' }}>
+                    <span>المجموع الفرعي:</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{parseFloat(selectedInvoice.subtotal).toLocaleString()} ج.م</span>
                   </div>
-                )}
+                  {parseFloat(selectedInvoice.discount_amount) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', color: '#b91c1c' }}>
+                      <span>الخصم الممنوح:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>-{parseFloat(selectedInvoice.discount_amount).toLocaleString()} ج.م</span>
+                    </div>
+                  )}
+                  {parseFloat(selectedInvoice.shipping_cost) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', color: '#475569' }}>
+                      <span>مصاريف الشحن:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>+{parseFloat(selectedInvoice.shipping_cost).toLocaleString()} ج.م</span>
+                    </div>
+                  )}
+                  {parseFloat(selectedInvoice.tax_amount) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', color: '#475569' }}>
+                      <span>ضريبة القيمة المضافة:</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>+{parseFloat(selectedInvoice.tax_amount).toLocaleString()} ج.م</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '2px solid #0f172a', marginTop: 6, paddingTop: 6, fontSize: 13.5, fontWeight: 900, color: '#0f172a' }}>
+                    <span>الإجمالي النهائي:</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 15 }}>{parseFloat(selectedInvoice.final_amount).toLocaleString()} ج.م</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', color: '#16a34a', fontWeight: 700 }}>
+                    <span>المبلغ المسدد:</span>
+                    <span style={{ fontFamily: 'monospace' }}>{parseFloat(selectedInvoice.paid_amount || 0).toLocaleString()} ج.م</span>
+                  </div>
+                  {parseFloat(selectedInvoice.final_amount) - parseFloat(selectedInvoice.paid_amount || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', color: '#dc2626', fontWeight: 800 }}>
+                      <span>المتبقي آجل للمورد:</span>
+                      <span style={{ fontFamily: 'monospace' }}>
+                        {(parseFloat(selectedInvoice.final_amount) - parseFloat(selectedInvoice.paid_amount || 0)).toLocaleString()} ج.م
+                      </span>
+                    </div>
+                  )}
+                </div>
               </Col>
             </Row>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, paddingTop: 16, borderTop: '1px dashed #94a3b8' }}>
-              <div><strong>توقيع أمين المستودع:</strong> _______________________</div>
-              <div><strong>اعتماد المشتريات:</strong> _______________________</div>
+            {/* Verification Footer */}
+            <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <span>مستند رسمي صادر عن منظومة إدارة المخازن والمشتريات Yoka SWM</span>
+              <span>تاريخ الطباعة: {new Date().toLocaleDateString('ar-EG')}</span>
             </div>
           </div>
         )}
@@ -1978,136 +2097,222 @@ export default function Purchases() {
         width={880}
       >
         {selectedReturn && (
-          <div ref={printReturnAreaRef} className="printable-return" style={{ direction: 'rtl' }}>
-            <div style={{ borderBottom: '2px solid #dc2626', paddingBottom: 10, marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div ref={printReturnAreaRef} className="printable-return" style={{ direction: 'rtl', padding: '6px' }}>
+            {/* Branded Header */}
+            <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #dc2626', paddingBottom: 12, marginBottom: 14 }}>
+              <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
                 <div>
-                  <h2 style={{ margin: 0, fontSize: 22, fontWeight: 'bold', color: '#dc2626' }}>
-                    منصة يوكا ستور — إشعار مرتجع مشتريات (Purchase Return Voucher)
-                  </h2>
-                  <div style={{ fontSize: 13, color: '#475569' }}>سند إرجاع بضاعة موردة وخصم من المخزون</div>
+                  <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#dc2626' }}>شركة يوكا ستور — إشعار مرتجع مشتريات</h1>
+                  <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>إدارة المستودعات وسلاسل الإمداد • سند خصم من المخزون وإرجاع للمورد</div>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>منظومة إدارة المخازن المركزية Yoka SWM</div>
                 </div>
-                <div style={{ textAlign: 'left' }}>
-                  <h3 style={{ margin: 0, fontSize: 18, color: '#dc2626' }}>إشعار #{selectedReturn.return_number}</h3>
-                  <div style={{ fontSize: 12 }}>تاريخ الإرجاع: {new Date(selectedReturn.return_date).toLocaleDateString('ar-EG')}</div>
-                  {selectedReturn.invoice_ref ? (
-                    <div style={{ fontSize: 12 }}>الفاتورة الأصلية: <strong>#{selectedReturn.invoice_ref}</strong></div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: '#7c3aed' }}><strong>مرتجع مشتريات مستقل (بدون فاتورة سابقة)</strong></div>
-                  )}
+              </div>
+              <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+                <div style={{ display: 'inline-block', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 6 }}>
+                  إشعار مرتجع مشتريات
                 </div>
+                <div style={{ marginTop: 5, fontSize: 12, color: '#334155', fontWeight: 700 }}>
+                  رقم الإشعار: <strong style={{ fontFamily: 'monospace', color: '#dc2626', fontSize: 13.5 }}>{selectedReturn.return_number}</strong>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                  تاريخ الإرجاع: {new Date(selectedReturn.return_date).toLocaleDateString('ar-EG')}
+                </div>
+                {selectedReturn.invoice_ref ? (
+                  <div style={{ fontSize: 10.5, color: '#475569', marginTop: 1 }}>
+                    الفاتورة الأصلية: <strong style={{ fontFamily: 'monospace' }}>#{selectedReturn.invoice_ref}</strong>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 10.5, color: '#7c3aed', fontWeight: 600, marginTop: 1 }}>
+                    مرتجع مستقل (بدون فاتورة سابقة)
+                  </div>
+                )}
               </div>
             </div>
 
-            <Row gutter={16} style={{ marginBottom: 16, background: '#fef2f2', padding: 12, borderRadius: 6, border: '1px solid #fecaca' }}>
-              <Col span={8}>
-                <div><strong>المورد:</strong> {selectedReturn.supplier_name} ({selectedReturn.supplier_code})</div>
-                <div><strong>الهاتف:</strong> {selectedReturn.supplier_phone || '—'}</div>
-                <div><strong>العنوان:</strong> {selectedReturn.supplier_address || '—'}</div>
-              </Col>
-              <Col span={8}>
-                <div><strong>المستودع المرتجع منه:</strong> {selectedReturn.warehouse_name}</div>
-                <div><strong>المسجل:</strong> {selectedReturn.created_by_name || 'مسؤول المخزن'}</div>
-                <div><strong>الحالة:</strong> <Tag color="red">تم الإرجاع وتحديث المخزون</Tag></div>
-              </Col>
-              <Col span={8}>
-                <div>
-                  <strong>التسوية المالية:</strong>{' '}
-                  <Tag color={parseFloat(selectedReturn.refund_amount) > 0 ? 'green' : 'blue'}>
-                    {parseFloat(selectedReturn.refund_amount) > 0 ? 'استرداد مالي مستلم' : 'خصم من حساب المورد'}
-                  </Tag>
-                </div>
-                <div>
-                  <strong>المبلغ المسترد:</strong>{' '}
-                  <Text strong>{parseFloat(selectedReturn.refund_amount || 0).toLocaleString()} ج.م</Text>
-                </div>
-              </Col>
-            </Row>
+            {/* Metadata Card */}
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+              <Row gutter={[16, 10]}>
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#991b1b', fontWeight: 700 }}>بيانات المورد:</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+                    {selectedReturn.supplier_name} ({selectedReturn.supplier_code})
+                  </div>
+                  {selectedReturn.supplier_phone && (
+                    <div style={{ fontSize: 11, color: '#475569' }}>هاتف: {selectedReturn.supplier_phone}</div>
+                  )}
+                  {selectedReturn.supplier_address && (
+                    <div style={{ fontSize: 10.5, color: '#64748b' }}>العنوان: {selectedReturn.supplier_address}</div>
+                  )}
+                </Col>
 
-            <Table
-              size="small"
-              loading={returnDetailsLoading}
-              dataSource={selectedReturn.items || []}
-              rowKey="id"
-              pagination={false}
-              bordered
-              columns={[
-                { title: 'كود المنتج', dataIndex: 'product_code', key: 'product_code', width: 130 },
-                { title: 'اسم الصنف المرتجع', dataIndex: 'product_name', key: 'product_name' },
-                {
-                  title: 'الكمية المرتجعة',
-                  dataIndex: 'quantity',
-                  key: 'quantity',
-                  width: 120,
-                  render: (q) => <Text strong style={{ color: '#dc2626' }}>{q} قطعة</Text>
-                },
-                {
-                  title: 'سعر التكلفة',
-                  dataIndex: 'unit_cost',
-                  key: 'unit_cost',
-                  width: 130,
-                  render: (v) => `${parseFloat(v).toLocaleString()} ج.م`
-                },
-                {
-                  title: 'إجمالي القيمة',
-                  dataIndex: 'line_total',
-                  key: 'line_total',
-                  width: 140,
-                  render: (v) => <Text strong style={{ color: '#dc2626' }}>{parseFloat(v).toLocaleString()} ج.م</Text>
-                }
-              ]}
-            />
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#991b1b', fontWeight: 700 }}>المستودع والإجراء:</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+                    {selectedReturn.warehouse_name || 'المستودع الرئيسي'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#475569' }}>
+                    المسؤول: {selectedReturn.created_by_name || 'مسؤول المخزن'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 700, marginTop: 2 }}>
+                    الحالة: تم الخصم من المخزون وإرجاع البضاعة
+                  </div>
+                </Col>
 
+                <Col span={8}>
+                  <div style={{ fontSize: 10.5, color: '#991b1b', fontWeight: 700 }}>التسوية المالية:</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: parseFloat(selectedReturn.refund_amount) > 0 ? '#16a34a' : '#2563eb', marginTop: 2 }}>
+                    {parseFloat(selectedReturn.refund_amount) > 0 ? 'استرداد مالي مستلم' : 'خصم من مديونية المورد'}
+                  </div>
+                  {parseFloat(selectedReturn.refund_amount) > 0 && (
+                    <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>
+                      المبلغ المسترد: <strong>{parseFloat(selectedReturn.refund_amount).toLocaleString()} ج.م</strong>
+                    </div>
+                  )}
+                </Col>
+              </Row>
+            </div>
+
+            {/* Items Table */}
+            <table
+              className="print-table"
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'right',
+                fontSize: '11px',
+                marginBottom: 12
+              }}
+            >
+              <thead>
+                <tr style={{ background: '#0f172a', color: '#ffffff' }}>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '30px', textAlign: 'center' }}>م</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '120px', textAlign: 'center' }}>كود المنتج</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a' }}>اسم الصنف المرتجع ومواصفاته</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '90px', textAlign: 'center' }}>الكمية المرتجعة</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '100px', textAlign: 'left' }}>سعر التكلفة</th>
+                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'left' }}>إجمالي القيمة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(selectedReturn.items || []).map((item, idx) => (
+                  <tr
+                    key={item.id || idx}
+                    style={{
+                      background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                      borderBottom: '1px solid #cbd5e1'
+                    }}
+                  >
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
+                      {item.product_code || item.variant_sku || '-'}
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product_name}</div>
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace', fontSize: '12px' }}>
+                      {item.quantity} قطعة
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace' }}>
+                      {parseFloat(item.unit_cost).toLocaleString()} ج.م
+                    </td>
+                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace' }}>
+                      {parseFloat(item.line_total).toLocaleString()} ج.م
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ background: '#f1f5f9', fontWeight: 800 }}>
+                  <td colSpan={3} style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'left' }}>
+                    إجمالي الكميات المرتجعة:
+                  </td>
+                  <td style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', color: '#dc2626' }}>
+                    {(selectedReturn.items || []).reduce((acc, curr) => acc + (parseInt(curr.quantity, 10) || 0), 0)} قطعة
+                  </td>
+                  <td style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'left' }}>
+                    إجمالي قيمة المرتجع:
+                  </td>
+                  <td style={{ padding: '7px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace', color: '#dc2626' }}>
+                    {parseFloat(selectedReturn.total_amount).toLocaleString()} ج.م
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Refund Payment Breakdown if available */}
             {parseFloat(selectedReturn.refund_amount) > 0 && selectedReturn.payment_breakdown && (
-              <Card size="small" style={{ marginTop: 14, background: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                <Text strong style={{ display: 'block', marginBottom: 6, color: '#166534' }}>
-                  <DollarCircleOutlined style={{ marginLeft: 6 }} />
-                  تفاصيل المبالغ المستردة نقداً وحوالات (Refund Receipt Breakdown):
-                </Text>
-                <Space size={[6, 6]} wrap>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '8px 12px', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#166534', marginBottom: 4 }}>
+                  تفاصيل المبالغ المستردة نقداً وحوالات (Refund Receipts):
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {(Array.isArray(selectedReturn.payment_breakdown)
                     ? selectedReturn.payment_breakdown
                     : typeof selectedReturn.payment_breakdown === 'string'
                     ? JSON.parse(selectedReturn.payment_breakdown)
                     : []
                   ).map((b, idx) => (
-                    <Tag key={idx} color="green" style={{ fontSize: 13, padding: '4px 10px' }}>
+                    <span key={idx} style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '2px 8px', borderRadius: 4, fontSize: 11, color: '#15803d' }}>
                       {b.method_name || b.method}: <strong>{parseFloat(b.amount).toLocaleString()} ج.م</strong>
-                    </Tag>
+                    </span>
                   ))}
-                </Space>
-              </Card>
+                </div>
+              </div>
             )}
 
-            <Divider style={{ margin: '16px 0' }} />
-
+            {/* Financial Summary & Signatures Row */}
             <Row gutter={16}>
-              <Col span={12}>
+              <Col span={14}>
                 {selectedReturn.reason && (
-                  <div style={{ background: '#f8fafc', padding: 8, borderRadius: 4 }}>
-                    <Text type="secondary">سبب الإرجاع: </Text>
-                    <div>{selectedReturn.reason}</div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', marginBottom: 12 }}>
+                    <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>سبب الإرجاع:</div>
+                    <div style={{ fontSize: 11.5, color: '#334155', marginTop: 2 }}>{selectedReturn.reason}</div>
                   </div>
                 )}
-              </Col>
-              <Col span={12} style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 18, fontWeight: 'bold', color: '#dc2626' }}>
-                  إجمالي قيمة المرتجع: {parseFloat(selectedReturn.total_amount).toLocaleString()} ج.م
+                <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px', background: '#f8fafc' }}>
+                  <div style={{ fontSize: 10.5, color: '#475569' }}>
+                    <strong>إقرار تسليم وإرجاع:</strong> يُقر مندوب المورد باستلام الأصناف المذكورة أعلاه بحالة مطابقة وسليمة، وتمت التسوية المالية بالخصم أو الاسترداد المالي.
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18, paddingTop: 8, borderTop: '1px dashed #94a3b8' }}>
+                    <div style={{ textAlign: 'center', width: '45%' }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#334155', marginBottom: 20 }}>توقيع أمين المستودع المسلِم</div>
+                      <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10, color: '#64748b' }}>........................</div>
+                    </div>
+                    <div style={{ textAlign: 'center', width: '45%' }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#334155', marginBottom: 20 }}>توقيع مندوب المورد المستلِم</div>
+                      <div style={{ borderTop: '1px solid #475569', paddingTop: 2, fontSize: 10, color: '#64748b' }}>........................</div>
+                    </div>
+                  </div>
                 </div>
-                {parseFloat(selectedReturn.refund_amount) > 0 && (
-                  <div style={{ color: '#16a34a', fontWeight: 'bold', marginTop: 4 }}>
-                    المسترد فعلياً: {parseFloat(selectedReturn.refund_amount).toLocaleString()} ج.م
+              </Col>
+
+              <Col span={10}>
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13.5px', fontWeight: 900, color: '#dc2626' }}>
+                    <span>إجمالي قيمة المرتجع:</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 15 }}>{parseFloat(selectedReturn.total_amount).toLocaleString()} ج.م</span>
                   </div>
-                )}
-                <div style={{ color: '#2563eb', fontWeight: 'bold', marginTop: 4 }}>
-                  المخصوم من رصيد المورد: {(parseFloat(selectedReturn.total_amount) - parseFloat(selectedReturn.refund_amount || 0)).toLocaleString()} ج.م
+                  {parseFloat(selectedReturn.refund_amount) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', color: '#16a34a', fontWeight: 700 }}>
+                      <span>المسترد نقداً / حوالات:</span>
+                      <span style={{ fontFamily: 'monospace' }}>{parseFloat(selectedReturn.refund_amount).toLocaleString()} ج.م</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', color: '#2563eb', fontWeight: 800 }}>
+                    <span>المخصوم من رصيد المورد:</span>
+                    <span style={{ fontFamily: 'monospace' }}>
+                      {(parseFloat(selectedReturn.total_amount) - parseFloat(selectedReturn.refund_amount || 0)).toLocaleString()} ج.م
+                    </span>
+                  </div>
                 </div>
               </Col>
             </Row>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, paddingTop: 16, borderTop: '1px dashed #94a3b8' }}>
-              <div><strong>توقيع أمين المستودع المسلم:</strong> _______________________</div>
-              <div><strong>توقيع مندوب المورد المستلم:</strong> _______________________</div>
+            {/* Verification Footer */}
+            <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <span>إشعار مرتجع رسمي صادر عن منظومة سلاسل الإمداد Yoka SWM</span>
+              <span>تاريخ الطباعة: {new Date().toLocaleDateString('ar-EG')}</span>
             </div>
           </div>
         )}

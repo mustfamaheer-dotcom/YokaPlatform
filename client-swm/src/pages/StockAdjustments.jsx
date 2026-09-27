@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import yokaLogo from '../assets/yokaStoreTransparent.png';
+import { printHtmlContent } from '../utils/printUtils';
 import {
   Card,
   Row,
@@ -46,7 +48,7 @@ import api from '../api';
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-export default function StockAdjustments({ currentUser }) {
+export default function StockAdjustments({ currentUser, autoOpenCreate, onResetAction }) {
   const isRetailBranch = Boolean(
     currentUser &&
     (currentUser.branchType === 'retail_branch' || currentUser.isBranchAccount) &&
@@ -154,6 +156,13 @@ export default function StockAdjustments({ currentUser }) {
     setVoucherItems([]);
     setCreateDrawerOpen(true);
   };
+
+  useEffect(() => {
+    if (autoOpenCreate) {
+      handleOpenCreateDrawer();
+      if (onResetAction) onResetAction();
+    }
+  }, [autoOpenCreate]);
 
   // Load items of the selected branch (either only in-stock or all items)
   const handleLoadBranchItems = async (onlyInStock = true) => {
@@ -392,37 +401,11 @@ export default function StockAdjustments({ currentUser }) {
   // Print Voucher
   const handleExecutePrintVoucher = () => {
     if (printAreaRef.current) {
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
-        <html dir="rtl">
-          <head>
-            <title>سند تسوية مخزنية ${selectedVoucher?.adjustment_number}</title>
-            <style>
-              body { font-family: sans-serif; padding: 25px; direction: rtl; font-size: 13px; color: #1e293b; }
-              table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-              th, td { border: 1px solid #94a3b8; padding: 8px 10px; text-align: right; }
-              th { background: #f1f5f9; font-weight: bold; }
-              .header-box { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
-              .summary-box { background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; margin-top: 15px; }
-              .deficit { color: #dc2626; font-weight: bold; }
-              .surplus { color: #16a34a; font-weight: bold; }
-              .signatures { margin-top: 45px; display: flex; justify-content: space-between; }
-              .sign-box { width: 28%; text-align: center; border-top: 1px solid #475569; padding-top: 8px; font-weight: bold; }
-              @media print {
-                @page { size: A4; margin: 12mm; }
-                button { display: none; }
-              }
-            </style>
-          </head>
-          <body>
-            ${printAreaRef.current.innerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
+      printHtmlContent({
+        title: `سند تسوية مخزنية - ${selectedVoucher?.adjustment_number || ''}`,
+        htmlContent: printAreaRef.current.innerHTML,
+        pageType: 'a4'
+      });
     }
   };
 
@@ -1131,72 +1114,95 @@ export default function StockAdjustments({ currentUser }) {
             <Spin size="large" />
           </div>
         ) : (
-          <div ref={printAreaRef} style={{ padding: '10px' }}>
-            {/* Voucher Header */}
-            <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: '12px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div ref={printAreaRef} className="printable-voucher" style={{ padding: '4px', color: '#0f172a', direction: 'rtl' }}>
+            {/* Voucher Branded Header */}
+            <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
+              <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <img src={yokaLogo} alt="Yoka Store" style={{ height: 46, maxWidth: 110, objectFit: 'contain' }} />
                 <div>
-                  <h2 style={{ margin: 0, color: '#0f172a' }}>Yoka Store — سند تسوية مخزنية معتمد</h2>
-                  <div style={{ fontSize: 13, color: '#475569', marginTop: 4 }}>
-                    الفرع / المستودع: <strong>{selectedVoucher.branch_name} ({selectedVoucher.branch_code})</strong>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'left', fontSize: 12, color: '#475569' }}>
-                  <div>رقم السند: <strong style={{ fontFamily: 'monospace', fontSize: 14 }}>{selectedVoucher.adjustment_number}</strong></div>
-                  <div>التاريخ: <strong>{dayjs(selectedVoucher.adjustment_date).format('YYYY-MM-DD')}</strong></div>
-                  <div>الحالة: <strong style={{ color: selectedVoucher.status === 'approved' ? '#16a34a' : '#d97706' }}>
-                    {selectedVoucher.status === 'approved' ? 'معتمد ومطبق' : 'مسودة'}
-                  </strong></div>
+                  <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>شركة يوكا ستور (YOKA STORE)</h2>
+                  <div style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>منظومة إدارة المخازن المركزية والفرعية • قسم مراقبة المخزون</div>
                 </div>
               </div>
-
-              <div style={{ marginTop: 10, fontSize: 13 }}>
-                سبب التسوية: <strong>{selectedVoucher.reason}</strong>
-                {selectedVoucher.notes && <span style={{ marginRight: 16 }}>• الملاحظات: {selectedVoucher.notes}</span>}
+              <div className="doc-badge-box" style={{ textAlign: 'left' }}>
+                <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 6 }}>
+                  سند تسوية مخزنية معتمد
+                </div>
+                <div style={{ marginTop: 4, fontSize: 12, color: '#334155', fontWeight: 600 }}>
+                  رقم السند: <strong style={{ fontFamily: 'monospace' }}>{selectedVoucher.adjustment_number}</strong>
+                </div>
               </div>
             </div>
 
+            {/* Meta Grid */}
+            <div className="meta-card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 14, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 14px' }}>
+              <div>
+                <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>الفرع / المستودع:</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>{selectedVoucher.branch_name} ({selectedVoucher.branch_code})</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>تاريخ التسوية:</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>{dayjs(selectedVoucher.adjustment_date).format('YYYY-MM-DD')}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>الحالة الرسمية:</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: selectedVoucher.status === 'approved' ? '#15803d' : '#b45309' }}>
+                  {selectedVoucher.status === 'approved' ? 'معتمد ومطبق مخزنياً' : 'مسودة قيد المراجعة'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>سبب التسوية:</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>{selectedVoucher.reason}</div>
+              </div>
+              {selectedVoucher.notes && (
+                <div style={{ gridColumn: 'span 4', borderTop: '1px solid #e2e8f0', paddingTop: 6, marginTop: 2 }}>
+                  <span style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>ملاحظات وتفاصيل إضافية: </span>
+                  <span style={{ fontSize: 12, color: '#334155' }}>{selectedVoucher.notes}</span>
+                </div>
+              )}
+            </div>
+
             {/* Items Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, marginBottom: 14 }}>
               <thead>
-                <tr style={{ background: '#f1f5f9' }}>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '35px', textAlign: 'center' }}>#</th>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '130px' }}>كود الصنف</th>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px' }}>اسم المنتج / الصنف</th>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '90px' }}>المقاس / اللون</th>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '80px', textAlign: 'center' }}>رصيد النظام</th>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '80px', textAlign: 'center' }}>الرصيد الفعلي</th>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '80px', textAlign: 'center' }}>الفارق</th>
-                  <th style={{ border: '1px solid #94a3b8', padding: '6px 8px', width: '90px', textAlign: 'right' }}>الأثر المالي</th>
+                <tr style={{ background: '#0f172a', color: '#fff' }}>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '32px', textAlign: 'center' }}>م</th>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '130px', textAlign: 'center' }}>كود الصنف / الباركود</th>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px' }}>اسم المنتج والمواصفات</th>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '90px', textAlign: 'center' }}>المقاس / اللون</th>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '75px', textAlign: 'center' }}>رصيد النظام</th>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '75px', textAlign: 'center' }}>الفعلي</th>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '75px', textAlign: 'center' }}>الفارق</th>
+                  <th style={{ border: '1px solid #0f172a', padding: '6px 8px', width: '95px', textAlign: 'left' }}>الأثر المالي</th>
                 </tr>
               </thead>
               <tbody>
                 {(selectedVoucher.items || []).map((it, idx) => (
-                  <tr key={idx}>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', textAlign: 'center' }}>{idx + 1}</td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', fontFamily: 'monospace' }}>
+                  <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
                       {it.variant_sku || it.product_code}
                     </td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', fontWeight: 'bold' }}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', fontWeight: 600 }}>
                       {it.product_name}
                       {it.item_notes && <div style={{ fontSize: 10, color: '#64748b' }}>{it.item_notes}</div>}
                     </td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px' }}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center' }}>
                       {[it.size, it.color].filter(Boolean).join(' / ') || '—'}
                     </td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', textAlign: 'center' }}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center' }}>
                       {it.system_qty}
                     </td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold' }}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontWeight: 700 }}>
                       {it.actual_qty}
                     </td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', textAlign: 'center', fontWeight: 'bold' }}>
-                      <span style={{ color: it.variance_qty < 0 ? '#dc2626' : (it.variance_qty > 0 ? '#16a34a' : '#475569') }}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'center', fontWeight: 700 }}>
+                      <span style={{ color: it.variance_qty < 0 ? '#b91c1c' : (it.variance_qty > 0 ? '#15803d' : '#475569') }}>
                         {it.variance_qty > 0 ? '+' : ''}{it.variance_qty}
                       </span>
                     </td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>
-                      <span style={{ color: parseFloat(it.variance_cost || 0) < 0 ? '#dc2626' : (parseFloat(it.variance_cost || 0) > 0 ? '#16a34a' : '#475569') }}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '5px 8px', textAlign: 'left', fontWeight: 700 }}>
+                      <span style={{ color: parseFloat(it.variance_cost || 0) < 0 ? '#b91c1c' : (parseFloat(it.variance_cost || 0) > 0 ? '#15803d' : '#475569') }}>
                         {parseFloat(it.variance_cost || 0) > 0 ? '+' : ''}{parseFloat(it.variance_cost || 0).toLocaleString()} ج.م
                       </span>
                     </td>
@@ -1206,36 +1212,42 @@ export default function StockAdjustments({ currentUser }) {
             </table>
 
             {/* Totals Summary */}
-            <div style={{ marginTop: '16px', padding: '12px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
-              <Row justify="space-between">
-                <Col span={6}>إجمالي الأصناف: <strong>{selectedVoucher.total_items} صنف</strong></Col>
-                <Col span={6}>إجمالي العجز: <strong style={{ color: '#dc2626' }}>-{selectedVoucher.total_deficit_qty} قطعة</strong></Col>
-                <Col span={6}>إجمالي الزيادة: <strong style={{ color: '#16a34a' }}>+{selectedVoucher.total_surplus_qty} قطعة</strong></Col>
-                <Col span={6} style={{ textAlign: 'left' }}>
-                  صافي الأثر المالي: <strong style={{ fontSize: 15, color: parseFloat(selectedVoucher.total_variance_cost || 0) < 0 ? '#dc2626' : '#16a34a' }}>
-                    {parseFloat(selectedVoucher.total_variance_cost || 0) > 0 ? '+' : ''}{parseFloat(selectedVoucher.total_variance_cost || 0).toLocaleString()} ج.م
-                  </strong>
-                </Col>
-              </Row>
+            <div style={{ marginTop: 12, padding: '10px 14px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <div>إجمالي الأصناف: <strong>{selectedVoucher.total_items} صنف</strong></div>
+              <div>إجمالي العجز: <strong style={{ color: '#b91c1c' }}>-{selectedVoucher.total_deficit_qty} قطعة</strong></div>
+              <div>إجمالي الزيادة: <strong style={{ color: '#15803d' }}>+{selectedVoucher.total_surplus_qty} قطعة</strong></div>
+              <div>
+                صافي الأثر المالي للتسوية: <strong style={{ fontSize: 14, color: parseFloat(selectedVoucher.total_variance_cost || 0) < 0 ? '#b91c1c' : '#15803d' }}>
+                  {parseFloat(selectedVoucher.total_variance_cost || 0) > 0 ? '+' : ''}{parseFloat(selectedVoucher.total_variance_cost || 0).toLocaleString()} ج.م
+                </strong>
+              </div>
             </div>
 
-            {/* Printable Signatures */}
-            <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-                <div>منشئ السند / أمين المخزن</div>
-                <div style={{ marginTop: '6px', fontSize: 12, color: '#475569' }}>{selectedVoucher.created_by_name || 'أمين العهدة'}</div>
-                <div style={{ marginTop: '16px', color: '#94a3b8' }}>..........................................</div>
+            {/* Signatures */}
+            <div className="signatures-grid" style={{ marginTop: 28, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, paddingTop: 14, borderTop: '1px dashed #94a3b8' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, marginBottom: 28, fontSize: 12 }}>أمين المخزن / منشئ السند</div>
+                <div style={{ borderTop: '1px solid #334155', width: '80%', margin: '0 auto', paddingTop: 4, fontSize: 11, color: '#475569' }}>
+                  {selectedVoucher.created_by_name || 'التوقيع: .....................'}
+                </div>
               </div>
-              <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-                <div>المراجع / المحاسب المالي</div>
-                <div style={{ marginTop: '6px', fontSize: 12, color: '#475569' }}>المراجعة والتدقيق</div>
-                <div style={{ marginTop: '16px', color: '#94a3b8' }}>..........................................</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, marginBottom: 28, fontSize: 12 }}>المراجع والمحاسب المالي</div>
+                <div style={{ borderTop: '1px solid #334155', width: '80%', margin: '0 auto', paddingTop: 4, fontSize: 11, color: '#475569' }}>
+                  التوقيع والاعتماد: .....................
+                </div>
               </div>
-              <div style={{ width: '28%', textAlign: 'center', borderTop: '1px solid #475569', paddingTop: '8px' }}>
-                <div>اعتماد مدير المستودع الرئيسي</div>
-                <div style={{ marginTop: '6px', fontSize: 12, color: '#475569' }}>{selectedVoucher.approved_by_name || 'مدير المستودع'}</div>
-                <div style={{ marginTop: '16px', color: '#94a3b8' }}>..........................................</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, marginBottom: 28, fontSize: 12 }}>اعتماد إدارة العمليات والمستودعات</div>
+                <div style={{ borderTop: '1px solid #334155', width: '80%', margin: '0 auto', paddingTop: 4, fontSize: 11, color: '#475569' }}>
+                  {selectedVoucher.approved_by_name || 'الختم والتوقيع: .....................'}
+                </div>
               </div>
+            </div>
+
+            {/* Document Verification Footer */}
+            <div style={{ marginTop: 16, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6 }}>
+              مستند إلكتروني رسمي صادر من منظومة Yoka SWM • تاريخ ووقت الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}
             </div>
           </div>
         )}
