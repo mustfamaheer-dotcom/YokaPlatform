@@ -20,15 +20,15 @@ export default function MobileBottomNav({ cartCount, onOpenCart, cartBounce }) {
         <span>المنتجات</span>
       </NavLink>
       <button onClick={onOpenCart} className="bottom-nav-btn" aria-label="عرض السلة">
-        <Badge count={cartCount} size="small" className={cartBounce ? 'cart-badge-bounce' : ''} style={{ backgroundColor: '#0A0A0A', color: '#C8A45C', boxShadow: 'none', fontWeight: 800 }}>
+        <Badge count={cartCount} size="small" className={cartBounce ? 'cart-badge-bounce' : ''} style={{ backgroundColor: '#C8A45C', color: '#1C1917', boxShadow: 'none', fontWeight: 800 }}>
           <ShoppingCartOutlined style={{ fontSize: '20px', color: 'inherit' }} />
         </Badge>
         <span>السلة</span>
       </button>
-      <a href="tel:01000000000" aria-label="اتصل بخدمة العملاء">
+      <NavLink to="/contact" className={({ isActive }) => isActive ? 'active' : ''} aria-label="تواصل معنا">
         <PhoneOutlined />
         <span>تواصل معنا</span>
-      </a>
+      </NavLink>
     </nav>
   );
 }

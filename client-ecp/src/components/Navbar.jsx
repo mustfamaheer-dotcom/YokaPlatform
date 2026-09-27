@@ -1,24 +1,35 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Badge, Button, Input, Space, Grid } from 'antd';
 import {
   ShoppingCartOutlined,
   SearchOutlined,
-  ShopOutlined,
   FireOutlined,
-  SafetyCertificateOutlined,
-  PhoneOutlined
+  ShopOutlined
 } from '@ant-design/icons';
+import { Flame } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
+import api from '../api';
 
 const { useBreakpoint } = Grid;
 
 export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
   const [searchVal, setSearchVal] = useState('');
+  const [storeSettings, setStoreSettings] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const screens = useBreakpoint();
 
-  // If screens is empty on initial render, default gracefully
+  useEffect(() => {
+    api.get('/api/ecp/catalog/store-settings')
+      .then((res) => {
+        if (res.data?.success && res.data?.data) {
+          setStoreSettings(res.data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const isMobile = screens.xs || (screens.sm === false && screens.md === false);
   const isTablet = screens.md && !screens.lg;
 
@@ -32,52 +43,178 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
     }
   };
 
+  const isOfferActive = storeSettings?.hero_offer_enabled !== 'false';
+  const offerText = storeSettings?.hero_offer_text || 'احصل على خصم يصل إلى 50%';
+  const offerLink = storeSettings?.hero_offer_link || '/catalog';
+
+  const isHome = location.pathname === '/';
+  const isCatalog = location.pathname === '/catalog' && !location.search.includes('sort=popular');
+  const isPopular = location.pathname === '/catalog' && location.search.includes('sort=popular');
+  const isContact = location.pathname === '/contact';
+
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 1000, background: '#0A0A0A', boxShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
-      {/* Top Announcement Bar (Tablet & Desktop) */}
-      <div className="announcement-bar desktop-only" style={{ background: '#141414', color: '#E8D5A8', padding: '6px 16px', fontSize: 12, textAlign: 'center', borderBottom: '1px solid rgba(200, 164, 92, 0.15)' }}>
-        <Space size="middle" wrap style={{ justifyContent: 'center' }}>
-          <span>✨ شحن مجاني لجميع محافظات مصر للطلبات فوق 1500 ج.م</span>
-          <span className="tablet-hide">•</span>
-          <span className="tablet-hide"><SafetyCertificateOutlined style={{ color: '#C8A45C' }} /> الدفع عند الاستلام مع فحص الأوردر</span>
-          <span>•</span>
-          <span><PhoneOutlined style={{ color: '#C8A45C' }} /> خدمة العملاء: 01000000000</span>
-        </Space>
-      </div>
+    <header
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000,
+        background: '#FFFFFF',
+        borderBottom: '1px solid #E2E8F0',
+        boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)'
+      }}
+    >
+      {/* Unified Single-Line Header */}
+      <div
+        style={{
+          maxWidth: 1360,
+          margin: '0 auto',
+          height: isMobile ? 58 : 68,
+          padding: isMobile ? '0 12px' : '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: isMobile ? 10 : 18
+        }}
+      >
+        {/* Right Section: Logo + Desktop Navigation Links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 18, flexShrink: 0 }}>
+          {/* Logo */}
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+            <img
+              src={yokaLogo}
+              alt="Yoka Store Logo"
+              style={{
+                height: isMobile ? 34 : 44,
+                width: 'auto',
+                objectFit: 'contain',
+                display: 'block'
+              }}
+            />
+          </Link>
 
-      {/* Main Navbar */}
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '8px 14px' : '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        {/* Logo */}
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <img
-            src={yokaLogo}
-            alt="Yoka Store Logo"
-            style={{ height: isMobile ? 38 : 46, objectFit: 'contain' }}
-          />
-        </Link>
+          {/* Desktop Nav Links (One Line) */}
+          {!isMobile && (
+            <nav style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 6 }}>
+              <Link
+                to="/"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 20,
+                  fontSize: 13.5,
+                  fontWeight: isHome ? 800 : 600,
+                  color: isHome ? '#0F172A' : '#475569',
+                  backgroundColor: isHome ? 'rgba(200, 164, 92, 0.16)' : 'transparent',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                الرئيسية
+              </Link>
 
-        {/* Search Bar for Tablet & Desktop (screens.md and up) */}
-        <div style={{ flex: 1, maxWidth: 520, display: isMobile ? 'none' : 'block' }}>
+              <Link
+                to="/catalog"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 20,
+                  fontSize: 13.5,
+                  fontWeight: isCatalog ? 800 : 600,
+                  color: isCatalog ? '#0F172A' : '#475569',
+                  backgroundColor: isCatalog ? 'rgba(200, 164, 92, 0.16)' : 'transparent',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                جميع المنتجات
+              </Link>
+
+              <Link
+                to="/catalog?sort=popular"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 20,
+                  fontSize: 13.5,
+                  fontWeight: isPopular ? 800 : 600,
+                  color: isPopular ? '#0F172A' : '#475569',
+                  backgroundColor: isPopular ? 'rgba(200, 164, 92, 0.16)' : 'transparent',
+                  display: isTablet ? 'none' : 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <FireOutlined style={{ color: '#C8A45C', fontSize: 13 }} />
+                <span>الأكثر مبيعاً</span>
+              </Link>
+
+              <Link
+                to="/contact"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 20,
+                  fontSize: 13.5,
+                  fontWeight: isContact ? 800 : 600,
+                  color: isContact ? '#0F172A' : '#475569',
+                  backgroundColor: isContact ? 'rgba(200, 164, 92, 0.16)' : 'transparent',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                تواصل معنا
+              </Link>
+
+              {/* Dynamic Offer Pill inside header if active */}
+              {isOfferActive && (
+                <Link
+                  to={offerLink}
+                  style={{
+                    display: screens.xl ? 'inline-flex' : 'none',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 12px',
+                    borderRadius: 18,
+                    background: 'rgba(200, 164, 92, 0.12)',
+                    border: '1px solid rgba(200, 164, 92, 0.35)',
+                    color: '#B38E46',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    marginRight: 6
+                  }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <Flame size={13} color="#C8A45C" strokeWidth={2.4} />
+                    <span>{offerText}</span>
+                  </span>
+                </Link>
+              )}
+            </nav>
+          )}
+        </div>
+
+        {/* Center: Search Bar (Integrated smoothly in the single line) */}
+        <div style={{ flex: '1 1 auto', maxWidth: isMobile ? 260 : 440, minWidth: isMobile ? 130 : 200, margin: '0 4px' }}>
           <Input
-            size="large"
-            placeholder="ابحث عن منتج، كود، أو ماركة (مثال: بلوفر، جاكيت، Hermas)..."
-            prefix={<SearchOutlined style={{ color: '#C8A45C', fontSize: 16 }} />}
+            size={isMobile ? 'middle' : 'large'}
+            placeholder={isMobile ? 'ابحث عن منتج...' : 'ابحث عن منتج، كود، أو ماركة...'}
+            prefix={<SearchOutlined style={{ color: '#C8A45C', fontSize: isMobile ? 14 : 16 }} onClick={() => handleSearchSubmit()} />}
             value={searchVal}
             onChange={(e) => setSearchVal(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit(e)}
             allowClear
-            style={{ borderRadius: 24, fontSize: 14, backgroundColor: '#1A1A1A', color: '#FAFAF8', borderColor: '#2D2D2D' }}
+            style={{
+              height: isMobile ? 38 : 42,
+              borderRadius: 22,
+              fontSize: isMobile ? 12.5 : 13.5,
+              backgroundColor: '#F8FAFC',
+              color: '#0F172A',
+              borderColor: '#CBD5E1'
+            }}
           />
         </div>
 
-        {/* Action Buttons */}
-        <Space size={isMobile ? 'small' : 'middle'} style={{ flexShrink: 0 }}>
-          <Link to="/catalog" className="desktop-only">
-            <Button type="text" icon={<ShopOutlined />} style={{ fontWeight: 600, color: '#E8D5A8' }}>
-              الكتالوج
-            </Button>
-          </Link>
-
+        {/* Left Section: Catalog (on tablet) & Cart Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, flexShrink: 0 }}>
           {/* Desktop/Tablet Full Cart Button */}
           <Button
             type="primary"
@@ -87,14 +224,16 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
             onClick={onOpenCart}
             aria-label="سلة التسوق"
             style={{
-              borderRadius: 24,
+              height: 44,
+              borderRadius: 22,
               backgroundColor: '#C8A45C',
-              color: '#0A0A0A',
-              display: 'flex',
+              color: '#0F172A',
+              display: 'inline-flex',
               alignItems: 'center',
-              fontWeight: 700,
-              padding: isTablet ? '0 14px' : '0 20px',
-              border: 'none'
+              fontWeight: 800,
+              padding: isTablet ? '0 16px' : '0 20px',
+              border: 'none',
+              boxShadow: '0 2px 10px rgba(200, 164, 92, 0.28)'
             }}
           >
             <span>السلة</span>
@@ -103,8 +242,8 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
               showZero
               className={cartBounce ? 'cart-badge-bounce' : ''}
               style={{
-                backgroundColor: '#0A0A0A',
-                color: '#C8A45C',
+                backgroundColor: '#0F172A',
+                color: '#FFFFFF',
                 marginRight: 8,
                 boxShadow: 'none',
                 fontWeight: 800
@@ -112,45 +251,33 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
             />
           </Button>
 
-          {/* Mobile Cart Icon button in Navbar */}
+          {/* Mobile Cart Button */}
           <Button
             className="mobile-only btn-touch"
             type="text"
             onClick={onOpenCart}
             aria-label="سلة التسوق"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{
+              width: 40,
+              height: 40,
+              padding: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 20,
+              backgroundColor: '#F8FAFC',
+              border: '1px solid #E2E8F0'
+            }}
           >
-            <Badge count={cartCount} size="small" className={cartBounce ? 'cart-badge-bounce' : ''} style={{ backgroundColor: '#C8A45C', color: '#0A0A0A', fontWeight: 800 }}>
-              <ShoppingCartOutlined style={{ fontSize: 22, color: '#E8D5A8' }} />
+            <Badge
+              count={cartCount}
+              size="small"
+              className={cartBounce ? 'cart-badge-bounce' : ''}
+              style={{ backgroundColor: '#C8A45C', color: '#0F172A', fontWeight: 800 }}
+            >
+              <ShoppingCartOutlined style={{ fontSize: 20, color: '#0F172A' }} />
             </Badge>
           </Button>
-        </Space>
-      </div>
-
-      {/* Mobile-Only Search Input Bar */}
-      <div className="mobile-only" style={{ padding: '0 14px 10px', background: '#0A0A0A' }}>
-        <Input
-          size="middle"
-          placeholder="ابحث عن منتج، كود، أو ماركة..."
-          prefix={<SearchOutlined style={{ color: '#C8A45C', fontSize: 16 }} onClick={() => handleSearchSubmit()} />}
-          value={searchVal}
-          onChange={(e) => setSearchVal(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit(e)}
-          allowClear
-          style={{ borderRadius: 20, fontSize: 13, backgroundColor: '#1A1A1A', color: '#FAFAF8', borderColor: '#2D2D2D' }}
-        />
-      </div>
-
-      {/* Sub Nav / Category Scroll Strip (Responsive on all screens) */}
-      <div style={{ borderTop: '1px solid rgba(200, 164, 92, 0.12)', background: '#0D0D0D', padding: isMobile ? '6px 14px' : '8px 20px' }}>
-        <div className="horizontal-scroll-strip" style={{ maxWidth: 1280, margin: '0 auto', fontSize: 13, fontWeight: 600 }}>
-          <Link to="/" style={{ color: '#C8A45C', padding: '4px 10px', background: 'rgba(200, 164, 92, 0.1)', borderRadius: 16, whiteSpace: 'nowrap' }}>الرئيسية</Link>
-          <Link to="/catalog" style={{ color: '#E8D5A8', padding: '4px 10px', borderRadius: 16, whiteSpace: 'nowrap' }}>جميع المنتجات</Link>
-          <Link to="/catalog?sort=popular" style={{ color: '#E8D5A8', padding: '4px 10px', borderRadius: 16, whiteSpace: 'nowrap' }}>
-            <FireOutlined style={{ color: '#C8A45C', marginLeft: 4 }} /> الأكثر مبيعاً
-          </Link>
-          <Link to="/catalog?min_price=1000" style={{ color: '#E8D5A8', padding: '4px 10px', borderRadius: 16, whiteSpace: 'nowrap' }}>عروض الشتاء</Link>
-          <Link to="/catalog?brand=Hermas" style={{ color: '#E8D5A8', padding: '4px 10px', borderRadius: 16, whiteSpace: 'nowrap' }}>تشكيلة Hermas</Link>
         </div>
       </div>
     </header>

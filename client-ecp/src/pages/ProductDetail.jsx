@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
+import { trackProductView } from '../services/tracker';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -65,6 +66,7 @@ export default function ProductDetail({ onAddToCart }) {
       if (res.data.success) {
         const prod = res.data.data;
         setProduct(prod);
+        trackProductView(prod);
 
         // Pre-select first variant if available
         if (prod.variants && prod.variants.length > 0) {
@@ -177,7 +179,7 @@ export default function ProductDetail({ onAddToCart }) {
       <div style={{ textAlign: 'center', padding: '100px 0' }}>
         <Title level={4}>لم يتم العثور على المنتج المطلوب</Title>
         <Link to="/catalog">
-          <Button type="primary" style={{ backgroundColor: '#C8A45C', color: '#0A0A0A', border: 'none' }}>العودة للكتالوج</Button>
+          <Button type="primary" style={{ backgroundColor: '#C8A45C', color: '#1C1917', border: 'none' }}>العودة للكتالوج</Button>
         </Link>
       </div>
     );
@@ -214,11 +216,11 @@ export default function ProductDetail({ onAddToCart }) {
             style={{
               background: '#FFFFFF',
               borderRadius: 16,
-              border: '1px solid #E8E4DB',
+              border: '1px solid #E2E8F0',
               overflow: 'hidden',
               padding: isMobile ? 16 : 24,
               textAlign: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+              boxShadow: '0 4px 16px rgba(15,23,42,0.04)'
             }}
           >
             <img
@@ -242,34 +244,34 @@ export default function ProductDetail({ onAddToCart }) {
               </Text>
             )}
 
-            <Title level={2} style={{ margin: 0, fontWeight: 800, color: '#0A0A0A', textWrap: 'balance' }}>
+            <Title level={2} style={{ margin: 0, fontWeight: 800, color: '#0F172A', textWrap: 'balance' }}>
               {product.product_name}
             </Title>
 
             <Space size="middle">
               <Text type="secondary" style={{ fontSize: 12 }}>
-                كود المنتج: <strong style={{ color: '#1A1A1A' }}>{product.product_code}</strong>
+                كود المنتج: <strong style={{ color: '#0F172A' }}>{product.product_code}</strong>
               </Text>
               {selectedVariant?.variant_sku && (
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  SKU: <strong style={{ color: '#1A1A1A' }}>{selectedVariant.variant_sku}</strong>
+                  SKU: <strong style={{ color: '#0F172A' }}>{selectedVariant.variant_sku}</strong>
                 </Text>
               )}
             </Space>
 
             {/* Price Box */}
-            <div style={{ background: 'rgba(200,164,92,0.06)', padding: '16px 20px', borderRadius: 12, border: '1px solid #E8E4DB' }}>
+            <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(15,23,42,0.03)' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
                 <span style={{ fontSize: 28, fontWeight: 900, color: '#C8A45C', fontVariantNumeric: 'tabular-nums' }}>
                   {price.toLocaleString()} <span style={{ fontSize: 16, fontWeight: 700 }}>ج.م</span>
                 </span>
                 {hasDiscount && (
-                  <span style={{ fontSize: 16, textDecoration: 'line-through', color: '#A0A0A0', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 16, textDecoration: 'line-through', color: '#94A3B8', fontVariantNumeric: 'tabular-nums' }}>
                     {originalPrice.toLocaleString()} ج.م
                   </span>
                 )}
               </div>
-              <Text type="secondary" style={{ fontSize: 12 }}>السعر شامل ضريبة القيمة المضافة</Text>
+              <Text type="secondary" style={{ fontSize: 12, color: '#64748B' }}>السعر شامل ضريبة القيمة المضافة</Text>
             </div>
 
             {/* Stock Availability */}
@@ -318,9 +320,9 @@ export default function ProductDetail({ onAddToCart }) {
                           style={{
                             borderRadius: 8,
                             fontWeight: 600,
-                            backgroundColor: selectedColor === c ? '#C8A45C' : '#FFFFFF',
-                            color: selectedColor === c ? '#0A0A0A' : '#1A1A1A',
-                            border: selectedColor === c ? 'none' : '1px solid #E8E4DB'
+                            backgroundColor: selectedColor === c ? '#0F172A' : '#FFFFFF',
+                            color: selectedColor === c ? '#FFFFFF' : '#0F172A',
+                            border: selectedColor === c ? 'none' : '1px solid #E2E8F0'
                           }}
                         >
                           {c}
@@ -333,7 +335,7 @@ export default function ProductDetail({ onAddToCart }) {
                 {/* Sizes Selector */}
                 {product.sizes && product.sizes.length > 0 && (
                   <div>
-                    <Text strong style={{ display: 'block', marginBottom: 8 }}>المقاس:</Text>
+                    <Text strong style={{ display: 'block', marginBottom: 8, color: '#0F172A' }}>المقاس:</Text>
                     <Space wrap>
                       {product.sizes.map((s) => (
                         <Button
@@ -345,9 +347,9 @@ export default function ProductDetail({ onAddToCart }) {
                             fontWeight: 700,
                             minWidth: 44,
                             minHeight: 44,
-                            backgroundColor: selectedSize === s ? '#C8A45C' : '#FFFFFF',
-                            color: selectedSize === s ? '#0A0A0A' : '#1A1A1A',
-                            border: selectedSize === s ? 'none' : '1px solid #E8E4DB'
+                            backgroundColor: selectedSize === s ? '#0F172A' : '#FFFFFF',
+                            color: selectedSize === s ? '#FFFFFF' : '#0F172A',
+                            border: selectedSize === s ? 'none' : '1px solid #E2E8F0'
                           }}
                         >
                           {s}
@@ -359,7 +361,7 @@ export default function ProductDetail({ onAddToCart }) {
 
                 {/* Quantity Stepper & Add to Cart */}
                 <div ref={ctaContainerRef} style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#FAFAF8', border: '1px solid #E8E4DB', borderRadius: 8, padding: '4px 8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '4px 8px' }}>
                     <Button
                       type="text"
                       icon={<MinusOutlined />}
@@ -368,7 +370,7 @@ export default function ProductDetail({ onAddToCart }) {
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       style={{ minWidth: 44, minHeight: 44 }}
                     />
-                    <span style={{ fontSize: 16, fontWeight: 700, padding: '0 8px', fontVariantNumeric: 'tabular-nums', width: 32, textAlign: 'center' }}>{quantity}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, padding: '0 8px', fontVariantNumeric: 'tabular-nums', width: 32, textAlign: 'center', color: '#0F172A' }}>{quantity}</span>
                     <Button
                       type="text"
                       icon={<PlusOutlined />}
@@ -388,12 +390,13 @@ export default function ProductDetail({ onAddToCart }) {
                     style={{
                       flex: 1,
                       height: 52,
-                      backgroundColor: availableStock > 0 ? '#C8A45C' : '#E8E8E8',
-                      color: availableStock > 0 ? '#0A0A0A' : '#A0A0A0',
+                      backgroundColor: availableStock > 0 ? '#C8A45C' : '#F1F5F9',
+                      color: availableStock > 0 ? '#0F172A' : '#94A3B8',
                       borderRadius: 8,
                       fontSize: 16,
                       fontWeight: 800,
-                      border: 'none'
+                      border: 'none',
+                      boxShadow: availableStock > 0 ? '0 4px 14px rgba(200,164,92,0.35)' : 'none'
                     }}
                   >
                     أضف إلى سلة التسوق ({quantity} قطعة)
@@ -402,7 +405,7 @@ export default function ProductDetail({ onAddToCart }) {
               </>
             ) : (
               /* MODE 2: MULTI-SIZE SELECTION (Pick size for each piece) */
-              <div style={{ background: '#FAFAF8', border: '1px solid #E8E4DB', borderRadius: 12, padding: 16 }}>
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16 }}>
                 <Text strong style={{ display: 'block', marginBottom: 12, fontSize: 14 }}>
                   حدد عدد القطع المطلوبة من كل مقاس ولون:
                 </Text>
@@ -423,11 +426,11 @@ export default function ProductDetail({ onAddToCart }) {
                           padding: '10px 14px',
                           background: '#FFFFFF',
                           borderRadius: 8,
-                          border: chosenQty > 0 ? '1px solid #C8A45C' : '1px solid #E8E4DB'
+                          border: chosenQty > 0 ? '1px solid #C8A45C' : '1px solid #E2E8F0'
                         }}
                       >
                         <div>
-                          <Text strong style={{ fontSize: 14, color: '#1A1A1A' }}>
+                          <Text strong style={{ fontSize: 14, color: '#0F172A' }}>
                             المقاس: {v.size || 'قياسي'} {v.color ? `— ${v.color}` : ''}
                           </Text>
                           <div style={{ fontSize: 12 }}>
@@ -440,7 +443,7 @@ export default function ProductDetail({ onAddToCart }) {
                         </div>
 
                         {/* Stepper for this specific size */}
-                        <div style={{ display: 'flex', alignItems: 'center', background: '#FAFAF8', border: '1px solid #E8E4DB', borderRadius: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6 }}>
                           <Button
                             type="text"
                             size="small"
@@ -449,7 +452,7 @@ export default function ProductDetail({ onAddToCart }) {
                             onClick={() => updateMultiQty(v.id, -1, varStock)}
                             style={{ minWidth: 32, minHeight: 32 }}
                           />
-                          <span style={{ fontSize: 14, fontWeight: 700, padding: '0 8px', minWidth: 24, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, padding: '0 8px', minWidth: 24, textAlign: 'center', fontVariantNumeric: 'tabular-nums', color: '#0F172A' }}>
                             {chosenQty}
                           </span>
                           <Button
@@ -476,12 +479,13 @@ export default function ProductDetail({ onAddToCart }) {
                   onClick={handleMultiAdd}
                   style={{
                     height: 50,
-                    backgroundColor: totalMultiPieces > 0 ? '#C8A45C' : '#E8E8E8',
-                    color: totalMultiPieces > 0 ? '#0A0A0A' : '#A0A0A0',
+                    backgroundColor: totalMultiPieces > 0 ? '#C8A45C' : '#F1F5F9',
+                    color: totalMultiPieces > 0 ? '#0F172A' : '#94A3B8',
                     borderRadius: 8,
                     fontSize: 16,
                     fontWeight: 800,
-                    border: 'none'
+                    border: 'none',
+                    boxShadow: totalMultiPieces > 0 ? '0 4px 14px rgba(200,164,92,0.35)' : 'none'
                   }}
                 >
                   {totalMultiPieces > 0
@@ -492,8 +496,8 @@ export default function ProductDetail({ onAddToCart }) {
             )}
 
             {/* Delivery Guarantees */}
-            <div style={{ marginTop: 16, borderTop: '1px solid #E8E4DB', paddingTop: 16 }}>
-              <Space direction="vertical" size="small" style={{ width: '100%', fontSize: 13, color: '#4A4A4A' }}>
+            <div style={{ marginTop: 16, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
+              <Space direction="vertical" size="small" style={{ width: '100%', fontSize: 13, color: '#64748B' }}>
                 <div><CarOutlined style={{ color: '#C8A45C', marginLeft: 6 }} /> شحن سريع يصلك خلال 2-4 أيام عمل</div>
                 <div><SafetyCertificateOutlined style={{ color: '#C8A45C', marginLeft: 6 }} /> الدفع عند الاستلام مع إمكانية فتح الشحنة والفحص</div>
                 <div><SyncOutlined style={{ color: '#C8A45C', marginLeft: 6 }} /> استبدال واسترجاع مجاني خلال 14 يوماً</div>
@@ -511,7 +515,7 @@ export default function ProductDetail({ onAddToCart }) {
               {price.toLocaleString()} <span style={{ fontSize: 12 }}>ج.م</span>
             </span>
             {selectedVariant?.size && (
-              <span style={{ fontSize: 11, color: '#E8D5A8' }}>
+              <span style={{ fontSize: 11, color: '#0F172A', fontWeight: 700 }}>
                 المقاس: {selectedVariant.size}
               </span>
             )}
@@ -526,12 +530,13 @@ export default function ProductDetail({ onAddToCart }) {
               flex: 1,
               maxWidth: 220,
               height: 44,
-              backgroundColor: availableStock > 0 ? '#C8A45C' : '#E8E8E8',
-              color: availableStock > 0 ? '#0A0A0A' : '#A0A0A0',
+              backgroundColor: availableStock > 0 ? '#C8A45C' : '#F1F5F9',
+              color: availableStock > 0 ? '#0F172A' : '#94A3B8',
               borderRadius: 8,
               fontWeight: 800,
               border: 'none',
-              fontSize: 14
+              fontSize: 14,
+              boxShadow: availableStock > 0 ? '0 2px 10px rgba(200, 164, 92, 0.3)' : 'none'
             }}
           >
             {availableStock > 0 ? 'أضف للسلة الآن' : 'غير متوفر'}

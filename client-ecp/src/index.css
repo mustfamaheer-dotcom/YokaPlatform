@@ -1,37 +1,37 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
 
 :root {
-  /* Brand Gold Palette — matched to YK logo */
+  /* Brand Gold Palette — 10% Core Accent */
   --gold: #C8A45C;
-  --gold-light: #D4B76A;
-  --gold-dark: #A68942;
-  --gold-muted: #E8D5A8;
-  --gold-bg: rgba(200, 164, 92, 0.08);
+  --gold-light: #DFCA95;
+  --gold-dark: #B38E46;
+  --gold-muted: #F1E5C8;
+  --gold-bg: rgba(200, 164, 92, 0.10);
 
-  /* Neutrals */
-  --black: #0A0A0A;
-  --black-soft: #1A1A1A;
-  --gray-900: #2D2D2D;
-  --gray-700: #4A4A4A;
-  --gray-500: #6B6B6B;
-  --gray-300: #A0A0A0;
-  --gray-100: #E8E8E8;
-  --gray-50: #F5F5F3;
+  /* Deep Imperial Navy & Slates — 30% Structural */
+  --navy: #0F172A;
+  --navy-soft: #1E293B;
+  --slate-700: #334155;
+  --slate-500: #64748B;
+  --slate-400: #94A3B8;
+  --slate-200: #E2E8F0;
+  --slate-100: #F1F5F9;
+  --slate-50: #F8FAFC;
 
-  /* Surfaces */
-  --bg-color: #FAFAF8;
+  /* Surfaces — 60% Canvas & Cards */
+  --bg-color: #F8FAFC;
   --card-bg: #FFFFFF;
-  --border-color: #E8E4DB;
-  --border-light: #F0EDE6;
+  --border-color: #E2E8F0;
+  --border-light: #F1F5F9;
 
   /* Semantic Aliases */
   --primary-color: var(--gold);
   --primary-hover: var(--gold-dark);
-  --text-main: var(--black-soft);
-  --text-muted: var(--gray-500);
-  --success: #2D7A3A;
-  --danger: #C62828;
-  --info: #1565C0;
+  --text-main: var(--navy);
+  --text-muted: var(--slate-500);
+  --success: #16A34A;
+  --danger: #DC2626;
+  --info: #0284C7;
 }
 
 * {
@@ -72,37 +72,132 @@ a {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--gray-50);
+  background: var(--slate-50);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
+  background: var(--slate-200);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-500);
+  background: var(--slate-400);
 }
 
-/* Product Card Hover Effect */
+/* Modern Luxury Product Card */
 .product-card {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   border: 1px solid var(--border-color);
   background: var(--card-bg);
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  position: relative;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .product-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px -8px rgba(200, 164, 92, 0.15);
-    border-color: var(--gold-muted);
+    transform: translateY(-5px);
+    box-shadow: 0 16px 32px -8px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(200, 164, 92, 0.4);
+    border-color: rgba(200, 164, 92, 0.6);
+  }
+
+  .product-card:hover .product-card-img {
+    transform: scale(1.06);
+  }
+
+  .product-card:hover .product-card-title {
+    color: var(--gold) !important;
+  }
+
+  .product-card:hover .product-card-btn {
+    background-color: var(--gold) !important;
+    color: var(--navy) !important;
+    border-color: var(--gold) !important;
+    box-shadow: 0 6px 18px rgba(200, 164, 92, 0.35) !important;
   }
 }
 
+/* Category Cards & Responsive Strip */
+.category-card {
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  border: 1px solid var(--border-color);
+  background: #FFFFFF;
+  border-radius: 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.category-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--gold);
+  box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(200, 164, 92, 0.3);
+}
+
+.category-card:hover .category-icon-wrapper {
+  background: var(--gold);
+  color: var(--navy);
+  transform: scale(1.08);
+}
+
+.category-icon-wrapper {
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Trust & Shopping Highlights Card */
+.trust-feature-card {
+  transition: all 0.25s ease;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 100%;
+}
+
+.trust-feature-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  transform: translateY(-2px);
+}
+
+/* Category Pills Filter */
+.category-filter-pill {
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #334155;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.category-filter-pill:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.category-filter-pill.active {
+  background: var(--navy);
+  color: #FFFFFF;
+  border-color: var(--navy);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
 .hero-gradient {
-  background: linear-gradient(145deg, #0A0A0A 0%, #1A1A1A 60%, #2D2D2D 100%);
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #0F172A 100%);
+  border: 1px solid rgba(200, 164, 92, 0.3);
+  box-shadow: 0 12px 36px -8px rgba(15, 23, 42, 0.25);
 }
 
 .badge-tag {
@@ -139,6 +234,119 @@ a {
   font-size: clamp(13px, 2vw, 16px) !important;
 }
 
+/* Modern 3D Floating Bag in Hero */
+.hero-3d-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+/* Luxury Backlight Halo behind 3D Product */
+.hero-3d-backlight {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(200, 164, 92, 0.28) 0%, rgba(200, 164, 92, 0.08) 45%, rgba(15, 23, 42, 0) 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(20px);
+  z-index: 1;
+}
+
+/* Ground Pedestal Shadow Pulsing in Sync with Floating Height */
+.hero-pedestal-shadow {
+  position: absolute;
+  bottom: 8px;
+  width: 78%;
+  height: 28px;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, rgba(200, 164, 92, 0.25) 40%, rgba(15, 23, 42, 0) 75%);
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(6px);
+  z-index: 1;
+  animation: hero-shadow-pulse 6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  transform-origin: center center;
+}
+
+.hero-3d-bag {
+  position: relative;
+  z-index: 2;
+  max-width: 100%;
+  height: auto;
+  image-rendering: -webkit-optimize-contrast;
+  transform-origin: center bottom;
+  filter: drop-shadow(0 20px 32px rgba(0, 0, 0, 0.58)) drop-shadow(0 6px 16px rgba(200, 164, 92, 0.3));
+  animation: hero-bag-float 6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  user-select: none;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Multi-Axis Organic Levitation */
+@keyframes hero-bag-float {
+  0% {
+    transform: translateY(0px) rotateY(-11deg) rotateX(5deg) rotateZ(0deg) scale(1.03);
+  }
+  25% {
+    transform: translateY(-8px) rotateY(-7deg) rotateX(3deg) rotateZ(1.2deg) scale(1.045);
+  }
+  50% {
+    transform: translateY(-16px) rotateY(-3deg) rotateX(1deg) rotateZ(0deg) scale(1.06);
+  }
+  75% {
+    transform: translateY(-7px) rotateY(-8deg) rotateX(4deg) rotateZ(-1.2deg) scale(1.045);
+  }
+  100% {
+    transform: translateY(0px) rotateY(-11deg) rotateX(5deg) rotateZ(0deg) scale(1.03);
+  }
+}
+
+/* Ground shadow contracts & softens when product is at peak elevation */
+@keyframes hero-shadow-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.95;
+    filter: blur(6px);
+  }
+  50% {
+    transform: scale(0.82);
+    opacity: 0.55;
+    filter: blur(11px);
+  }
+}
+
+/* Hero Offer Badge Pulse */
+.hero-offer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(200, 164, 92, 0.22) 0%, rgba(200, 164, 92, 0.1) 100%);
+  border: 1px solid rgba(200, 164, 92, 0.5);
+  box-shadow: 0 0 16px rgba(200, 164, 92, 0.2);
+  padding: 6px 14px;
+  border-radius: 24px;
+  font-size: 13px;
+  color: #F8FAFC;
+  font-weight: 800;
+  backdrop-filter: blur(8px);
+  text-decoration: none;
+  transition: all 0.25s ease;
+}
+
+.hero-offer-badge:hover {
+  background: linear-gradient(135deg, rgba(200, 164, 92, 0.35) 0%, rgba(200, 164, 92, 0.18) 100%);
+  border-color: #C8A45C;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(200, 164, 92, 0.35);
+  color: #FFFFFF;
+}
+
 /* Touch Target Minimum & Accessibility */
 .btn-touch {
   min-width: 44px !important;
@@ -151,17 +359,17 @@ a {
   bottom: 64px; /* sits right above mobile bottom nav */
   left: 0;
   right: 0;
-  background: rgba(10, 10, 10, 0.95);
-  border-top: 1px solid rgba(200, 164, 92, 0.3);
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid #E2E8F0;
   padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   z-index: 1000;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08);
   animation: fadeIn 0.25s ease-out;
 }
 
@@ -204,8 +412,11 @@ a {
   left: 0;
   right: 0;
   height: 64px;
-  background: var(--black);
-  border-top: 1px solid rgba(200, 164, 92, 0.2);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid #E2E8F0;
+  box-shadow: 0 -2px 14px rgba(15, 23, 42, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -219,7 +430,7 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--gray-500);
+  color: var(--slate-500);
   font-size: 11px;
   gap: 4px;
   flex: 1;
@@ -233,8 +444,8 @@ a {
 
 .mobile-bottom-nav a.active,
 .mobile-bottom-nav button.bottom-nav-btn:active {
-  color: var(--gold);
-  font-weight: 700;
+  color: var(--navy);
+  font-weight: 800;
 }
 
 .mobile-bottom-nav a svg,
@@ -361,5 +572,76 @@ a {
   display: none;
 }
 
+/* ========================================================= */
+/* HIGHLIGHT PULSE EFFECT FOR PRINT INVOICE                  */
+/* ========================================================= */
+@keyframes print-pulse-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(200, 164, 92, 0.75), 0 4px 14px rgba(15, 23, 42, 0.2);
+    border-color: #C8A45C;
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(200, 164, 92, 0), 0 8px 24px rgba(200, 164, 92, 0.55);
+    border-color: #E6C875;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(200, 164, 92, 0), 0 4px 14px rgba(15, 23, 42, 0.2);
+    border-color: #C8A45C;
+  }
+}
 
+.print-invoice-highlight-btn {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
+  color: #FFFFFF !important;
+  border: 2px solid #C8A45C !important;
+  border-radius: 10px !important;
+  height: 44px !important;
+  padding: 0 22px !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  animation: print-pulse-glow 2.2s infinite ease-in-out !important;
+  position: relative !important;
+  transition: all 0.3s ease !important;
+}
 
+.print-invoice-highlight-btn:hover {
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%) !important;
+  border-color: #DFCA95 !important;
+  color: #F8FAFC !important;
+  transform: translateY(-2px) scale(1.02) !important;
+}
+
+.print-invoice-highlight-btn .anticon {
+  color: #C8A45C !important;
+  font-size: 17px !important;
+}
+
+.invoice-action-notice {
+  margin: 20px 0 24px;
+  background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+  border: 1.5px solid #F59E0B;
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.12);
+}
+
+@media (max-width: 640px) {
+  .invoice-action-notice {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  .invoice-action-notice .print-invoice-highlight-btn {
+    width: 100% !important;
+  }
+}

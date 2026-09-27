@@ -17,7 +17,8 @@ import {
   Divider,
   Modal,
   DatePicker,
-  Tabs
+  Tabs,
+  Segmented
 } from 'antd';
 import {
   InboxOutlined,
@@ -43,10 +44,12 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../api';
+import VisitorAnalytics from '../components/VisitorAnalytics';
 
 const { Title, Text } = Typography;
 
 export default function EcomAnalytics({ currentUser, onNavigate }) {
+  const [activeSection, setActiveSection] = useState('overview'); // 'overview' | 'visitors'
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState([dayjs().subtract(29, 'day'), dayjs()]);
   const [isAllTime, setIsAllTime] = useState(false);
@@ -525,61 +528,97 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
         </div>
 
         <Space size="middle" wrap>
-          <Tag color="purple" style={{ fontSize: 13, padding: '4px 12px', fontWeight: 600 }}>
-            🛒 مستودع المتجر الإلكتروني (ECP)
-          </Tag>
-
-          <Divider type="vertical" style={{ height: 24 }} />
-
-          <Space size={6}>
-            <CalendarOutlined style={{ color: '#2563eb' }} />
-            <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>المدى الزمني:</span>
-          </Space>
-
-          <DatePicker.RangePicker
-            value={isAllTime ? null : dateRange}
-            onChange={(dates) => {
-              if (!dates || !dates[0] || !dates[1]) {
-                setIsAllTime(true);
-                setDateRange(null);
-              } else {
-                setIsAllTime(false);
-                setDateRange(dates);
+          {/* Section Switcher */}
+          <Segmented
+            size="middle"
+            value={activeSection}
+            onChange={setActiveSection}
+            options={[
+              {
+                value: 'overview',
+                label: (
+                  <Space size={6}>
+                    <InboxOutlined style={{ color: '#8b5cf6' }} />
+                    <span style={{ fontWeight: 700 }}>مبيعات وطلبات المتجر (Sales & Orders)</span>
+                  </Space>
+                )
+              },
+              {
+                value: 'visitors',
+                label: (
+                  <Space size={6}>
+                    <UserOutlined style={{ color: '#0284c7' }} />
+                    <span style={{ fontWeight: 700 }}>تحليلات وسلوك الزوار والمدن (Visitors & Cities)</span>
+                  </Space>
+                )
               }
-            }}
-            format="YYYY-MM-DD"
-            placeholder={['من تاريخ', 'إلى تاريخ']}
-            presets={rangePresets}
-            allowClear
-            style={{ borderRadius: 8, minWidth: 240 }}
+            ]}
+            style={{ background: '#f1f5f9', padding: 3, borderRadius: 8 }}
           />
 
-          <Button
-            type={isAllTime ? 'primary' : 'default'}
-            onClick={() => {
-              setIsAllTime(true);
-              setDateRange(null);
-            }}
-            style={{ borderRadius: 8 }}
-          >
-            كل الأوقات
-          </Button>
+          {activeSection === 'overview' && (
+            <>
+              <Tag color="purple" style={{ fontSize: 13, padding: '4px 12px', fontWeight: 600 }}>
+                🛒 مستودع المتجر الإلكتروني (ECP)
+              </Tag>
 
-          <Button icon={<ReloadOutlined />} onClick={fetchAnalytics} loading={loading} style={{ borderRadius: 8 }}>
-            تحديث
-          </Button>
+              <Divider type="vertical" style={{ height: 24 }} />
+
+              <Space size={6}>
+                <CalendarOutlined style={{ color: '#2563eb' }} />
+                <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>المدى الزمني:</span>
+              </Space>
+
+              <DatePicker.RangePicker
+                value={isAllTime ? null : dateRange}
+                onChange={(dates) => {
+                  if (!dates || !dates[0] || !dates[1]) {
+                    setIsAllTime(true);
+                    setDateRange(null);
+                  } else {
+                    setIsAllTime(false);
+                    setDateRange(dates);
+                  }
+                }}
+                format="YYYY-MM-DD"
+                placeholder={['من تاريخ', 'إلى تاريخ']}
+                presets={rangePresets}
+                allowClear
+                style={{ borderRadius: 8, minWidth: 240 }}
+              />
+
+              <Button
+                type={isAllTime ? 'primary' : 'default'}
+                onClick={() => {
+                  setIsAllTime(true);
+                  setDateRange(null);
+                }}
+                style={{ borderRadius: 8 }}
+              >
+                كل الأوقات
+              </Button>
+
+              <Button icon={<ReloadOutlined />} onClick={fetchAnalytics} loading={loading} style={{ borderRadius: 8 }}>
+                تحديث
+              </Button>
+            </>
+          )}
         </Space>
       </div>
 
-      {/* Active Scope Summary Banner */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 12,
-          background: '#fdf4ff',
+      {activeSection === 'visitors' ? (
+        <VisitorAnalytics />
+      ) : (
+        <>
+          {/* Active Scope Summary Banner */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12,
+              background: '#fdf4ff',
           padding: '10px 16px',
           borderRadius: 10,
           border: '1px solid #f5d0fe'
@@ -1079,6 +1118,8 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
           ]}
         />
       </Modal>
+        </>
+      )}
     </div>
   );
 }

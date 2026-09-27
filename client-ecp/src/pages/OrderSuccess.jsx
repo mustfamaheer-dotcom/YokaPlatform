@@ -4,6 +4,7 @@ import { Result, Button, Card, Descriptions, Table, Typography, Space, Spin } fr
 import { CheckCircleFilled, ShoppingOutlined, PrinterOutlined, HomeOutlined, MessageOutlined } from '@ant-design/icons';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
+import { trackPurchase } from '../services/tracker';
 
 const { Title, Text } = Typography;
 
@@ -11,9 +12,17 @@ export default function OrderSuccess() {
   const { orderNumber } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [storeSettings, setStoreSettings] = useState(null);
 
   useEffect(() => {
     fetchOrderDetails();
+    api.get('/api/ecp/catalog/store-settings')
+      .then(res => {
+        if (res.data?.success && res.data?.data) {
+          setStoreSettings(res.data.data);
+        }
+      })
+      .catch(() => {});
   }, [orderNumber]);
 
   const fetchOrderDetails = async () => {
@@ -22,6 +31,7 @@ export default function OrderSuccess() {
       const res = await api.get(`/api/ecp/checkout/order/${orderNumber}`);
       if (res.data.success) {
         setOrder(res.data.data);
+        trackPurchase(orderNumber, res.data.data?.total_amount);
       }
     } catch (err) {
       console.error(err);
@@ -75,44 +85,94 @@ export default function OrderSuccess() {
   ];
 
   const waText = encodeURIComponent(`مرحباً يوكا ستور، أود الاستفسار عن طلبي رقم #${orderNumber}`);
+  const rawWhatsapp = storeSettings?.contact_whatsapp || '01000000000';
+  let cleanWhatsapp = rawWhatsapp.replace(/[^0-9]/g, '');
+  if (cleanWhatsapp.startsWith('01') && cleanWhatsapp.length === 11) {
+    cleanWhatsapp = '2' + cleanWhatsapp;
+  }
+  const contactPhone = storeSettings?.contact_phone || '01000000000';
 
   return (
     <div className="fade-in" style={{ maxWidth: 840, margin: '0 auto', paddingBottom: 60 }}>
       <Result
         status="success"
         icon={<CheckCircleFilled style={{ color: '#2D7A3A' }} />}
-        title={<span style={{ fontWeight: 800, fontSize: 'clamp(22px, 4vw, 28px)', color: '#1A1A1A' }}>تم استلام طلبك بنجاح!</span>}
+        title={<span style={{ fontWeight: 800, fontSize: 'clamp(22px, 4vw, 28px)', color: '#0F172A' }}>تم استلام طلبك بنجاح!</span>}
         subTitle={
-          <span style={{ fontSize: 15, color: '#4A4A4A' }}>
+          <span style={{ fontSize: 15, color: '#475569' }}>
             رقم الطلب الخاص بك: <strong style={{ color: '#C8A45C', fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>#{orderNumber}</strong> — سنتواصل معك هاتفياً لتأكيد الشحن والتسليم.
           </span>
         }
         extra={
           <Space wrap size="middle" style={{ justifyContent: 'center' }}>
+            <Button
+              key="print"
+              icon={<PrinterOutlined />}
+              onClick={() => window.print()}
+              className="print-invoice-highlight-btn"
+            >
+              طباعة الفاتورة
+            </Button>
             <Link to="/" key="home">
-              <Button type="primary" size="large" icon={<HomeOutlined />} style={{ backgroundColor: '#C8A45C', color: '#0A0A0A', borderRadius: 8, fontWeight: 700, border: 'none', height: 44 }}>
+              <Button type="primary" size="large" icon={<HomeOutlined />} style={{ backgroundColor: '#0F172A', color: '#FFFFFF', borderRadius: 8, fontWeight: 700, border: 'none', height: 44 }}>
                 العودة للرئيسية
               </Button>
             </Link>
             <Link to="/catalog" key="catalog">
-              <Button size="large" icon={<ShoppingOutlined />} style={{ borderRadius: 8, fontWeight: 600, height: 44 }}>
+              <Button size="large" icon={<ShoppingOutlined />} style={{ borderRadius: 8, fontWeight: 600, height: 44, borderColor: '#CBD5E1', color: '#0F172A' }}>
                 متابعة التسوق
               </Button>
             </Link>
-            <a href={`https://wa.me/201000000000?text=${waText}`} target="_blank" rel="noopener noreferrer" key="whatsapp">
+            <a href={`https://wa.me/${cleanWhatsapp || '201000000000'}?text=${waText}`} target="_blank" rel="noopener noreferrer" key="whatsapp">
               <Button size="large" icon={<MessageOutlined />} style={{ backgroundColor: '#25D366', color: '#FFFFFF', borderRadius: 8, fontWeight: 700, border: 'none', height: 44 }}>
                 واتساب
               </Button>
             </a>
-            <Button key="print" type="text" icon={<PrinterOutlined />} onClick={() => window.print()} style={{ borderRadius: 8, height: 44 }}>
-              طباعة الفاتورة
-            </Button>
           </Space>
         }
       />
 
+      {/* Customer Notice to Print/Save Invoice */}
+      <div className="invoice-action-notice no-print">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 260 }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: '#D97706',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 22,
+              flexShrink: 0,
+              boxShadow: '0 2px 8px rgba(217, 119, 6, 0.28)'
+            }}
+          >
+            <PrinterOutlined />
+          </div>
+          <div>
+            <div style={{ fontSize: 15.5, fontWeight: 800, color: '#92400E', marginBottom: 2 }}>
+              تنبيه هام: يرجى طباعة الفاتورة أو حفظها كمرجع لطلبك
+            </div>
+            <div style={{ fontSize: 13, color: '#78350F', lineHeight: 1.5 }}>
+              يرجى الاحتفاظ بنسخة مطبوعة أو PDF من الفاتورة لمطابقة الأصناف مع مندوب التوصيل وتسهيل خدمات الضمان والاستبدال.
+            </div>
+          </div>
+        </div>
+        <Button
+          type="primary"
+          icon={<PrinterOutlined />}
+          onClick={() => window.print()}
+          className="print-invoice-highlight-btn"
+        >
+          طباعة الفاتورة الآن
+        </Button>
+      </div>
+
       {order && (
-        <Card className="customer-invoice-print" style={{ borderRadius: 12, marginTop: 24, border: '1px solid #E8E4DB' }}>
+        <Card className="customer-invoice-print" style={{ borderRadius: 12, marginTop: 16, border: '1px solid #E2E8F0', background: '#FFFFFF' }}>
           {/* Print-Only Branded Header */}
           <div className="print-only" style={{ borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -121,7 +181,7 @@ export default function OrderSuccess() {
                 <div>
                   <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
                   <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>أرقى ملابس المحجبات والأزياء الراقية • متجر أونلاين</div>
-                  <div style={{ fontSize: 10.5, color: '#64748b' }}>خدمة العملاء: 01000000000 • الموقع: yokastore.com</div>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>خدمة العملاء: {contactPhone} • الموقع: yokastore.com</div>
                 </div>
               </div>
               <div style={{ textAlign: 'left' }}>
@@ -138,7 +198,25 @@ export default function OrderSuccess() {
             </div>
           </div>
 
-          <Descriptions title={<span style={{ fontWeight: 700 }}>بيانات الشحن والفاتورة</span>} bordered size="small" column={{ xs: 1, sm: 2 }}>
+          <Descriptions 
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <span style={{ fontWeight: 700, color: '#0F172A' }}>بيانات الشحن والفاتورة</span>
+                <Button
+                  className="no-print"
+                  size="small"
+                  icon={<PrinterOutlined />}
+                  onClick={() => window.print()}
+                  style={{ borderColor: '#C8A45C', color: '#0F172A', fontWeight: 700, borderRadius: 6 }}
+                >
+                  طباعة
+                </Button>
+              </div>
+            }
+            bordered 
+            size="small" 
+            column={{ xs: 1, sm: 2 }}
+          >
             <Descriptions.Item label="اسم العميل">
               {order.shipping_address?.recipient_name || 'عميل المتجر'}
             </Descriptions.Item>
@@ -161,7 +239,7 @@ export default function OrderSuccess() {
           </Descriptions>
 
           <div style={{ marginTop: 24 }}>
-            <Title level={5}>المنتجات المطلوبة:</Title>
+            <Title level={5} style={{ color: '#0F172A' }}>المنتجات المطلوبة:</Title>
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <Table
                 dataSource={order.items || []}
@@ -174,18 +252,18 @@ export default function OrderSuccess() {
             </div>
           </div>
 
-          <div style={{ marginTop: 20, textAlign: 'start', padding: 16, background: '#FAFAF8', borderRadius: 8, border: '1px solid #E8E4DB' }}>
+          <div style={{ marginTop: 20, textAlign: 'start', padding: 16, background: '#F8FAFC', borderRadius: 8, border: '1px solid #E2E8F0' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                 <Text type="secondary">إجمالي المنتجات:</Text>
-                <Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>{parseFloat(order.subtotal).toLocaleString()} ج.م</Text>
+                <Text strong style={{ fontVariantNumeric: 'tabular-nums', color: '#0F172A' }}>{parseFloat(order.subtotal).toLocaleString()} ج.م</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                 <Text type="secondary">تكلفة الشحن:</Text>
-                <Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>{parseFloat(order.shipping_cost) === 0 ? 'مجاناً' : `${parseFloat(order.shipping_cost).toLocaleString()} ج.م`}</Text>
+                <Text strong style={{ fontVariantNumeric: 'tabular-nums', color: '#0F172A' }}>{parseFloat(order.shipping_cost) === 0 ? 'مجاناً' : `${parseFloat(order.shipping_cost).toLocaleString()} ج.م`}</Text>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, borderTop: '1px solid #E8E4DB', paddingTop: 12, marginTop: 4 }}>
-                <Text strong>الإجمالي الكلي:</Text>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, borderTop: '1px solid #E2E8F0', paddingTop: 12, marginTop: 4 }}>
+                <Text strong style={{ color: '#0F172A' }}>الإجمالي الكلي:</Text>
                 <Text strong style={{ color: '#C8A45C', fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>{parseFloat(order.total_amount).toLocaleString()} ج.م</Text>
               </div>
             </Space>

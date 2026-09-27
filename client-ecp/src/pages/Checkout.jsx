@@ -36,7 +36,9 @@ import {
   CreditCardOutlined,
   EyeOutlined
 } from '@ant-design/icons';
+import { Sparkles, Truck } from 'lucide-react';
 import api from '../api';
+import { trackBeginCheckout } from '../services/tracker';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -65,6 +67,7 @@ export default function Checkout({ cart, onRefreshCart }) {
   useEffect(() => {
     fetchShippingRates();
     fetchPaymentMethods();
+    trackBeginCheckout(cart);
   }, []);
 
   const fetchPaymentMethods = async () => {
@@ -256,7 +259,7 @@ export default function Checkout({ cart, onRefreshCart }) {
         <Title level={3}>سلة التسوق فارغة</Title>
         <p style={{ color: '#6B6B6B', marginBottom: 20 }}>يرجى اختيار بعض المنتجات لمتابعة الدفع</p>
         <Link to="/catalog">
-          <Button type="primary" size="large" style={{ backgroundColor: '#C8A45C', color: '#0A0A0A', borderRadius: 8, border: 'none', fontWeight: 700 }}>
+          <Button type="primary" size="large" style={{ backgroundColor: '#C8A45C', color: '#1C1917', borderRadius: 8, border: 'none', fontWeight: 700 }}>
             تصفح الكتالوج الآن
           </Button>
         </Link>
@@ -281,16 +284,16 @@ export default function Checkout({ cart, onRefreshCart }) {
         }
         type="warning"
         showIcon={false}
-        style={{ marginBottom: 24, borderRadius: 8, backgroundColor: '#0A0A0A', border: '1px solid #A68942', color: '#E8D5A8' }}
+        style={{ marginBottom: 24, borderRadius: 8, backgroundColor: '#0F172A', border: '1px solid rgba(200, 164, 92, 0.35)', color: '#E2C889' }}
       />
 
       <div style={{ display: 'flex', flexDirection: screens.xs ? 'column' : 'row', justifyContent: 'space-between', alignItems: screens.xs ? 'flex-start' : 'center', gap: 10, marginBottom: 20 }}>
         <div>
-          <Title level={2} style={{ margin: 0, fontWeight: 800, fontSize: 'clamp(20px, 3.5vw, 26px)' }}>إتمام الشراء وإنهاء الطلب</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>يرجى إدخال عنوان التوصيل لاكتمال الأوردر</Text>
+          <Title level={2} style={{ margin: 0, fontWeight: 800, fontSize: 'clamp(20px, 3.5vw, 26px)', color: '#0F172A' }}>إتمام الشراء وإنهاء الطلب</Title>
+          <Text type="secondary" style={{ fontSize: 13, color: '#64748B' }}>يرجى إدخال عنوان التوصيل لاكتمال الأوردر</Text>
         </div>
         <Link to="/catalog">
-          <Button type="text" style={{ color: '#C8A45C', fontWeight: 600, padding: 0 }} icon={<ArrowRightOutlined />}>متابعة التسوق</Button>
+          <Button type="text" style={{ color: '#C8A45C', fontWeight: 700, padding: 0 }} icon={<ArrowRightOutlined />}>متابعة التسوق</Button>
         </Link>
       </div>
 
@@ -302,11 +305,11 @@ export default function Checkout({ cart, onRefreshCart }) {
             <Card
               title={
                 <Space>
-                  <span style={{ width: 24, height: 24, background: '#C8A45C', color: '#0A0A0A', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>1</span>
-                  <span>بيانات المستلم والتواصل</span>
+                  <span style={{ width: 24, height: 24, background: '#0F172A', color: '#C8A45C', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>1</span>
+                  <span style={{ color: '#0F172A', fontWeight: 700 }}>بيانات المستلم والتواصل</span>
                 </Space>
               }
-              style={{ borderRadius: 12, marginBottom: 20, borderColor: '#E8E4DB' }}
+              style={{ borderRadius: 12, marginBottom: 20, borderColor: '#E2E8F0' }}
             >
               <Row gutter={16}>
                 <Col xs={24} sm={12}>
@@ -346,11 +349,11 @@ export default function Checkout({ cart, onRefreshCart }) {
             <Card
               title={
                 <Space>
-                  <span style={{ width: 24, height: 24, background: '#C8A45C', color: '#0A0A0A', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>2</span>
-                  <span>عنوان التوصيل</span>
+                  <span style={{ width: 24, height: 24, background: '#0F172A', color: '#C8A45C', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>2</span>
+                  <span style={{ color: '#0F172A', fontWeight: 700 }}>عنوان التوصيل</span>
                 </Space>
               }
-              style={{ borderRadius: 12, marginBottom: 20, borderColor: '#E8E4DB' }}
+              style={{ borderRadius: 12, marginBottom: 20, borderColor: '#E2E8F0' }}
             >
               <Row gutter={16}>
                 <Col xs={24} sm={12}>
@@ -402,11 +405,11 @@ export default function Checkout({ cart, onRefreshCart }) {
               id="payment-step-card"
               title={
                 <Space>
-                  <span style={{ width: 24, height: 24, background: '#C8A45C', color: '#0A0A0A', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>3</span>
-                  <span>طريقة السداد</span>
+                  <span style={{ width: 24, height: 24, background: '#0F172A', color: '#C8A45C', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>3</span>
+                  <span style={{ color: '#0F172A', fontWeight: 700 }}>طريقة السداد</span>
                 </Space>
               }
-              style={{ borderRadius: 12, borderColor: '#E8E4DB' }}
+              style={{ borderRadius: 12, borderColor: '#E2E8F0' }}
             >
               <Radio.Group
                 value={paymentMethod}
@@ -514,8 +517,8 @@ export default function Checkout({ cart, onRefreshCart }) {
                     {/* Account Details Banner */}
                     <div style={{ marginBottom: 16 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: 16, color: '#C8A45C' }}>✦</span>
-                        <strong style={{ fontSize: 14, color: '#0A0A0A' }}>
+                        <Sparkles size={16} color="#C8A45C" strokeWidth={2.2} />
+                        <strong style={{ fontSize: 14, color: '#1C1917' }}>
                           بيانات تحويل المبلغ لحساب المتجر:
                         </strong>
                       </div>
@@ -539,7 +542,7 @@ export default function Checkout({ cart, onRefreshCart }) {
                             <span style={{ fontSize: 12, color: '#666', display: 'block' }}>
                               رقم المحفظة / عنوان إنستاباي:
                             </span>
-                            <span style={{ fontSize: 16, fontWeight: 800, color: '#0A0A0A', letterSpacing: 0.5 }}>
+                            <span style={{ fontSize: 16, fontWeight: 800, color: '#1C1917', letterSpacing: 0.5 }}>
                               {currentMethod.account_number}
                             </span>
                             {currentMethod.account_name && (
@@ -553,8 +556,8 @@ export default function Checkout({ cart, onRefreshCart }) {
                             icon={copiedKey ? <CheckOutlined /> : <CopyOutlined />}
                             onClick={() => handleCopyAccount(currentMethod.account_number)}
                             style={{
-                              backgroundColor: copiedKey ? '#16a34a' : '#0A0A0A',
-                              borderColor: copiedKey ? '#16a34a' : '#0A0A0A',
+                              backgroundColor: copiedKey ? '#16a34a' : '#1C1917',
+                              borderColor: copiedKey ? '#16a34a' : '#1C1917',
                               color: '#fff',
                               borderRadius: 6
                             }}
@@ -574,7 +577,7 @@ export default function Checkout({ cart, onRefreshCart }) {
                     {/* Transfer Receipt Upload Area */}
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <label style={{ fontWeight: 700, fontSize: 13, color: '#0A0A0A' }}>
+                        <label style={{ fontWeight: 700, fontSize: 13, color: '#1C1917' }}>
                           إرفاق سكرين شوت إشعار التحويل (IPN Screenshot) <span style={{ color: '#dc2626' }}>*</span>
                         </label>
                         <span style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>إلزامي لإتمام الطلب</span>
@@ -603,7 +606,7 @@ export default function Checkout({ cart, onRefreshCart }) {
                           }}
                         >
                           <CameraOutlined style={{ fontSize: 28, color: '#C8A45C', marginBottom: 8 }} />
-                          <div style={{ fontWeight: 700, fontSize: 14, color: '#0A0A0A', marginBottom: 4 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: '#1C1917', marginBottom: 4 }}>
                             اضغط هنا لرفع أو التقاط صورة إشعار التحويل
                           </div>
                           <div style={{ fontSize: 12, color: '#777' }}>
@@ -696,20 +699,20 @@ export default function Checkout({ cart, onRefreshCart }) {
           {/* Order Summary Column */}
           <Col xs={24} lg={9}>
             <Card
-              title={<span style={{ fontWeight: 800 }}>ملخص الطلب ({cart.items_count} قطعة)</span>}
-              style={{ borderRadius: 12, position: 'sticky', top: 90, borderColor: '#E8E4DB' }}
+              title={<span style={{ fontWeight: 800, color: '#0F172A' }}>ملخص الطلب ({cart.items_count} قطعة)</span>}
+              style={{ borderRadius: 12, position: 'sticky', top: 90, borderColor: '#E2E8F0', boxShadow: '0 4px 16px rgba(15,23,42,0.04)' }}
             >
               {/* Items List preview */}
               <div style={{ maxHeight: 220, overflowY: 'auto', marginBottom: 16 }}>
                 {cart.items.map((item) => (
                   <div key={item.item_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13 }}>
                     <div style={{ flex: 1, paddingLeft: 8 }}>
-                      <Text strong ellipsis>{item.product_name}</Text>
-                      <Text type="secondary" style={{ display: 'block', fontSize: 11 }}>
+                      <Text strong ellipsis style={{ color: '#0F172A' }}>{item.product_name}</Text>
+                      <Text type="secondary" style={{ display: 'block', fontSize: 11, color: '#64748B' }}>
                         الكمية: {item.quantity} × {parseFloat(item.unit_price).toLocaleString()} ج.م
                       </Text>
                     </div>
-                    <Text strong style={{ color: '#1A1A1A', fontVariantNumeric: 'tabular-nums' }}>
+                    <Text strong style={{ color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
                       {(item.quantity * parseFloat(item.unit_price)).toLocaleString()} ج.م
                     </Text>
                   </div>
@@ -720,21 +723,28 @@ export default function Checkout({ cart, onRefreshCart }) {
 
               {/* Pricing breakdown */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
-                <Text type="secondary">إجمالي المنتجات:</Text>
-                <Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>{subtotal.toLocaleString()} ج.م</Text>
+                <Text type="secondary" style={{ color: '#64748B' }}>إجمالي المنتجات:</Text>
+                <Text strong style={{ fontVariantNumeric: 'tabular-nums', color: '#0F172A' }}>{subtotal.toLocaleString()} ج.م</Text>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14 }}>
-                <Text type="secondary">تكلفة الشحن ({selectedGov}):</Text>
-                <Text strong style={{ color: isFreeShipping ? '#2D7A3A' : '#1A1A1A', fontVariantNumeric: 'tabular-nums' }}>
-                  {isFreeShipping ? 'مجاناً 🚚' : `${finalShippingCost} ج.م`}
+                <Text type="secondary" style={{ color: '#64748B' }}>تكلفة الشحن ({selectedGov}):</Text>
+                <Text strong style={{ color: isFreeShipping ? '#16A34A' : '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                  {isFreeShipping ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <span>مجاناً</span>
+                      <Truck size={14} color="#16A34A" strokeWidth={2.2} />
+                    </span>
+                  ) : (
+                    `${finalShippingCost} ج.م`
+                  )}
                 </Text>
               </div>
 
               <Divider style={{ margin: '12px 0' }} />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, alignItems: 'baseline' }}>
-                <Text strong style={{ fontSize: 16 }}>الإجمالي النهائي:</Text>
+                <Text strong style={{ fontSize: 16, color: '#0F172A' }}>الإجمالي النهائي:</Text>
                 <Text strong style={{ fontSize: 24, color: '#C8A45C', fontVariantNumeric: 'tabular-nums' }}>
                   {totalAmount.toLocaleString()} <span style={{ fontSize: 14 }}>ج.م</span>
                 </Text>
@@ -750,11 +760,12 @@ export default function Checkout({ cart, onRefreshCart }) {
                 style={{
                   height: 52,
                   backgroundColor: '#C8A45C',
-                  color: '#0A0A0A',
+                  color: '#0F172A',
                   borderRadius: 8,
                   fontSize: 17,
                   fontWeight: 800,
-                  border: 'none'
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(200,164,92,0.35)'
                 }}
               >
                 تأكيد وإتمام الطلب الآن

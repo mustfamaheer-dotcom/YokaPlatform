@@ -31,6 +31,7 @@ import {
   Menu as MenuIcon,
   X
 } from 'lucide-react';
+import ScrollToTopTabs from './components/ScrollToTopTabs';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -76,6 +77,7 @@ export default function App() {
   const [unlockModalVisible, setUnlockModalVisible] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 840 : false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [openKeys, setOpenKeys] = useState([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -278,34 +280,83 @@ export default function App() {
 
     const role = currentUser.role;
 
-    const allItems = [
-      { key: 'home', icon: <HomeIcon size={18} />, label: 'الرئيسية', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-      { key: 'pos', icon: <ScanLine size={18} />, label: 'فاتورة بيع جديدة', roles: ['super_admin', 'admin', 'supervisor', 'salesperson', 'branch_account'] },
-      { key: 'retail_analytics', icon: <BarChart3 size={18} />, label: 'إحصائيات فروع التجزئة', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-      { key: 'ecom_analytics', icon: <TrendingUp size={18} />, label: 'إحصائيات المتجر الإلكتروني', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-      { key: 'daily_shift', icon: <CalendarCheck size={18} />, label: 'صفحة يومية البائع', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-      { key: 'orders', icon: <ShoppingBag size={18} />, label: 'طلبات المتجر الإلكتروني', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-      { key: 'branches_daily', icon: <FileSpreadsheet size={18} />, label: 'يومية الفروع', roles: ['super_admin', 'admin'] },
-      { key: 'admin_journals', icon: <BookOpenCheck size={18} />, label: 'اليوميات الإدارية', roles: ['super_admin', 'admin'] },
-      { key: 'treasury_admin', icon: <Landmark size={18} />, label: 'إدارة الخزائن', roles: ['super_admin', 'admin'] },
-      { key: 'transfers', icon: <ArrowLeftRight size={18} />, label: 'إذن الصرف والتحويل', roles: ['super_admin', 'admin'] },
-      { key: 'stock_audit', icon: <ClipboardCheck size={18} />, label: 'الجرد المجمع', roles: ['super_admin', 'admin'] },
-      { key: 'stock_adjustments', icon: <SlidersHorizontal size={18} />, label: 'سند التسوية', roles: ['super_admin', 'admin'] },
-      { key: 'groups_items', icon: <Layers size={18} />, label: 'المجموعات والأصناف', roles: ['super_admin', 'admin'] },
-      { key: 'products', icon: <Boxes size={18} />, label: 'كتالوج المنتجات والمخزون', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-      { key: 'purchases', icon: <Receipt size={18} />, label: 'فواتير المشتريات والتوريد', roles: ['super_admin', 'admin'] },
-      { key: 'suppliers', icon: <Truck size={18} />, label: 'الموردين والحسابات', roles: ['super_admin', 'admin'] },
-      { key: 'branches', icon: <Store size={18} />, label: 'الفروع والمستودعات', roles: ['super_admin', 'admin'] },
-      { key: 'users', icon: <Users size={18} />, label: 'طاقم عمل الفرع', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-      { key: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'نظرة عامة على النظام', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] }
+    const grouped = [
+      {
+        key: 'group_sales',
+        label: 'المبيعات',
+        icon: <ShoppingBag size={18} />, 
+        children: [
+          { key: 'pos', icon: <ScanLine size={18} />, label: 'فاتورة بيع جديدة', roles: ['super_admin', 'admin', 'supervisor', 'salesperson', 'branch_account'] },
+          { key: 'daily_shift', icon: <CalendarCheck size={18} />, label: 'صفحة يومية البائع', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] }
+        ]
+      },
+      {
+        key: 'group_ecp',
+        label: 'المتجر الإلكتروني',
+        icon: <ShoppingBag size={18} />, 
+        children: [
+          { key: 'orders', icon: <ShoppingBag size={18} />, label: 'طلبات المتجر الإلكتروني', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
+          { key: 'ecom_analytics', icon: <TrendingUp size={18} />, label: 'إحصائيات المتجر الإلكتروني', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] }
+        ]
+      },
+      {
+        key: 'group_inventory',
+        label: 'المخزون',
+        icon: <Layers size={18} />, 
+        children: [
+          { key: 'products', icon: <Boxes size={18} />, label: 'كتالوج المنتجات والمخزون', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
+          { key: 'groups_items', icon: <Layers size={18} />, label: 'المجموعات والأصناف', roles: ['super_admin', 'admin'] },
+          { key: 'stock_audit', icon: <ClipboardCheck size={18} />, label: 'الجرد المجمع', roles: ['super_admin', 'admin'] },
+          { key: 'stock_adjustments', icon: <SlidersHorizontal size={18} />, label: 'سند التسوية', roles: ['super_admin', 'admin'] },
+          { key: 'transfers', icon: <ArrowLeftRight size={18} />, label: 'أذونات الصرف والتحويل', roles: ['super_admin', 'admin'] }
+        ]
+      },
+      {
+        key: 'group_purchases',
+        label: 'المشتريات',
+        icon: <Receipt size={18} />, 
+        children: [
+          { key: 'purchases', icon: <Receipt size={18} />, label: 'فواتير المشتريات والتوريد', roles: ['super_admin', 'admin'] },
+          { key: 'suppliers', icon: <Truck size={18} />, label: 'الموردين والحسابات', roles: ['super_admin', 'admin'] }
+        ]
+      },
+      {
+        key: 'group_finance',
+        label: 'المالية',
+        icon: <Wallet size={18} />, 
+        children: [
+          { key: 'branch_treasury', icon: <Wallet size={18} />, label: 'خزنة الفرع', roles: ['super_admin', 'admin', 'supervisor'] },
+          { key: 'treasury_admin', icon: <Landmark size={18} />, label: 'إدارة الخزائن', roles: ['super_admin', 'admin'] }
+        ]
+      },
+      {
+        key: 'group_system',
+        label: 'النظام',
+        icon: <LayoutDashboard size={18} />, 
+        children: [
+          { key: 'home', icon: <HomeIcon size={18} />, label: 'الرئيسية', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
+          { key: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'نظرة عامة على النظام', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
+          { key: 'branches_daily', icon: <FileSpreadsheet size={18} />, label: 'يومية الفروع', roles: ['super_admin', 'admin'] },
+          { key: 'admin_journals', icon: <BookOpenCheck size={18} />, label: 'اليوميات الإدارية', roles: ['super_admin', 'admin'] },
+          { key: 'branches', icon: <Store size={18} />, label: 'الفروع والمستودعات', roles: ['super_admin', 'admin'] },
+          { key: 'users', icon: <Users size={18} />, label: 'طاقم عمل الفرع', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] }
+        ]
+      }
     ];
 
-    return allItems
-      .filter((item) => {
-        if (!item.roles.includes(role)) return false;
-        return true;
-      })
-      .map(({ roles, ...rest }) => rest);
+    // Filter children by role and drop empty groups
+    const filtered = grouped.map(g => ({
+      ...g,
+      children: g.children.filter(item => item.roles.includes(role))
+    })).filter(g => g.children.length > 0);
+
+    // Strip role arrays before returning
+    const menuItems = filtered.map(({ children, ...rest }) => ({
+      ...rest,
+      children: children.map(({ roles, ...c }) => c)
+    }));
+
+    return menuItems;
   }, [currentUser, isEcomWarehouse, isRetailBranch, isSupervisor, isWarehouseAdmin]);
 
   // Ensure active tab is allowed for current user
@@ -339,10 +390,11 @@ export default function App() {
   const branchDisplayName = currentUser.branchName || (isAdminPortal ? 'المستودع الرئيسي' : 'الفرع المحدد');
 
   // Check if current active tab is permitted
-  const isTabAllowed = menuItems.some((m) => m.key === activeTab);
+  const isTabAllowed = menuItems.some(m => m.key === activeTab || (m.children && m.children.some(c => c.key === activeTab)));
 
   return (
     <Layout style={{ minHeight: '100vh', direction: 'rtl' }}>
+      <ScrollToTopTabs activeTab={activeTab} />
       {/* Mobile Navigation Drawer */}
       <Drawer
         placement="right"

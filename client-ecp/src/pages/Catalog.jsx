@@ -74,7 +74,8 @@ export default function Catalog({ onAddToCart }) {
 
       const res = await api.get('/api/ecp/catalog', { params });
       if (res.data.success) {
-        setProducts(res.data.data);
+        const inStock = (res.data.data || []).filter(p => (parseInt(p.total_stock, 10) || 0) > 0);
+        setProducts(inStock);
         setMeta(res.data.meta);
       }
     } catch (err) {
@@ -183,7 +184,7 @@ export default function Catalog({ onAddToCart }) {
               key={s}
               checked={size === s}
               onChange={(checked) => setSize(checked ? s : '')}
-              style={{ padding: '4px 10px', borderRadius: 4, fontWeight: 700, backgroundColor: size === s ? '#C8A45C' : '#FAFAF8', color: size === s ? '#0A0A0A' : '#1A1A1A', border: '1px solid', borderColor: size === s ? '#C8A45C' : '#E8E4DB' }}
+              style={{ padding: '4px 10px', borderRadius: 4, fontWeight: 700, backgroundColor: size === s ? '#0F172A' : '#F8FAFC', color: size === s ? '#FFFFFF' : '#0F172A', border: '1px solid', borderColor: size === s ? '#0F172A' : '#E2E8F0' }}
             >
               {s}
             </Tag.CheckableTag>
@@ -195,7 +196,7 @@ export default function Catalog({ onAddToCart }) {
         type="primary"
         block
         onClick={handleApplyFilters}
-        style={{ backgroundColor: '#C8A45C', color: '#0A0A0A', borderRadius: 8, height: 44, fontWeight: 800, border: 'none' }}
+        style={{ backgroundColor: '#C8A45C', color: '#0F172A', borderRadius: 8, height: 44, fontWeight: 800, border: 'none', boxShadow: '0 2px 8px rgba(200, 164, 92, 0.25)' }}
       >
         تطبيق الفلاتر
       </Button>
@@ -217,8 +218,8 @@ export default function Catalog({ onAddToCart }) {
       {/* Page Title & Sort Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Title level={2} style={{ margin: 0, fontWeight: 800, fontSize: 'clamp(20px, 3.5vw, 28px)' }}>الكتالوج والمنتجات</Title>
-          <Text type="secondary" style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+          <Title level={2} style={{ margin: 0, fontWeight: 800, fontSize: 'clamp(20px, 3.5vw, 28px)', color: '#0F172A' }}>الكتالوج والمنتجات</Title>
+          <Text type="secondary" style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: '#64748B' }}>
             عرض {meta.total} منتج متوفر للطلب أونلاين
           </Text>
         </div>
@@ -228,13 +229,13 @@ export default function Catalog({ onAddToCart }) {
             className="mobile-only btn-touch" 
             icon={<FilterOutlined style={{ color: '#C8A45C' }} />} 
             onClick={() => setFilterDrawerVisible(true)}
-            style={{ borderRadius: 8, fontWeight: 700, borderColor: '#C8A45C' }}
+            style={{ borderRadius: 8, fontWeight: 700, borderColor: '#C8A45C', color: '#0F172A' }}
           >
             تصفية وفلاتر {activeFilters.length > 0 ? `(${activeFilters.length})` : ''}
           </Button>
 
           <Space size="small">
-            <Text style={{ fontWeight: 600 }} className="desktop-only">ترتيب حسب:</Text>
+            <Text style={{ fontWeight: 600, color: '#0F172A' }} className="desktop-only">ترتيب حسب:</Text>
             <Select
               value={sort}
               onChange={(val) => {
@@ -254,8 +255,8 @@ export default function Catalog({ onAddToCart }) {
 
       {/* Active Filter Chips */}
       {activeFilters.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 18, background: '#FFFFFF', padding: '10px 14px', borderRadius: 10, border: '1px solid #E8E4DB' }}>
-          <Text type="secondary" style={{ fontSize: 12, fontWeight: 600 }}>الفلاتر النشطة:</Text>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 18, background: '#FFFFFF', padding: '10px 14px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+          <Text type="secondary" style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>الفلاتر النشطة:</Text>
           {activeFilters.map((f) => (
             <Tag
               key={f.key}
@@ -267,7 +268,7 @@ export default function Catalog({ onAddToCart }) {
               {f.label}
             </Tag>
           ))}
-          <Button type="link" size="small" onClick={handleResetFilters} style={{ padding: 0, fontSize: 12, color: '#C8A45C', fontWeight: 600 }}>
+          <Button type="link" size="small" onClick={handleResetFilters} style={{ padding: 0, fontSize: 12, color: '#C8A45C', fontWeight: 700 }}>
             مسح الكل
           </Button>
         </div>
@@ -276,7 +277,7 @@ export default function Catalog({ onAddToCart }) {
       <Row gutter={[{ xs: 12, sm: 16, md: 24 }, { xs: 12, sm: 16, md: 24 }]}>
         {/* Desktop Sidebar Filters */}
         <Col xs={0} md={7} lg={6}>
-          <Card style={{ borderRadius: 12, borderColor: '#E8E4DB', position: 'sticky', top: 120 }}>
+          <Card style={{ borderRadius: 12, borderColor: '#E2E8F0', position: 'sticky', top: 120 }}>
             {renderFilterContent()}
           </Card>
         </Col>
@@ -340,11 +341,11 @@ export default function Catalog({ onAddToCart }) {
               )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '80px 0', background: '#FFFFFF', borderRadius: 12, border: '1px solid #E8E4DB' }}>
+            <div style={{ textAlign: 'center', padding: '80px 0', background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0' }}>
               <Empty
-                description={<span style={{ color: '#6B6B6B', fontSize: 15 }}>لم يتم العثور على أي منتجات مطابقة للبحث</span>}
+                description={<span style={{ color: '#64748B', fontSize: 15 }}>لم يتم العثور على أي منتجات مطابقة للبحث</span>}
               >
-                <Button type="primary" onClick={handleResetFilters} style={{ backgroundColor: '#C8A45C', color: '#0A0A0A', borderRadius: 6, border: 'none' }}>
+                <Button type="primary" onClick={handleResetFilters} style={{ backgroundColor: '#C8A45C', color: '#0F172A', borderRadius: 6, border: 'none', fontWeight: 700 }}>
                   إعادة ضبط الفلاتر
                 </Button>
               </Empty>

@@ -111,15 +111,21 @@ const treasuryRoutes = require('./routes/treasury');
 app.use('/api/swm/treasury', treasuryRoutes);
 const analyticsRoutes = require('./routes/analytics');
 app.use('/api/swm/analytics', analyticsRoutes);
+const storeSettingsRoutes = require('./routes/storeSettings');
+app.use('/api/swm/store-settings', storeSettingsRoutes);
+const visitorAnalyticsRoutes = require('./routes/visitorAnalytics');
+app.use('/api/swm/visitor-analytics', visitorAnalyticsRoutes);
 
 // ECP (E-Commerce Platform) Public API Routes
 const ecpCatalogRoutes = require('../ecp/routes/catalog');
 const ecpCartRoutes = require('../ecp/routes/cart');
 const ecpCheckoutRoutes = require('../ecp/routes/checkout');
+const ecpTrackingRoutes = require('../ecp/routes/tracking');
 
 app.use('/api/ecp/catalog', ecpCatalogRoutes);
 app.use('/api/ecp/cart', ecpCartRoutes);
 app.use('/api/ecp/checkout', ecpCheckoutRoutes);
+app.use('/api/ecp/track', ecpTrackingRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

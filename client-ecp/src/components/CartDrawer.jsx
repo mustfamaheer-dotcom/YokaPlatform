@@ -9,6 +9,7 @@ import {
   ArrowLeftOutlined,
   CarOutlined
 } from '@ant-design/icons';
+import { Truck } from 'lucide-react';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 
@@ -66,11 +67,17 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
   const renderCheckoutSummary = () => (
     <div style={{ padding: '12px 16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))', background: '#FFFFFF' }}>
       {/* Free Shipping Progress */}
-      <div style={{ marginBottom: 12, background: '#FAFAF8', border: '1px solid #E8E4DB', padding: '8px 12px', borderRadius: 8 }}>
+      <div style={{ marginBottom: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '8px 12px', borderRadius: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-          <span style={{ fontWeight: 600 }}>
-            <CarOutlined style={{ color: '#C8A45C', marginLeft: 4 }} />
-            {diff > 0 ? `أضف ${diff.toLocaleString()} ج.م للحصول على شحن مجاني!` : 'تهانينا! حصلت على شحن مجاني 🚚'}
+          <span style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <Truck size={14} style={{ color: '#C8A45C' }} strokeWidth={2.2} />
+            {diff > 0 ? (
+              <span>أضف {diff.toLocaleString()} ج.م للحصول على شحن مجاني!</span>
+            ) : (
+              <span style={{ color: '#16A34A', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span>تهانينا! حصلت على شحن مجاني</span>
+              </span>
+            )}
           </span>
           <span style={{ fontWeight: 700, color: '#C8A45C' }}>{progressPct}%</span>
         </div>
@@ -79,8 +86,8 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
 
       {/* Subtotal & Checkout */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 15 }}>
-        <Text strong style={{ color: '#6B6B6B' }}>إجمالي المنتجات:</Text>
-        <Text strong style={{ fontSize: 19, color: '#1A1A1A', fontVariantNumeric: 'tabular-nums' }}>
+        <Text strong style={{ color: '#64748B' }}>إجمالي المنتجات:</Text>
+        <Text strong style={{ fontSize: 19, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
           {subtotal.toLocaleString()} <span style={{ fontSize: 13 }}>ج.م</span>
         </Text>
       </div>
@@ -94,7 +101,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
         style={{
           height: 48,
           backgroundColor: '#C8A45C',
-          color: '#0A0A0A',
+          color: '#0F172A',
           borderRadius: 8,
           fontSize: 16,
           fontWeight: 800,
@@ -143,7 +150,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
         footer: {
           padding: 0,
           background: '#FFFFFF',
-          borderTop: '1px solid #E8E4DB'
+          borderTop: '1px solid #E2E8F0'
         }
       }}
       footer={cart?.items?.length > 0 ? renderCheckoutSummary() : null}
@@ -158,7 +165,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
                 display: 'flex',
                 gap: 12,
                 padding: '12px 0',
-                borderBottom: '1px solid #F0EDE6',
+                borderBottom: '1px solid #F1F5F9',
                 alignItems: 'center'
               }}
             >
@@ -169,8 +176,8 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
                   height: 64,
                   borderRadius: 8,
                   overflow: 'hidden',
-                  background: '#FAFAF8',
-                  border: '1px solid #E8E4DB',
+                  background: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
                   flexShrink: 0
                 }}
               >
@@ -188,7 +195,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
 
               {/* Item Details */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <Text strong ellipsis style={{ display: 'block', fontSize: 14, color: '#1A1A1A' }}>
+                <Text strong ellipsis style={{ display: 'block', fontSize: 14, color: '#0F172A' }}>
                   {item.product_name}
                 </Text>
                 {(item.color || item.size) && (
@@ -213,7 +220,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
                   style={{ minWidth: 38, minHeight: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 />
 
-                <Space size={4} style={{ background: '#F0EDE6', borderRadius: 8, padding: '3px 6px' }}>
+                <Space size={4} style={{ background: '#F1F5F9', borderRadius: 8, padding: '3px 6px' }}>
                   <Button
                     size="middle"
                     type="text"
@@ -242,7 +249,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={<span style={{ color: '#A0A0A0', fontSize: 14 }}>سلة التسوق فارغة حالياً</span>}
+            description={<span style={{ color: '#94A3B8', fontSize: 14 }}>سلة التسوق فارغة حالياً</span>}
           >
             <Button
               type="primary"
@@ -250,7 +257,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
                 onClose();
                 navigate('/catalog');
               }}
-              style={{ backgroundColor: '#C8A45C', color: '#0A0A0A', borderRadius: 6, border: 'none', fontWeight: 600 }}
+              style={{ backgroundColor: '#C8A45C', color: '#0F172A', borderRadius: 6, border: 'none', fontWeight: 700 }}
             >
               تسوق الآن
             </Button>

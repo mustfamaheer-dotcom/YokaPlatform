@@ -21,13 +21,19 @@ router.get('/categories', async (req, res) => {
 
     const categories = await query(`
       SELECT c.id, c.category_name, c.slug, c.description, c.image_url,
-             COUNT(p.id) AS products_count
+             COUNT(DISTINCT p.id) AS products_count
       FROM product_categories c
-      LEFT JOIN products p ON p.category_id = c.id AND p.status = 'active' AND p.is_ecom_listed = true
+      LEFT JOIN products p ON p.category_id = c.id 
+                          AND p.status = 'active' 
+                          AND p.is_ecom_listed = true
+                          AND EXISTS (
+                            SELECT 1 FROM inventory_balances ib 
+                            WHERE ib.product_id = p.id AND ib.branch_id = $1 AND ib.available_qty > 0
+                          )
       WHERE c.status = 'active'
       GROUP BY c.id
       ORDER BY c.display_order ASC, c.category_name ASC
-    `);
+    `, [ONLINE_BRANCH_ID]);
 
     await redis.setex(cacheKey, 300, JSON.stringify(categories));
     return res.json({ success: true, data: categories });
@@ -71,7 +77,11 @@ router.get('/', async (req, res) => {
       } catch (e) {}
     }
 
-    const whereClauses = [`p.status = 'active'`, `p.is_ecom_listed = true`];
+    const whereClauses = [
+      `p.status = 'active'`,
+      `p.is_ecom_listed = true`,
+      `EXISTS (SELECT 1 FROM inventory_balances ib WHERE ib.product_id = p.id AND ib.branch_id = $1 AND ib.available_qty > 0)`
+    ];
     const params = [ONLINE_BRANCH_ID];
     let pIdx = 2;
 
@@ -140,7 +150,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN product_categories c ON c.id = p.category_id
       ${whereSql}
     `;
-    const [countResult] = await query(countSql, params.slice(1));
+    const [countResult] = await query(countSql, params);
     const total = parseInt(countResult?.total || 0, 10);
 
     // Products list with calculated available stock
@@ -218,6 +228,33 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('ECP catalog error:', err);
     return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/ecp/catalog/store-settings
+ * Public store settings (Hero offers, announcements, etc.)
+ */
+router.get('/store-settings', async (req, res) => {
+  try {
+    const result = await query('SELECT key, value, label FROM store_settings');
+    const settingsMap = {};
+    (result.rows || result).forEach(row => {
+      settingsMap[row.key] = row.value;
+    });
+    return res.json({ success: true, data: settingsMap });
+  } catch (err) {
+    console.error('ECP store-settings fetch error:', err);
+    return res.json({
+      success: true,
+      data: {
+        hero_offer_enabled: 'true',
+        hero_offer_text: 'احصل على خصم يصل إلى 50%',
+        hero_offer_link: '/catalog',
+        contact_phone: '01000000000',
+        contact_whatsapp: '01000000000'
+      }
+    });
   }
 });
 

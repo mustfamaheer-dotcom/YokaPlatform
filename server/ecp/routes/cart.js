@@ -43,71 +43,75 @@ async function getOrCreateCart(req) {
 }
 
 /**
+ * Helper to build unified cart payload with formatted items, counts, and subtotal
+ */
+async function getCartPayload(cartId, sessionId, couponCode = null) {
+  const items = await query(
+    `SELECT ci.id AS item_id,
+            ci.cart_id,
+            ci.product_id,
+            ci.variant_id,
+            ci.quantity,
+            ci.unit_price,
+            p.product_name,
+            p.product_code,
+            p.slug,
+            p.featured_image,
+            pv.variant_sku,
+            pv.color,
+            pv.size,
+            COALESCE(ib_var.available_qty, ib_base.available_qty, 0) AS stock_qty
+     FROM ecp_cart_items ci
+     JOIN products p ON p.id = ci.product_id
+     LEFT JOIN product_variants pv ON pv.id = ci.variant_id
+     LEFT JOIN inventory_balances ib_var ON ib_var.product_id = ci.product_id
+                                        AND ib_var.variant_id = ci.variant_id
+                                        AND ib_var.branch_id = $2
+     LEFT JOIN inventory_balances ib_base ON ib_base.product_id = ci.product_id
+                                         AND ib_base.variant_id IS NULL
+                                         AND ib_base.branch_id = $2
+     WHERE ci.cart_id = $1
+     ORDER BY ci.id ASC`,
+    [cartId, ONLINE_BRANCH_ID]
+  );
+
+  let subtotal = 0;
+  const formattedItems = (items || []).map((it) => {
+    const price = parseFloat(it.unit_price) || 0;
+    const qty = parseInt(it.quantity, 10);
+    const lineTotal = price * qty;
+    subtotal += lineTotal;
+
+    return {
+      ...it,
+      unit_price: price,
+      line_total: lineTotal,
+      display_name: it.color || it.size
+        ? `${it.product_name} (${[it.color, it.size].filter(Boolean).join(' / ')})`
+        : it.product_name,
+      is_in_stock: parseInt(it.stock_qty, 10) >= qty
+    };
+  });
+
+  return {
+    cart_id: cartId,
+    session_id: sessionId,
+    items: formattedItems,
+    items_count: formattedItems.reduce((acc, it) => acc + it.quantity, 0),
+    subtotal,
+    coupon_code: couponCode || null
+  };
+}
+
+/**
  * GET /api/ecp/cart
  * Get current shopping cart items with pricing and inventory status
  */
 router.get('/', async (req, res) => {
   try {
     const cart = await getOrCreateCart(req);
-
-    const items = await query(
-      `SELECT ci.id AS item_id,
-              ci.cart_id,
-              ci.product_id,
-              ci.variant_id,
-              ci.quantity,
-              ci.unit_price,
-              p.product_name,
-              p.product_code,
-              p.slug,
-              p.featured_image,
-              pv.variant_sku,
-              pv.color,
-              pv.size,
-              COALESCE(ib_var.available_qty, ib_base.available_qty, 0) AS stock_qty
-       FROM ecp_cart_items ci
-       JOIN products p ON p.id = ci.product_id
-       LEFT JOIN product_variants pv ON pv.id = ci.variant_id
-       LEFT JOIN inventory_balances ib_var ON ib_var.product_id = ci.product_id
-                                          AND ib_var.variant_id = ci.variant_id
-                                          AND ib_var.branch_id = $2
-       LEFT JOIN inventory_balances ib_base ON ib_base.product_id = ci.product_id
-                                           AND ib_base.variant_id IS NULL
-                                           AND ib_base.branch_id = $2
-       WHERE ci.cart_id = $1
-       ORDER BY ci.id ASC`,
-      [cart.id, ONLINE_BRANCH_ID]
-    );
-
-    let subtotal = 0;
-    const formattedItems = items.map((it) => {
-      const price = parseFloat(it.unit_price) || 0;
-      const qty = parseInt(it.quantity, 10);
-      const lineTotal = price * qty;
-      subtotal += lineTotal;
-
-      return {
-        ...it,
-        unit_price: price,
-        line_total: lineTotal,
-        display_name: it.color || it.size
-          ? `${it.product_name} (${[it.color, it.size].filter(Boolean).join(' / ')})`
-          : it.product_name,
-        is_in_stock: parseInt(it.stock_qty, 10) >= qty
-      };
-    });
-
-    return res.json({
-      success: true,
-      data: {
-        cart_id: cart.id,
-        session_id: cart.session_id,
-        items: formattedItems,
-        items_count: formattedItems.reduce((acc, it) => acc + it.quantity, 0),
-        subtotal,
-        coupon_code: cart.coupon_code || null
-      }
-    });
+    const data = await getCartPayload(cart.id, cart.session_id, cart.coupon_code);
+    return res.json({ success: true, data });
   } catch (err) {
     console.error('ECP get cart error:', err);
     return res.status(500).json({ success: false, message: err.message });
@@ -116,68 +120,43 @@ router.get('/', async (req, res) => {
 
 /**
  * POST /api/ecp/cart/items
- * Add an item or increment quantity in the cart
+ * Add an item or increment quantity in the cart with lightning-fast execution
  */
 router.post('/items', async (req, res) => {
   try {
     const { product_id, variant_id = null, quantity = 1 } = req.body;
-
     const addQty = Math.max(1, parseInt(quantity, 10) || 1);
-    const cart = await getOrCreateCart(req);
 
-    // Fetch product details & selling price
-    const [prod] = await query(
-      `SELECT id, product_name, cost_price, selling_price, sale_price, status
-       FROM products
-       WHERE id = $1 AND status = 'active'`,
-      [product_id]
-    );
+    // Run cart retrieval and product+stock validation in parallel
+    const [cart, prodRows] = await Promise.all([
+      getOrCreateCart(req),
+      query(
+        `SELECT p.id, p.product_name, p.selling_price, p.sale_price, p.status,
+                COALESCE(pv.price_modifier, 0) AS price_modifier,
+                COALESCE(ib_var.available_qty, ib_base.available_qty, 0) AS available_stock
+         FROM products p
+         LEFT JOIN product_variants pv ON pv.id = $2 AND pv.product_id = p.id
+         LEFT JOIN inventory_balances ib_var ON ib_var.product_id = p.id 
+                                            AND ib_var.branch_id = $3 
+                                            AND ib_var.variant_id = $2
+         LEFT JOIN inventory_balances ib_base ON ib_base.product_id = p.id 
+                                             AND ib_base.branch_id = $3 
+                                             AND ib_base.variant_id IS NULL
+         WHERE p.id = $1 AND p.status = 'active'`,
+        [product_id, variant_id, ONLINE_BRANCH_ID]
+      )
+    ]);
 
+    const prod = prodRows?.[0];
     if (!prod) {
-      return res.status(404).json({ success: false, message: 'Product not found or inactive' });
+      return res.status(404).json({ success: false, message: 'الصنف المطلوب غير متوفر حالياً' });
     }
 
-    let unitPrice = parseFloat(prod.sale_price || prod.selling_price) || 0;
+    const availableStock = parseInt(prod.available_stock, 10) || 0;
+    const basePrice = parseFloat(prod.sale_price || prod.selling_price) || 0;
+    const unitPrice = basePrice + (parseFloat(prod.price_modifier) || 0);
 
-    // Check variant price modifier if applicable
-    if (variant_id) {
-      const [v] = await query(
-        `SELECT price_modifier FROM product_variants WHERE id = $1 AND product_id = $2`,
-        [variant_id, product_id]
-      );
-      if (v) {
-        unitPrice += parseFloat(v.price_modifier || 0);
-      }
-    }
-
-    // Verify stock availability
-    let availableStock = 0;
-    if (variant_id) {
-      const [vBal] = await query(
-        `SELECT available_qty FROM inventory_balances
-         WHERE branch_id = $1 AND product_id = $2 AND variant_id = $3`,
-        [ONLINE_BRANCH_ID, product_id, variant_id]
-      );
-      if (vBal && parseInt(vBal.available_qty, 10) > 0) {
-        availableStock = parseInt(vBal.available_qty, 10);
-      } else {
-        const [bBal] = await query(
-          `SELECT available_qty FROM inventory_balances
-           WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL`,
-          [ONLINE_BRANCH_ID, product_id]
-        );
-        availableStock = bBal ? parseInt(bBal.available_qty, 10) : 0;
-      }
-    } else {
-      const [bBal] = await query(
-        `SELECT available_qty FROM inventory_balances
-         WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL`,
-        [ONLINE_BRANCH_ID, product_id]
-      );
-      availableStock = bBal ? parseInt(bBal.available_qty, 10) : 0;
-    }
-
-    // Check current quantity in cart
+    // Check existing item in cart
     const [existing] = await query(
       `SELECT id, quantity FROM ecp_cart_items
        WHERE cart_id = $1 AND product_id = $2 AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))`,
@@ -210,10 +189,14 @@ router.post('/items', async (req, res) => {
       );
     }
 
+    // Return the fresh, complete cart payload immediately so frontend never needs another round-trip
+    const data = await getCartPayload(cart.id, cart.session_id, cart.coupon_code);
+
     return res.json({
       success: true,
       message: 'تمت إضافة المنتج إلى سلة التسوق بنجاح',
-      cart_token: cart.session_id
+      cart_token: cart.session_id,
+      data
     });
   } catch (err) {
     console.error('ECP add cart item error:', err);
@@ -236,38 +219,22 @@ router.put('/items/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Cart item not found' });
     }
 
+    const cart = await getOrCreateCart(req);
+
     if (newQty <= 0) {
       await query(`DELETE FROM ecp_cart_items WHERE id = $1`, [id]);
-      return res.json({ success: true, message: 'تم حذف الصنف من السلة' });
+      const data = await getCartPayload(cart.id, cart.session_id, cart.coupon_code);
+      return res.json({ success: true, message: 'تم حذف الصنف من السلة', data });
     }
 
     // Verify stock
-    let availableStock = 0;
-    if (item.variant_id) {
-      const [vBal] = await query(
-        `SELECT available_qty FROM inventory_balances
-         WHERE branch_id = $1 AND product_id = $2 AND variant_id = $3`,
-        [ONLINE_BRANCH_ID, item.product_id, item.variant_id]
-      );
-      if (vBal && parseInt(vBal.available_qty, 10) > 0) {
-        availableStock = parseInt(vBal.available_qty, 10);
-      } else {
-        const [bBal] = await query(
-          `SELECT available_qty FROM inventory_balances
-           WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL`,
-          [ONLINE_BRANCH_ID, item.product_id]
-        );
-        availableStock = bBal ? parseInt(bBal.available_qty, 10) : 0;
-      }
-    } else {
-      const [bBal] = await query(
-        `SELECT available_qty FROM inventory_balances
-         WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL`,
-        [ONLINE_BRANCH_ID, item.product_id]
-      );
-      availableStock = bBal ? parseInt(bBal.available_qty, 10) : 0;
-    }
+    const [bBal] = await query(
+      `SELECT available_qty FROM inventory_balances
+       WHERE branch_id = $1 AND product_id = $2 AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))`,
+      [ONLINE_BRANCH_ID, item.product_id, item.variant_id]
+    );
 
+    const availableStock = bBal ? parseInt(bBal.available_qty, 10) : 0;
     if (availableStock < newQty) {
       return res.status(400).json({
         success: false,
@@ -280,7 +247,8 @@ router.put('/items/:id', async (req, res) => {
       [newQty, id]
     );
 
-    return res.json({ success: true, message: 'تم تحديث الكمية بنجاح' });
+    const data = await getCartPayload(cart.id, cart.session_id, cart.coupon_code);
+    return res.json({ success: true, message: 'تم تحديث الكمية بنجاح', data });
   } catch (err) {
     console.error('ECP update cart item error:', err);
     return res.status(500).json({ success: false, message: err.message });
@@ -294,8 +262,10 @@ router.put('/items/:id', async (req, res) => {
 router.delete('/items/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await query(`DELETE FROM ecp_cart_items WHERE id = $1`, [id]);
-    return res.json({ success: true, message: 'تم حذف الصنف من السلة' });
+    const cart = await getOrCreateCart(req);
+    await query(`DELETE FROM ecp_cart_items WHERE id = $1 AND cart_id = $2`, [id, cart.id]);
+    const data = await getCartPayload(cart.id, cart.session_id, cart.coupon_code);
+    return res.json({ success: true, message: 'تم حذف الصنف من السلة', data });
   } catch (err) {
     console.error('ECP delete cart item error:', err);
     return res.status(500).json({ success: false, message: err.message });
@@ -310,7 +280,8 @@ router.delete('/', async (req, res) => {
   try {
     const cart = await getOrCreateCart(req);
     await query(`DELETE FROM ecp_cart_items WHERE cart_id = $1`, [cart.id]);
-    return res.json({ success: true, message: 'تم تفريغ السلة بنجاح' });
+    const data = await getCartPayload(cart.id, cart.session_id, cart.coupon_code);
+    return res.json({ success: true, message: 'تم تفريغ السلة بنجاح', data });
   } catch (err) {
     console.error('ECP clear cart error:', err);
     return res.status(500).json({ success: false, message: err.message });

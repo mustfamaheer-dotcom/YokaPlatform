@@ -46,15 +46,18 @@ import {
   CreditCardOutlined,
   QrcodeOutlined,
   UserOutlined,
-  TeamOutlined
+  TeamOutlined,
+  RiseOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import ShippingWaybillA4 from '../components/ShippingWaybillA4';
+import StoreSettings from './StoreSettings';
+import VisitorAnalytics from '../components/VisitorAnalytics';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function Orders() {
+export default function Orders({ currentUser }) {
   const { message } = AntdApp.useApp();
   const [activeTab, setActiveTab] = useState('orders');
 
@@ -749,7 +752,7 @@ export default function Orders() {
                 onClick={() => handleViewReceipt(r.transfer_receipt_url, r.order_number)}
                 style={{ fontSize: 11, height: 24, padding: '0 8px', color: '#059669', borderColor: '#059669' }}
               >
-                إشعار التحويل 📎
+                إشعار التحويل
               </Button>
             </div>
           )}
@@ -1186,6 +1189,30 @@ export default function Orders() {
                   bordered
                 />
               </div>
+            )
+          },
+          {
+            key: 'store_settings',
+            label: (
+              <span>
+                <ShopOutlined style={{ marginLeft: 6 }} />
+                إعدادات واجهة المتجر والهيرو (Storefront & Hero)
+              </span>
+            ),
+            children: (
+              <StoreSettings currentUser={currentUser} />
+            )
+          },
+          {
+            key: 'visitor_analytics',
+            label: (
+              <span>
+                <RiseOutlined style={{ marginLeft: 6 }} />
+                تحليلات وسلوك الزوار والمدن (Visitor Analytics)
+              </span>
+            ),
+            children: (
+              <VisitorAnalytics />
             )
           }
         ]}

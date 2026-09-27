@@ -11,45 +11,53 @@ const memoryStore = new Map();
 let redisClient;
 let isConnected = false;
 
-try {
-  redisClient = new Redis({
-    host,
-    port,
-    password: password || undefined,
-    retryStrategy: (times) => {
-      // Limit retry attempts in development to prevent flooding logs
-      if (process.env.NODE_ENV === 'development' && times > 3) {
-        return null; // Stop retrying and fallback to in-memory store
-      }
-      return Math.min(times * 150, 3000);
-    },
-    maxRetriesPerRequest: 2,
-    enableOfflineQueue: false,
-    connectTimeout: 2000,
-    lazyConnect: true
-  });
+const isRedisExplicitlyEnabled = process.env.ENABLE_REDIS === 'true' || process.env.REDIS_ENABLED === 'true';
 
-  redisClient.connect().then(() => {
-    isConnected = true;
-    console.log('✅ [Redis] Connected successfully to ' + host + ':' + port);
-  }).catch((err) => {
-    console.warn('⚠️ [Redis] Could not connect to Redis (' + err.message + '). Operating with in-memory token store fallback.');
-  });
+if (isRedisExplicitlyEnabled) {
+  try {
+    redisClient = new Redis({
+      host,
+      port,
+      password: password || undefined,
+      retryStrategy: (times) => {
+        if (times > 2) {
+          return null; // Stop retrying and fallback to in-memory store
+        }
+        return 1000;
+      },
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      connectTimeout: 1000,
+      lazyConnect: true
+    });
 
-  redisClient.on('connect', () => {
-    isConnected = true;
-    console.log('✅ [Redis] Connection established');
-  });
+    redisClient.connect().then(() => {
+      isConnected = true;
+      console.log('✅ [Redis] Connected successfully to ' + host + ':' + port);
+    }).catch((err) => {
+      isConnected = false;
+      console.warn('⚠️ [Redis] Could not connect to Redis (' + err.message + '). Operating with in-memory token store fallback.');
+    });
 
-  redisClient.on('error', (err) => {
+    redisClient.on('connect', () => {
+      isConnected = true;
+      console.log('✅ [Redis] Connection established');
+    });
+
+    redisClient.on('error', () => {
+      isConnected = false;
+    });
+
+    redisClient.on('reconnecting', () => {
+      console.log('🔄 [Redis] Attempting reconnection...');
+    });
+  } catch (e) {
     isConnected = false;
-  });
-
-  redisClient.on('reconnecting', () => {
-    console.log('🔄 [Redis] Attempting reconnection...');
-  });
-} catch (e) {
-  console.warn('⚠️ [Redis] Initialization failed, using in-memory store.');
+    console.warn('⚠️ [Redis] Initialization failed, using in-memory store.');
+  }
+} else {
+  // Direct fast in-memory store mode for development and local testing
+  // Eliminates TCP reconnect overhead and connection timeouts
 }
 
 // Unified redis proxy with in-memory fallback
