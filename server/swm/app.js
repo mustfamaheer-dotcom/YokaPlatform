@@ -234,9 +234,14 @@ const staticOptions = {
 
 // Serve SWM (Admin Panel) on /swm-admin
 if (swmStaticDir && fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
-  app.get('/swm-admin', (req, res) => res.redirect(302, '/swm-admin/'));
+  app.use((req, res, next) => {
+    if (req.originalUrl === '/swm-admin' || req.path === '/swm-admin') {
+      return res.redirect(302, '/swm-admin/');
+    }
+    next();
+  });
   app.use('/swm-admin', express.static(swmStaticDir, staticOptions));
-  app.get(['/swm-admin', '/swm-admin/*'], (req, res, next) => {
+  app.get(['/swm-admin/', '/swm-admin/*'], (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path === '/health') return next();
     sendNoCacheFile(res, path.join(swmStaticDir, 'index.html'));
   });
