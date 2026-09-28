@@ -1274,6 +1274,8 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                           display: 'flex',
                           alignItems: 'center',
                           gap: 12,
+                          height: '100%',
+                          minHeight: 88,
                           boxShadow: hasImg ? '0 2px 6px rgba(34,197,94,0.1)' : 'none'
                         }}
                       >
@@ -1597,7 +1599,9 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                           padding: '10px',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 12
+                          gap: 12,
+                          height: '100%',
+                          minHeight: 88
                         }}
                       >
                         <div

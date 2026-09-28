@@ -19,7 +19,14 @@ import {
   Alert,
   Tabs,
   Radio,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  Spin,
+  Badge,
+  Upload,
+  Avatar,
+  Popover,
+  Switch
 } from 'antd';
 import {
   PlusOutlined,
@@ -31,11 +38,28 @@ import {
   CheckCircleOutlined,
   DollarCircleOutlined,
   RollbackOutlined,
-  ShoppingOutlined
+  ShoppingOutlined,
+  AppstoreOutlined,
+  ThunderboltOutlined,
+  CheckSquareOutlined,
+  BorderOutlined,
+  TagsOutlined,
+  BgColorsOutlined,
+  ColumnWidthOutlined,
+  PictureOutlined,
+  BarcodeOutlined,
+  UploadOutlined,
+  CameraOutlined,
+  EditOutlined,
+  FilterOutlined,
+  FolderOpenOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import SplitPayment from '../components/SplitPayment';
+import BarcodePrintModal from '../components/BarcodePrintModal';
+import BarcodeImage from '../components/BarcodeImage';
 import { printHtmlContent } from '../utils/printUtils';
+import { generateValidEAN13 } from '../utils/barcode';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 
 const { Title, Text } = Typography;
@@ -56,7 +80,57 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   const [suppliersList, setSuppliersList] = useState([]);
   const [branchesList, setBranchesList] = useState([]);
   const [productsList, setProductsList] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [colorsList, setColorsList] = useState([]);
+  const [sizesList, setSizesList] = useState([]);
   const [defaultBranchId, setDefaultBranchId] = useState(null);
+  const [refreshingProducts, setRefreshingProducts] = useState(false);
+
+  // Quick Variant Modal State (Quick Add Color/Size to existing product)
+  const [quickVariantModalItem, setQuickVariantModalItem] = useState(null);
+  const [quickVariantForm] = Form.useForm();
+  const [quickVariantSubmitting, setQuickVariantSubmitting] = useState(false);
+  const [quickNewColorInput, setQuickNewColorInput] = useState('');
+  const [quickNewColorCode, setQuickNewColorCode] = useState('#000000');
+  const [quickNewSizeInput, setQuickNewSizeInput] = useState('');
+
+  // Barcode Print Modal State
+  const [barcodeModalOpen, setBarcodeModalOpen] = useState(false);
+  const [barcodeModalItems, setBarcodeModalItems] = useState([]);
+
+  // Master Product Modal State (Full Product Add & Edit from Products & Categories)
+  const [masterProductModalOpen, setMasterProductModalOpen] = useState(false);
+  const [masterProductMode, setMasterProductMode] = useState('create'); // 'create' | 'edit'
+  const [editingMasterProduct, setEditingMasterProduct] = useState(null);
+  const [targetInvoiceItemKey, setTargetInvoiceItemKey] = useState(null);
+  const [masterProductForm] = Form.useForm();
+  const [masterProductSubmitting, setMasterProductSubmitting] = useState(false);
+  const [masterAutoCode, setMasterAutoCode] = useState('');
+  const [masterAutoBarcode, setMasterAutoBarcode] = useState('');
+  const [masterConstructedName, setMasterConstructedName] = useState('');
+  const [masterVariantMode, setMasterVariantMode] = useState('single'); // 'single' | 'multi'
+  const [masterSelectedMultiColors, setMasterSelectedMultiColors] = useState([]);
+  const [masterSelectedMultiSizes, setMasterSelectedMultiSizes] = useState([]);
+  const [masterColorImages, setMasterColorImages] = useState({});
+  const [masterFeaturedImageUrl, setMasterFeaturedImageUrl] = useState('');
+
+  const watchedMasterColor = Form.useWatch('color', masterProductForm);
+  const watchedMasterBarcode = Form.useWatch('barcode', masterProductForm);
+  const watchedMasterCode = Form.useWatch('product_code', masterProductForm);
+  const watchedMasterPrice = Form.useWatch('selling_price', masterProductForm);
+
+  const activeMasterColors = masterVariantMode === 'multi'
+    ? masterSelectedMultiColors
+    : (watchedMasterColor ? [watchedMasterColor] : (editingMasterProduct?.color ? editingMasterProduct.color.split('/').map(c => c.trim()) : []));
+
+  // Inline Quick Add state inside Master Product Modal
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [creatingCategoryInline, setCreatingCategoryInline] = useState(false);
+  const [newColorInput, setNewColorInput] = useState('');
+  const [newColorHex, setNewColorHex] = useState('#1e293b');
+  const [creatingColorInline, setCreatingColorInline] = useState(false);
+  const [newSizeInput, setNewSizeInput] = useState('');
+  const [creatingSizeInline, setCreatingSizeInline] = useState(false);
 
   // 1. Create Purchase Invoice Drawer State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -171,10 +245,13 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
   const fetchLookups = async () => {
     try {
-      const [supRes, brRes, prodRes] = await Promise.all([
+      const [supRes, brRes, prodRes, catRes, colorsRes, sizesRes] = await Promise.all([
         api.get('/api/swm/suppliers', { params: { limit: 100 } }),
         api.get('/api/swm/branches'),
-        api.get('/api/swm/products', { params: { limit: 250 } })
+        api.get('/api/swm/products', { params: { limit: 500, status: 'active', has_category: 'true' } }),
+        api.get('/api/swm/categories'),
+        api.get('/api/swm/attributes', { params: { type: 'color' } }),
+        api.get('/api/swm/attributes', { params: { type: 'size' } })
       ]);
       if (supRes.data.success) setSuppliersList(supRes.data.data);
       if (brRes.data.success) {
@@ -194,9 +271,31 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
           if (!standaloneBranch) setStandaloneBranch(main.id);
         }
       }
-      if (prodRes.data.success) setProductsList(prodRes.data.data);
+      if (prodRes.data.success) {
+        const registeredProds = (prodRes.data.data || []).filter(p => p.status === 'active' && p.category_id);
+        setProductsList(registeredProds);
+      }
+      if (catRes.data.success) setCategoriesList(catRes.data.data);
+      if (colorsRes.data.success) setColorsList(colorsRes.data.data);
+      if (sizesRes.data.success) setSizesList(sizesRes.data.data);
     } catch (e) {
       // Lookup error
+    }
+  };
+
+  const handleRefreshProductsList = async () => {
+    setRefreshingProducts(true);
+    try {
+      const res = await api.get('/api/swm/products', { params: { limit: 500, status: 'active', has_category: 'true' } });
+      if (res.data.success) {
+        const registeredProds = (res.data.data || []).filter(p => p.status === 'active' && p.category_id);
+        setProductsList(registeredProds);
+        message.success('تم تحديث ومزامنة قائمة الأصناف بنجاح');
+      }
+    } catch (e) {
+      message.error('فشل تحديث قائمة الأصناف');
+    } finally {
+      setRefreshingProducts(false);
     }
   };
 
@@ -211,7 +310,23 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   // ==========================================
 
   const calculateSubtotal = () => {
-    return items.reduce((sum, it) => sum + (parseFloat(it.line_total) || 0), 0);
+    return items.reduce((sum, it) => {
+      const itTotal = (it.variantRows || []).reduce((vSum, row) => {
+        if (!row.enabled || !row.quantity || row.quantity <= 0) return vSum;
+        return vSum + (parseFloat(row.line_total) || 0);
+      }, 0);
+      return sum + itTotal;
+    }, 0);
+  };
+
+  const calculateTotalPieces = () => {
+    return items.reduce((sum, it) => {
+      const itQty = (it.variantRows || []).reduce((vSum, row) => {
+        if (!row.enabled || !row.quantity || row.quantity <= 0) return vSum;
+        return vSum + (parseInt(row.quantity, 10) || 0);
+      }, 0);
+      return sum + itQty;
+    }, 0);
   };
 
   const calculatedSubtotal = calculateSubtotal();
@@ -221,43 +336,145 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   );
 
   const handleAddItem = () => {
-    setItems([
-      ...items,
+    setItems(prev => [
+      ...prev,
       {
         key: Date.now() + Math.random(),
         product_id: null,
-        variant_id: null,
         product_name: '',
-        quantity: 1,
-        unit_cost: 0,
-        selling_price: 0,
-        discount_pct: 0,
-        line_total: 0
+        product_code: '',
+        category_name: '',
+        loadingVariants: false,
+        batchQty: null,
+        batchCost: null,
+        batchSelling: null,
+        variantRows: []
       }
     ]);
   };
 
-  const handleUpdateItem = (key, field, value) => {
-    setItems(prev => prev.map(item => {
-      if (item.key !== key) return item;
-      const updated = { ...item, [field]: value };
+  const handleSelectProduct = async (itemKey, productId) => {
+    const prodMeta = productsList.find(p => p.id === productId);
+    if (!prodMeta) return;
 
-      if (field === 'product_id') {
-        const prod = productsList.find(p => p.id === value);
-        if (prod) {
-          updated.product_name = prod.product_name;
-          updated.unit_cost = parseFloat(prod.cost_price) || 0;
-          updated.selling_price = parseFloat(prod.selling_price) || 0;
-        }
+    // Set loading indicator for this item
+    setItems(prev => prev.map(it => it.key === itemKey ? {
+      ...it,
+      product_id: productId,
+      product_name: prodMeta.product_name,
+      product_code: prodMeta.product_code || prodMeta.barcode || '',
+      category_name: prodMeta.category_name || '',
+      loadingVariants: true,
+      variantRows: []
+    } : it));
+
+    try {
+      const res = await api.get(`/api/swm/products/${productId}`);
+      const fullProd = res.data?.data;
+      const variants = fullProd?.variants || [];
+      const baseCost = parseFloat(fullProd?.cost_price || prodMeta.cost_price) || 0;
+      const baseSelling = parseFloat(fullProd?.selling_price || prodMeta.selling_price) || 0;
+
+      let variantRows = [];
+      if (variants.length > 0) {
+        variantRows = variants.map(v => {
+          const cost = parseFloat(v.cost_price) || baseCost;
+          const selling = parseFloat(v.selling_price) || baseSelling;
+          return {
+            key: v.id,
+            variant_id: v.id,
+            color: v.color || '',
+            size: v.size || '',
+            sku: v.variant_sku || '',
+            enabled: true,
+            quantity: 1,
+            unit_cost: cost,
+            selling_price: selling,
+            discount_pct: 0,
+            line_total: cost
+          };
+        });
+      } else {
+        // Fallback for simple product without variants
+        variantRows = [
+          {
+            key: 'base',
+            variant_id: null,
+            color: null,
+            size: null,
+            sku: fullProd?.product_code || prodMeta.product_code || '—',
+            enabled: true,
+            quantity: 1,
+            unit_cost: baseCost,
+            selling_price: baseSelling,
+            discount_pct: 0,
+            line_total: baseCost
+          }
+        ];
       }
 
-      const qty = parseInt(updated.quantity, 10) || 0;
-      const cost = parseFloat(updated.unit_cost) || 0;
-      const disc = parseFloat(updated.discount_pct) || 0;
-      const discAmount = (qty * cost) * (disc / 100);
-      updated.line_total = Math.max(0, (qty * cost) - discAmount);
+      setItems(prev => prev.map(it => it.key === itemKey ? {
+        ...it,
+        loadingVariants: false,
+        variantRows
+      } : it));
+    } catch (err) {
+      message.error('تعذر جلب تفاصيل مقاسات وألوان الصنف');
+      setItems(prev => prev.map(it => it.key === itemKey ? { ...it, loadingVariants: false } : it));
+    }
+  };
 
-      return updated;
+  const handleUpdateVariantRow = (itemKey, variantKey, field, value) => {
+    setItems(prev => prev.map(it => {
+      if (it.key !== itemKey) return it;
+      const updatedVariantRows = it.variantRows.map(row => {
+        if (row.key !== variantKey) return row;
+        const updated = { ...row, [field]: value };
+        const qty = parseInt(updated.quantity, 10) || 0;
+        const cost = parseFloat(updated.unit_cost) || 0;
+        const disc = parseFloat(updated.discount_pct) || 0;
+        const discAmount = (qty * cost) * (disc / 100);
+        updated.line_total = Math.max(0, (qty * cost) - discAmount);
+        return updated;
+      });
+      return { ...it, variantRows: updatedVariantRows };
+    }));
+  };
+
+  const handleBatchUpdate = (itemKey, field, val) => {
+    setItems(prev => prev.map(it => {
+      if (it.key !== itemKey) return it;
+      return { ...it, [field]: val };
+    }));
+  };
+
+  const handleApplyBatch = (itemKey, targetField, val) => {
+    if (val === undefined || val === null || val === '') return;
+    const numVal = parseFloat(val) || 0;
+    setItems(prev => prev.map(it => {
+      if (it.key !== itemKey) return it;
+      const updatedRows = (it.variantRows || []).map(row => {
+        const updated = { ...row, [targetField]: numVal };
+        const qty = parseInt(updated.quantity, 10) || 0;
+        const cost = parseFloat(updated.unit_cost) || 0;
+        const disc = parseFloat(updated.discount_pct) || 0;
+        const discAmount = (qty * cost) * (disc / 100);
+        updated.line_total = Math.max(0, (qty * cost) - discAmount);
+        return updated;
+      });
+      return { ...it, variantRows: updatedRows };
+    }));
+    message.success('تم تطبيق القيمة بنجاح على كافة المتغيرات');
+  };
+
+  const handleToggleSelectAll = (itemKey, enabled) => {
+    setItems(prev => prev.map(it => {
+      if (it.key !== itemKey) return it;
+      const updatedVariantRows = (it.variantRows || []).map(row => ({
+        ...row,
+        enabled
+      }));
+      return { ...it, variantRows: updatedVariantRows };
     }));
   };
 
@@ -265,19 +482,652 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
     setItems(items.filter(it => it.key !== key));
   };
 
+  // ==========================================
+  // QUICK ADD VARIANT & NEW PRODUCT HANDLERS
+  // ==========================================
+
+  const handleQuickAddColorInline = async (colorName, colorCode) => {
+    if (!colorName?.trim()) return null;
+    try {
+      const res = await api.post('/api/swm/attributes', {
+        attribute_type: 'color',
+        name: colorName.trim(),
+        code: colorCode || '#000000'
+      });
+      if (res.data.success) {
+        setColorsList(prev => [...prev, res.data.data]);
+        return res.data.data;
+      }
+    } catch (err) {
+      // attribute might exist or skip
+    }
+    return null;
+  };
+
+  const handleQuickAddSizeInline = async (sizeName) => {
+    if (!sizeName?.trim()) return null;
+    try {
+      const res = await api.post('/api/swm/attributes', {
+        attribute_type: 'size',
+        name: sizeName.trim()
+      });
+      if (res.data.success) {
+        setSizesList(prev => [...prev, res.data.data]);
+        return res.data.data;
+      }
+    } catch (err) {
+      // attribute might exist or skip
+    }
+    return null;
+  };
+
+  const handleQuickAddGroupInline = async () => {
+    if (!newCategoryInput.trim()) return;
+    setCreatingCategoryInline(true);
+    try {
+      const res = await api.post('/api/swm/categories', {
+        category_name: newCategoryInput.trim(),
+        is_ecom_visible: true
+      });
+      if (res.data.success) {
+        setCategoriesList(prev => [...prev, res.data.data]);
+        quickProductForm.setFieldsValue({ category_id: res.data.data.id });
+        setNewCategoryInput('');
+        message.success(`تمت إضافة المجموعة "${res.data.data.category_name}"`);
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل إضافة المجموعة');
+    } finally {
+      setCreatingCategoryInline(false);
+    }
+  };
+
+  const handleOpenQuickVariantModal = (it) => {
+    setQuickVariantModalItem(it);
+    setQuickNewColorInput('');
+    setQuickNewSizeInput('');
+    const baseCost = it.batchCost ?? it.variantRows[0]?.unit_cost ?? 0;
+    const baseSelling = it.batchSelling ?? it.variantRows[0]?.selling_price ?? 0;
+    quickVariantForm.resetFields();
+    quickVariantForm.setFieldsValue({
+      color: undefined,
+      size: undefined,
+      quantity: 1,
+      unit_cost: baseCost,
+      selling_price: baseSelling
+    });
+  };
+
+  const handleSaveQuickVariant = async () => {
+    try {
+      const values = await quickVariantForm.validateFields();
+      if (!quickVariantModalItem) return;
+      setQuickVariantSubmitting(true);
+
+      let finalColor = values.color?.trim() || (quickNewColorInput.trim() || null);
+      let finalSize = values.size?.trim() || (quickNewSizeInput.trim() || null);
+
+      if (!finalColor && !finalSize) {
+        message.error('يرجى تحديد اللون أو المقاس للمتغير الجديد');
+        setQuickVariantSubmitting(false);
+        return;
+      }
+
+      if (quickNewColorInput.trim()) {
+        await handleQuickAddColorInline(quickNewColorInput.trim(), quickNewColorCode);
+        finalColor = quickNewColorInput.trim();
+      }
+
+      if (quickNewSizeInput.trim()) {
+        await handleQuickAddSizeInline(quickNewSizeInput.trim());
+        finalSize = quickNewSizeInput.trim();
+      }
+
+      const res = await api.post(`/api/swm/products/${quickVariantModalItem.product_id}/variants`, {
+        color: finalColor,
+        size: finalSize
+      });
+
+      const newVar = res.data?.data;
+      const qty = parseInt(values.quantity, 10) || 1;
+      const cost = parseFloat(values.unit_cost) || 0;
+      const selling = parseFloat(values.selling_price) || 0;
+
+      setItems(prev => prev.map(it => {
+        if (it.key !== quickVariantModalItem.key) return it;
+        const exists = (it.variantRows || []).some(
+          r => (newVar?.id && r.variant_id === newVar.id) || (r.color === finalColor && r.size === finalSize)
+        );
+        if (exists) {
+          const updatedRows = it.variantRows.map(r => {
+            if ((newVar?.id && r.variant_id === newVar.id) || (r.color === finalColor && r.size === finalSize)) {
+              const newQty = (parseInt(r.quantity, 10) || 0) + qty;
+              return {
+                ...r,
+                enabled: true,
+                quantity: newQty,
+                unit_cost: cost || r.unit_cost,
+                selling_price: selling || r.selling_price,
+                line_total: newQty * (cost || r.unit_cost)
+              };
+            }
+            return r;
+          });
+          return { ...it, variantRows: updatedRows };
+        } else {
+          const baseRows = (it.variantRows || []).filter(r => r.key !== 'base' || (r.quantity > 0 && r.enabled));
+          const newRow = {
+            key: newVar?.id || `var-${Date.now()}`,
+            variant_id: newVar?.id || null,
+            color: finalColor,
+            size: finalSize,
+            sku: newVar?.variant_sku || `${it.product_code || 'PRD'}-${finalColor || 'C'}-${finalSize || 'S'}`,
+            enabled: true,
+            quantity: qty,
+            unit_cost: cost,
+            selling_price: selling,
+            discount_pct: 0,
+            line_total: qty * cost
+          };
+          return { ...it, variantRows: [...baseRows, newRow] };
+        }
+      }));
+
+      message.success(`تمت إضافة المتغير (${finalColor || ''} ${finalSize || ''}) بنجاح وحفظه على الصنف بالفاتورة`);
+      setQuickVariantModalItem(null);
+      quickVariantForm.resetFields();
+    } catch (err) {
+      if (err.errorFields) return;
+      message.error(err.response?.data?.message || 'فشل حفظ المتغير على الصنف');
+    } finally {
+      setQuickVariantSubmitting(false);
+    }
+  };
+
+  // Helper to handle local file upload to Base64 data URI with canvas compression
+  const handleCompressFile = (file, callback) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800; // Optimal size for e-commerce and ERP product cards
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG 82% quality (typically ~40-90KB)
+        const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        callback(optimizedDataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    return false; // prevent automatic HTTP post
+  };
+
+  // Open Full Master Product Modal in Create Mode
+  const handleOpenMasterCreate = (targetItemKey = null) => {
+    setTargetInvoiceItemKey(targetItemKey);
+    setMasterProductMode('create');
+    setEditingMasterProduct(null);
+    masterProductForm.resetFields();
+
+    const randNum = Math.floor(100000 + Math.random() * 900000);
+    const code = `PRD-${randNum}`;
+    const barcode = generateValidEAN13('622');
+    setMasterAutoCode(code);
+    setMasterAutoBarcode(barcode);
+    setMasterConstructedName('');
+    setMasterVariantMode('single');
+    setMasterSelectedMultiColors([]);
+    setMasterSelectedMultiSizes([]);
+    setMasterColorImages({});
+    setMasterFeaturedImageUrl('');
+
+    masterProductForm.setFieldsValue({
+      product_code: code,
+      barcode: barcode,
+      brand: 'Yoka Store',
+      cost_price: 0,
+      selling_price: 0,
+      is_ecom_listed: false,
+      base_name: '',
+      color: colorsList[0]?.name || 'أسود',
+      size: sizesList[0]?.name || 'L',
+      product_name: '',
+      featured_image: '',
+      category_id: categoriesList[0]?.id || undefined
+    });
+
+    setMasterProductModalOpen(true);
+  };
+
+  // Open Full Master Product Modal in Edit Mode (from invoice item or lookup)
+  const handleOpenMasterEdit = async (productId, targetItemKey = null) => {
+    if (!productId) return;
+    setTargetInvoiceItemKey(targetItemKey);
+    setMasterProductMode('edit');
+    masterProductForm.resetFields();
+
+    try {
+      const res = await api.get(`/api/swm/products/${productId}`);
+      if (res.data.success) {
+        const prod = res.data.data;
+        setEditingMasterProduct(prod);
+        setMasterAutoCode(prod.product_code || '');
+        setMasterAutoBarcode(prod.barcode || '');
+        setMasterFeaturedImageUrl(prod.featured_image || '');
+
+        const initialColorImages = {};
+        if (prod.color_variants && Array.isArray(prod.color_variants)) {
+          prod.color_variants.forEach(cv => {
+            if (cv.color && cv.image_url) {
+              initialColorImages[cv.color] = cv.image_url;
+            }
+          });
+        }
+        if (prod.variants && Array.isArray(prod.variants)) {
+          prod.variants.forEach(v => {
+            if (v.color && v.image_url && !initialColorImages[v.color]) {
+              initialColorImages[v.color] = v.image_url;
+            }
+          });
+        }
+        setMasterColorImages(initialColorImages);
+
+        // Extract distinct colors
+        const rawColors = [];
+        if (prod.color) {
+          prod.color.split('/').forEach(c => {
+            const clean = c.trim();
+            if (clean && !rawColors.includes(clean)) rawColors.push(clean);
+          });
+        }
+        if (Array.isArray(prod.variants)) {
+          prod.variants.forEach(v => {
+            if (v.color && v.color.trim() && !rawColors.includes(v.color.trim())) {
+              rawColors.push(v.color.trim());
+            }
+          });
+        }
+        Object.keys(initialColorImages).forEach(c => {
+          if (c && !rawColors.includes(c)) rawColors.push(c);
+        });
+
+        // Extract distinct sizes
+        const rawSizes = [];
+        if (prod.size) {
+          prod.size.split('/').forEach(s => {
+            const clean = s.trim();
+            if (clean && !rawSizes.includes(clean)) rawSizes.push(clean);
+          });
+        }
+        if (Array.isArray(prod.variants)) {
+          prod.variants.forEach(v => {
+            if (v.size && v.size.trim() && !rawSizes.includes(v.size.trim())) {
+              rawSizes.push(v.size.trim());
+            }
+          });
+        }
+
+        const isMulti = rawColors.length > 1 || rawSizes.length > 1 || (Array.isArray(prod.variants) && prod.variants.length > 1);
+        setMasterVariantMode(isMulti ? 'multi' : 'single');
+        setMasterSelectedMultiColors(rawColors);
+        setMasterSelectedMultiSizes(rawSizes);
+
+        masterProductForm.setFieldsValue({
+          product_code: prod.product_code,
+          barcode: prod.barcode,
+          product_name: prod.product_name,
+          base_name: prod.product_name,
+          category_id: prod.category_id,
+          brand: prod.brand || 'Yoka Store',
+          cost_price: prod.cost_price,
+          selling_price: prod.selling_price,
+          sale_price: prod.sale_price,
+          status: prod.status || 'active',
+          is_ecom_listed: prod.is_ecom_listed,
+          featured_image: prod.featured_image || '',
+          color: rawColors[0] || prod.color || '',
+          size: rawSizes[0] || prod.size || ''
+        });
+
+        setMasterProductModalOpen(true);
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في تحميل بيانات الصنف للتعديل');
+    }
+  };
+
+  const handleRegenerateMasterCodes = () => {
+    const randNum = Math.floor(100000 + Math.random() * 900000);
+    const code = `PRD-${randNum}`;
+    const barcode = generateValidEAN13('622');
+    setMasterAutoCode(code);
+    setMasterAutoBarcode(barcode);
+    masterProductForm.setFieldsValue({
+      product_code: code,
+      barcode: barcode
+    });
+    message.info('تم توليد كود وباركود EAN-13 جديدين تلقائياً');
+  };
+
+  const handleMasterValuesChange = (changedValues) => {
+    if ('featured_image' in changedValues) {
+      setMasterFeaturedImageUrl(changedValues.featured_image || '');
+    }
+  };
+
+  // Inline Quick Add Category in Master Modal
+  const handleQuickAddCategoryInMaster = async () => {
+    if (!newCategoryInput.trim()) return message.warning('يرجى كتابة اسم المجموعة أولاً');
+    setCreatingCategoryInline(true);
+    try {
+      const res = await api.post('/api/swm/categories', {
+        category_name: newCategoryInput.trim(),
+        is_ecom_visible: true
+      });
+      if (res.data.success) {
+        message.success(`تمت إضافة مجموعة "${newCategoryInput.trim()}" بنجاح!`);
+        await fetchLookups();
+        masterProductForm.setFieldsValue({ category_id: res.data.data.id });
+        setNewCategoryInput('');
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في إضافة المجموعة');
+    } finally {
+      setCreatingCategoryInline(false);
+    }
+  };
+
+  // Inline Quick Add Color in Master Modal
+  const handleQuickAddColorInMaster = async () => {
+    if (!newColorInput.trim()) return message.warning('يرجى كتابة اسم اللون');
+    setCreatingColorInline(true);
+    try {
+      const res = await api.post('/api/swm/attributes', {
+        attribute_type: 'color',
+        name: newColorInput.trim(),
+        code: newColorHex
+      });
+      if (res.data.success) {
+        message.success(`تمت إضافة اللون "${newColorInput.trim()}" بنجاح!`);
+        await fetchLookups();
+        if (masterVariantMode === 'multi') {
+          setMasterSelectedMultiColors(prev => [...prev, newColorInput.trim()]);
+        } else {
+          masterProductForm.setFieldsValue({ color: newColorInput.trim() });
+        }
+        setNewColorInput('');
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في إضافة اللون');
+    } finally {
+      setCreatingColorInline(false);
+    }
+  };
+
+  // Inline Quick Add Size in Master Modal
+  const handleQuickAddSizeInMaster = async () => {
+    if (!newSizeInput.trim()) return message.warning('يرجى كتابة المقاس');
+    setCreatingSizeInline(true);
+    try {
+      const res = await api.post('/api/swm/attributes', {
+        attribute_type: 'size',
+        name: newSizeInput.trim(),
+        code: newSizeInput.trim()
+      });
+      if (res.data.success) {
+        message.success(`تمت إضافة المقاس "${newSizeInput.trim()}" بنجاح!`);
+        await fetchLookups();
+        if (masterVariantMode === 'multi') {
+          setMasterSelectedMultiSizes(prev => [...prev, newSizeInput.trim()]);
+        } else {
+          masterProductForm.setFieldsValue({ size: newSizeInput.trim() });
+        }
+        setNewSizeInput('');
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في إضافة المقاس');
+    } finally {
+      setCreatingSizeInline(false);
+    }
+  };
+
+  // Save Master Product (Create or Edit)
+  const handleSaveMasterProduct = async () => {
+    try {
+      const values = await masterProductForm.validateFields();
+      setMasterProductSubmitting(true);
+
+      const activeColorsList = masterVariantMode === 'multi'
+        ? masterSelectedMultiColors
+        : (values.color ? [values.color] : (editingMasterProduct?.color ? editingMasterProduct.color.split('/').map(c => c.trim()) : []));
+
+      const firstColorWithImg = activeColorsList.find(c => masterColorImages[c]);
+      const defaultFeatured = (firstColorWithImg && masterColorImages[firstColorWithImg]) || masterFeaturedImageUrl || values.featured_image || null;
+
+      if (masterProductMode === 'create') {
+        const finalProductName = values.product_name?.trim() || values.base_name?.trim();
+        if (!finalProductName) {
+          message.error('يرجى إدخال اسم الصنف');
+          setMasterProductSubmitting(false);
+          return;
+        }
+
+        let variantsPayload = [];
+        if (masterVariantMode === 'multi' && masterSelectedMultiColors.length > 0 && masterSelectedMultiSizes.length > 0) {
+          variantsPayload = masterSelectedMultiColors.flatMap((c, cIdx) =>
+            masterSelectedMultiSizes.map((s, sIdx) => {
+              const rawCode = masterAutoCode || values.product_code || 'PRD';
+              const cClean = c.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || `C${cIdx + 1}`;
+              const sClean = s.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || `S${sIdx + 1}`;
+              return {
+                color: c,
+                size: s,
+                sku: `${rawCode}-${cClean}-${sClean}`,
+                price_modifier: 0,
+                image_url: masterColorImages[c] || defaultFeatured || null
+              };
+            })
+          );
+        } else if (values.color || values.size) {
+          variantsPayload = [{
+            color: values.color || null,
+            size: values.size || null,
+            sku: masterAutoCode || values.product_code || 'PRD',
+            price_modifier: 0,
+            image_url: (values.color && masterColorImages[values.color]) || defaultFeatured || null
+          }];
+        }
+
+        const payload = {
+          product_code: masterAutoCode || values.product_code,
+          barcode: masterAutoBarcode || values.barcode,
+          product_name: finalProductName,
+          category_id: values.category_id,
+          brand: values.brand || 'Yoka Store',
+          color: masterVariantMode === 'multi' ? masterSelectedMultiColors.join(' / ') : (values.color || null),
+          size: masterVariantMode === 'multi' ? masterSelectedMultiSizes.join(' / ') : (values.size || null),
+          cost_price: Number(values.cost_price || 0),
+          selling_price: Number(values.selling_price || 0),
+          is_ecom_listed: Boolean(values.is_ecom_listed || false),
+          featured_image: defaultFeatured,
+          color_images: masterColorImages,
+          variants: variantsPayload
+        };
+
+        const res = await api.post('/api/swm/products', payload);
+        if (res.data.success) {
+          const newProd = res.data.data;
+          message.success(`تم إنشاء الصنف الجديد "${newProd.product_name}" بنجاح وإدراجه في الفاتورة!`);
+          await fetchLookups();
+
+          if (targetInvoiceItemKey) {
+            await handleSelectProduct(targetInvoiceItemKey, newProd.id);
+          } else {
+            const newKey = Date.now();
+            setItems(prev => [
+              ...prev,
+              {
+                key: newKey,
+                product_id: newProd.id,
+                product_name: newProd.product_name,
+                product_code: newProd.product_code,
+                category_name: categoriesList.find(c => c.id === newProd.category_id)?.category_name || '',
+                loadingVariants: true,
+                batchQty: null,
+                batchCost: null,
+                batchSelling: null,
+                variantRows: []
+              }
+            ]);
+            await handleSelectProduct(newKey, newProd.id);
+          }
+
+          setMasterProductModalOpen(false);
+          masterProductForm.resetFields();
+        }
+      } else {
+        // Edit mode
+        let variantsPayload = [];
+        if (masterVariantMode === 'multi' && masterSelectedMultiColors.length > 0 && masterSelectedMultiSizes.length > 0) {
+          variantsPayload = masterSelectedMultiColors.flatMap((c, cIdx) =>
+            masterSelectedMultiSizes.map((s, sIdx) => {
+              const rawCode = editingMasterProduct.product_code || values.product_code || 'PRD';
+              const cClean = c.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || `C${cIdx + 1}`;
+              const sClean = s.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || `S${sIdx + 1}`;
+              return {
+                color: c,
+                size: s,
+                sku: `${rawCode}-${cClean}-${sClean}`,
+                price_modifier: 0,
+                image_url: masterColorImages[c] || defaultFeatured || null
+              };
+            })
+          );
+        } else if (values.color || values.size) {
+          variantsPayload = [{
+            color: values.color || null,
+            size: values.size || null,
+            sku: editingMasterProduct.product_code || values.product_code || 'PRD',
+            price_modifier: 0,
+            image_url: (values.color && masterColorImages[values.color]) || defaultFeatured || null
+          }];
+        }
+
+        const { cost_price, selling_price, status, is_ecom_listed, ...restValues } = values;
+        const payload = {
+          ...restValues,
+          color: masterVariantMode === 'multi' ? masterSelectedMultiColors.join(' / ') : (values.color || null),
+          size: masterVariantMode === 'multi' ? masterSelectedMultiSizes.join(' / ') : (values.size || null),
+          featured_image: defaultFeatured,
+          color_images: masterColorImages,
+          variants: variantsPayload
+        };
+
+        const res = await api.put(`/api/swm/products/${editingMasterProduct.id}`, payload);
+        if (res.data.success) {
+          message.success(`تم تحديث بيانات الصنف "${values.product_name || editingMasterProduct.product_name}" بالمجموعات والأصناف وفي الفاتورة بنجاح!`);
+          await fetchLookups();
+
+          // Refresh all invoice items pointing to this product
+          const matchingItems = items.filter(it => it.product_id === editingMasterProduct.id);
+          for (const item of matchingItems) {
+            await handleSelectProduct(item.key, editingMasterProduct.id);
+          }
+          if (targetInvoiceItemKey && !matchingItems.some(it => it.key === targetInvoiceItemKey)) {
+            await handleSelectProduct(targetInvoiceItemKey, editingMasterProduct.id);
+          }
+
+          setMasterProductModalOpen(false);
+          setEditingMasterProduct(null);
+        }
+      }
+    } catch (err) {
+      if (err.errorFields) return;
+      message.error(err.response?.data?.message || 'فشل في حفظ بيانات الصنف');
+    } finally {
+      setMasterProductSubmitting(false);
+    }
+  };
+
+  // Barcode Printing Helpers
+  const handleOpenBarcodePrintFromCurrentDrawer = () => {
+    const printItems = [];
+    items.forEach(it => {
+      (it.variantRows || []).forEach(row => {
+        if (row.enabled && row.quantity > 0) {
+          printItems.push({
+            product_id: it.product_id,
+            product_name: it.product_name,
+            product_code: it.product_code || row.sku || '',
+            barcode: row.sku || it.product_code || '',
+            color: row.color || '',
+            size: row.size || '',
+            unit_cost: row.unit_cost,
+            selling_price: row.selling_price,
+            quantity: parseInt(row.quantity, 10) || 1
+          });
+        }
+      });
+    });
+    if (printItems.length === 0) {
+      return message.warning('لا توجد أصناف وكميات صالحة لطباعة الباركود في الفاتورة الحالية');
+    }
+    setBarcodeModalItems(printItems);
+    setBarcodeModalOpen(true);
+  };
+
+  const handleOpenBarcodePrintFromInvoice = (invoice) => {
+    if (!invoice || !invoice.items || invoice.items.length === 0) {
+      return message.warning('لا توجد أصناف في هذه الفاتورة للطباعة');
+    }
+    const printItems = invoice.items.map(it => ({
+      product_id: it.product_id,
+      product_name: it.product_name,
+      product_code: it.product_code || it.variant_sku || '',
+      barcode: it.barcode || it.product_code || it.variant_sku || '',
+      color: it.color || '',
+      size: it.size || '',
+      unit_cost: it.unit_cost,
+      selling_price: it.selling_price,
+      quantity: it.quantity || 1
+    }));
+    setBarcodeModalItems(printItems);
+    setBarcodeModalOpen(true);
+  };
+
   const handleOpenCreateDrawer = () => {
+    fetchLookups();
     if (defaultBranchId) setSelectedBranch(defaultBranchId);
     setItems([
       {
         key: Date.now(),
         product_id: null,
-        variant_id: null,
         product_name: '',
-        quantity: 1,
-        unit_cost: 0,
-        selling_price: 0,
-        discount_pct: 0,
-        line_total: 0
+        product_code: '',
+        category_name: '',
+        loadingVariants: false,
+        batchQty: null,
+        batchCost: null,
+        batchSelling: null,
+        variantRows: []
       }
     ]);
     setSplitPaymentBreakdown([]);
@@ -297,10 +1147,31 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
     if (!selectedBranch) return message.error('يرجى اختيار مستودع الاستلام');
     if (items.length === 0) return message.error('يجب إضافة صنف واحد على الأقل في الفاتورة');
 
+    // Flatten all selected variants across all items
+    const flatItems = [];
     for (const it of items) {
-      if (!it.product_id || !it.quantity || it.quantity <= 0) {
-        return message.error('يرجى التأكد من اختيار الصنف وإدخال كمية صحيحة');
+      if (!it.product_id) continue;
+      for (const row of (it.variantRows || [])) {
+        if (!row.enabled) continue;
+        const qty = parseInt(row.quantity, 10);
+        if (!qty || qty <= 0) continue;
+        const cost = parseFloat(row.unit_cost) || 0;
+        const selling = parseFloat(row.selling_price) || 0;
+        const disc = parseFloat(row.discount_pct) || 0;
+
+        flatItems.push({
+          product_id: it.product_id,
+          variant_id: row.variant_id || null,
+          quantity: qty,
+          unit_cost: cost,
+          selling_price: selling,
+          discount_pct: disc
+        });
       }
+    }
+
+    if (flatItems.length === 0) {
+      return message.error('يرجى اختيار المنتجات وتحديد كمية أكبر من صفر لمتغير واحد على الأقل');
     }
 
     setSubmitting(true);
@@ -317,19 +1188,33 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         payment_method: splitPaymentBreakdown.length > 1 ? 'split' : (splitPaymentBreakdown[0]?.method || 'cash'),
         payment_breakdown: splitPaymentBreakdown,
         notes,
-        items: items.map(it => ({
-          product_id: it.product_id,
-          variant_id: it.variant_id || null,
-          quantity: it.quantity,
-          unit_cost: parseFloat(it.unit_cost) || 0,
-          selling_price: it.selling_price !== undefined && it.selling_price !== null ? parseFloat(it.selling_price) : 0,
-          discount_pct: parseFloat(it.discount_pct) || 0
-        }))
+        items: flatItems
       };
 
       const res = await api.post('/api/swm/purchases', payload);
       if (res.data.success) {
-        message.success('تم اعتماد فاتورة المشتريات وتحديث أسعار الأصناف وأرصدة المخزون وحساب المورد بنجاح');
+        message.success('تم اعتماد فاتورة المشتريات وتحديث أسعار الأصناف والمتغيرات وأرصدة المخزون وحساب المورد بنجاح');
+
+        // Prepare items for barcode sticker printing if user wants
+        const printItemsSnapshot = [];
+        items.forEach(it => {
+          (it.variantRows || []).forEach(row => {
+            if (row.enabled && row.quantity > 0) {
+              printItemsSnapshot.push({
+                product_id: it.product_id,
+                product_name: it.product_name,
+                product_code: it.product_code || row.sku || '',
+                barcode: row.sku || it.product_code || '',
+                color: row.color || '',
+                size: row.size || '',
+                unit_cost: row.unit_cost,
+                selling_price: row.selling_price,
+                quantity: parseInt(row.quantity, 10) || 1
+              });
+            }
+          });
+        });
+
         setIsCreateOpen(false);
         setItems([]);
         setSelectedSupplier(null);
@@ -338,6 +1223,28 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         setSplitPaymentBreakdown([]);
         fetchInvoices(1);
         fetchLookups();
+
+        if (printItemsSnapshot.length > 0) {
+          Modal.confirm({
+            title: 'تم اعتماد فاتورة الشراء وتوريد البضاعة بنجاح!',
+            icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
+            content: (
+              <div>
+                <p>تم تحديث المخزون وحسابات المورد وتكاليف الأصناف بنجاح.</p>
+                <p style={{ fontWeight: 600, color: '#0f766e' }}>
+                  هل ترغب في طباعة ملصقات الباركود [الموديل - اللون - المقاس - الباركود - السعر] لقطع البضاعة المستلمة الآن؟
+                </p>
+              </div>
+            ),
+            okText: '🖨️ نعم، طباعة ملصقات الباركود',
+            cancelText: 'لاحقاً',
+            okButtonProps: { style: { backgroundColor: '#0d9488', borderColor: '#0d9488' } },
+            onOk: () => {
+              setBarcodeModalItems(printItemsSnapshot);
+              setBarcodeModalOpen(true);
+            }
+          });
+        }
       }
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في حفظ فاتورة المشتريات');
@@ -379,6 +1286,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   // ==============================================================
 
   const handleOpenStandaloneReturnDrawer = () => {
+    fetchLookups();
     if (defaultBranchId) setStandaloneBranch(defaultBranchId);
     setStandaloneSupplier(null);
     setStandaloneDate(new Date().toISOString().split('T')[0]);
@@ -1024,11 +1932,19 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       <Drawer
         title="تسجيل فاتورة مشتريات وتوريد بضاعة"
         placement="left"
-        width={1050}
+        width={1150}
         onClose={() => setIsCreateOpen(false)}
         open={isCreateOpen}
         extra={
           <Space>
+            <Button
+              icon={<BarcodeOutlined />}
+              onClick={handleOpenBarcodePrintFromCurrentDrawer}
+              style={{ color: '#0f766e', borderColor: '#0f766e' }}
+              disabled={!items.some(it => (it.variantRows || []).some(r => r.enabled && r.quantity > 0))}
+            >
+              🖨️ طباعة ملصقات الباركود للبضاعة
+            </Button>
             <Button onClick={() => setIsCreateOpen(false)}>إلغاء</Button>
             <Button
               type="primary"
@@ -1103,123 +2019,426 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             style={{ marginBottom: 12 }}
           />
 
-          <Table
-            size="small"
-            dataSource={items}
-            pagination={false}
-            columns={[
-              {
-                title: 'الصنف / المنتج',
-                dataIndex: 'product_id',
-                key: 'product_id',
-                width: 280,
-                render: (_, record) => (
-                  <Select
-                    showSearch
-                    placeholder="اختر الصنف..."
-                    value={record.product_id}
-                    onChange={(val) => handleUpdateItem(record.key, 'product_id', val)}
-                    style={{ width: '100%' }}
-                    filterOption={(input, opt) => (opt?.label || '').toLowerCase().includes(input.toLowerCase())}
-                    options={productsList.map(p => ({
-                      value: p.id,
-                      label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
-                    }))}
-                  />
-                )
-              },
-              {
-                title: 'الكمية',
-                dataIndex: 'quantity',
-                key: 'quantity',
-                width: 90,
-                render: (_, record) => (
-                  <InputNumber
-                    min={1}
-                    value={record.quantity}
-                    onChange={(val) => handleUpdateItem(record.key, 'quantity', val || 1)}
-                    style={{ width: '100%' }}
-                  />
-                )
-              },
-              {
-                title: 'سعر التكلفة (Cost Price)',
-                dataIndex: 'unit_cost',
-                key: 'unit_cost',
-                width: 140,
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    precision={2}
-                    value={record.unit_cost}
-                    onChange={(val) => handleUpdateItem(record.key, 'unit_cost', val || 0)}
-                    style={{ width: '100%' }}
-                    addonAfter="ج.م"
-                  />
-                )
-              },
-              {
-                title: 'سعر البيع النهائي (Selling Price)',
-                dataIndex: 'selling_price',
-                key: 'selling_price',
-                width: 140,
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    precision={2}
-                    value={record.selling_price}
-                    onChange={(val) => handleUpdateItem(record.key, 'selling_price', val || 0)}
-                    style={{ width: '100%', borderColor: '#16a34a' }}
-                    addonAfter="ج.م"
-                  />
-                )
-              },
-              {
-                title: 'نسبة الخصم %',
-                dataIndex: 'discount_pct',
-                key: 'discount_pct',
-                width: 100,
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    max={100}
-                    value={record.discount_pct}
-                    onChange={(val) => handleUpdateItem(record.key, 'discount_pct', val || 0)}
-                    style={{ width: '100%' }}
-                  />
-                )
-              },
-              {
-                title: 'إجمالي السطر',
-                dataIndex: 'line_total',
-                key: 'line_total',
-                width: 120,
-                render: (val) => <Text strong>{(parseFloat(val) || 0).toLocaleString()} ج.م</Text>
-              },
-              {
-                title: '',
-                key: 'actions',
-                width: 50,
-                render: (_, record) => (
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveItem(record.key)}
-                  />
-                )
-              }
-            ]}
-          />
+          {/* Products & Multi-Variant Matrix List */}
+          <div style={{ marginBottom: 16 }}>
+            {items.map((it, idx) => {
+              const itemTotal = (it.variantRows || []).reduce((sum, row) => {
+                if (!row.enabled || !row.quantity || row.quantity <= 0) return sum;
+                return sum + (parseFloat(row.line_total) || 0);
+              }, 0);
+              const itemPieces = (it.variantRows || []).reduce((sum, row) => {
+                if (!row.enabled || !row.quantity || row.quantity <= 0) return sum;
+                return sum + (parseInt(row.quantity, 10) || 0);
+              }, 0);
+              const allSelected = (it.variantRows || []).length > 0 && it.variantRows.every(r => r.enabled);
 
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={handleAddItem}
-            style={{ width: '100%', marginTop: 8 }}
-          >
-            إضافة صنف للفاتورة
-          </Button>
+              return (
+                <Card
+                  key={it.key}
+                  size="small"
+                  style={{
+                    marginBottom: 16,
+                    border: it.product_id ? '1px solid #93c5fd' : '1px dashed #cbd5e1',
+                    borderRadius: 10,
+                    boxShadow: it.product_id ? '0 4px 12px rgba(37, 99, 235, 0.05)' : '0 1px 3px rgba(0,0,0,0.03)',
+                    background: '#ffffff',
+                    overflow: 'hidden'
+                  }}
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, padding: '4px 0' }}>
+                      <Space align="center" wrap style={{ flex: 1 }}>
+                        <Badge count={idx + 1} style={{ backgroundColor: it.product_id ? '#16a34a' : '#2563eb' }} />
+                        <Text strong style={{ fontSize: 13.5 }}>الصنف {idx + 1}:</Text>
+
+                        {/* Category / Group Filter */}
+                        <Select
+                          allowClear
+                          placeholder="📁 كل المجموعات"
+                          value={it.category_filter || undefined}
+                          onChange={(catId) => {
+                            setItems(prev => prev.map(item => item.key === it.key ? {
+                              ...item,
+                              category_filter: catId,
+                              product_id: null,
+                              variantRows: []
+                            } : item));
+                          }}
+                          style={{ width: 160 }}
+                          options={[
+                            { value: '', label: '📁 كل المجموعات' },
+                            ...categoriesList.map(c => ({ value: c.id, label: `📁 ${c.category_name}` }))
+                          ]}
+                        />
+
+                        {/* Product Selector filtered by category */}
+                        <Select
+                          showSearch
+                          placeholder="🔍 ابحث بالاسم أو كود الصنف أو الباركود..."
+                          value={it.product_id}
+                          onChange={(val) => handleSelectProduct(it.key, val)}
+                          style={{ minWidth: 320 }}
+                          filterOption={(input, opt) => (opt?.label || '').toLowerCase().includes(input.toLowerCase())}
+                          options={productsList
+                            .filter(p => p.status === 'active' && p.category_id && (!it.category_filter || p.category_id === it.category_filter))
+                            .map(p => ({
+                              value: p.id,
+                              label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'بدون كود'})`
+                            }))}
+                        />
+
+                        {/* Edit Master Product button (when product is selected) */}
+                        {it.product_id && (
+                          <Tooltip title="فتح نافذة تعديل الصنف بالكامل وتحديث بياناته بالمجموعات والأصناف والفاتورة">
+                            <Button
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={() => handleOpenMasterEdit(it.product_id, it.key)}
+                              style={{ color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', fontWeight: 600 }}
+                            >
+                              تعديل الصنف
+                            </Button>
+                          </Tooltip>
+                        )}
+
+                        {/* Create new product directly into this slot if product/group not found */}
+                        <Tooltip title="إضافة صنف جديد تماماً إلى المجموعات والأصناف وربطه فوراً بهذه الخانة">
+                          <Button
+                            size="small"
+                            type="dashed"
+                            icon={<PlusOutlined />}
+                            onClick={() => handleOpenMasterCreate(it.key)}
+                            style={{ color: '#7c3aed', borderColor: '#c4b5fd', background: '#f5f3ff' }}
+                          >
+                            + صنف جديد
+                          </Button>
+                        </Tooltip>
+
+                        <Tooltip title="تحديث ومزامنة قائمة الأصناف">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<ReloadOutlined spin={refreshingProducts} />}
+                            onClick={handleRefreshProductsList}
+                            style={{ color: '#4f46e5' }}
+                          />
+                        </Tooltip>
+                      </Space>
+
+                      <Space>
+                        {it.product_id && (
+                          <Tag color="cyan" style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, fontWeight: 700 }}>
+                            {itemPieces} قطعة مختارة | {itemTotal.toLocaleString()} ج.م
+                          </Tag>
+                        )}
+                        <Button
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => handleRemoveItem(it.key)}
+                          title="حذف الصنف من الفاتورة"
+                        >
+                          حذف الصنف
+                        </Button>
+                      </Space>
+                    </div>
+                  }
+                >
+                  {it.loadingVariants ? (
+                    <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                      <Spin tip="جاري جلب تفاصيل المقاسات والألوان وأسعار الصنف..." />
+                    </div>
+                  ) : !it.product_id ? (
+                    <Alert
+                      message="اختر الصنف من القائمة المنسدلة أعلاه لتظهر لك جميع ألوانه ومقاساته لتحديد الكميات وأسعار التكلفة والبيع."
+                      type="info"
+                      showIcon
+                      style={{ margin: '8px 0' }}
+                    />
+                  ) : (
+                    <div>
+                      {/* Quick Batch Apply Toolbar if more than 1 variant */}
+                      {it.variantRows.length > 1 && (
+                        <div style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 6,
+                          padding: '8px 12px',
+                          marginBottom: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: 8
+                        }}>
+                          <Space size="middle" wrap align="middle">
+                            <Button
+                              size="small"
+                              type={allSelected ? 'default' : 'primary'}
+                              ghost={!allSelected}
+                              icon={allSelected ? <BorderOutlined /> : <CheckSquareOutlined />}
+                              onClick={() => handleToggleSelectAll(it.key, !allSelected)}
+                            >
+                              {allSelected ? 'إلغاء تحديد الكل' : 'تحديد جميع المقاسات/الألوان'}
+                            </Button>
+
+                            <Space size="small">
+                              <Text type="secondary" style={{ fontSize: 12 }}>كمية موحدة:</Text>
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                placeholder="الكمية"
+                                value={it.batchQty}
+                                onChange={(v) => handleBatchUpdate(it.key, 'batchQty', v)}
+                                style={{ width: 80 }}
+                              />
+                              <Button
+                                size="small"
+                                onClick={() => handleApplyBatch(it.key, 'quantity', it.batchQty)}
+                              >
+                                تطبيق
+                              </Button>
+                            </Space>
+
+                            <Space size="small">
+                              <Text type="secondary" style={{ fontSize: 12 }}>سعر تكلفة موحد:</Text>
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                precision={2}
+                                placeholder="التكلفة"
+                                value={it.batchCost}
+                                onChange={(v) => handleBatchUpdate(it.key, 'batchCost', v)}
+                                style={{ width: 95 }}
+                              />
+                              <Button
+                                size="small"
+                                onClick={() => handleApplyBatch(it.key, 'unit_cost', it.batchCost)}
+                              >
+                                تطبيق
+                              </Button>
+                            </Space>
+
+                            <Space size="small">
+                              <Text type="secondary" style={{ fontSize: 12 }}>سعر بيع موحد:</Text>
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                precision={2}
+                                placeholder="سعر البيع"
+                                value={it.batchSelling}
+                                onChange={(v) => handleBatchUpdate(it.key, 'batchSelling', v)}
+                                style={{ width: 95 }}
+                              />
+                              <Button
+                                size="small"
+                                onClick={() => handleApplyBatch(it.key, 'selling_price', it.batchSelling)}
+                              >
+                                تطبيق
+                              </Button>
+                            </Space>
+                          </Space>
+                        </div>
+                      )}
+
+                      {/* Variants Matrix Table */}
+                      <Table
+                        size="small"
+                        dataSource={it.variantRows}
+                        pagination={false}
+                        rowKey="key"
+                        columns={[
+                          {
+                            title: 'تضمين',
+                            key: 'enabled',
+                            width: 60,
+                            align: 'center',
+                            render: (_, row) => (
+                              <Checkbox
+                                checked={row.enabled}
+                                onChange={(e) => handleUpdateVariantRow(it.key, row.key, 'enabled', e.target.checked)}
+                              />
+                            )
+                          },
+                          ...(it.variantRows.some(r => r.variant_id) ? [
+                            {
+                              title: 'اللون',
+                              dataIndex: 'color',
+                              key: 'color',
+                              width: 100,
+                              render: (color, row) => row.enabled ? (
+                                <Tag color="geekblue" style={{ fontSize: 12 }}>{color || 'عام'}</Tag>
+                              ) : <Text type="secondary">{color || '—'}</Text>
+                            },
+                            {
+                              title: 'المقاس',
+                              dataIndex: 'size',
+                              key: 'size',
+                              width: 90,
+                              render: (size, row) => row.enabled ? (
+                                <Tag color="purple" style={{ fontSize: 12, fontWeight: 600 }}>{size || 'حر'}</Tag>
+                              ) : <Text type="secondary">{size || '—'}</Text>
+                            },
+                            {
+                              title: 'كود المتغير / SKU',
+                              dataIndex: 'sku',
+                              key: 'sku',
+                              width: 150,
+                              render: (sku) => sku ? <Text code style={{ fontSize: 11 }}>{sku}</Text> : <Text type="secondary">—</Text>
+                            }
+                          ] : [
+                            {
+                              title: 'اسم الصنف الأساسي',
+                              key: 'single_name',
+                              render: () => <Text strong>{it.product_name} (بدون متغيرات)</Text>
+                            }
+                          ]),
+                          {
+                            title: 'الكمية المشتراة',
+                            dataIndex: 'quantity',
+                            key: 'quantity',
+                            width: 110,
+                            render: (_, row) => (
+                              <InputNumber
+                                min={0}
+                                disabled={!row.enabled}
+                                value={row.quantity}
+                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'quantity', val || 0)}
+                                style={{ width: '100%', fontWeight: 600 }}
+                              />
+                            )
+                          },
+                          {
+                            title: 'سعر التكلفة (Cost)',
+                            dataIndex: 'unit_cost',
+                            key: 'unit_cost',
+                            width: 140,
+                            render: (_, row) => (
+                              <InputNumber
+                                min={0}
+                                precision={2}
+                                disabled={!row.enabled}
+                                value={row.unit_cost}
+                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'unit_cost', val || 0)}
+                                style={{ width: '100%' }}
+                                addonAfter="ج.م"
+                              />
+                            )
+                          },
+                          {
+                            title: 'سعر البيع النهائي (Selling)',
+                            dataIndex: 'selling_price',
+                            key: 'selling_price',
+                            width: 140,
+                            render: (_, row) => (
+                              <InputNumber
+                                min={0}
+                                precision={2}
+                                disabled={!row.enabled}
+                                value={row.selling_price}
+                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'selling_price', val || 0)}
+                                style={{ width: '100%', borderColor: '#16a34a' }}
+                                addonAfter="ج.م"
+                              />
+                            )
+                          },
+                          {
+                            title: 'نسبة الخصم %',
+                            dataIndex: 'discount_pct',
+                            key: 'discount_pct',
+                            width: 95,
+                            render: (_, row) => (
+                              <InputNumber
+                                min={0}
+                                max={100}
+                                disabled={!row.enabled}
+                                value={row.discount_pct}
+                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'discount_pct', val || 0)}
+                                style={{ width: '100%' }}
+                              />
+                            )
+                          },
+                          {
+                            title: 'إجمالي السطر',
+                            dataIndex: 'line_total',
+                            key: 'line_total',
+                            width: 120,
+                            render: (val, row) => row.enabled ? (
+                              <Text strong style={{ color: '#15803d' }}>
+                                {(parseFloat(val) || 0).toLocaleString()} ج.م
+                              </Text>
+                            ) : (
+                              <Text type="secondary">—</Text>
+                            )
+                          }
+                        ]}
+                      />
+
+
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+
+          <Row gutter={12} style={{ marginTop: 4, marginBottom: 8 }}>
+            <Col xs={24} sm={14}>
+              <Button
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={handleAddItem}
+                style={{ width: '100%', height: 42, borderColor: '#2563eb', color: '#2563eb', fontWeight: 600, borderRadius: 6 }}
+              >
+                + اختيار صنف / منتج مسجل بالفاتورة
+              </Button>
+            </Col>
+            <Col xs={24} sm={10}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => handleOpenMasterCreate(null)}
+                style={{ width: '100%', height: 42, backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: 600, borderRadius: 6 }}
+              >
+                ✨ إضافة صنف جديد للمنظومة والفاتورة
+              </Button>
+            </Col>
+          </Row>
+
+          {items.length > 0 && (
+            <div style={{
+              margin: '14px 0',
+              padding: '12px 18px',
+              background: 'linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%)',
+              border: '1px solid #a7f3d0',
+              borderRadius: 8,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 12
+            }}>
+              <Space size="large" wrap>
+                <Text strong style={{ color: '#065f46', fontSize: 13.5 }}>
+                  📦 إجمالي الأصناف بالفاتورة: {items.filter(i => i.product_id).length} منتج
+                </Text>
+                <Text strong style={{ color: '#065f46', fontSize: 13.5 }}>
+                  🔢 إجمالي عدد القطع المشتراة: {calculateTotalPieces()} قطعة
+                </Text>
+                <Text strong style={{ color: '#065f46', fontSize: 15 }}>
+                  💰 إجمالي بضاعة المشتريات: {calculateSubtotal().toLocaleString()} ج.م
+                </Text>
+              </Space>
+
+              <Button
+                icon={<BarcodeOutlined />}
+                onClick={handleOpenBarcodePrintFromCurrentDrawer}
+                style={{ color: '#0f766e', borderColor: '#0f766e', background: '#ffffff', fontWeight: 700 }}
+                disabled={!items.some(it => (it.variantRows || []).some(r => r.enabled && r.quantity > 0))}
+              >
+                🖨️ طباعة ملصقات الباركود للبضاعة
+              </Button>
+            </div>
+          )}
 
           <Divider orientation="left" style={{ margin: '16px 0' }}>الإجماليات والمدفوعات (Totals & Multi-Tender)</Divider>
 
@@ -1412,10 +2631,12 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                     onChange={(val) => handleUpdateStandaloneItem(record.key, 'product_id', val)}
                     style={{ width: '100%' }}
                     filterOption={(input, opt) => (opt?.label || '').toLowerCase().includes(input.toLowerCase())}
-                    options={productsList.map(p => ({
-                      value: p.id,
-                      label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
-                    }))}
+                    options={productsList
+                      .filter(p => p.status === 'active' && p.category_id)
+                      .map(p => ({
+                        value: p.id,
+                        label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
+                      }))}
                   />
                 )
               },
@@ -1788,6 +3009,13 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             <span>تفاصيل فاتورة المشتريات: {selectedInvoice?.invoice_number || ''}</span>
             <Space>
               <Button
+                icon={<BarcodeOutlined />}
+                onClick={() => handleOpenBarcodePrintFromInvoice(selectedInvoice)}
+                style={{ color: '#0f766e', borderColor: '#0f766e' }}
+              >
+                طباعة باركود البضاعة
+              </Button>
+              <Button
                 danger
                 icon={<RollbackOutlined />}
                 onClick={() => {
@@ -1811,6 +3039,14 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         onCancel={() => setDetailsOpen(false)}
         footer={[
           <Button key="close" onClick={() => setDetailsOpen(false)}>إغلاق</Button>,
+          <Button
+            key="barcode"
+            icon={<BarcodeOutlined />}
+            onClick={() => handleOpenBarcodePrintFromInvoice(selectedInvoice)}
+            style={{ color: '#0f766e', borderColor: '#0f766e' }}
+          >
+            طباعة ملصقات الباركود
+          </Button>,
           <Button
             key="return"
             danger
@@ -2316,6 +3552,792 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* MODAL: QUICK ADD VARIANT (COLOR / SIZE) TO PRODUCT        */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <Space>
+            <TagsOutlined style={{ color: '#0284c7' }} />
+            <span>إضافة لون أو مقاس جديد للصنف: {quickVariantModalItem?.product_name}</span>
+          </Space>
+        }
+        open={Boolean(quickVariantModalItem)}
+        onCancel={() => {
+          setQuickVariantModalItem(null);
+          quickVariantForm.resetFields();
+        }}
+        onOk={handleSaveQuickVariant}
+        confirmLoading={quickVariantSubmitting}
+        okText="حفظ وإضافة إلى الفاتورة"
+        cancelText="إلغاء"
+        destroyOnClose
+        width={550}
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="سيتم حفظ هذا المتغير (اللون/المقاس) تلقائياً على بطاقة الصنف الأصلية (Master Product) وسيظهر متاحاً في النظام وفي الفاتورة الحالية."
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={quickVariantForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="color"
+                label={
+                  <Space>
+                    <BgColorsOutlined style={{ color: '#7c3aed' }} />
+                    <span>اللون:</span>
+                  </Space>
+                }
+              >
+                <Select
+                  placeholder="اختر لوناً أو اكتب جديداً..."
+                  allowClear
+                  showSearch
+                  dropdownRender={(menu) => (
+                    <>
+                      {menu}
+                      <Divider style={{ margin: '8px 0' }} />
+                      <div style={{ padding: '0 8px 4px' }}>
+                        <Space.Compact style={{ width: '100%' }}>
+                          <Input
+                            placeholder="لون جديد..."
+                            value={quickNewColorInput}
+                            onChange={(e) => setQuickNewColorInput(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            style={{ flex: 1 }}
+                          />
+                          <input
+                            type="color"
+                            value={quickNewColorCode}
+                            onChange={(e) => setQuickNewColorCode(e.target.value)}
+                            style={{ width: 34, height: 32, padding: 2, cursor: 'pointer', border: '1px solid #d9d9d9' }}
+                          />
+                          <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={async () => {
+                              if (!quickNewColorInput.trim()) return;
+                              await handleQuickAddColorInline(quickNewColorInput.trim(), quickNewColorCode);
+                              quickVariantForm.setFieldsValue({ color: quickNewColorInput.trim() });
+                              setQuickNewColorInput('');
+                            }}
+                            style={{ backgroundColor: '#7c3aed' }}
+                          >
+                            إضافة
+                          </Button>
+                        </Space.Compact>
+                      </div>
+                    </>
+                  )}
+                >
+                  {colorsList.map(c => (
+                    <Option key={c.id} value={c.name}>
+                      <Space align="middle">
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: c.code || '#000',
+                            border: '1px solid #cbd5e1'
+                          }}
+                        />
+                        <span>{c.name}</span>
+                      </Space>
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item
+                name="size"
+                label={
+                  <Space>
+                    <ColumnWidthOutlined style={{ color: '#0284c7' }} />
+                    <span>المقاس / الحجم:</span>
+                  </Space>
+                }
+              >
+                <Select
+                  placeholder="اختر مقاساً أو اكتب جديداً..."
+                  allowClear
+                  showSearch
+                  dropdownRender={(menu) => (
+                    <>
+                      {menu}
+                      <Divider style={{ margin: '8px 0' }} />
+                      <Space style={{ padding: '0 8px 4px', width: '100%' }}>
+                        <Input
+                          placeholder="مقاس جديد (مثل: 5XL أو 42)..."
+                          value={quickNewSizeInput}
+                          onChange={(e) => setQuickNewSizeInput(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          style={{ minWidth: 140 }}
+                        />
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={async () => {
+                            if (!quickNewSizeInput.trim()) return;
+                            await handleQuickAddSizeInline(quickNewSizeInput.trim());
+                            quickVariantForm.setFieldsValue({ size: quickNewSizeInput.trim() });
+                            setQuickNewSizeInput('');
+                          }}
+                          style={{ backgroundColor: '#0284c7' }}
+                        >
+                          إضافة
+                        </Button>
+                      </Space>
+                    </>
+                  )}
+                >
+                  {sizesList.map(s => (
+                    <Option key={s.id} value={s.name}>
+                      <Tag color="blue">{s.name}</Tag>
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="quantity"
+                label="الكمية المشتراة"
+                rules={[{ required: true, message: 'مطلوب' }]}
+              >
+                <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="unit_cost"
+                label="سعر التكلفة"
+                rules={[{ required: true, message: 'مطلوب' }]}
+              >
+                <InputNumber min={0} precision={2} style={{ width: '100%' }} addonAfter="ج.م" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="selling_price"
+                label="سعر البيع المقترح"
+              >
+                <InputNumber min={0} precision={2} style={{ width: '100%' }} addonAfter="ج.م" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* MODAL: BARCODE LABELS PRINT (THERMAL ROLLS & A4 SHEETS)   */}
+      {/* ========================================================= */}
+      <BarcodePrintModal
+        open={barcodeModalOpen}
+        onClose={() => setBarcodeModalOpen(false)}
+        itemsData={barcodeModalItems}
+      />
+
+      {/* ========================================================= */}
+      {/* MODAL: MASTER PRODUCT MANAGEMENT (CREATE & EDIT MODES)    */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '96%' }}>
+            <Space>
+              {masterProductMode === 'create' ? (
+                <>
+                  <PlusOutlined style={{ color: '#7c3aed', fontSize: 18 }} />
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                    إضافة صنف جديد تماماً إلى النظام وإدراجه بالفاتورة
+                  </span>
+                </>
+              ) : (
+                <>
+                  <EditOutlined style={{ color: '#2563eb', fontSize: 18 }} />
+                  <span style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                    تعديل بطاقة الصنف بالمجموعات والأصناف: {editingMasterProduct?.product_name || ''}
+                  </span>
+                </>
+              )}
+            </Space>
+          </div>
+        }
+        open={masterProductModalOpen}
+        onCancel={() => {
+          setMasterProductModalOpen(false);
+          setEditingMasterProduct(null);
+          masterProductForm.resetFields();
+        }}
+        onOk={handleSaveMasterProduct}
+        confirmLoading={masterProductSubmitting}
+        okText={masterProductMode === 'create' ? 'حفظ الصنف وإدراجه بالفاتورة' : 'حفظ وتحديث بيانات الصنف'}
+        cancelText="إلغاء"
+        destroyOnClose
+        width={780}
+      >
+        <Form
+          form={masterProductForm}
+          layout="vertical"
+          onValuesChange={handleMasterValuesChange}
+        >
+          {/* 1. Barcode and Code Auto-Generation Row */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+            <Row gutter={16} align="middle">
+              <Col xs={24} sm={10}>
+                <Form.Item
+                  name="product_code"
+                  label={<Text strong style={{ fontSize: 12.5 }}>كود الصنف (Item Code)</Text>}
+                  rules={[{ required: true, message: 'مطلوب' }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <Input
+                    readOnly={masterProductMode === 'edit'}
+                    addonAfter={
+                      masterProductMode === 'create' ? (
+                        <Tooltip title="توليد كود تلقائي">
+                          <Button
+                            type="link"
+                            size="small"
+                            icon={<ReloadOutlined />}
+                            onClick={handleRegenerateMasterCodes}
+                            style={{ padding: 0, height: 'auto' }}
+                          />
+                        </Tooltip>
+                      ) : null
+                    }
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={10}>
+                <Form.Item
+                  name="barcode"
+                  label={<Text strong style={{ fontSize: 12.5 }}>الباركود الدولي (EAN-13)</Text>}
+                  style={{ marginBottom: 0 }}
+                >
+                  <Input
+                    addonAfter={
+                      masterProductMode === 'create' ? (
+                        <Tooltip title="توليد باركود EAN-13 متوافق">
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => masterProductForm.setFieldsValue({ barcode: generateValidEAN13('622') })}
+                            style={{ padding: 0, height: 'auto', fontWeight: 600 }}
+                          >
+                            توليد
+                          </Button>
+                        </Tooltip>
+                      ) : null
+                    }
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={4} style={{ textAlign: 'center' }}>
+                <div style={{ paddingTop: 18 }}>
+                  <BarcodeImage
+                    barcode={watchedMasterBarcode || masterAutoBarcode || '6221234567890'}
+                    height={28}
+                    width={1.1}
+                    displayValue={false}
+                  />
+                </div>
+              </Col>
+            </Row>
+          </div>
+
+          {/* 2. Names and Categories */}
+          <Row gutter={16}>
+            <Col xs={24} sm={16}>
+              <Form.Item
+                name="product_name"
+                label="اسم الصنف (Product Name)"
+                rules={[{ required: true, message: 'يرجى إدخال اسم الصنف' }]}
+              >
+                <Input placeholder="اسم الصنف (مثل: LV، قميص أكسفورد، كوتشي نايك...)" />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={8}>
+              <Form.Item name="brand" label="الماركة / البراند">
+                <Input placeholder="Yoka Store" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Category Selector with Inline Creation */}
+          <Form.Item
+            name="category_id"
+            label="المجموعة / القسم التابع له الصنف"
+            rules={[{ required: true, message: 'يرجى اختيار المجموعة' }]}
+          >
+            <Select
+              placeholder="اختر المجموعة أو أنشئ مجموعة جديدة فوراً بالأسفل..."
+              showSearch
+              filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
+              dropdownRender={(menu) => (
+                <>
+                  {menu}
+                  <Divider style={{ margin: '8px 0' }} />
+                  <Space style={{ padding: '0 8px 4px', width: '100%' }}>
+                    <Input
+                      placeholder="اسم مجموعة جديدة..."
+                      value={newCategoryInput}
+                      onChange={(e) => setNewCategoryInput(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      style={{ minWidth: 200 }}
+                    />
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      loading={creatingCategoryInline}
+                      onClick={handleQuickAddCategoryInMaster}
+                      style={{ backgroundColor: '#5b21b6' }}
+                    >
+                      إضافة المجموعة
+                    </Button>
+                  </Space>
+                </>
+              )}
+            >
+              {categoriesList.map(c => (
+                <Option key={c.id} value={c.id}>📁 {c.category_name}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          {/* 3. VARIANT OPTIONS (SINGLE VS MULTI-VARIANT) - MATCHING IMAGE 1 */}
+          <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text strong style={{ color: '#334155', fontSize: 13.5 }}>
+                خيارات وتنوع الصنف (طريقة إدارة الألوان والمقاسات):
+              </Text>
+              <Tag color={masterVariantMode === 'multi' ? 'purple' : 'default'} style={{ fontWeight: 600 }}>
+                {masterVariantMode === 'multi' ? 'وضع المقاسات والألوان المتعددة (Multi-Variants)' : 'صنف بسيط'}
+              </Tag>
+            </div>
+
+            <Radio.Group
+              value={masterVariantMode}
+              onChange={(e) => setMasterVariantMode(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <Row gutter={12}>
+                <Col xs={24} sm={12}>
+                  <Card
+                    hoverable
+                    size="small"
+                    style={{
+                      border: masterVariantMode === 'single' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                      borderRadius: 8,
+                      backgroundColor: masterVariantMode === 'single' ? '#f5f3ff' : '#ffffff',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setMasterVariantMode('single')}
+                  >
+                    <Radio value="single">
+                      <Text strong style={{ color: masterVariantMode === 'single' ? '#6d28d9' : '#475569' }}>
+                        1. صنف بسيط (لون ومقاس محدد فقط)
+                      </Text>
+                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
+                        يناسب الأصناف التي لا تحتوي على تشكيلة مقاسات أو ألوان (مثل: شنطة لون أسود مقاس موحد، أو إكسسوار محدد).
+                      </div>
+                    </Radio>
+                  </Card>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <Card
+                    hoverable
+                    size="small"
+                    style={{
+                      border: masterVariantMode === 'multi' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                      borderRadius: 8,
+                      backgroundColor: masterVariantMode === 'multi' ? '#f5f3ff' : '#ffffff',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => setMasterVariantMode('multi')}
+                  >
+                    <Radio value="multi">
+                      <Text strong style={{ color: masterVariantMode === 'multi' ? '#6d28d9' : '#475569' }}>
+                        2. صنف متعدد الألوان والمقاسات (Multi-Variants)
+                      </Text>
+                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
+                        توليد شبكة متكاملة من الألوان والمقاسات تلقائياً (مثل: قميص متوفر بـ 3 ألوان و 4 مقاسات = توليد 12 تركيبة وربط صورة لكل لون).
+                      </div>
+                    </Radio>
+                  </Card>
+                </Col>
+              </Row>
+            </Radio.Group>
+          </div>
+
+          {/* 4. DYNAMIC VARIANT INPUTS (SINGLE VS MULTI) - MATCHING IMAGE 1 */}
+          {masterVariantMode === 'multi' ? (
+            <div style={{ backgroundColor: '#f5f3ff', border: '1.5px solid #c4b5fd', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+              <Text strong style={{ color: '#5b21b6', display: 'block', marginBottom: 10, fontSize: 13.5 }}>
+                <Space>
+                  <TagsOutlined />
+                  <span>تحديد المقاسات والألوان المتعددة لهذا الصنف:</span>
+                </Space>
+              </Text>
+              <Row gutter={16}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label={
+                      <Space>
+                        <BgColorsOutlined style={{ color: '#7c3aed' }} />
+                        <Text strong style={{ color: '#6d28d9' }}>الألوان المتاحة (Multiple Colors):</Text>
+                      </Space>
+                    }
+                    required
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      mode="multiple"
+                      placeholder="حدد ألوان الصنف..."
+                      value={masterSelectedMultiColors}
+                      onChange={setMasterSelectedMultiColors}
+                      allowClear
+                      style={{ width: '100%' }}
+                      dropdownRender={(menu) => (
+                        <>
+                          {menu}
+                          <Divider style={{ margin: '8px 0' }} />
+                          <div style={{ padding: '0 8px 4px' }}>
+                            <Space.Compact style={{ width: '100%' }}>
+                              <Input
+                                placeholder="لون جديد..."
+                                value={newColorInput}
+                                onChange={(e) => setNewColorInput(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                style={{ flex: 1 }}
+                              />
+                              <input
+                                type="color"
+                                value={newColorHex}
+                                onChange={(e) => setNewColorHex(e.target.value)}
+                                style={{ width: 34, height: 32, padding: 2, cursor: 'pointer', border: '1px solid #d9d9d9' }}
+                              />
+                              <Button
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                loading={creatingColorInline}
+                                onClick={handleQuickAddColorInMaster}
+                                style={{ backgroundColor: '#7c3aed' }}
+                              >
+                                إضافة
+                              </Button>
+                            </Space.Compact>
+                          </div>
+                        </>
+                      )}
+                    >
+                      {colorsList.map(c => (
+                        <Option key={c.id} value={c.name}>
+                          <Space align="middle">
+                            <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', backgroundColor: c.code || '#000', border: '1px solid #cbd5e1' }} />
+                            <span>{c.name}</span>
+                          </Space>
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label={
+                      <Space>
+                        <ColumnWidthOutlined style={{ color: '#0284c7' }} />
+                        <Text strong style={{ color: '#0369a1' }}>المقاسات المتاحة (Multiple Sizes):</Text>
+                      </Space>
+                    }
+                    required
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      mode="multiple"
+                      placeholder="حدد مقاسات الصنف..."
+                      value={masterSelectedMultiSizes}
+                      onChange={setMasterSelectedMultiSizes}
+                      allowClear
+                      style={{ width: '100%' }}
+                      dropdownRender={(menu) => (
+                        <>
+                          {menu}
+                          <Divider style={{ margin: '8px 0' }} />
+                          <Space style={{ padding: '0 8px 4px', width: '100%' }}>
+                            <Input
+                              placeholder="مقاس جديد (مثل: 4XL)..."
+                              value={newSizeInput}
+                              onChange={(e) => setNewSizeInput(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              style={{ minWidth: 140 }}
+                            />
+                            <Button
+                              type="primary"
+                              icon={<PlusOutlined />}
+                              loading={creatingSizeInline}
+                              onClick={handleQuickAddSizeInMaster}
+                              style={{ backgroundColor: '#0284c7' }}
+                            >
+                              إضافة
+                            </Button>
+                          </Space>
+                        </>
+                      )}
+                    >
+                      {sizesList.map(s => (
+                        <Option key={s.id} value={s.name}>
+                          <Tag color="blue" style={{ fontWeight: 600 }}>{s.name}</Tag>
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+          ) : (
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="color" label="اللون (Color)">
+                  <Select
+                    placeholder="اختر لون الصنف..."
+                    allowClear
+                    showSearch
+                    dropdownRender={(menu) => (
+                      <>
+                        {menu}
+                        <Divider style={{ margin: '8px 0' }} />
+                        <div style={{ padding: '0 8px 4px' }}>
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Input
+                              placeholder="لون جديد..."
+                              value={newColorInput}
+                              onChange={(e) => setNewColorInput(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              style={{ flex: 1 }}
+                            />
+                            <input
+                              type="color"
+                              value={newColorHex}
+                              onChange={(e) => setNewColorHex(e.target.value)}
+                              style={{ width: 34, height: 32, padding: 2, cursor: 'pointer', border: '1px solid #d9d9d9' }}
+                            />
+                            <Button
+                              type="primary"
+                              icon={<PlusOutlined />}
+                              loading={creatingColorInline}
+                              onClick={handleQuickAddColorInMaster}
+                              style={{ backgroundColor: '#7c3aed' }}
+                            >
+                              إضافة
+                            </Button>
+                          </Space.Compact>
+                        </div>
+                      </>
+                    )}
+                  >
+                    {colorsList.map(c => (
+                      <Option key={c.id} value={c.name}>
+                        <Space align="middle">
+                          <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', backgroundColor: c.code || '#000', border: '1px solid #cbd5e1' }} />
+                          <span>{c.name}</span>
+                        </Space>
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="size" label="المقاس (Size)">
+                  <Select
+                    placeholder="اختر المقاس..."
+                    allowClear
+                    showSearch
+                    dropdownRender={(menu) => (
+                      <>
+                        {menu}
+                        <Divider style={{ margin: '8px 0' }} />
+                        <Space style={{ padding: '0 8px 4px', width: '100%' }}>
+                          <Input
+                            placeholder="مقاس جديد..."
+                            value={newSizeInput}
+                            onChange={(e) => setNewSizeInput(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            style={{ minWidth: 140 }}
+                          />
+                          <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            loading={creatingSizeInline}
+                            onClick={handleQuickAddSizeInMaster}
+                            style={{ backgroundColor: '#0284c7' }}
+                          >
+                            إضافة
+                          </Button>
+                        </Space>
+                      </>
+                    )}
+                  >
+                    {sizesList.map(s => (
+                      <Option key={s.id} value={s.name}>
+                        <Tag color="blue" style={{ fontWeight: 600 }}>{s.name}</Tag>
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
+
+          {/* 5. DEDICATED IMAGE FOR EACH COLOR - EXACT MATCH WITH IMAGE 1 */}
+          {activeMasterColors.length > 0 && (
+            <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                <Space align="middle">
+                  <PictureOutlined style={{ color: '#16a34a', fontSize: 18 }} />
+                  <Text strong style={{ color: '#15803d', fontSize: 14 }}>
+                    صور ألوان الصنف (صورة مخصصة لكل لون):
+                  </Text>
+                </Space>
+                <Tag color={activeMasterColors.every(c => masterColorImages[c]) ? 'green' : 'blue'}>
+                  {activeMasterColors.filter(c => masterColorImages[c]).length} من {activeMasterColors.length} ألوان تم تحديد صورها
+                </Tag>
+              </div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12, color: '#166534' }}>
+                💡 يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
+              </Text>
+
+              <Row gutter={[12, 12]}>
+                {activeMasterColors.map(colName => {
+                  const colObj = colorsList.find(c => c.name === colName);
+                  const hasImg = Boolean(masterColorImages[colName]);
+                  return (
+                    <Col xs={24} sm={12} key={colName}>
+                      <div
+                        style={{
+                          background: '#ffffff',
+                          border: hasImg ? '1.5px solid #22c55e' : '1px dashed #cbd5e1',
+                          borderRadius: 8,
+                          padding: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          height: '100%',
+                          minHeight: 88,
+                          boxShadow: hasImg ? '0 2px 6px rgba(34,197,94,0.1)' : 'none'
+                        }}
+                      >
+                        {/* Thumbnail on Right */}
+                        <div
+                          style={{
+                            width: 66,
+                            height: 66,
+                            borderRadius: 6,
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: '#f8fafc',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            flexShrink: 0
+                          }}
+                        >
+                          {hasImg ? (
+                            <img
+                              src={masterColorImages[colName]}
+                              alt={colName}
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            />
+                          ) : (
+                            <CameraOutlined style={{ fontSize: 24, color: '#94a3b8' }} />
+                          )}
+                        </div>
+
+                        {/* Details and Actions on Left */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <Space align="middle" size={6}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  width: 14,
+                                  height: 14,
+                                  borderRadius: '50%',
+                                  backgroundColor: colObj?.code || '#000',
+                                  border: '1px solid #cbd5e1'
+                                }}
+                              />
+                              <Text strong style={{ fontSize: 13 }}>{colName}</Text>
+                            </Space>
+                            {hasImg ? (
+                              <Button
+                                type="text"
+                                danger
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                onClick={() => {
+                                  setMasterColorImages(prev => {
+                                    const next = { ...prev };
+                                    delete next[colName];
+                                    return next;
+                                  });
+                                }}
+                                style={{ padding: '0 4px', height: 20 }}
+                              >
+                                مسح
+                              </Button>
+                            ) : (
+                              <Text type="secondary" style={{ fontSize: 11 }}>بدون صورة</Text>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <Upload
+                              beforeUpload={(file) => {
+                                handleCompressFile(file, (dataUrl) => {
+                                  setMasterColorImages(prev => ({ ...prev, [colName]: dataUrl }));
+                                  message.success(`تم حفظ صورة لون "${colName}" بنجاح!`);
+                                });
+                                return false;
+                              }}
+                              showUploadList={false}
+                              accept="image/*"
+                            >
+                              <Button size="small" icon={<UploadOutlined />} style={{ fontSize: 12 }}>
+                                {hasImg ? 'تغيير' : 'رفع صورة'}
+                              </Button>
+                            </Upload>
+                            {hasImg && (
+                              <Tag color="success" style={{ margin: 0, fontSize: 11 }}>
+                                صورة مرفوعة
+                              </Tag>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Col>
+                  );
+                })}
+              </Row>
+            </div>
+          )}
+
+
+        </Form>
       </Modal>
     </div>
   );

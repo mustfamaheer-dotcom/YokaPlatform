@@ -730,6 +730,43 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           throw new Error(`Product ID ${item.product_id} not found`);
         }
 
+        // Auto-resolve or create variant if color/size provided but variant_id is missing
+        let effectiveVariantId = item.variant_id || null;
+        if (!effectiveVariantId && (item.color || item.size)) {
+          const cleanColor = item.color ? String(item.color).trim() : null;
+          const cleanSize = item.size ? String(item.size).trim() : null;
+
+          const existingVar = await client.query(
+            `SELECT id FROM product_variants 
+             WHERE product_id = $1 
+               AND (color = $2 OR (color IS NULL AND $2 IS NULL)) 
+               AND (size = $3 OR (size IS NULL AND $3 IS NULL)) 
+             LIMIT 1`,
+            [item.product_id, cleanColor, cleanSize]
+          );
+
+          if (existingVar.rows.length > 0) {
+            effectiveVariantId = existingVar.rows[0].id;
+          } else {
+            const cClean = cleanColor ? cleanColor.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'COL' : 'GEN';
+            const sClean = cleanSize ? cleanSize.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'SIZ' : 'ONE';
+            let vSku = `${prod.product_code}-${cClean}-${sClean}`;
+            const skuCheck = await client.query(`SELECT id FROM product_variants WHERE variant_sku = $1`, [vSku]);
+            if (skuCheck.rows.length > 0) {
+              vSku = `${vSku}-${Math.floor(Math.random() * 900 + 100)}`;
+            }
+
+            const insVar = await client.query(
+              `INSERT INTO product_variants (
+                product_id, variant_sku, color, size, price_modifier, status, created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, 0, 'active', NOW(), NOW())
+              RETURNING id`,
+              [item.product_id, vSku, cleanColor, cleanSize]
+            );
+            effectiveVariantId = insVar.rows[0].id;
+          }
+        }
+
         // Insert purchase invoice item including selling_price
         const [insertedItem] = (await client.query(
           `INSERT INTO purchase_invoice_items (
@@ -740,7 +777,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           [
             newInvoice.id,
             item.product_id,
-            item.variant_id || null,
+            effectiveVariantId,
             qty,
             unitCost,
             sellingPrice,
@@ -756,12 +793,12 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
         // 3. Update or Insert inventory_balances with FOR UPDATE locking
         let balanceRow;
-        if (item.variant_id) {
+        if (effectiveVariantId) {
           const res = await client.query(
             `SELECT * FROM inventory_balances
              WHERE branch_id = $1 AND product_id = $2 AND variant_id = $3
              FOR UPDATE`,
-            [warehouse_branch_id, item.product_id, item.variant_id]
+            [warehouse_branch_id, item.product_id, effectiveVariantId]
           );
           balanceRow = res.rows[0];
         } else {

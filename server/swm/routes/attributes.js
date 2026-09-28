@@ -44,7 +44,7 @@ router.get('/', requireAuth, async (req, res) => {
  * POST /api/swm/attributes
  * Add new size or color
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_manager']), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'inventory_manager']), async (req, res) => {
   try {
     const { attribute_type, name, code, display_order } = req.body;
     if (!attribute_type || !['size', 'color'].includes(attribute_type.toLowerCase())) {

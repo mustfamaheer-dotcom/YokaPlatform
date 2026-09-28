@@ -176,23 +176,29 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
   }, [autoOpenCreate]);
 
   // Add Item to Transfer
-  const handleAddItem = (productId) => {
-    if (!productId) return;
-    const stockRow = availableStock.find((s) => s.product_id === productId);
+  const handleAddItem = (balanceId) => {
+    if (!balanceId) return;
+    const stockRow = availableStock.find((s) => s.balance_id === balanceId);
     if (!stockRow) return;
 
-    const existing = transferItems.find((i) => i.product_id === productId && i.variant_id === stockRow.variant_id);
+    const existing = transferItems.find(
+      (i) => i.product_id === stockRow.product_id && (i.variant_id || null) === (stockRow.variant_id || null)
+    );
     if (existing) {
-      message.warning('هذا الصنف مضاف بالفعل في قائمة التحويل');
+      message.warning('هذا الصنف بالمقاس واللون المحدد مضاف بالفعل في قائمة التحويل');
       return;
     }
 
     setTransferItems((prev) => [
       ...prev,
       {
+        balance_id: stockRow.balance_id,
         product_id: stockRow.product_id,
         variant_id: stockRow.variant_id || null,
-        product_name: stockRow.display_name || stockRow.product_name,
+        product_name: stockRow.product_name,
+        display_name: stockRow.display_name,
+        color: stockRow.color,
+        size: stockRow.size,
         product_code: stockRow.product_code,
         barcode: stockRow.variant_sku || stockRow.barcode,
         available_qty: stockRow.available_qty,
@@ -244,7 +250,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
           product_id: item.product_id,
           variant_id: item.variant_id,
           quantity: item.quantity,
-          product_name: item.product_name,
+          product_name: item.display_name || item.product_name,
           product_code: item.product_code,
           notes: item.notes
         }))
@@ -614,14 +620,14 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
                   value={null}
                   style={{ width: '100%' }}
                   options={availableStock.map((s) => ({
-                    value: s.product_id,
-                    label: `${s.display_name} | كود: ${s.product_code} (المتاح: ${s.available_qty} قطعة)`
+                    value: s.balance_id,
+                    label: `${s.display_name} | كود: ${s.variant_sku || s.product_code} (المتاح: ${s.available_qty} قطعة)`
                   }))}
                 />
               </Col>
               <Col span={6}>
                 <div style={{ textAlign: 'center', fontSize: 12, color: '#64748b' }}>
-                  الأصناف المتوفرة بالمخزن: <strong>{availableStock.length}</strong>
+                  الأصناف والمتغيرات المتوفرة: <strong>{availableStock.length}</strong>
                 </div>
               </Col>
             </Row>
@@ -632,7 +638,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
               <thead style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <th style={{ padding: '8px 10px' }}>الصنف والكود</th>
+                  <th style={{ padding: '8px 10px' }}>الصنف والمتغير</th>
                   <th style={{ padding: '8px 10px', textAlign: 'center' }}>الرصيد المتاح</th>
                   <th style={{ padding: '8px 10px', textAlign: 'center', width: 120 }}>الكمية المنصرفة</th>
                   <th style={{ padding: '8px 10px' }}>ملاحظات الصنف</th>
@@ -644,7 +650,11 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
                   <tr key={`${item.product_id}-${item.variant_id || '0'}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '8px 10px' }}>
                       <div style={{ fontWeight: 600 }}>{item.product_name}</div>
-                      <Text code style={{ fontSize: 11 }}>{item.product_code}</Text>
+                      <Space size={4} style={{ marginTop: 2, flexWrap: 'wrap' }}>
+                        {item.color && <Tag color="geekblue" style={{ fontSize: 11, margin: 0 }}>{item.color}</Tag>}
+                        {item.size && <Tag color="purple" style={{ fontSize: 11, margin: 0, fontWeight: 600 }}>{item.size}</Tag>}
+                        <Text code style={{ fontSize: 11 }}>{item.barcode || item.product_code}</Text>
+                      </Space>
                     </td>
                     <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                       <Tag color="cyan">{item.available_qty} قطعة</Tag>

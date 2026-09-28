@@ -311,8 +311,9 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
     try {
       const res = await api.delete(`/api/swm/categories/${catId}`);
       if (res.data.success) {
-        message.success('تم حذف المجموعة بنجاح');
+        message.success(res.data.message || 'تم حذف المجموعة بنجاح');
         fetchCategories();
+        fetchItems(itemsPagination.current);
       }
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في حذف المجموعة');
@@ -537,12 +538,9 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       barcode: barcode,
       category_id: selectedCategoryFilter || (categories[0]?.id || null),
       brand: 'Yoka Store',
-      cost_price: 100,
-      selling_price: 180,
       material: '',
       color: colors[0]?.name || 'أسود',
-      size: sizes[0]?.name || 'L',
-      is_ecom_listed: true
+      size: sizes[0]?.name || 'L'
     });
     setIsItemModalOpen(true);
   };
@@ -566,10 +564,14 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       });
     }
 
+    let variants = [];
+    let fullProduct = item;
     try {
       const res = await api.get(`/api/swm/products/${item.id}`);
-      if (res.data.success && Array.isArray(res.data.variants)) {
-        res.data.variants.forEach(v => {
+      if (res.data?.success && res.data?.data) {
+        fullProduct = { ...item, ...res.data.data };
+        variants = Array.isArray(res.data.data.variants) ? res.data.data.variants : [];
+        variants.forEach(v => {
           if (v.color && v.image_url && !initialColorImages[v.color]) {
             initialColorImages[v.color] = v.image_url;
           }
@@ -581,38 +583,42 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
 
     setColorImages(initialColorImages);
 
-    const isMulti = Boolean(
-      (item.variant_count && item.variant_count > 1) ||
-      (item.color && item.color.includes('/')) ||
-      (item.size && item.size.includes('/'))
-    );
+    // Determine colors and sizes from variants first, or fallback to product item
+    const loadedColors = [...new Set(variants.map(v => v.color).filter(Boolean))];
+    const loadedSizes = [...new Set(variants.map(v => v.size).filter(Boolean))];
+
+    const fallbackColors = fullProduct.color ? fullProduct.color.split('/').map(s => s.trim()).filter(Boolean) : [];
+    const fallbackSizes = fullProduct.size ? fullProduct.size.split('/').map(s => s.trim()).filter(Boolean) : [];
+
+    const finalColors = loadedColors.length > 0 ? loadedColors : fallbackColors;
+    const finalSizes = loadedSizes.length > 0 ? loadedSizes : fallbackSizes;
+
+    const isMulti = variants.length > 1 || finalColors.length > 1 || finalSizes.length > 1;
     setIsMultiVariant(isMulti);
 
     if (isMulti) {
-      const multiColors = item.color ? item.color.split('/').map(s => s.trim()).filter(Boolean) : [];
-      const multiSizes = item.size ? item.size.split('/').map(s => s.trim()).filter(Boolean) : [];
-      setSelectedMultiColors(multiColors);
-      setSelectedMultiSizes(multiSizes);
+      setSelectedMultiColors(finalColors);
+      setSelectedMultiSizes(finalSizes);
     } else {
       setSelectedMultiColors([]);
       setSelectedMultiSizes([]);
     }
 
     itemForm.setFieldsValue({
-      product_name: item.product_name,
-      product_code: item.product_code,
-      barcode: item.barcode,
-      category_id: item.category_id,
-      brand: item.brand || 'Yoka Store',
-      color: item.color || '',
-      size: item.size || '',
-      material: item.material || '',
-      cost_price: parseFloat(item.cost_price) || 0,
-      selling_price: parseFloat(item.selling_price) || 0,
-      wholesale_price: parseFloat(item.wholesale_price) || 0,
-      status: item.status || 'active',
-      is_ecom_listed: Boolean(item.is_ecom_listed),
-      featured_image: item.featured_image || ''
+      product_name: fullProduct.product_name,
+      product_code: fullProduct.product_code,
+      barcode: fullProduct.barcode,
+      category_id: fullProduct.category_id,
+      brand: fullProduct.brand || 'Yoka Store',
+      color: finalColors[0] || fullProduct.color || '',
+      size: finalSizes[0] || fullProduct.size || '',
+      material: fullProduct.material || '',
+      cost_price: parseFloat(fullProduct.cost_price) || 0,
+      selling_price: parseFloat(fullProduct.selling_price) || 0,
+      wholesale_price: parseFloat(fullProduct.wholesale_price) || 0,
+      status: fullProduct.status || 'active',
+      is_ecom_listed: Boolean(fullProduct.is_ecom_listed),
+      featured_image: fullProduct.featured_image || ''
     });
     setIsItemModalOpen(true);
   };
@@ -668,6 +674,10 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       }
 
       const payload = {
+        cost_price: editingItem ? (parseFloat(editingItem.cost_price) || 0) : 0,
+        selling_price: editingItem ? (parseFloat(editingItem.selling_price) || 0) : 0,
+        wholesale_price: editingItem ? (parseFloat(editingItem.wholesale_price) || 0) : 0,
+        is_ecom_listed: editingItem ? Boolean(editingItem.is_ecom_listed) : false,
         ...values,
         featured_image: defaultFeatured,
         color_images: colorImages,
@@ -707,11 +717,11 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
     try {
       const res = await api.delete(`/api/swm/products/${itemId}`);
       if (res.data.success) {
-        message.success('تم تعطيل الصنف');
+        message.success(res.data.message || 'تم حذف / تعطيل الصنف بنجاح');
         fetchItems(itemsPagination.current);
       }
     } catch (err) {
-      message.error(err.response?.data?.message || 'فشل في تعطيل الصنف');
+      message.error(err.response?.data?.message || 'فشل في حذف الصنف');
     }
   };
 
@@ -822,14 +832,20 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
             تعديل
           </Button>
           <Popconfirm
-            title="حذف المجموعة"
-            description="هل أنت متأكد من حذف هذه المجموعة؟ لا يمكن الحذف إذا كانت تحتوي على أصناف."
+            title="تأكيد حذف المجموعة"
+            description={
+              parseInt(record.products_count, 10) > 0
+                ? `هذه المجموعة تحتوي على (${record.products_count}) صنف. هل أنت متأكد من حذفها؟ (ستبقى الأصناف محفوظة في النظام ولكن بدون مجموعة مربوطة).`
+                : 'هل أنت متأكد من حذف هذه المجموعة؟'
+            }
             onConfirm={() => handleDeleteGroup(record.id)}
-            okText="نعم، حذف"
+            okText="نعم، موافق واحذف"
             cancelText="إلغاء"
             okButtonProps={{ danger: true }}
           >
-            <Button size="small" danger icon={<DeleteOutlined />} />
+            <Button size="small" danger icon={<DeleteOutlined />}>
+              حذف
+            </Button>
           </Popconfirm>
         </Space>
       )
@@ -1098,72 +1114,35 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
         );
       }
     },
-    {
-      title: 'سعر التكلفة (للمشتريات)',
-      dataIndex: 'cost_price',
-      key: 'cost_price',
-      width: 130,
-      render: (cost) => (
-        <Text strong style={{ color: '#047857' }}>
-          {parseFloat(cost || 0).toLocaleString()} ج.م
-        </Text>
-      )
-    },
-    {
-      title: 'سعر البيع',
-      dataIndex: 'selling_price',
-      key: 'selling_price',
-      width: 110,
-      render: (price) => (
-        <Text strong style={{ color: '#0284c7' }}>
-          {parseFloat(price || 0).toLocaleString()} ج.م
-        </Text>
-      )
-    },
-    {
-      title: 'المخزون',
-      dataIndex: 'total_stock',
-      key: 'total_stock',
-      width: 90,
-      render: (stk) => {
-        const stock = parseInt(stk, 10) || 0;
-        return (
-          <Tag color={stock > 0 ? 'cyan' : 'default'} style={{ fontWeight: 600 }}>
-            {stock}
-          </Tag>
-        );
-      }
-    },
-    {
-      title: 'الحالة',
-      dataIndex: 'status',
-      key: 'status',
-      width: 80,
-      render: (st) => st === 'active'
-        ? <Tag color="success">نشط</Tag>
-        : <Tag color="default">معطل</Tag>
-    },
+
     {
       title: 'إجراءات',
       key: 'actions',
-      width: 120,
+      width: 160,
+      fixed: 'left',
+      align: 'center',
       render: (_, record) => (
-        <Space>
+        <Space size="small">
           <Button
+            type="primary"
             size="small"
             icon={<EditOutlined />}
             onClick={() => handleOpenEditItem(record)}
+            style={{ backgroundColor: '#2563eb' }}
           >
             تعديل
           </Button>
           <Popconfirm
-            title="تعطيل الصنف"
-            description="هل أنت متأكد من تعطيل هذا الصنف؟"
+            title="حذف الصنف"
+            description="هل أنت متأكد من حذف هذا الصنف؟ (سيتم حذفه أو تعطيله إذا كان مرتبطاً بحركات سابقة)"
             onConfirm={() => handleDeleteItem(record.id)}
-            okText="نعم"
+            okText="نعم، احذف"
             cancelText="إلغاء"
+            okButtonProps={{ danger: true }}
           >
-            <Button size="small" danger icon={<StopOutlined />} />
+            <Button size="small" danger icon={<DeleteOutlined />}>
+              حذف
+            </Button>
           </Popconfirm>
         </Space>
       )
@@ -1422,7 +1401,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
               <div>
                 <Card style={{ marginBottom: 16 }}>
                   <Row gutter={[16, 16]} align="middle">
-                    <Col xs={24} md={8}>
+                    <Col xs={24} md={10}>
                       <Input
                         prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
                         placeholder="ابحث باسم الصنف، الكود، الباركود، أو الماركة..."
@@ -1432,7 +1411,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                         size="large"
                       />
                     </Col>
-                    <Col xs={24} md={8}>
+                    <Col xs={24} md={10}>
                       <Select
                         placeholder="تصفية حسب المجموعة (Category Filter)..."
                         value={selectedCategoryFilter}
@@ -1447,19 +1426,6 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                             {c.category_name} ({parseInt(c.products_count, 10) || 0} صنف)
                           </Option>
                         ))}
-                      </Select>
-                    </Col>
-                    <Col xs={24} md={4}>
-                      <Select
-                        placeholder="الحالة"
-                        value={selectedStatusFilter}
-                        onChange={setSelectedStatusFilter}
-                        allowClear
-                        size="large"
-                        style={{ width: '100%' }}
-                      >
-                        <Option value="active">نشط فقط</Option>
-                        <Option value="discontinued">معطل</Option>
                       </Select>
                     </Col>
                     <Col xs={24} md={4} style={{ textAlign: 'left' }}>
@@ -1743,35 +1709,88 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
           </div>
 
           {/* 4. Variant Mode Selection: Single Item vs Multi-variant */}
-          {!editingItem && (
-            <div style={{ marginBottom: 16, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px' }}>
-              <Text strong style={{ display: 'block', marginBottom: 8, color: '#1e293b' }}>
-                خيارات وتنوع الصنف (Variant Mode):
+          <div style={{ marginBottom: 16, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text strong style={{ color: '#1e293b', fontSize: 13 }}>
+                خيارات وتنوع الصنف (طريقة إدارة الألوان والمقاسات):
               </Text>
-              <Radio.Group
-                value={isMultiVariant ? 'multi' : 'single'}
-                onChange={(e) => {
-                  const isMulti = e.target.value === 'multi';
-                  setIsMultiVariant(isMulti);
-                  if (isMulti && selectedMultiColors.length === 0) {
-                    setSelectedMultiColors(colors.slice(0, 2).map(c => c.name));
-                  }
-                  if (isMulti && selectedMultiSizes.length === 0) {
-                    setSelectedMultiSizes(sizes.slice(0, 3).map(s => s.name));
-                  }
-                }}
-                buttonStyle="solid"
-                style={{ width: '100%' }}
-              >
-                <Radio.Button value="single" style={{ width: '50%', textAlign: 'center' }}>
-                  صنف بسيط (لون ومقاس واحد فقط)
-                </Radio.Button>
-                <Radio.Button value="multi" style={{ width: '50%', textAlign: 'center', color: '#4f46e5', fontWeight: 600 }}>
-                  ✨ صنف متعدد (كذا مقاس وكذا لون - Multi-Variants)
-                </Radio.Button>
-              </Radio.Group>
+              <Tag color={isMultiVariant ? 'purple' : 'blue'} style={{ fontWeight: 600 }}>
+                {isMultiVariant ? 'وضع المقاسات والألوان المتعددة (Multi-Variants)' : 'وضع الصنف البسيط (Single)'}
+              </Tag>
             </div>
-          )}
+
+            <Radio.Group
+              value={isMultiVariant ? 'multi' : 'single'}
+              onChange={(e) => {
+                const isMulti = e.target.value === 'multi';
+                setIsMultiVariant(isMulti);
+                if (isMulti && selectedMultiColors.length === 0) {
+                  setSelectedMultiColors(colors.slice(0, 2).map(c => c.name));
+                }
+                if (isMulti && selectedMultiSizes.length === 0) {
+                  setSelectedMultiSizes(sizes.slice(0, 3).map(s => s.name));
+                }
+              }}
+              style={{ width: '100%' }}
+            >
+              <Row gutter={12}>
+                <Col xs={24} sm={12}>
+                  <div
+                    onClick={() => setIsMultiVariant(false)}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '12px 14px',
+                      borderRadius: 8,
+                      border: !isMultiVariant ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                      background: !isMultiVariant ? '#eff6ff' : '#ffffff',
+                      transition: 'all 0.2s',
+                      height: '100%'
+                    }}
+                  >
+                    <Radio value="single">
+                      <Text strong style={{ color: !isMultiVariant ? '#1d4ed8' : '#334155', fontSize: 13 }}>
+                        1. صنف بسيط (لون ومقاس محدد فقط)
+                      </Text>
+                    </Radio>
+                    <div style={{ paddingRight: 24, marginTop: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 11, display: 'block', lineHeight: 1.5 }}>
+                        يناسب الأصناف التي لا تحتوي على تشكيلة مقاسات أو ألوان (مثل: شنطة لون أسود مقاس موحد، أو إكسسوار محدد).
+                      </Text>
+                    </div>
+                  </div>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <div
+                    onClick={() => {
+                      setIsMultiVariant(true);
+                      if (selectedMultiColors.length === 0) setSelectedMultiColors(colors.slice(0, 2).map(c => c.name));
+                      if (selectedMultiSizes.length === 0) setSelectedMultiSizes(sizes.slice(0, 3).map(s => s.name));
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '12px 14px',
+                      borderRadius: 8,
+                      border: isMultiVariant ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                      background: isMultiVariant ? '#f5f3ff' : '#ffffff',
+                      transition: 'all 0.2s',
+                      height: '100%'
+                    }}
+                  >
+                    <Radio value="multi">
+                      <Text strong style={{ color: isMultiVariant ? '#6d28d9' : '#334155', fontSize: 13 }}>
+                        2. صنف متعدد الألوان والمقاسات (Multi-Variants)
+                      </Text>
+                    </Radio>
+                    <div style={{ paddingRight: 24, marginTop: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 11, display: 'block', lineHeight: 1.5 }}>
+                        توليد شبكة متكاملة من الألوان والمقاسات تلقائياً (مثل: قميص متوفر بـ 3 ألوان و 4 مقاسات = توليد 12 تركيبة وربط صورة لكل لون).
+                      </Text>
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+            </Radio.Group>
+          </div>
 
           {/* 5. Colors & Sizes Selectors */}
           {isMultiVariant ? (
@@ -2066,6 +2085,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                           display: 'flex',
                           alignItems: 'center',
                           gap: 12,
+                          height: '100%',
+                          minHeight: 88,
                           boxShadow: hasImg ? '0 2px 6px rgba(34,197,94,0.1)' : 'none'
                         }}
                       >
@@ -2242,75 +2263,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
             </div>
           )}
 
-          {/* 7. Prices (Purchase & Sell Price - matching Image 1) */}
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item
-                name="cost_price"
-                label="سعر التكلفة الافتراضي (الشراء)"
-                rules={[{ required: true, message: 'مطلوب' }]}
-                tooltip="سعر التكلفة الأساسي الذي يُعتمد افتراضياً عند إنشاء أوامر التوريد والمشتريات"
-              >
-                <InputNumber
-                  min={0}
-                  step={5}
-                  style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  addonAfter="ج.م"
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item
-                name="selling_price"
-                label="سعر البيع (قطاعي)"
-                rules={[{ required: true, message: 'مطلوب' }]}
-              >
-                <InputNumber
-                  min={0}
-                  step={5}
-                  style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  addonAfter="ج.م"
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item
-                name="wholesale_price"
-                label="سعر البيع (جملة)"
-              >
-                <InputNumber
-                  min={0}
-                  step={5}
-                  style={{ width: '100%' }}
-                  formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  addonAfter="ج.م"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
 
-          <Row gutter={16}>
-            <Col xs={24} sm={14}>
-              <Form.Item name="is_ecom_listed" label="إتاحة في المتجر الإلكتروني (ECP Sync)" valuePropName="checked">
-                <Radio.Group buttonStyle="solid">
-                  <Radio.Button value={true}>متاح في المتجر الإلكتروني</Radio.Button>
-                  <Radio.Button value={false}>مخزن داخلي فقط</Radio.Button>
-                </Radio.Group>
-              </Form.Item>
-            </Col>
-            {editingItem && (
-              <Col xs={24} sm={10}>
-                <Form.Item name="status" label="حالة الصنف">
-                  <Select>
-                    <Option value="active">نشط (Active)</Option>
-                    <Option value="discontinued">معطل (Discontinued)</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            )}
-          </Row>
         </Form>
       </Modal>
     </div>

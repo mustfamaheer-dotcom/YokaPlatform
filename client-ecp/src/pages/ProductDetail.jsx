@@ -39,6 +39,7 @@ export default function ProductDetail({ onAddToCart }) {
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [displayImage, setDisplayImage] = useState(null);
 
   // Multi-size selection state: { [variantId]: qty }
   const [multiQuantities, setMultiQuantities] = useState({});
@@ -59,6 +60,13 @@ export default function ProductDetail({ onAddToCart }) {
     return () => observer.disconnect();
   }, [product, orderMode]);
 
+  // Helper to find image for a specific color
+  const getColorImage = (colorName) => {
+    if (!colorName || !product?.variants) return null;
+    const match = product.variants.find((v) => v.color === colorName && v.image_url);
+    return match?.image_url || null;
+  };
+
   const fetchProductDetails = async () => {
     setLoading(true);
     try {
@@ -75,12 +83,20 @@ export default function ProductDetail({ onAddToCart }) {
           setSelectedSize(first.size || null);
           setSelectedVariant(first);
 
+          const firstImg = (first.color && prod.variants.find(v => v.color === first.color && v.image_url)?.image_url) 
+            || first.image_url 
+            || prod.featured_image 
+            || yokaLogo;
+          setDisplayImage(firstImg);
+
           // Initialize multi-quantities mapping
           const initialMulti = {};
           prod.variants.forEach((v) => {
             initialMulti[v.id] = 0;
           });
           setMultiQuantities(initialMulti);
+        } else {
+          setDisplayImage(prod.featured_image || yokaLogo);
         }
       }
     } catch (err) {
@@ -99,6 +115,94 @@ export default function ProductDetail({ onAddToCart }) {
     );
     setSelectedVariant(matched || product.variants[0]);
   }, [selectedColor, selectedSize, product]);
+
+  // When selectedColor changes, update displayed image if a color image exists
+  useEffect(() => {
+    if (!product) return;
+    if (selectedColor) {
+      const colorImg = getColorImage(selectedColor);
+      if (colorImg) {
+        setDisplayImage(colorImg);
+      } else if (product.featured_image) {
+        setDisplayImage(product.featured_image);
+      }
+    }
+  }, [selectedColor, product]);
+
+  // Extract distinct images for gallery thumbnails
+  const galleryItems = React.useMemo(() => {
+    if (!product) return [];
+    const items = [];
+    const seenUrls = new Set();
+
+    // 1. Featured product image
+    if (product.featured_image && !seenUrls.has(product.featured_image)) {
+      items.push({
+        url: product.featured_image,
+        label: 'الرئيسية',
+        color: null
+      });
+      seenUrls.add(product.featured_image);
+    }
+
+    // 2. Distinct color variant images
+    if (product.variants && Array.isArray(product.variants)) {
+      for (const v of product.variants) {
+        if (v.image_url && !seenUrls.has(v.image_url)) {
+          items.push({
+            url: v.image_url,
+            label: v.color || 'لون إضافي',
+            color: v.color || null
+          });
+          seenUrls.add(v.image_url);
+        }
+      }
+    }
+
+    // 3. Product gallery_images if present
+    if (product.gallery_images) {
+      let gImgs = [];
+      if (Array.isArray(product.gallery_images)) {
+        gImgs = product.gallery_images;
+      } else if (typeof product.gallery_images === 'string') {
+        try {
+          const parsed = JSON.parse(product.gallery_images);
+          if (Array.isArray(parsed)) gImgs = parsed;
+        } catch (e) {
+          gImgs = [product.gallery_images];
+        }
+      }
+      for (const gUrl of gImgs) {
+        if (gUrl && typeof gUrl === 'string' && !seenUrls.has(gUrl)) {
+          items.push({
+            url: gUrl,
+            label: 'معاينة',
+            color: null
+          });
+          seenUrls.add(gUrl);
+        }
+      }
+    }
+
+    return items;
+  }, [product]);
+
+  const handleSelectThumbnail = (item) => {
+    setDisplayImage(item.url);
+    if (item.color) {
+      setSelectedColor(item.color);
+    }
+  };
+
+  const handleColorChange = (c) => {
+    setSelectedColor(c);
+    const colorImg = getColorImage(c);
+    if (colorImg) {
+      setDisplayImage(colorImg);
+    } else if (product.featured_image) {
+      setDisplayImage(product.featured_image);
+    }
+  };
 
   const availableStock = selectedVariant
     ? parseInt(selectedVariant.available_qty || 0, 10)
@@ -218,21 +322,112 @@ export default function ProductDetail({ onAddToCart }) {
               borderRadius: 16,
               border: '1px solid #E2E8F0',
               overflow: 'hidden',
-              padding: isMobile ? 16 : 24,
-              textAlign: 'center',
-              boxShadow: '0 4px 16px rgba(15,23,42,0.04)'
+              padding: isMobile ? 12 : 20,
+              boxShadow: '0 4px 16px rgba(15,23,42,0.04)',
+              position: 'relative',
+              width: '100%',
+              height: isMobile ? 340 : 460,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
             <img
-              src={product.featured_image || yokaLogo}
+              key={displayImage}
+              src={displayImage || product.featured_image || yokaLogo}
               alt={product.product_name || 'صورة المنتج'}
               style={{
-                width: '100%',
-                maxHeight: isMobile ? 320 : 450,
-                objectFit: 'contain'
+                maxWidth: '100%',
+                maxHeight: '100%',
+                width: 'auto',
+                height: 'auto',
+                objectFit: 'contain',
+                transition: 'opacity 0.25s ease'
+              }}
+              onError={(e) => {
+                e.target.src = yokaLogo;
               }}
             />
           </div>
+
+          {/* Gallery Thumbnails Strip */}
+          {galleryItems.length > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                marginTop: 14,
+                overflowX: 'auto',
+                paddingBottom: 6,
+                scrollbarWidth: 'thin'
+              }}
+            >
+              {galleryItems.map((item, idx) => {
+                const currentActive = displayImage || product.featured_image;
+                const isActive = currentActive === item.url;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectThumbnail(item)}
+                    style={{
+                      width: isMobile ? 64 : 76,
+                      height: isMobile ? 64 : 76,
+                      flexShrink: 0,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      border: isActive ? '2px solid #C8A45C' : '1px solid #E2E8F0',
+                      boxShadow: isActive ? '0 0 0 2px rgba(200,164,92,0.25)' : 'none',
+                      background: '#FFFFFF',
+                      padding: 4,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <img
+                      src={item.url}
+                      alt={item.label}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        borderRadius: 6
+                      }}
+                      onError={(e) => {
+                        e.target.src = yokaLogo;
+                      }}
+                    />
+                    {item.label && item.label !== 'الرئيسية' && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 2,
+                          left: 2,
+                          right: 2,
+                          background: 'rgba(15,23,42,0.8)',
+                          color: '#FFFFFF',
+                          fontSize: 9,
+                          fontWeight: 700,
+                          textAlign: 'center',
+                          borderRadius: 3,
+                          padding: '1px 2px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {item.label}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Col>
 
         {/* Product Details & Purchase Form */}
@@ -310,24 +505,54 @@ export default function ProductDetail({ onAddToCart }) {
                 {/* Colors Selector */}
                 {product.colors && product.colors.length > 0 && (
                   <div>
-                    <Text strong style={{ display: 'block', marginBottom: 8 }}>اللون:</Text>
-                    <Space wrap>
-                      {product.colors.map((c) => (
-                        <Button
-                          key={c}
-                          type={selectedColor === c ? 'primary' : 'default'}
-                          onClick={() => setSelectedColor(c)}
-                          style={{
-                            borderRadius: 8,
-                            fontWeight: 600,
-                            backgroundColor: selectedColor === c ? '#0F172A' : '#FFFFFF',
-                            color: selectedColor === c ? '#FFFFFF' : '#0F172A',
-                            border: selectedColor === c ? 'none' : '1px solid #E2E8F0'
-                          }}
-                        >
-                          {c}
-                        </Button>
-                      ))}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text strong style={{ color: '#0F172A', fontSize: 14 }}>
+                        اللون: <span style={{ color: '#C8A45C', fontWeight: 800 }}>{selectedColor || '—'}</span>
+                      </Text>
+                    </div>
+                    <Space wrap size={[8, 8]}>
+                      {product.colors.map((c) => {
+                        const cImg = getColorImage(c);
+                        const isSelected = selectedColor === c;
+                        return (
+                          <Button
+                            key={c}
+                            type={isSelected ? 'primary' : 'default'}
+                            onClick={() => handleColorChange(c)}
+                            style={{
+                              borderRadius: 8,
+                              fontWeight: 700,
+                              height: 40,
+                              padding: cImg ? '4px 14px 4px 8px' : '4px 16px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              backgroundColor: isSelected ? '#0F172A' : '#FFFFFF',
+                              color: isSelected ? '#FFFFFF' : '#0F172A',
+                              border: isSelected ? '2px solid #C8A45C' : '1px solid #E2E8F0',
+                              boxShadow: isSelected ? '0 2px 8px rgba(15,23,42,0.15)' : 'none'
+                            }}
+                          >
+                            {cImg && (
+                              <img
+                                src={cImg}
+                                alt={c}
+                                style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: 4,
+                                  objectFit: 'cover',
+                                  border: isSelected ? '1px solid #C8A45C' : '1px solid #CBD5E1'
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            )}
+                            <span>{c}</span>
+                          </Button>
+                        );
+                      })}
                     </Space>
                   </div>
                 )}
@@ -416,6 +641,8 @@ export default function ProductDetail({ onAddToCart }) {
                     const isVarInStock = varStock > 0;
                     const chosenQty = multiQuantities[v.id] || 0;
 
+                    const vImg = v.image_url || getColorImage(v.color) || product.featured_image;
+
                     return (
                       <div
                         key={v.id}
@@ -429,16 +656,39 @@ export default function ProductDetail({ onAddToCart }) {
                           border: chosenQty > 0 ? '1px solid #C8A45C' : '1px solid #E2E8F0'
                         }}
                       >
-                        <div>
-                          <Text strong style={{ fontSize: 14, color: '#0F172A' }}>
-                            المقاس: {v.size || 'قياسي'} {v.color ? `— ${v.color}` : ''}
-                          </Text>
-                          <div style={{ fontSize: 12 }}>
-                            {isVarInStock ? (
-                              <Text type="secondary">متاح بالمخزن: {varStock} قطعة</Text>
-                            ) : (
-                              <Text type="danger">نفد المخزون</Text>
-                            )}
+                        <div
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: vImg ? 'pointer' : 'default' }}
+                          onClick={() => vImg && setDisplayImage(vImg)}
+                          title={vImg ? 'انقر لمعاينة صورة هذا اللون' : undefined}
+                        >
+                          {vImg && (
+                            <img
+                              src={vImg}
+                              alt={v.color || 'صورة المقاس'}
+                              style={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: 6,
+                                objectFit: 'contain',
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0'
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          )}
+                          <div>
+                            <Text strong style={{ fontSize: 14, color: '#0F172A' }}>
+                              المقاس: {v.size || 'قياسي'} {v.color ? `— ${v.color}` : ''}
+                            </Text>
+                            <div style={{ fontSize: 12 }}>
+                              {isVarInStock ? (
+                                <Text type="secondary">متاح بالمخزن: {varStock} قطعة</Text>
+                              ) : (
+                                <Text type="danger">نفد المخزون</Text>
+                              )}
+                            </div>
                           </div>
                         </div>
 

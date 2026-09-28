@@ -136,7 +136,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_ma
 /**
  * DELETE /api/swm/categories/:id
  */
-router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager']), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'inventory_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const [cat] = await query(`SELECT * FROM product_categories WHERE id = $1`, [id]);
@@ -144,14 +144,29 @@ router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content
       return res.status(404).json({ success: false, message: 'المجموعة غير موجودة' });
     }
 
-    const [prodCount] = await query(`SELECT COUNT(*)::int AS cnt FROM products WHERE category_id = $1`, [id]);
-    if (prodCount?.cnt > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `لا يمكن حذف المجموعة لأنها تحتوي على (${prodCount.cnt}) صنف. يرجى نقل الأصناف لمجموعة أخرى أولاً.`
-      });
+    const prods = await query(`SELECT id, product_name FROM products WHERE category_id = $1`, [id]);
+    const cnt = prods.length;
+
+    // Process each product belonging to this category
+    for (const prod of prods) {
+      const [purchaseItem] = await query(`SELECT id FROM purchase_invoice_items WHERE product_id = $1 LIMIT 1`, [prod.id]);
+      const [posItem] = await query(`SELECT id FROM swm_sales_invoice_items WHERE product_id = $1 LIMIT 1`, [prod.id]);
+      const [ecpItem] = await query(`SELECT id FROM ecp_order_items WHERE product_id = $1 LIMIT 1`, [prod.id]);
+      const [transferItem] = await query(`SELECT id FROM stock_transfer_items WHERE product_id = $1 LIMIT 1`, [prod.id]);
+
+      if (purchaseItem || posItem || ecpItem || transferItem) {
+        // Soft delete to protect financial/sales records
+        await query(`UPDATE products SET status = 'discontinued', category_id = NULL, updated_at = NOW() WHERE id = $1`, [prod.id]);
+      } else {
+        // Completely safe to permanently delete
+        await query(`DELETE FROM inventory_balances WHERE product_id = $1`, [prod.id]);
+        await query(`DELETE FROM product_variants WHERE product_id = $1`, [prod.id]);
+        await query(`DELETE FROM products WHERE id = $1`, [prod.id]);
+      }
     }
 
+    // Unlink child categories and delete the category
+    await query(`UPDATE product_categories SET parent_id = NULL WHERE parent_id = $1`, [id]);
     await query(`DELETE FROM product_categories WHERE id = $1`, [id]);
 
     logActivity({
@@ -163,10 +178,15 @@ router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content
       oldValue: cat,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-      notes: `Category ${cat.category_name} deleted`
+      notes: `Category ${cat.category_name} deleted (and its ${cnt} products removed/discontinued)`
     });
 
-    return res.json({ success: true, message: 'تم حذف المجموعة بنجاح' });
+    return res.json({
+      success: true,
+      message: cnt > 0
+        ? `تم حذف المجموعة وحذف/تعطيل (${cnt}) صنف تابعة لها بنجاح`
+        : 'تم حذف المجموعة بنجاح'
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

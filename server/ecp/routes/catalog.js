@@ -191,7 +191,7 @@ router.get('/', async (req, res) => {
     if (products.length > 0) {
       const pIds = products.map((p) => p.id);
       const variants = await query(
-        `SELECT id, product_id, variant_sku, color, size, price_modifier
+        `SELECT id, product_id, variant_sku, color, size, price_modifier, image_url
          FROM product_variants
          WHERE product_id = ANY($1) AND status = 'active'
          ORDER BY id ASC`,

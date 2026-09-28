@@ -28,6 +28,7 @@ import {
   MapPin,
   User,
   Crown,
+  PackageCheck,
   Menu as MenuIcon,
   X
 } from 'lucide-react';
@@ -54,6 +55,7 @@ import DailyShift from './pages/DailyShift';
 import Transfers from './pages/Transfers';
 import BranchTreasury from './pages/BranchTreasury';
 import TreasuryAdmin from './pages/TreasuryAdmin';
+import EcomInventory from './pages/EcomInventory';
 import SupervisorUnlockModal from './components/SupervisorUnlockModal';
 import yokaLogo from './assets/yokaStoreTransparent.png';
 import api from './api';
@@ -204,6 +206,11 @@ export default function App() {
       if (isSupervisor) {
         items.push(
           {
+            key: 'ecom_inventory',
+            icon: <PackageCheck size={18} />,
+            label: 'مخزون ومعروضات المتجر'
+          },
+          {
             key: 'branch_treasury',
             icon: <Wallet size={18} />,
             label: 'خزنة المستودع'
@@ -217,11 +224,6 @@ export default function App() {
             key: 'stock_adjustments',
             icon: <SlidersHorizontal size={18} />,
             label: 'سند التسوية للمستودع'
-          },
-          {
-            key: 'transfers',
-            icon: <ArrowLeftRight size={18} />,
-            label: 'أذونات الصرف والتحويل'
           },
           {
             key: 'users',
@@ -282,13 +284,10 @@ export default function App() {
 
     const grouped = [
       {
-        key: 'group_sales',
-        label: 'المبيعات',
-        icon: <ShoppingBag size={18} />, 
-        children: [
-          { key: 'pos', icon: <ScanLine size={18} />, label: 'فاتورة بيع جديدة', roles: ['super_admin', 'admin', 'supervisor', 'salesperson', 'branch_account'] },
-          { key: 'daily_shift', icon: <CalendarCheck size={18} />, label: 'صفحة يومية البائع', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] }
-        ]
+        key: 'home',
+        icon: <HomeIcon size={18} />,
+        label: 'الرئيسية',
+        roles: ['super_admin', 'admin', 'supervisor', 'branch_account']
       },
       {
         key: 'group_ecp',
@@ -304,8 +303,7 @@ export default function App() {
         label: 'المخزون',
         icon: <Layers size={18} />, 
         children: [
-          { key: 'products', icon: <Boxes size={18} />, label: 'كتالوج المنتجات والمخزون', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-          { key: 'groups_items', icon: <Layers size={18} />, label: 'المجموعات والأصناف', roles: ['super_admin', 'admin'] },
+          { key: 'groups_items', icon: <Layers size={18} />, label: 'المجموعات والأصناف', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
           { key: 'stock_audit', icon: <ClipboardCheck size={18} />, label: 'الجرد المجمع', roles: ['super_admin', 'admin'] },
           { key: 'stock_adjustments', icon: <SlidersHorizontal size={18} />, label: 'سند التسوية', roles: ['super_admin', 'admin'] },
           { key: 'transfers', icon: <ArrowLeftRight size={18} />, label: 'أذونات الصرف والتحويل', roles: ['super_admin', 'admin'] }
@@ -330,31 +328,43 @@ export default function App() {
         ]
       },
       {
-        key: 'group_system',
-        label: 'النظام',
-        icon: <LayoutDashboard size={18} />, 
+        key: 'group_journals',
+        label: 'اليوميات',
+        icon: <BookOpenCheck size={18} />, 
         children: [
-          { key: 'home', icon: <HomeIcon size={18} />, label: 'الرئيسية', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
-          { key: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'نظرة عامة على النظام', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] },
           { key: 'branches_daily', icon: <FileSpreadsheet size={18} />, label: 'يومية الفروع', roles: ['super_admin', 'admin'] },
-          { key: 'admin_journals', icon: <BookOpenCheck size={18} />, label: 'اليوميات الإدارية', roles: ['super_admin', 'admin'] },
+          { key: 'admin_journals', icon: <BookOpenCheck size={18} />, label: 'اليوميات الإدارية', roles: ['super_admin', 'admin'] }
+        ]
+      },
+      {
+        key: 'group_branches_users',
+        label: 'الفروع و الموظفين',
+        icon: <Store size={18} />, 
+        children: [
           { key: 'branches', icon: <Store size={18} />, label: 'الفروع والمستودعات', roles: ['super_admin', 'admin'] },
           { key: 'users', icon: <Users size={18} />, label: 'طاقم عمل الفرع', roles: ['super_admin', 'admin', 'supervisor', 'branch_account'] }
         ]
       }
     ];
 
-    // Filter children by role and drop empty groups
-    const filtered = grouped.map(g => ({
-      ...g,
-      children: g.children.filter(item => item.roles.includes(role))
-    })).filter(g => g.children.length > 0);
-
-    // Strip role arrays before returning
-    const menuItems = filtered.map(({ children, ...rest }) => ({
-      ...rest,
-      children: children.map(({ roles, ...c }) => c)
-    }));
+    // Filter items and children by role and drop empty groups
+    const menuItems = grouped
+      .map(item => {
+        if (item.children) {
+          const filteredChildren = item.children.filter(child => !child.roles || child.roles.includes(role));
+          if (filteredChildren.length === 0) return null;
+          return {
+            ...item,
+            children: filteredChildren.map(({ roles, ...c }) => c)
+          };
+        }
+        if (item.roles && !item.roles.includes(role)) {
+          return null;
+        }
+        const { roles, ...rest } = item;
+        return rest;
+      })
+      .filter(Boolean);
 
     return menuItems;
   }, [currentUser, isEcomWarehouse, isRetailBranch, isSupervisor, isWarehouseAdmin]);
@@ -364,7 +374,7 @@ export default function App() {
     if (isEcomWarehouse) {
       const allowed = ['orders', 'daily_shift'];
       if (isSupervisor) {
-        allowed.push('branch_treasury', 'stock_audit', 'stock_adjustments', 'transfers', 'users');
+        allowed.push('ecom_inventory', 'branch_treasury', 'stock_audit', 'stock_adjustments', 'users');
       }
       if (!allowed.includes(activeTab)) {
         setActiveTab('orders');
@@ -390,7 +400,9 @@ export default function App() {
   const branchDisplayName = currentUser.branchName || (isAdminPortal ? 'المستودع الرئيسي' : 'الفرع المحدد');
 
   // Check if current active tab is permitted
-  const isTabAllowed = menuItems.some(m => m.key === activeTab || (m.children && m.children.some(c => c.key === activeTab)));
+  const isTabAllowed =
+    activeTab === 'dashboard' ||
+    menuItems.some(m => m.key === activeTab || (m.children && m.children.some(c => c.key === activeTab)));
 
   return (
     <Layout style={{ minHeight: '100vh', direction: 'rtl' }}>
@@ -805,6 +817,12 @@ export default function App() {
                 />
               )}
               {activeTab === 'treasury_admin' && <TreasuryAdmin />}
+              {activeTab === 'ecom_inventory' && (
+                <EcomInventory
+                  currentUser={currentUser}
+                  onNavigate={handleNavigate}
+                />
+              )}
             </>
           )}
         </Content>

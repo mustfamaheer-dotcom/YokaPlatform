@@ -56,7 +56,7 @@ async function getCartPayload(cartId, sessionId, couponCode = null) {
             p.product_name,
             p.product_code,
             p.slug,
-            p.featured_image,
+            COALESCE(pv.image_url, p.featured_image) AS featured_image,
             pv.variant_sku,
             pv.color,
             pv.size,
