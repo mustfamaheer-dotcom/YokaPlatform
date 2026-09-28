@@ -133,6 +133,10 @@ export default function App() {
     }
   };
 
+  if (location.pathname.startsWith('/swm-admin')) {
+    return null;
+  }
+
   return (
     <Layout style={{ minHeight: '100vh', background: 'var(--bg-color)' }}>
       <ScrollToTop />

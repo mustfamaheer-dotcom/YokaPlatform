@@ -5,6 +5,17 @@ import arEG from 'antd/locale/ar_EG';
 import App from './App';
 import './index.css';
 
+// Ensure no rogue Service Worker controls /swm-admin
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const reg of registrations) {
+      if (reg.scope && reg.scope.includes('/swm-admin')) {
+        reg.unregister();
+      }
+    }
+  }).catch(() => {});
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ConfigProvider

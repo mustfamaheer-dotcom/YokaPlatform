@@ -31,9 +31,11 @@ export default defineConfig({
         ]
       },
       workbox: {
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/swm-admin/, /^\/api/],
         runtimeCaching: [
           {
-            urlPattern: ({ request }) => request.destination === 'document',
+            urlPattern: ({ request, url }) => request.destination === 'document' && !url.pathname.startsWith('/swm-admin') && !url.pathname.startsWith('/api'),
             handler: 'NetworkFirst',
             options: { cacheName: 'html-cache', expiration: { maxEntries: 10 } }
           },
@@ -57,7 +59,7 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: ({ url, request }) => (request.destination === 'script' || request.destination === 'style') && url.origin === self.location.origin,
+            urlPattern: ({ url, request }) => (request.destination === 'script' || request.destination === 'style') && url.origin === self.location.origin && !url.pathname.startsWith('/swm-admin'),
             handler: 'StaleWhileRevalidate',
             options: { cacheName: 'asset-cache' }
           },

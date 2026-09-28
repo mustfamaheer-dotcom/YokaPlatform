@@ -214,21 +214,40 @@ if (imgDir) app.use(express.static(imgDir));
 if (swmPublicDir) app.use(express.static(swmPublicDir));
 if (ecpPublicDir) app.use(express.static(ecpPublicDir));
 
+// Helper for serving index.html without caching to ensure fresh deployments
+const sendNoCacheFile = (res, filePath) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(filePath);
+};
+
+const staticOptions = {
+  setHeaders: (res, filePath) => {
+    if (filePath && filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+};
+
 // Serve SWM (Admin Panel) on /swm-admin
 if (swmStaticDir && fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
-  app.use('/swm-admin', express.static(swmStaticDir));
+  app.get('/swm-admin', (req, res) => res.redirect(302, '/swm-admin/'));
+  app.use('/swm-admin', express.static(swmStaticDir, staticOptions));
   app.get(['/swm-admin', '/swm-admin/*'], (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path === '/health') return next();
-    res.sendFile(path.join(swmStaticDir, 'index.html'));
+    sendNoCacheFile(res, path.join(swmStaticDir, 'index.html'));
   });
 }
 
 // Serve ECP (Public Customer Store) on Root '/'
 if (ecpStaticDir && fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
-  app.use('/', express.static(ecpStaticDir));
+  app.use('/', express.static(ecpStaticDir, staticOptions));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path === '/health' || req.path.startsWith('/swm-admin')) return next();
-    res.sendFile(path.join(ecpStaticDir, 'index.html'));
+    sendNoCacheFile(res, path.join(ecpStaticDir, 'index.html'));
   });
 } else {
   // Graceful API root handler when frontend has not been compiled yet

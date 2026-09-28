@@ -55,7 +55,7 @@ export default function Login({ onLoginSuccess }) {
         if (onLoginSuccess) {
           onLoginSuccess(user);
         } else {
-          window.location.href = '/dashboard';
+          window.location.href = '/swm-admin/';
         }
       } else {
         setErrorMessage(response.data.message || 'فشل تسجيل الدخول');

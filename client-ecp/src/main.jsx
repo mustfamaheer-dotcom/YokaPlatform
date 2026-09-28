@@ -6,7 +6,22 @@ import arEG from 'antd/locale/ar_EG';
 import App from './App';
 import { registerSW } from 'virtual:pwa-register';
 
-if (import.meta.env.PROD) {
+// Self-healing check: If a stale service worker incorrectly served ECP on /swm-admin,
+// unregister all service workers immediately and force a hard reload from the network.
+if (typeof window !== 'undefined' && window.location.pathname.startsWith('/swm-admin')) {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+      window.location.replace('/swm-admin/');
+    });
+  } else {
+    window.location.replace('/swm-admin/');
+  }
+}
+
+if (import.meta.env.PROD && typeof window !== 'undefined' && !window.location.pathname.startsWith('/swm-admin')) {
   registerSW({ immediate: true });
 }
 import './index.css';
