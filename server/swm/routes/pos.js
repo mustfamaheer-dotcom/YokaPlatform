@@ -1,7 +1,8 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireBranchScope } = require('../../shared/authMiddleware');
+const { requireAuth, requireBranchScope, requireRole } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+const { executeEodShiftClosure } = require('../services/shiftClosingService');
 
 /**
  * Helper to get or create default cash register for branch
@@ -29,6 +30,58 @@ async function getOrCreateBranchRegister(branchId) {
 }
 
 /**
+ * Single Source of Truth helper:
+ * Resolves the exact payment method breakdown for an invoice or return,
+ * strictly guaranteeing that: cash + card + transfer === finalAmount
+ */
+function resolveInvoicePaymentBreakdown(inv) {
+  const finalAmt = Math.max(0, Math.round(parseFloat(inv.final_amount || 0) * 100) / 100);
+  if (finalAmt === 0) {
+    return { cash: 0, card: 0, transfer: 0 };
+  }
+
+  let bd = inv.payment_breakdown;
+  if (typeof bd === 'string') {
+    try { bd = JSON.parse(bd); } catch (e) { bd = {}; }
+  }
+
+  let rawCash = Math.max(0, parseFloat(bd?.cash || 0));
+  let rawCard = Math.max(0, parseFloat(bd?.card || 0));
+  let rawTransfer = Math.max(0, parseFloat(bd?.transfer || 0));
+  let rawSum = Math.round((rawCash + rawCard + rawTransfer) * 100) / 100;
+
+  // If no breakdown recorded or sum is 0, default to cash
+  if (rawSum === 0) {
+    return { cash: finalAmt, card: 0, transfer: 0 };
+  }
+
+  // If exact match already, return rounded
+  if (Math.abs(rawSum - finalAmt) < 0.001) {
+    const rCash = Math.round(rawCash * 100) / 100;
+    const rCard = Math.round(rawCard * 100) / 100;
+    const rTransfer = Math.round((finalAmt - rCash - rCard) * 100) / 100;
+    return { cash: rCash, card: rCard, transfer: rTransfer };
+  }
+
+  // Non-cash electronic payments (Card, Transfer) are fixed swiped/transferred amounts.
+  // If card + transfer <= finalAmt, the remainder is cash.
+  if (Math.round((rawCard + rawTransfer) * 100) / 100 <= finalAmt) {
+    const rCard = Math.round(rawCard * 100) / 100;
+    const rTransfer = Math.round(rawTransfer * 100) / 100;
+    const rCash = Math.max(0, Math.round((finalAmt - rCard - rTransfer) * 100) / 100);
+    return { cash: rCash, card: rCard, transfer: rTransfer };
+  }
+
+  // Otherwise, scale proportionally across the tendered methods so they strictly equal finalAmt
+  const scale = finalAmt / rawSum;
+  const scaledCard = Math.round(rawCard * scale * 100) / 100;
+  const scaledTransfer = Math.round(rawTransfer * scale * 100) / 100;
+  const allocatedCash = Math.max(0, Math.round((finalAmt - scaledCard - scaledTransfer) * 100) / 100);
+
+  return { cash: allocatedCash, card: scaledCard, transfer: scaledTransfer };
+}
+
+/**
  * GET /api/swm/pos/session/current
  * Return active session state and today's cash metrics for cashier
  */
@@ -36,6 +89,20 @@ router.get('/session/current', requireAuth, requireBranchScope, async (req, res)
   try {
     const branchId = req.scopedBranchId;
     const register = await getOrCreateBranchRegister(branchId);
+
+    // Auto-close check if session spans past 1:00 AM cutoff
+    if (register.status === 'open') {
+      const now = new Date();
+      const lastUpdated = new Date(register.updated_at || register.created_at);
+      const today1Am = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 1, 0, 0, 0);
+      if (lastUpdated < today1Am && now >= today1Am) {
+        await query(
+          `UPDATE cash_registers SET status = 'closed', last_transfer_at = NOW(), updated_at = NOW() WHERE id = $1`,
+          [register.id]
+        );
+        register.status = 'closed';
+      }
+    }
 
     // Get today's total sales and transaction count
     const [metrics] = await query(
@@ -61,6 +128,62 @@ router.get('/session/current', requireAuth, requireBranchScope, async (req, res)
     });
   } catch (err) {
     console.error('POS current session error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/swm/pos/seller-dashboard
+ * Returns ONLY the essential transactional cards for the Seller's App:
+ * 1. Daily Sales Total (simplistic)
+ * 2. Total Daily Returns
+ * 3. Cash Drawer Balance (simple)
+ */
+router.get('/seller-dashboard', requireAuth, requireBranchScope, async (req, res) => {
+  try {
+    const branchId = req.scopedBranchId;
+    const register = await getOrCreateBranchRegister(branchId);
+
+    // 1. Daily Sales Total
+    const [salesRow] = await query(
+      `SELECT COUNT(id) AS sales_count,
+              COALESCE(SUM(final_amount), 0) AS daily_sales_total
+       FROM swm_sales_invoices
+       WHERE branch_id = $1
+         AND DATE(invoice_date) = CURRENT_DATE
+         AND status = 'completed'`,
+      [branchId]
+    );
+
+    // 2. Total Daily Returns
+    const [returnsRow] = await query(
+      `SELECT COUNT(id) AS returns_count,
+              COALESCE(SUM(final_amount), 0) AS total_daily_returns
+       FROM swm_sales_invoices
+       WHERE branch_id = $1
+         AND DATE(invoice_date) = CURRENT_DATE
+         AND status = 'returned'`,
+      [branchId]
+    );
+
+    // 3. Cash Drawer Balance
+    const cashDrawerBalance = parseFloat(register.current_balance || 0);
+
+    return res.json({
+      success: true,
+      data: {
+        daily_sales_total: parseFloat(salesRow?.daily_sales_total || 0),
+        sales_count: parseInt(salesRow?.sales_count || 0, 10),
+        total_daily_returns: parseFloat(returnsRow?.total_daily_returns || 0),
+        returns_count: parseInt(returnsRow?.returns_count || 0, 10),
+        cash_drawer_balance: cashDrawerBalance,
+        register_status: register.status || 'closed',
+        register_code: register.register_code,
+        branch_id: branchId
+      }
+    });
+  } catch (err) {
+    console.error('POS seller-dashboard error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -119,71 +242,206 @@ router.post('/session/open', requireAuth, requireBranchScope, async (req, res) =
 });
 
 /**
- * POST /api/swm/pos/session/close
- * Close cash drawer with actual cash counted & calculate discrepancy
+ * GET /api/swm/pos/shift/current
+ * Return active shift, live calculated snapshot, and branch safe balances
  */
-router.post('/session/close', requireAuth, requireBranchScope, async (req, res) => {
+router.get('/shift/current', requireAuth, requireBranchScope, async (req, res) => {
   try {
     const branchId = req.scopedBranchId;
-    const { actual_cash, notes } = req.body;
-
-    if (actual_cash === undefined || isNaN(parseFloat(actual_cash))) {
-      return res.status(400).json({ success: false, message: 'Actual cash amount counted is required' });
-    }
-
-    const actual = parseFloat(actual_cash);
     const register = await getOrCreateBranchRegister(branchId);
 
-    if (register.status !== 'open') {
-      return res.status(400).json({
-        success: false,
-        message: 'Register is not currently open'
-      });
-    }
-
-    const expectedCash = parseFloat(register.current_balance) || 0;
-    const discrepancy = actual - expectedCash;
-
-    const [updated] = await query(
-      `UPDATE cash_registers
-       SET status = 'closed',
-           current_balance = $1,
-           last_transfer_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $2
-       RETURNING *`,
-      [actual, register.id]
+    // Fetch active shift
+    let [activeShift] = await query(
+      `SELECT * FROM pos_shifts 
+       WHERE branch_id = $1 AND register_id = $2 AND status = 'open' 
+       ORDER BY id DESC LIMIT 1`,
+      [branchId, register.id]
     );
 
-    logActivity({
-      userId: req.user.id,
-      branchId,
-      actionType: 'POS_SESSION_CLOSE',
-      entityType: 'cash_registers',
-      entityId: register.id,
-      newValue: {
-        expected_cash: expectedCash,
-        actual_cash: actual,
-        discrepancy,
-        notes
-      },
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-      notes: `POS Session closed. Expected: ${expectedCash}, Actual: ${actual}, Discrepancy: ${discrepancy}`
-    });
+    // Fetch branch safe
+    let [branchSafe] = await query(
+      `SELECT * FROM branch_safes WHERE branch_id = $1`,
+      [branchId]
+    );
+
+    if (!branchSafe) {
+      const [branch] = await query(`SELECT branch_name FROM branches WHERE id = $1`, [branchId]);
+      const [created] = await query(
+        `INSERT INTO branch_safes (branch_id, safe_name, cash_balance, visa_balance, transfer_balance)
+         VALUES ($1, $2, 0, 0, 0) RETURNING *`,
+        [branchId, `خزينة ${branch?.branch_name || branchId}`]
+      );
+      branchSafe = created;
+    }
+
+    const shiftStartTime = activeShift?.opened_at || register.updated_at || new Date(new Date().setHours(0,0,0,0));
+
+    // Live aggregated sales
+    const salesInvoices = await query(
+      `SELECT * FROM swm_sales_invoices 
+       WHERE branch_id = $1 AND status = 'completed'
+         AND (shift_id = $2 OR (shift_id IS NULL AND invoice_date >= $3))`,
+      [branchId, activeShift?.id || 0, shiftStartTime]
+    );
+
+    const returnInvoices = await query(
+      `SELECT * FROM swm_sales_invoices 
+       WHERE branch_id = $1 AND status = 'returned'
+         AND (shift_id = $2 OR (shift_id IS NULL AND invoice_date >= $3))`,
+      [branchId, activeShift?.id || 0, shiftStartTime]
+    );
+
+    const expenses = await query(
+      `SELECT * FROM expenses 
+       WHERE branch_id = $1 AND status = 'approved'
+         AND (shift_id = $2 OR (shift_id IS NULL AND expense_date >= $3))`,
+      [branchId, activeShift?.id || 0, shiftStartTime]
+    );
+
+    let grossCash = 0, grossVisa = 0, grossTrf = 0, grossTotal = 0;
+    for (const inv of salesInvoices) {
+      const amt = parseFloat(inv.final_amount || 0);
+      const bd = resolveInvoicePaymentBreakdown(inv);
+      grossCash += bd.cash;
+      grossVisa += bd.card;
+      grossTrf += bd.transfer;
+      grossTotal += amt;
+    }
+
+    let retCash = 0, retVisa = 0, retTrf = 0, retTotal = 0;
+    for (const ret of returnInvoices) {
+      const amt = parseFloat(ret.final_amount || 0);
+      const bd = resolveInvoicePaymentBreakdown(ret);
+      retCash += bd.cash;
+      retVisa += bd.card;
+      retTrf += bd.transfer;
+      retTotal += amt;
+    }
+
+    let expCash = 0, expVisa = 0, expTrf = 0;
+    for (const exp of expenses) {
+      const amt = parseFloat(exp.amount || 0);
+      const isRef = exp.category === 'refunded_expense';
+      const m = (exp.payment_method || 'cash').toLowerCase();
+      const mult = isRef ? -1 : 1;
+      if (m === 'card' || m === 'visa') expVisa += (amt * mult);
+      else if (m === 'transfer') expTrf += (amt * mult);
+      else expCash += (amt * mult);
+    }
+
+    const netCash = Math.round((grossCash - retCash - expCash) * 100) / 100;
+    const netVisa = Math.round((grossVisa - retVisa - expVisa) * 100) / 100;
+    const netTrf = Math.round((grossTrf - retTrf - expTrf) * 100) / 100;
+    const netRevenue = Math.round((netCash + netVisa + netTrf) * 100) / 100;
+
+    const openingFloat = parseFloat(activeShift?.opening_float || register.opening_balance || 0);
+    const expectedDrawerCash = Math.round((openingFloat + netCash) * 100) / 100;
 
     return res.json({
       success: true,
       data: {
-        register: updated,
-        expected_cash: expectedCash,
-        actual_cash: actual,
-        discrepancy
-      },
-      message: 'Cash drawer session closed successfully'
+        active_shift: activeShift || {
+          shift_code: `PENDING-OPEN`,
+          status: register.status,
+          opening_float: openingFloat
+        },
+        register,
+        branch_safe: {
+          id: branchSafe.id,
+          safe_name: branchSafe.safe_name,
+          cash_balance: parseFloat(branchSafe.cash_balance || 0),
+          visa_balance: parseFloat(branchSafe.visa_balance || 0),
+          transfer_balance: parseFloat(branchSafe.transfer_balance || 0),
+          total_balance: Math.round((parseFloat(branchSafe.cash_balance || 0) + parseFloat(branchSafe.visa_balance || 0) + parseFloat(branchSafe.transfer_balance || 0)) * 100) / 100
+        },
+        live_snapshot: {
+          opening_float: openingFloat,
+          gross_sales: { cash: grossCash, visa: grossVisa, transfer: grossTrf, total: grossTotal },
+          returns: { cash: retCash, visa: retVisa, transfer: retTrf, total: retTotal },
+          expenses: { cash: expCash, visa: expVisa, transfer: expTrf, total: expCash + expVisa + expTrf },
+          net_revenue: { net_cash: netCash, net_visa: netVisa, net_transfer: netTrf, total: netRevenue },
+          expected_drawer_cash: expectedDrawerCash
+        }
+      }
     });
   } catch (err) {
-    console.error('POS close session error:', err);
+    console.error('POS current shift error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/swm/pos/shift/close
+ * POST /api/swm/pos/session/close
+ * End-of-Day (EOD) Shift Closure & Fund Transfer to Main Branch Safe
+ * Wrapped in strict ACID Database Transaction with row-level locks
+ */
+const handleShiftCloseEndpoint = async (req, res) => {
+  try {
+    const branchId = req.scopedBranchId;
+    const { actual_cash, next_opening_float, notes } = req.body;
+
+    const result = await executeEodShiftClosure({
+      branchId,
+      closedBy: req.user?.id || null,
+      actualCashCounted: actual_cash !== undefined && !isNaN(parseFloat(actual_cash)) ? parseFloat(actual_cash) : undefined,
+      nextOpeningFloat: next_opening_float !== undefined && !isNaN(parseFloat(next_opening_float)) ? parseFloat(next_opening_float) : undefined,
+      closureType: 'manual',
+      notes: notes || 'Manual EOD Shift Closure & Fund Transfer'
+    });
+
+    logActivity({
+      userId: req.user.id,
+      branchId,
+      actionType: 'EOD_SHIFT_CLOSE',
+      entityType: 'pos_shifts',
+      entityId: result.closed_shift.id,
+      newValue: {
+        closed_shift_code: result.closed_shift.shift_code,
+        net_revenue: result.snapshot.net_revenue,
+        transferred_to_safe: result.snapshot.transferred_to_safe,
+        branch_safe: result.branch_safe,
+        new_shift_code: result.new_shift.shift_code
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `إغلاق يدوي للوردية وتصفير الدرج وترحيل صافي الإيرادات (${result.snapshot.transferred_to_safe.total} ج.م) لخزينة الفرع`
+    });
+
+    return res.json({
+      success: true,
+      message: 'تم إغلاق الوردية وتصفير الدرج وترحيل صافي الإيرادات لخزينة الفرع بنجاح',
+      data: {
+        ...result,
+        register: result.updated_register,
+        expected_cash: result.snapshot.drawer_reconciliation.expected_cash,
+        actual_cash: result.snapshot.drawer_reconciliation.actual_cash_counted,
+        discrepancy: result.snapshot.drawer_reconciliation.discrepancy
+      }
+    });
+  } catch (err) {
+    console.error('POS shift close error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+router.post('/shift/close', requireAuth, requireBranchScope, handleShiftCloseEndpoint);
+router.post('/session/close', requireAuth, requireBranchScope, handleShiftCloseEndpoint);
+
+/**
+ * POST /api/swm/pos/session/auto-close
+ * Manually trigger or verify automated 1:00 AM shift closing across open branches
+ */
+router.post('/session/auto-close', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+  try {
+    const { autoCloseDailyShifts } = require('../cron/shiftClosingJob');
+    const result = await autoCloseDailyShifts();
+    return res.json({
+      success: true,
+      message: `تم فحص وإغلاق الورديات التلقائي وترحيل الأرصدة بنجاح. عدد الورديات المغلقة: ${result?.closedCount || 0}`,
+      data: result
+    });
+  } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -266,21 +524,39 @@ router.post('/session/cash-in-out', requireAuth, requireBranchScope, async (req,
 router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
   try {
     const branchId = req.scopedBranchId;
-    const { query: searchQuery } = req.query;
+    const { query: searchQuery, category_id } = req.query;
 
-    if (!searchQuery || !searchQuery.trim()) {
-      return res.json({ success: true, data: [] });
+    const whereClauses = [`p.status = 'active'`];
+    const params = [branchId];
+    let pIdx = 2;
+
+    if (category_id && category_id !== 'all') {
+      whereClauses.push(`p.category_id = $${pIdx++}`);
+      params.push(parseInt(category_id, 10));
     }
 
-    const clean = searchQuery.trim();
+    if (searchQuery && searchQuery.trim()) {
+      const clean = searchQuery.trim();
+      whereClauses.push(`(
+        p.barcode = $${pIdx}
+        OR pv.variant_sku = $${pIdx}
+        OR p.product_code ILIKE $${pIdx + 1}
+        OR p.product_name ILIKE $${pIdx + 1}
+        OR p.brand ILIKE $${pIdx + 1}
+        OR pv.variant_sku ILIKE $${pIdx + 1}
+      )`);
+      params.push(clean, `%${clean}%`);
+      pIdx += 2;
+    }
 
-    // Query both base product and product variants with stock at this branch
     const sql = `
       SELECT p.id AS product_id,
              p.product_code,
              p.barcode AS product_barcode,
              p.product_name,
              p.brand,
+             p.category_id,
+             c.category_name,
              p.selling_price,
              p.sale_price,
              p.cost_price,
@@ -291,6 +567,7 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
              pv.price_modifier,
              COALESCE(ib_var.available_qty, ib_base.available_qty, 0) AS available_qty
       FROM products p
+      LEFT JOIN product_categories c ON c.id = p.category_id
       LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.status = 'active'
       LEFT JOIN inventory_balances ib_var ON ib_var.product_id = p.id
                                          AND ib_var.variant_id = pv.id
@@ -298,20 +575,12 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
       LEFT JOIN inventory_balances ib_base ON ib_base.product_id = p.id
                                           AND ib_base.variant_id IS NULL
                                           AND ib_base.branch_id = $1
-      WHERE p.status = 'active'
-        AND (
-          p.barcode = $2
-          OR pv.variant_sku = $2
-          OR p.product_code ILIKE $3
-          OR p.product_name ILIKE $3
-          OR p.brand ILIKE $3
-          OR pv.variant_sku ILIKE $3
-        )
+      WHERE ${whereClauses.join(' AND ')}
       ORDER BY p.id DESC, pv.id ASC
-      LIMIT 25
+      LIMIT 60
     `;
 
-    const results = await query(sql, [branchId, clean, `%${clean}%`]);
+    const results = await query(sql, params);
 
     const formatted = results.map(row => {
       const basePrice = parseFloat(row.sale_price || row.selling_price) || 0;
@@ -324,6 +593,8 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
         product_code: row.product_code,
         barcode: row.variant_sku || row.product_barcode,
         product_name: row.product_name,
+        category_id: row.category_id,
+        category_name: row.category_name,
         color: row.color,
         size: row.size,
         display_name: row.variant_sku
@@ -488,19 +759,19 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
       const taxTotal = parseFloat(tax_amount) || 0;
       const finalAmount = Math.max(0, subtotal - discTotal + taxTotal);
 
-      // Structure payment breakdown
-      let finalBreakdown = {
-        cash: parseFloat(payment_breakdown?.cash || 0),
-        card: parseFloat(payment_breakdown?.card || 0),
-        transfer: parseFloat(payment_breakdown?.transfer || 0)
-      };
-
+      // Structure payment breakdown normalized strictly to finalAmount
+      let finalBreakdown;
       if (payment_method === 'cash') {
         finalBreakdown = { cash: finalAmount, card: 0, transfer: 0 };
       } else if (payment_method === 'card') {
         finalBreakdown = { cash: 0, card: finalAmount, transfer: 0 };
       } else if (payment_method === 'transfer') {
         finalBreakdown = { cash: 0, card: 0, transfer: finalAmount };
+      } else {
+        finalBreakdown = resolveInvoicePaymentBreakdown({
+          final_amount: finalAmount,
+          payment_breakdown
+        });
       }
 
       // Resolve valid salesperson / user ID for relational constraints
@@ -653,6 +924,353 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
 });
 
 /**
+ * POST /api/swm/pos/return
+ * Execute retail return/refund transaction with stock restock and cash drawer deduction
+ */
+router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
+  try {
+    const branchId = req.scopedBranchId;
+    const {
+      customer_name = 'عميل مرتجع',
+      customer_phone,
+      customer_address,
+      salesperson_id,
+      payment_method = 'cash',
+      payment_breakdown = { cash: 0, card: 0, transfer: 0 },
+      notes,
+      items
+    } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'أصناف المرتجع مطلوبة' });
+    }
+
+    const register = await getOrCreateBranchRegister(branchId);
+
+    // Generate unique return number: RET-YYMM-XXXXX
+    const yymm = new Date().toISOString().slice(2, 7).replace('-', '');
+    const [{ count }] = await query(`SELECT COUNT(id) AS count FROM swm_sales_invoices WHERE status = 'returned'`);
+    const retNumber = `RET-${yymm}-${String(parseInt(count, 10) + 1).padStart(5, '0')}`;
+
+    const returnResult = await transaction(async (client) => {
+      let subtotal = 0;
+      const preparedItems = [];
+
+      for (const item of items) {
+        const qty = parseInt(item.quantity, 10);
+        if (!qty || qty <= 0) {
+          throw new Error(`الكمية المرتجعة غير صالحة للصنف ${item.product_name || item.product_id}`);
+        }
+
+        // Find existing inventory balance for this product / variant in branch
+        let balanceRow;
+        if (item.variant_id) {
+          const res = await client.query(
+            `SELECT * FROM inventory_balances WHERE branch_id = $1 AND product_id = $2 AND variant_id = $3 FOR UPDATE`,
+            [branchId, item.product_id, item.variant_id]
+          );
+          if (res.rows.length > 0) {
+            balanceRow = res.rows[0];
+          }
+        } else {
+          const res = await client.query(
+            `SELECT * FROM inventory_balances WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL FOR UPDATE`,
+            [branchId, item.product_id]
+          );
+          if (res.rows.length > 0) {
+            balanceRow = res.rows[0];
+          }
+        }
+
+        const [prod] = (await client.query(
+          `SELECT id, product_code, product_name, cost_price FROM products WHERE id = $1`,
+          [item.product_id]
+        )).rows;
+
+        const unitPrice = parseFloat(item.unit_price) || 0;
+        const lineTotal = qty * unitPrice;
+        subtotal += lineTotal;
+
+        const currentStock = balanceRow ? parseInt(balanceRow.available_qty, 10) : 0;
+
+        preparedItems.push({
+          product_id: item.product_id,
+          variant_id: item.variant_id || null,
+          quantity: qty,
+          unit_price: unitPrice,
+          final_unit_price: unitPrice,
+          line_total: lineTotal,
+          cost_at_sale: parseFloat(prod?.cost_price || 0),
+          product_name: item.product_name || prod?.product_name,
+          product_code: prod?.product_code,
+          balance_id: balanceRow?.id,
+          stock_before: currentStock,
+          stock_after: currentStock + qty
+        });
+      }
+
+      const finalAmount = subtotal;
+
+      let finalBreakdown;
+      if (payment_method === 'cash') {
+        finalBreakdown = { cash: finalAmount, card: 0, transfer: 0 };
+      } else if (payment_method === 'card') {
+        finalBreakdown = { cash: 0, card: finalAmount, transfer: 0 };
+      } else if (payment_method === 'transfer') {
+        finalBreakdown = { cash: 0, card: 0, transfer: finalAmount };
+      } else {
+        finalBreakdown = resolveInvoicePaymentBreakdown({
+          final_amount: finalAmount,
+          payment_breakdown
+        });
+      }
+
+      const cashRefund = parseFloat(finalBreakdown?.cash || 0);
+
+      // Verify cash in drawer if cash refund
+      if (cashRefund > 0) {
+        const curBal = parseFloat(register.current_balance || 0);
+        if (cashRefund > curBal) {
+          throw new Error(`رصيد الدرج الحالي (${curBal} ج.م) لا يكفي لرد المبلغ نقدًا (${cashRefund} ج.م)`);
+        }
+      }
+
+      let effectiveUserId = salesperson_id ? parseInt(salesperson_id, 10) : null;
+      if (!effectiveUserId) {
+        if (!req.user.isBranchAccount) {
+          effectiveUserId = req.user.id;
+        } else {
+          const userRows = (await client.query(
+            `SELECT id FROM users WHERE branch_id = $1 AND status = 'active' ORDER BY id ASC LIMIT 1`,
+            [branchId]
+          )).rows;
+          effectiveUserId = userRows.length > 0 ? userRows[0].id : (req.user.id || 1);
+        }
+      }
+
+      // Insert return invoice with status 'returned'
+      const [invoice] = (await client.query(
+        `INSERT INTO swm_sales_invoices (
+          invoice_number, branch_id, salesperson_id, customer_name,
+          customer_phone, customer_address, invoice_date, subtotal, discount_amount,
+          tax_amount, final_amount, payment_breakdown, payment_status,
+          notes, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, 0, 0, $8, $9, 'paid', $10, 'returned', NOW(), NOW())
+        RETURNING *`,
+        [
+          retNumber,
+          branchId,
+          effectiveUserId,
+          customer_name || 'عميل مرتجع',
+          customer_phone || null,
+          customer_address || null,
+          subtotal,
+          finalAmount,
+          JSON.stringify(finalBreakdown),
+          notes || 'فاتورة مرتجع مبيعات'
+        ]
+      )).rows;
+
+      // Restock inventory and record movements
+      const savedItems = [];
+      for (const pItem of preparedItems) {
+        const [savedItem] = (await client.query(
+          `INSERT INTO swm_sales_invoice_items (
+            invoice_id, product_id, variant_id, quantity, unit_price,
+            discount_pct, discount_amount, final_unit_price, line_total,
+            cost_at_sale, product_name, product_code
+          ) VALUES ($1, $2, $3, $4, $5, 0, 0, $6, $7, $8, $9, $10)
+          RETURNING *`,
+          [
+            invoice.id,
+            pItem.product_id,
+            pItem.variant_id,
+            pItem.quantity,
+            pItem.unit_price,
+            pItem.final_unit_price,
+            pItem.line_total,
+            pItem.cost_at_sale,
+            pItem.product_name,
+            pItem.product_code
+          ]
+        )).rows;
+        savedItems.push(savedItem);
+
+        // Restock inventory: increment available_qty and returned_qty, and create record if none exists
+        if (pItem.balance_id) {
+          await client.query(
+            `UPDATE inventory_balances
+             SET available_qty = available_qty + $1,
+                 returned_qty = COALESCE(returned_qty, 0) + $1,
+                 sold_qty = GREATEST(0, COALESCE(sold_qty, 0) - $1),
+                 last_movement_at = NOW(),
+                 last_updated = NOW()
+             WHERE id = $2`,
+            [pItem.quantity, pItem.balance_id]
+          );
+        } else {
+          // Re-check in case another item in the same invoice created it
+          const checkSql = pItem.variant_id
+            ? `SELECT id FROM inventory_balances WHERE branch_id = $1 AND product_id = $2 AND variant_id = $3 FOR UPDATE`
+            : `SELECT id FROM inventory_balances WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL FOR UPDATE`;
+          const checkParams = pItem.variant_id
+            ? [branchId, pItem.product_id, pItem.variant_id]
+            : [branchId, pItem.product_id];
+          const checkRes = await client.query(checkSql, checkParams);
+
+          if (checkRes.rows.length > 0) {
+            pItem.balance_id = checkRes.rows[0].id;
+            await client.query(
+              `UPDATE inventory_balances
+               SET available_qty = available_qty + $1,
+                   returned_qty = COALESCE(returned_qty, 0) + $1,
+                   sold_qty = GREATEST(0, COALESCE(sold_qty, 0) - $1),
+                   last_movement_at = NOW(),
+                   last_updated = NOW()
+               WHERE id = $2`,
+              [pItem.quantity, pItem.balance_id]
+            );
+          } else {
+            const insRes = await client.query(
+              `INSERT INTO inventory_balances (
+                branch_id, product_id, variant_id, available_qty, reserved_qty,
+                on_order_qty, sold_qty, returned_qty, last_movement_at, last_updated
+              ) VALUES ($1, $2, $3, $4, 0, 0, 0, $4, NOW(), NOW())
+              RETURNING id`,
+              [branchId, pItem.product_id, pItem.variant_id || null, pItem.quantity]
+            );
+            pItem.balance_id = insRes.rows[0]?.id;
+          }
+        }
+
+        await client.query(
+          `INSERT INTO inventory_movements (
+            branch_id, product_id, variant_id, movement_type, quantity_change,
+            quantity_before, quantity_after, reference_type, reference_id,
+            notes, created_by, created_at, updated_at
+          ) VALUES ($1, $2, $3, 'return_in', $4, $5, $6, 'swm_sales_invoices', $7, $8, $9, NOW(), NOW())`,
+          [
+            branchId,
+            pItem.product_id,
+            pItem.variant_id,
+            pItem.quantity,
+            pItem.stock_before,
+            pItem.stock_after,
+            invoice.id,
+            `POS Return #${retNumber}`,
+            effectiveUserId
+          ]
+        );
+      }
+
+      // Deduct cash from drawer if cash refunded
+      if (cashRefund > 0) {
+        await client.query(
+          `UPDATE cash_registers
+           SET current_balance = GREATEST(0, current_balance - $1),
+               updated_at = NOW()
+           WHERE id = $2`,
+          [cashRefund, register.id]
+        );
+      }
+
+      return { invoice, items: savedItems, cashRefund };
+    });
+
+    logActivity({
+      userId: req.user.id,
+      branchId,
+      actionType: 'POS_RETURN',
+      entityType: 'swm_sales_invoices',
+      entityId: returnResult.invoice.id,
+      newValue: {
+        invoice_number: retNumber,
+        refund_amount: returnResult.invoice.final_amount,
+        items_count: items.length
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `POS Return #${retNumber} processed for refund of ${returnResult.invoice.final_amount} EGP`
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: returnResult.invoice,
+      items: returnResult.items,
+      message: 'تم إتمام المرتجع وإعادة الأصناف للمخزون وخصم النقدية بنجاح'
+    });
+  } catch (err) {
+    console.error('POS return error:', err);
+    return res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/swm/pos/settings
+ * Supervisor settings for POS validation and expense recipients
+ */
+router.get('/settings', requireAuth, requireBranchScope, async (req, res) => {
+  try {
+    const rows = await query(
+      `SELECT key, value FROM store_settings WHERE key LIKE 'pos_%'`
+    );
+    const settingsMap = {};
+    (rows.rows || rows).forEach(r => {
+      settingsMap[r.key] = r.value;
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        require_customer_name: settingsMap['pos_require_customer_name'] === 'true',
+        require_customer_phone: settingsMap['pos_require_customer_phone'] === 'true',
+        allowed_expense_recipients: settingsMap['pos_allowed_expense_recipients']
+          ? JSON.parse(settingsMap['pos_allowed_expense_recipients'])
+          : ['بائعين الفرع', 'مصاريف إدارية وتشغيل', 'مرافق وفواتير', 'نثريات وضيافة', 'نظافة ومهمات', 'أخرى']
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * PUT /api/swm/pos/settings
+ * Update supervisor settings
+ */
+router.put('/settings', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+  try {
+    const { require_customer_name, require_customer_phone, allowed_expense_recipients } = req.body;
+
+    if (require_customer_name !== undefined) {
+      await query(
+        `INSERT INTO store_settings (key, value, updated_at) VALUES ('pos_require_customer_name', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [String(require_customer_name)]
+      );
+    }
+    if (require_customer_phone !== undefined) {
+      await query(
+        `INSERT INTO store_settings (key, value, updated_at) VALUES ('pos_require_customer_phone', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [String(require_customer_phone)]
+      );
+    }
+    if (allowed_expense_recipients !== undefined) {
+      await query(
+        `INSERT INTO store_settings (key, value, updated_at) VALUES ('pos_allowed_expense_recipients', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [JSON.stringify(allowed_expense_recipients)]
+      );
+    }
+
+    return res.json({ success: true, message: 'تم حفظ إعدادات الـ POS بنجاح' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * GET /api/swm/pos/invoices
  * List recent sales invoices for reprint or refund
  */
@@ -770,8 +1388,8 @@ router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) =
 
     const targetDate = date ? date : new Date().toISOString().split('T')[0];
 
-    // Build filter for sales invoices
-    let invWhere = `si.branch_id = $1 AND DATE(si.invoice_date) = $2 AND si.status = 'completed'`;
+    // Build filter for sales & return invoices
+    let invWhere = `si.branch_id = $1 AND DATE(si.invoice_date) = $2 AND si.status IN ('completed', 'returned')`;
     const invParams = [branchId, targetDate];
 
     if (salesperson_id) {
@@ -779,7 +1397,7 @@ router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) =
       invParams.push(parseInt(salesperson_id, 10));
     }
 
-    const invoices = await query(
+    const allInvoices = await query(
       `SELECT si.*,
               u.full_name AS cashier_name,
               u.username AS cashier_username
@@ -789,6 +1407,9 @@ router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) =
        ORDER BY si.invoice_date DESC`,
       invParams
     );
+
+    const salesInvoices = allInvoices.filter(i => i.status === 'completed');
+    const returnInvoices = allInvoices.filter(i => i.status === 'returned');
 
     // Build filter for expenses
     let expWhere = `e.branch_id = $1 AND DATE(e.expense_date) = $2 AND e.status = 'approved'`;
@@ -810,216 +1431,276 @@ router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) =
       expParams
     );
 
-    // Fetch completed/delivered ECP (Online Store) orders for this branch/warehouse on targetDate
-    const ecpWhere = `((o.fulfilling_branch_id = $1) OR ($1 IN (1, 2) AND (o.fulfilling_branch_id IS NULL OR o.fulfilling_branch_id IN (1, 2))))
-                      AND o.order_status IN ('delivered', 'completed')
-                      AND DATE(COALESCE(o.delivered_at, o.updated_at, o.created_at)) = $2`;
-    const ecpOrders = await query(
-      `SELECT o.id, o.order_number, o.guest_email, o.shipping_address,
-              o.subtotal, o.shipping_cost, o.total_amount,
-              o.order_status, o.payment_status, o.payment_method,
-              o.shipping_carrier, o.tracking_number, o.parcel_count,
-              o.shipped_at, o.delivered_at, o.created_at, o.updated_at,
-              o.customer_notes
-       FROM ecp_orders o
-       WHERE ${ecpWhere}
-       ORDER BY COALESCE(o.delivered_at, o.created_at) DESC`,
-      [branchId, targetDate]
-    );
-
-    // Also fetch recent delivered ECP orders (up to 25) so users can inspect them anytime
-    const recentEcpOrders = await query(
-      `SELECT o.id, o.order_number, o.guest_email, o.shipping_address,
-              o.subtotal, o.shipping_cost, o.total_amount,
-              o.order_status, o.payment_status, o.payment_method,
-              o.shipping_carrier, o.tracking_number, o.parcel_count,
-              o.shipped_at, o.delivered_at, o.created_at, o.updated_at,
-              o.customer_notes
-       FROM ecp_orders o
-       WHERE ((o.fulfilling_branch_id = $1) OR ($1 IN (1, 2) AND (o.fulfilling_branch_id IS NULL OR o.fulfilling_branch_id IN (1, 2))))
-         AND o.order_status IN ('delivered', 'completed')
-       ORDER BY COALESCE(o.delivered_at, o.created_at) DESC
-       LIMIT 25`,
-      [branchId]
-    );
-
-    // Calculate aggregated sales KPIs for POS invoices
+    // Single Source of Truth: Calculate aggregated sales KPIs for completed POS invoices
     let posSales = 0;
     let cashSales = 0;
     let cardSales = 0;
     let transferSales = 0;
 
-    for (const inv of invoices) {
-      const amt = parseFloat(inv.final_amount || 0);
-      posSales += amt;
+    for (const inv of salesInvoices) {
+      const invFinalAmt = Math.max(0, parseFloat(inv.final_amount || 0));
+      const bd = resolveInvoicePaymentBreakdown(inv);
 
-      let bd = inv.payment_breakdown;
-      if (typeof bd === 'string') {
-        try { bd = JSON.parse(bd); } catch (e) { bd = {}; }
-      }
-      if (bd && typeof bd === 'object') {
-        cashSales += parseFloat(bd.cash || 0);
-        cardSales += parseFloat(bd.card || 0);
-        transferSales += parseFloat(bd.transfer || 0);
-      } else {
-        cashSales += amt;
-      }
+      posSales += invFinalAmt;
+      cashSales += bd.cash;
+      cardSales += bd.card;
+      transferSales += bd.transfer;
     }
 
-    // Calculate aggregated sales KPIs for ECP orders
-    let ecpSales = 0;
-    for (const ord of ecpOrders) {
-      const amt = parseFloat(ord.total_amount || 0);
-      ecpSales += amt;
-      const pm = (ord.payment_method || '').toLowerCase();
-      if (pm === 'cod' || pm.includes('cash') || pm.includes('استلام')) {
-        cashSales += amt;
-      } else if (pm.includes('card') || pm.includes('visa')) {
-        cardSales += amt;
-      } else {
-        transferSales += amt;
-      }
+    // Mathematical guarantee: Gross Sales === Cash Sales + Visa Sales + Transfer Sales
+    posSales = Math.round(posSales * 100) / 100;
+    cashSales = Math.round(cashSales * 100) / 100;
+    cardSales = Math.round(cardSales * 100) / 100;
+    transferSales = Math.round((posSales - cashSales - cardSales) * 100) / 100;
+
+    // Single Source of Truth: Calculate aggregated returns KPIs
+    let returnsTotal = 0;
+    let cashReturns = 0;
+    let cardReturns = 0;
+    let transferReturns = 0;
+
+    for (const ret of returnInvoices) {
+      const retFinalAmt = Math.max(0, parseFloat(ret.final_amount || 0));
+      const bd = resolveInvoicePaymentBreakdown(ret);
+
+      returnsTotal += retFinalAmt;
+      cashReturns += bd.cash;
+      cardReturns += bd.card;
+      transferReturns += bd.transfer;
     }
 
-    // Calculate expenses KPIs
+    // Mathematical guarantee: Returns Total === Cash Returns + Visa Returns + Transfer Returns
+    returnsTotal = Math.round(returnsTotal * 100) / 100;
+    cashReturns = Math.round(cashReturns * 100) / 100;
+    cardReturns = Math.round(cardReturns * 100) / 100;
+    transferReturns = Math.round((returnsTotal - cashReturns - cardReturns) * 100) / 100;
+
+    // Calculate expenses KPIs categorized by payment source
     let totalExpenses = 0;
+    let refundedExpenses = 0;
+    let cashExpenses = 0;
+    let refundedCashExpenses = 0;
+    let cardExpenses = 0;
+    let refundedCardExpenses = 0;
+    let transferExpenses = 0;
+    let refundedTransferExpenses = 0;
+
     for (const exp of expenses) {
-      totalExpenses += parseFloat(exp.amount || 0);
+      const amt = parseFloat(exp.amount || 0);
+      const isRefunded = exp.category === 'refunded_expense';
+
+      // Check payment source for expense (defaults to cash for branch drawer disbursements)
+      const payMethod = (exp.payment_method || 'cash').toLowerCase();
+
+      if (isRefunded) {
+        refundedExpenses += amt;
+        if (payMethod === 'card' || payMethod === 'visa') {
+          refundedCardExpenses += amt;
+        } else if (payMethod === 'transfer') {
+          refundedTransferExpenses += amt;
+        } else {
+          refundedCashExpenses += amt;
+        }
+      } else {
+        totalExpenses += amt;
+        if (payMethod === 'card' || payMethod === 'visa') {
+          cardExpenses += amt;
+        } else if (payMethod === 'transfer') {
+          transferExpenses += amt;
+        } else {
+          cashExpenses += amt;
+        }
+      }
     }
+
+    const netExpenses = Math.round((totalExpenses - refundedExpenses) * 100) / 100;
+    const netCashExpenses = Math.round((cashExpenses - refundedCashExpenses) * 100) / 100;
+    const netCardExpenses = Math.round((cardExpenses - refundedCardExpenses) * 100) / 100;
+    const netTransferExpenses = Math.round((transferExpenses - refundedTransferExpenses) * 100) / 100;
+
+    // Accounting Formula 1:
+    // Net Revenue = Total Gross Sales - Total Returns - Net Expenses & Withdrawals
+    const netRevenue = Math.round((posSales - returnsTotal - netExpenses) * 100) / 100;
+
+    // Accounting Formula 2 & Developer Note:
+    // Dedicated Payment Method Deductions:
+    // Net Cash = Cash Sales - Cash Returns - Net Cash Expenses
+    // Net Visa = Card Sales - Card Returns - Net Card Expenses
+    // Net Transfers = Transfer Sales - Transfer Returns - Net Transfer Expenses
+    // Mathematical Identity: Net Cash + Net Visa + Net Transfers === Net Revenue
+    const netCash = Math.round((cashSales - cashReturns - netCashExpenses) * 100) / 100;
+    const netVisa = Math.round((cardSales - cardReturns - netCardExpenses) * 100) / 100;
+    const netTransfers = Math.round((transferSales - transferReturns - netTransferExpenses) * 100) / 100;
 
     // Get register opening & current balance
     const register = await getOrCreateBranchRegister(branchId);
-    const openingBalance = parseFloat(register.opening_balance || 0);
-    const expectedDrawerCash = Math.max(0, openingBalance + cashSales - totalExpenses);
+    const openingBalance = Math.round(parseFloat(register.opening_balance || 0) * 100) / 100;
 
-    const totalSales = posSales + ecpSales;
-    const completedCount = invoices.length + ecpOrders.length;
-    const averageOrderValue = completedCount > 0 ? (totalSales / completedCount) : 0;
-    const netRevenue = totalSales - totalExpenses;
+    // Physical Drawer Cash = Opening Cash Float + Net Cash generated during shift
+    const expectedDrawerCash = Math.round((openingBalance + netCash) * 100) / 100;
 
-    // Helper to format an ECP order for the completed orders table
-    const formatEcpOrder = (o) => {
-      let addr = {};
-      if (typeof o.shipping_address === 'string') {
-        try { addr = JSON.parse(o.shipping_address || '{}'); } catch (e) { addr = {}; }
-      } else if (o.shipping_address) {
-        addr = o.shipping_address;
-      }
-      return {
-        id: `ecp_${o.id}`,
-        rawId: o.id,
-        orderType: 'ecp',
-        typeLabel: 'طلب متجر إلكتروني (ECP)',
-        orderNumber: o.order_number,
-        time: o.delivered_at || o.created_at,
-        customerName: addr.recipient_name || o.guest_email || 'عميل المتجر',
-        customerPhone: addr.phone || '-',
-        city: addr.city || 'متجر إلكتروني',
-        amount: parseFloat(o.total_amount || 0),
-        paymentMethod: o.payment_method || 'الدفع عند الاستلام',
-        carrier: o.shipping_carrier || 'مندوب المتجر',
-        trackingNumber: o.tracking_number || '-',
-        parcelCount: o.parcel_count || 1,
-        status: o.order_status,
-        salesperson: 'المتجر الإلكتروني',
-        details: o
-      };
-    };
+    const completedSalesCount = salesInvoices.length;
+    const averageOrderValue = completedSalesCount > 0 ? (posSales / completedSalesCount) : 0;
 
-    // Combine POS invoices & ECP orders into unified completed_orders
-    const completedOrders = [
-      ...invoices.map(inv => ({
-        id: `pos_${inv.id}`,
-        rawId: inv.id,
-        orderType: 'pos',
-        typeLabel: 'فاتورة صالة (POS)',
-        orderNumber: inv.invoice_number,
-        time: inv.invoice_date,
-        customerName: inv.customer_name || 'عميل نقدي',
-        customerPhone: inv.customer_phone || '-',
-        city: 'الفرع مباشرة',
-        amount: parseFloat(inv.final_amount || 0),
-        paymentMethod: inv.payment_breakdown ? 'تفصيل متعدد' : 'كاش / نقدية',
-        paymentBreakdown: inv.payment_breakdown,
-        status: inv.status,
-        salesperson: inv.cashier_name || inv.cashier_username || 'الفرع',
-        details: inv
-      })),
-      ...ecpOrders.map(formatEcpOrder)
+    // Build unified detailed transactions list for the seller's daily report
+    const allTransactions = [
+      ...salesInvoices.map(inv => {
+        const invBd = resolveInvoicePaymentBreakdown(inv);
+        return {
+          id: `sale_${inv.id}`,
+          rawId: inv.id,
+          type: 'sale',
+          typeLabel: 'فاتورة بيع',
+          typeColor: 'green',
+          number: inv.invoice_number,
+          time: inv.invoice_date,
+          amount: parseFloat(inv.final_amount || 0),
+          displayAmount: `+${parseFloat(inv.final_amount || 0).toFixed(2)} ج.م`,
+          isPositive: true,
+          customerOrRecipient: inv.customer_name || 'عميل نقدي',
+          phone: inv.customer_phone || '-',
+          salesperson: inv.cashier_name || inv.cashier_username || 'الفرع',
+          paymentMethod: inv.payment_breakdown ? 'تفصيل متعدد' : 'كاش / نقدية',
+          paymentBreakdown: invBd,
+          notes: inv.notes,
+          status: inv.status,
+          details: inv
+        };
+      }),
+      ...returnInvoices.map(ret => {
+        const retBd = resolveInvoicePaymentBreakdown(ret);
+        return {
+          id: `return_${ret.id}`,
+          rawId: ret.id,
+          type: 'return',
+          typeLabel: 'فاتورة مرتجع',
+          typeColor: 'error',
+          number: ret.invoice_number,
+          time: ret.invoice_date,
+          amount: -parseFloat(ret.final_amount || 0),
+          displayAmount: `-${parseFloat(ret.final_amount || 0).toFixed(2)} ج.م`,
+          isPositive: false,
+          customerOrRecipient: ret.customer_name || 'عميل مرتجع',
+          phone: ret.customer_phone || '-',
+          salesperson: ret.cashier_name || ret.cashier_username || 'الفرع',
+          paymentMethod: ret.payment_breakdown ? 'رد نقدي / وسيلة' : 'رد نقدية',
+          paymentBreakdown: retBd,
+          notes: ret.notes,
+          status: ret.status,
+          details: ret
+        };
+      }),
+      ...expenses.map(exp => {
+        const isRefunded = exp.category === 'refunded_expense';
+        const amt = parseFloat(exp.amount || 0);
+        return {
+          id: `exp_${exp.id}`,
+          rawId: exp.id,
+          type: isRefunded ? 'refunded_expense' : 'expense',
+          typeLabel: isRefunded ? 'مصروف مرتد للدرج' : (exp.category === 'utility_bill' ? 'دفع فواتير' : 'سحب مصروفات'),
+          typeColor: isRefunded ? 'cyan' : 'orange',
+          number: exp.expense_ref,
+          time: exp.created_at || exp.expense_date,
+          amount: isRefunded ? amt : -amt,
+          displayAmount: `${isRefunded ? '+' : '-'}${amt.toFixed(2)} ج.م`,
+          isPositive: isRefunded,
+          customerOrRecipient: exp.recipient_name
+            ? `${exp.recipient_name} • ${exp.subcategory || exp.description || 'سلفة / مصروف'}`
+            : (exp.description || (isRefunded ? 'إعادة إلى الدرج' : 'مصروف فرع')),
+          recipient_name: exp.recipient_name,
+          category: exp.subcategory || exp.category,
+          phone: '-',
+          salesperson: exp.created_by_name || exp.created_by_username || 'الفرع',
+          paymentMethod: exp.payment_method ? (exp.payment_method === 'card' ? 'فيزا' : (exp.payment_method === 'transfer' ? 'تحويل' : 'نقدًا من الدرج')) : 'نقدًا من الدرج',
+          notes: exp.description,
+          status: exp.status,
+          details: exp
+        };
+      })
     ].sort((a, b) => new Date(b.time) - new Date(a.time));
 
-    const recentCompletedEcp = recentEcpOrders.map(formatEcpOrder);
-
-    // Combine into unified chronological timeline
-    const timeline = [
-      ...invoices.map(inv => ({
-        type: 'sale',
-        id: inv.id,
-        number: inv.invoice_number,
-        time: inv.invoice_date,
-        amount: parseFloat(inv.final_amount || 0),
-        customer_name: inv.customer_name,
-        customer_phone: inv.customer_phone,
-        salesperson_name: inv.cashier_name || inv.cashier_username,
-        payment_breakdown: inv.payment_breakdown,
-        notes: inv.notes,
-        source: 'pos'
-      })),
-      ...ecpOrders.map(o => ({
-        type: 'sale',
-        id: o.id,
-        number: o.order_number,
-        time: o.delivered_at || o.created_at,
-        amount: parseFloat(o.total_amount || 0),
-        customer_name: (typeof o.shipping_address === 'string' ? JSON.parse(o.shipping_address || '{}').recipient_name : o.shipping_address?.recipient_name) || o.guest_email || 'عميل أونلاين',
-        customer_phone: (typeof o.shipping_address === 'string' ? JSON.parse(o.shipping_address || '{}').phone : o.shipping_address?.phone) || '-',
-        salesperson_name: 'شحن أونلاين',
-        payment_breakdown: o.payment_method,
-        notes: `شركة الشحن: ${o.shipping_carrier || 'مندوب'} - بوليصة: ${o.tracking_number || '-'}`,
-        source: 'ecp'
-      })),
-      ...expenses.map(exp => ({
-        type: 'expense',
-        id: exp.id,
-        number: exp.expense_ref,
-        time: exp.created_at || exp.expense_date,
-        amount: parseFloat(exp.amount || 0),
-        category: exp.category,
-        subcategory: exp.subcategory,
-        description: exp.description,
-        salesperson_name: exp.created_by_name || exp.created_by_username
-      }))
-    ].sort((a, b) => new Date(b.time) - new Date(a.time));
+    // Timeline format
+    const timeline = allTransactions.map(t => ({
+      type: t.type,
+      id: t.rawId,
+      number: t.number,
+      time: t.time,
+      amount: Math.abs(t.amount),
+      customer_name: t.customerOrRecipient,
+      customer_phone: t.phone,
+      salesperson_name: t.salesperson,
+      payment_breakdown: t.paymentBreakdown || t.paymentMethod,
+      notes: t.notes,
+      source: 'pos'
+    }));
 
     return res.json({
       success: true,
       data: {
         date: targetDate,
-        sales_count: completedCount,
-        pos_count: invoices.length,
-        ecp_count: ecpOrders.length,
+        sales_count: completedSalesCount,
+        pos_count: completedSalesCount,
+        returns_count: returnInvoices.length,
+        returns_total: returnsTotal,
         expenses_count: expenses.length,
-        total_transactions: completedCount + expenses.length,
+        total_transactions: allTransactions.length,
         kpi: {
-          total_sales: totalSales,
+          total_sales: posSales,
+          gross_sales: posSales,
           pos_sales: posSales,
-          ecp_sales: ecpSales,
-          completed_count: completedCount,
+          returns_total: returnsTotal,
+          returns_count: returnInvoices.length,
+          completed_count: completedSalesCount,
           average_order_value: averageOrderValue,
+
+          // Gross Sales by Payment Method
           cash_sales: cashSales,
           card_sales: cardSales,
           transfer_sales: transferSales,
+
+          // Returns by Payment Method
+          cash_returns: cashReturns,
+          card_returns: cardReturns,
+          transfer_returns: transferReturns,
+
+          // Expenses Breakdown by Source
           total_expenses: totalExpenses,
+          refunded_expenses: refundedExpenses,
+          net_expenses: netExpenses,
+          cash_expenses: cashExpenses,
+          net_cash_expenses: netCashExpenses,
+          card_expenses: cardExpenses,
+          net_card_expenses: netCardExpenses,
+          transfer_expenses: transferExpenses,
+          net_transfer_expenses: netTransferExpenses,
+
+          // 1. Net Revenue: Total Gross Sales - Total Returns - Net Expenses
           net_revenue: netRevenue,
+
+          // 2. Strict Payment Method Breakdown: Net Revenue = Net Cash + Net Visa + Net Transfers
+          net_cash_revenue: netCash,
+          net_card_revenue: netVisa,
+          net_transfer_revenue: netTransfers,
+          net_cash: netCash,
+          net_visa: netVisa,
+          net_transfers: netTransfers,
+
+          // Cash Drawer Balance: Opening + Net Cash
           opening_balance: openingBalance,
-          expected_drawer_cash: expectedDrawerCash,
-          register_current_balance: parseFloat(register.current_balance || 0)
+          expected_drawer_cash: Math.max(0, expectedDrawerCash),
+          raw_expected_drawer_cash: expectedDrawerCash,
+          register_current_balance: parseFloat(register.current_balance || 0),
+
+          // Drawer & Holdings Categorization
+          net_cash_drawer: Math.max(0, expectedDrawerCash),
+          net_card_total: netVisa,
+          net_transfer_total: netTransfers,
+          total_drawer_balance: Math.max(0, expectedDrawerCash) + Math.max(0, netVisa) + Math.max(0, netTransfers)
         },
-        invoices,
-        ecp_orders: ecpOrders,
-        completed_orders: completedOrders,
-        recent_completed_ecp: recentCompletedEcp,
+        invoices: salesInvoices,
+        returns: returnInvoices,
         expenses,
+        all_transactions: allTransactions,
         timeline
       }
     });

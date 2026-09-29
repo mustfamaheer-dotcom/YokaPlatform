@@ -1,6 +1,450 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth, requireBranchScope } = require('../../shared/authMiddleware');
+const { requireAuth, requireBranchScope, requireRole } = require('../../shared/authMiddleware');
+
+// ─────────────────────────────────────────────────────────────
+// Strict RBAC: Analytics and reports are accessible to Supervisor and Manager/Admin:
+// ['super_admin', 'admin', 'supervisor'].
+// Salesperson / POS tokens are strictly blocked with 403 Forbidden.
+// ─────────────────────────────────────────────────────────────
+router.use(requireAuth);
+router.use(requireRole(['super_admin', 'admin', 'supervisor']));
+
+/**
+ * GET /api/swm/analytics/sales-dashboard
+ * Comprehensive, analytical Sales Dashboard endpoint for Manager's Admin Panel:
+ * - Detailed Sales Metrics (Gross Sales, Net Sales, AOV, Conversion Rate)
+ * - Returns Analysis (Gross Returns, Net Returns, Returns Percentage)
+ * - Profit / Loss Metrics (COGS, Gross Profit, Expenses, Net Profit)
+ * - Advanced Financial Breakdown by Payment Method tied to Net Revenue
+ * - Graphical Analytics (Sales Trends, Multi-Branch Comparisons, Customer Analytics)
+ */
+const handleSalesDashboard = async (req, res) => {
+  try {
+    const { branch_id, period = 'month', startDate, endDate } = req.query;
+    const scopedBranch = req.scopedBranchId;
+    const branchFilter = (scopedBranch && scopedBranch !== 'all') ? scopedBranch : branch_id;
+
+    // Date range calculation
+    let startD, endD;
+    const now = new Date();
+
+    if (startDate && endDate) {
+      startD = `${startDate} 00:00:00`;
+      endD = `${endDate} 23:59:59`;
+    } else if (period === 'today') {
+      const todayStr = now.toISOString().slice(0, 10);
+      startD = `${todayStr} 00:00:00`;
+      endD = `${todayStr} 23:59:59`;
+    } else if (period === 'yesterday') {
+      const y = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const yStr = y.toISOString().slice(0, 10);
+      startD = `${yStr} 00:00:00`;
+      endD = `${yStr} 23:59:59`;
+    } else if (period === 'week') {
+      const w = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      startD = `${w.toISOString().slice(0, 10)} 00:00:00`;
+      endD = `${now.toISOString().slice(0, 10)} 23:59:59`;
+    } else if (period === 'month') {
+      const yr = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, '0');
+      startD = `${yr}-${mo}-01 00:00:00`;
+      endD = `${now.toISOString().slice(0, 10)} 23:59:59`;
+    } else if (period === 'year') {
+      const yr = new Date(now.getFullYear(), 0, 1);
+      startD = `${yr.toISOString().slice(0, 10)} 00:00:00`;
+      endD = `${now.toISOString().slice(0, 10)} 23:59:59`;
+    } else {
+      // Default: last 30 days
+      const m = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      startD = `${m.toISOString().slice(0, 10)} 00:00:00`;
+      endD = `${now.toISOString().slice(0, 10)} 23:59:59`;
+    }
+
+    // Branch condition
+    let branchCondition = '';
+    let expenseBranchCondition = '';
+    if (branchFilter && branchFilter !== 'all') {
+      const bId = parseInt(branchFilter, 10);
+      branchCondition = `AND si.branch_id = ${bId}`;
+      expenseBranchCondition = `AND e.branch_id = ${bId}`;
+    }
+
+    // 1. Fetch Sales Invoices (Completed)
+    const salesInvoices = await query(
+      `SELECT si.id, si.invoice_number, si.branch_id, b.branch_name, si.salesperson_id,
+              u.full_name AS salesperson_name, si.customer_name, si.customer_phone,
+              si.final_amount, si.discount_amount, si.payment_breakdown, si.invoice_date
+       FROM swm_sales_invoices si
+       LEFT JOIN branches b ON b.id = si.branch_id
+       LEFT JOIN users u ON u.id = si.salesperson_id
+       WHERE si.status = 'completed'
+         AND si.invoice_date >= $1 AND si.invoice_date <= $2
+         ${branchCondition}
+       ORDER BY si.invoice_date DESC`,
+      [startD, endD]
+    );
+
+    // 2. Fetch Sales Returns (Returned)
+    const returnInvoices = await query(
+      `SELECT si.id, si.invoice_number, si.branch_id, b.branch_name, si.salesperson_id,
+              u.full_name AS salesperson_name, si.customer_name, si.customer_phone,
+              si.final_amount, si.payment_breakdown, si.invoice_date
+       FROM swm_sales_invoices si
+       LEFT JOIN branches b ON b.id = si.branch_id
+       LEFT JOIN users u ON u.id = si.salesperson_id
+       WHERE si.status = 'returned'
+         AND si.invoice_date >= $1 AND si.invoice_date <= $2
+         ${branchCondition}
+       ORDER BY si.invoice_date DESC`,
+      [startD, endD]
+    );
+
+    // 3. Fetch Operational Expenses for Period
+    const expensesList = await query(
+      `SELECT e.id, e.branch_id, e.category, e.subcategory, e.amount, e.expense_date,
+              e.expense_ref, e.description, e.created_at,
+              u.full_name AS recorded_by_name
+       FROM expenses e
+       LEFT JOIN users u ON u.id = e.recorded_by
+       WHERE e.status = 'approved'
+         AND e.expense_date >= $1::date AND e.expense_date <= $2::date
+         ${expenseBranchCondition}
+       ORDER BY e.expense_date DESC, e.id DESC`,
+      [startD.slice(0, 10), endD.slice(0, 10)]
+    );
+
+    // 4. Fetch Cost of Goods Sold (COGS)
+    const cogsRow = await query(
+      `SELECT COALESCE(SUM(sii.quantity * COALESCE(sii.cost_at_sale, p.cost_price, 0)), 0) AS total_cogs
+       FROM swm_sales_invoice_items sii
+       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+       LEFT JOIN products p ON p.id = sii.product_id
+       WHERE si.status = 'completed'
+         AND si.invoice_date >= $1 AND si.invoice_date <= $2
+         ${branchCondition}`,
+      [startD, endD]
+    );
+    const totalCogs = parseFloat(cogsRow[0]?.total_cogs || 0);
+
+    // 5. Fetch Detailed Returned Items Breakdown
+    const returnItems = await query(
+      `SELECT sii.id, sii.invoice_id, si.invoice_number, si.invoice_date,
+              sii.product_id, sii.product_name, sii.product_code,
+              sii.quantity, sii.unit_price, sii.line_total,
+              u.full_name AS salesperson_name,
+              si.customer_name, si.customer_phone
+       FROM swm_sales_invoice_items sii
+       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+       LEFT JOIN users u ON u.id = si.salesperson_id
+       WHERE si.status = 'returned'
+         AND si.invoice_date >= $1 AND si.invoice_date <= $2
+         ${branchCondition}
+       ORDER BY si.invoice_date DESC, sii.id DESC`,
+      [startD, endD]
+    );
+
+    // 6. Fetch Top Products & Top Categories for Period
+    const topProducts = await query(
+      `SELECT sii.product_name,
+              MAX(sii.product_code) AS product_code,
+              COALESCE(c.category_name, 'عام') AS category_name,
+              SUM(sii.quantity)::int AS units_sold,
+              SUM(sii.line_total)::numeric(12,2) AS total_revenue
+       FROM swm_sales_invoice_items sii
+       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+       LEFT JOIN products p ON p.id = sii.product_id
+       LEFT JOIN product_categories c ON c.id = p.category_id
+       WHERE si.status = 'completed'
+         AND si.invoice_date >= $1 AND si.invoice_date <= $2
+         ${branchCondition}
+       GROUP BY sii.product_name, c.category_name
+       ORDER BY total_revenue DESC, units_sold DESC
+       LIMIT 10`,
+      [startD, endD]
+    );
+
+    const topCategories = await query(
+      `SELECT COALESCE(c.category_name, 'عام') AS category_name,
+              SUM(sii.quantity)::int AS units_sold,
+              SUM(sii.line_total)::numeric(12,2) AS total_revenue
+       FROM swm_sales_invoice_items sii
+       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+       LEFT JOIN products p ON p.id = sii.product_id
+       LEFT JOIN product_categories c ON c.id = p.category_id
+       WHERE si.status = 'completed'
+         AND si.invoice_date >= $1 AND si.invoice_date <= $2
+         ${branchCondition}
+       GROUP BY c.category_name
+       ORDER BY total_revenue DESC
+       LIMIT 8`,
+      [startD, endD]
+    );
+
+    // Helper to parse payment breakdown
+    const parseBreakdown = (breakdownRaw, finalAmt) => {
+      let b = breakdownRaw;
+      if (typeof b === 'string') {
+        try { b = JSON.parse(b); } catch (e) { b = {}; }
+      }
+      b = b || {};
+      let cash = parseFloat(b.cash || 0);
+      let card = parseFloat(b.card || b.visa || 0);
+      let transfer = parseFloat(b.transfer || 0);
+      const total = cash + card + transfer;
+      if (total === 0) {
+        cash = finalAmt;
+      } else if (Math.abs(total - finalAmt) > 0.01) {
+        const scale = finalAmt / total;
+        cash = Math.round(cash * scale * 100) / 100;
+        card = Math.round(card * scale * 100) / 100;
+        transfer = Math.max(0, Math.round((finalAmt - cash - card) * 100) / 100);
+      }
+      return { cash, card, transfer };
+    };
+
+    let grossSales = 0;
+    let salesCash = 0;
+    let salesVisa = 0;
+    let salesTransfer = 0;
+
+    // Timeline grouping map
+    const trendsMap = {};
+    // Branch grouping map
+    const branchMap = {};
+    // Customer grouping map
+    const customerMap = {};
+    // Salesperson grouping map
+    const sellerMap = {};
+
+    for (const inv of salesInvoices) {
+      const amt = parseFloat(inv.final_amount || 0);
+      grossSales += amt;
+      const b = parseBreakdown(inv.payment_breakdown, amt);
+      salesCash += b.cash;
+      salesVisa += b.card;
+      salesTransfer += b.transfer;
+
+      // Group by day for trends
+      const dayKey = new Date(inv.invoice_date).toISOString().slice(0, 10);
+      if (!trendsMap[dayKey]) {
+        trendsMap[dayKey] = { date: dayKey, gross_sales: 0, returns: 0, net_sales: 0, sales_count: 0 };
+      }
+      trendsMap[dayKey].gross_sales += amt;
+      trendsMap[dayKey].net_sales += amt;
+      trendsMap[dayKey].sales_count += 1;
+
+      // Group by branch
+      const bName = inv.branch_name || `فرع ${inv.branch_id}`;
+      if (!branchMap[inv.branch_id]) {
+        branchMap[inv.branch_id] = { branch_id: inv.branch_id, branch_name: bName, gross_sales: 0, returns: 0, net_revenue: 0, sales_count: 0 };
+      }
+      branchMap[inv.branch_id].gross_sales += amt;
+      branchMap[inv.branch_id].net_revenue += amt;
+      branchMap[inv.branch_id].sales_count += 1;
+
+      // Group by customer
+      if (inv.customer_phone || (inv.customer_name && inv.customer_name !== 'Walk-in Customer')) {
+        const cKey = inv.customer_phone || inv.customer_name;
+        if (!customerMap[cKey]) {
+          customerMap[cKey] = {
+            name: inv.customer_name || 'عميل نقدي',
+            phone: inv.customer_phone || '-',
+            invoices_count: 0,
+            total_spent: 0
+          };
+        }
+        customerMap[cKey].invoices_count += 1;
+        customerMap[cKey].total_spent += amt;
+      }
+
+      // Group by salesperson
+      if (inv.salesperson_id) {
+        const sKey = inv.salesperson_id;
+        if (!sellerMap[sKey]) {
+          sellerMap[sKey] = {
+            salesperson_id: sKey,
+            salesperson_name: inv.salesperson_name || `بائع ${sKey}`,
+            invoices_count: 0,
+            total_sales: 0
+          };
+        }
+        sellerMap[sKey].invoices_count += 1;
+        sellerMap[sKey].total_sales += amt;
+      }
+    }
+
+    let grossReturns = 0;
+    let returnCash = 0;
+    let returnVisa = 0;
+    let returnTransfer = 0;
+
+    for (const ret of returnInvoices) {
+      const amt = parseFloat(ret.final_amount || 0);
+      grossReturns += amt;
+      const b = parseBreakdown(ret.payment_breakdown, amt);
+      returnCash += b.cash;
+      returnVisa += b.card;
+      returnTransfer += b.transfer;
+
+      // Group returns in trends
+      const dayKey = new Date(ret.invoice_date).toISOString().slice(0, 10);
+      if (!trendsMap[dayKey]) {
+        trendsMap[dayKey] = { date: dayKey, gross_sales: 0, returns: 0, net_sales: 0, sales_count: 0 };
+      }
+      trendsMap[dayKey].returns += amt;
+      trendsMap[dayKey].net_sales -= amt;
+
+      // Group returns in branch
+      if (branchMap[ret.branch_id]) {
+        branchMap[ret.branch_id].returns += amt;
+        branchMap[ret.branch_id].net_revenue -= amt;
+      }
+    }
+
+    // Expenses aggregation
+    let totalExpenseOut = 0;
+    let totalExpenseRefunded = 0;
+    for (const exp of expensesList) {
+      const amt = parseFloat(exp.amount || 0);
+      if (exp.category === 'refunded_expense' || exp.category === 'مصروف مرتد') {
+        totalExpenseRefunded += amt;
+      } else {
+        totalExpenseOut += amt;
+      }
+    }
+    const netExpenses = Math.max(0, totalExpenseOut - totalExpenseRefunded);
+
+    // Sales Metrics
+    const salesCount = salesInvoices.length;
+    const returnsCount = returnInvoices.length;
+    const aov = salesCount > 0 ? (grossSales / salesCount) : 0;
+    const netSales = Math.max(0, grossSales - grossReturns);
+    const returnRatePercentage = grossSales > 0 ? ((grossReturns / grossSales) * 100) : 0;
+    const conversionRate = (salesCount + returnsCount) > 0 ? ((salesCount / (salesCount + returnsCount)) * 100) : 100;
+
+    // Profit & Loss
+    const grossProfit = Math.max(0, netSales - totalCogs);
+    const grossProfitMargin = netSales > 0 ? ((grossProfit / netSales) * 100) : 0;
+    const netProfit = grossProfit - netExpenses;
+    const netProfitMargin = netSales > 0 ? ((netProfit / netSales) * 100) : 0;
+
+    // Advanced Financial Breakdown:
+    // Net Revenue = Gross Sales - Returns - Expenses
+    const netRevenue = grossSales - grossReturns - netExpenses;
+    const netCash = salesCash - returnCash - netExpenses;
+    const netVisa = salesVisa - returnVisa;
+    const netTransfer = salesTransfer - returnTransfer;
+
+    // Convert trends map to sorted array
+    const salesTrends = Object.values(trendsMap).sort((a, b) => a.date.localeCompare(b.date));
+    const branchPerformance = Object.values(branchMap).sort((a, b) => b.gross_sales - a.gross_sales);
+    const topCustomers = Object.values(customerMap).sort((a, b) => b.total_spent - a.total_spent).slice(0, 10);
+    const topSellers = Object.values(sellerMap).sort((a, b) => b.total_sales - a.total_sales).slice(0, 10);
+
+    const formattedExpenses = expensesList.map(e => ({
+      id: e.id,
+      branch_id: e.branch_id,
+      amount: parseFloat(e.amount || 0),
+      expense_date: e.expense_date,
+      expense_ref: e.expense_ref || `EXP-${e.id}`,
+      category: e.category,
+      subcategory: e.subcategory,
+      description: e.description,
+      recorded_by_name: e.recorded_by_name || 'موظف الفرع',
+      created_at: e.created_at,
+      is_refunded: (e.category === 'refunded_expense' || e.subcategory === 'refunded_expense')
+    }));
+
+    const formattedTopProducts = (topProducts || []).map(p => ({
+      product_name: p.product_name,
+      product_code: p.product_code,
+      category_name: p.category_name,
+      units_sold: parseInt(p.units_sold || 0, 10),
+      total_revenue: parseFloat(p.total_revenue || 0)
+    }));
+
+    const formattedTopCategories = (topCategories || []).map(c => ({
+      category_name: c.category_name,
+      units_sold: parseInt(c.units_sold || 0, 10),
+      total_revenue: parseFloat(c.total_revenue || 0)
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        filter: {
+          period,
+          startDate: startD,
+          endDate: endD,
+          branch_id: branchFilter || 'all'
+        },
+        sales_metrics: {
+          gross_sales: grossSales,
+          net_sales: netSales,
+          sales_count: salesCount,
+          aov: Math.round(aov * 100) / 100,
+          conversion_rate: Math.round(conversionRate * 10) / 10
+        },
+        returns_analysis: {
+          gross_returns: grossReturns,
+          net_returns: grossReturns,
+          returns_count: returnsCount,
+          returns_percentage: Math.round(returnRatePercentage * 10) / 10,
+          returns_list: returnInvoices.slice(0, 100),
+          returns_items: returnItems.slice(0, 100)
+        },
+        profit_loss: {
+          cogs: totalCogs,
+          gross_profit: grossProfit,
+          gross_profit_margin: Math.round(grossProfitMargin * 10) / 10,
+          total_expenses: netExpenses,
+          total_expenses_out: totalExpenseOut,
+          total_expenses_refunded: totalExpenseRefunded,
+          net_profit: netProfit,
+          net_profit_margin: Math.round(netProfitMargin * 10) / 10,
+          expenses_list: formattedExpenses
+        },
+        advanced_financials: {
+          net_revenue: netRevenue,
+          gross_sales: grossSales,
+          gross_returns: grossReturns,
+          net_expenses: netExpenses,
+          // Payment method breakdown tied to Net Revenue
+          net_cash: netCash,
+          net_visa: netVisa,
+          net_transfer: netTransfer,
+          // Individual component breakdowns
+          breakdown: {
+            sales: { cash: salesCash, visa: salesVisa, transfer: salesTransfer },
+            returns: { cash: returnCash, visa: returnVisa, transfer: returnTransfer },
+            expenses: { cash: netExpenses }
+          },
+          verified_balanced: Math.abs(netRevenue - (netCash + netVisa + netTransfer)) < 0.05
+        },
+        graphical_analytics: {
+          sales_trends: salesTrends,
+          branch_performance: branchPerformance,
+          top_products: formattedTopProducts,
+          top_categories: formattedTopCategories,
+          customer_analytics: {
+            top_customers: topCustomers,
+            top_sellers: topSellers
+          }
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Admin sales dashboard error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Route and aliases for sales dashboard and reports
+router.get('/sales-dashboard', requireBranchScope, handleSalesDashboard);
+router.get('/dashboard', requireBranchScope, handleSalesDashboard);
+router.get('/reports/sales', requireBranchScope, handleSalesDashboard);
+router.get('/sales', requireBranchScope, handleSalesDashboard);
 
 /**
  * GET /api/swm/analytics/overview
@@ -47,7 +491,7 @@ router.get('/overview', requireAuth, requireBranchScope, async (req, res) => {
       // 100% pure retail in-store POS sales
       ecpBranchCondition = `AND 1=0`;
       posBranchCondition = `AND si.branch_id IN (SELECT id FROM branches WHERE branch_type = 'retail_branch')`;
-    } else if (branchFilter === 'ecom' || branchFilter === 'ecs' || String(branchFilter) === '2') {
+    } else if (branchFilter === 'ecom' || branchFilter === 'ecs') {
       // 100% pure online E-Commerce store orders
       ecpBranchCondition = ``;
       posBranchCondition = `AND 1=0`;
@@ -529,7 +973,7 @@ router.get('/overview', requireAuth, requireBranchScope, async (req, res) => {
                               AND o.order_status NOT IN ('cancelled', 'refunded')
                               ${ecpDateCondition}
         WHERE u.status = 'active'
-          AND (b.branch_type = 'ecom_warehouse' OR b.branch_code = 'BR-ECOM' OR b.id = 2)
+          AND (b.branch_type = 'ecom_warehouse' OR b.branch_code = 'BR-ECOM')
         GROUP BY staff_name, u.username, u.role, b.branch_name, b.id
         ORDER BY total_sales DESC, invoice_count DESC
       `;
@@ -593,12 +1037,12 @@ router.get('/overview', requireAuth, requireBranchScope, async (req, res) => {
     const rawBranchPos = await query(branchPosSql, dateParams);
 
     const branchEcpSql = `
-      SELECT COALESCE(o.fulfilling_branch_id, 2) AS branch_id,
+      SELECT COALESCE(o.fulfilling_branch_id, (SELECT id FROM branches WHERE branch_type = 'ecom_warehouse' ORDER BY id ASC LIMIT 1)) AS branch_id,
              COALESCE(SUM(o.total_amount), 0)::numeric(12,2) AS ecp_sales,
              COUNT(o.id)::int AS ecp_orders_count
       FROM ecp_orders o
       WHERE o.order_status NOT IN ('cancelled', 'refunded') ${ecpDateCondition}
-      GROUP BY COALESCE(o.fulfilling_branch_id, 2)
+      GROUP BY COALESCE(o.fulfilling_branch_id, (SELECT id FROM branches WHERE branch_type = 'ecom_warehouse' ORDER BY id ASC LIMIT 1))
     `;
     const rawBranchEcp = await query(branchEcpSql, dateParams);
 

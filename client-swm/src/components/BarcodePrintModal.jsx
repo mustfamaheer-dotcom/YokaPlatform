@@ -285,7 +285,7 @@ export default function BarcodePrintModal({
           طباعة {totalStickersToPrint} ملصق باركود الآن
         </Button>
       ]}
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ padding: '4px 0' }}>
         {/* Controls Row */}

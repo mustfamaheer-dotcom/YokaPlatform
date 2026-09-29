@@ -227,8 +227,8 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
     const [{ count }] = await query(`SELECT COUNT(id) AS count FROM stock_adjustments`);
     const voucherNumber = `ADJ-${yymm}-${String(parseInt(count, 10) + 1).padStart(5, '0')}`;
 
-    // Branch accounts can only save drafts for admin review
-    const isApproved = isBranchAccount ? false : (status === 'approved');
+    // Branch supervisors and managers have direct approval rights for their branch
+    const isApproved = (req.user.role === 'supervisor' || !isBranchAccount) ? (status === 'approved') : false;
 
     // Execute atomic creation transaction
     const createdVoucher = await transaction(async (client) => {
@@ -429,7 +429,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
  * PUT /api/swm/stock-adjustments/:id/approve
  * Approves a previously saved draft adjustment voucher and applies changes to inventory
  */
-router.put('/:id/approve', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.put('/:id/approve', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -440,6 +440,11 @@ router.put('/:id/approve', requireAuth, requireRole(['super_admin', 'admin', 'in
 
     if (voucher.status === 'approved') {
       return res.status(400).json({ success: false, message: 'سند التسوية معتمد ومطبق مسبقاً' });
+    }
+
+    // Branch scoping for supervisor
+    if (req.user.role === 'supervisor' && req.user.branchId && voucher.branch_id !== req.user.branchId) {
+      return res.status(403).json({ success: false, message: 'غير مصرح لك باعتماد سندات تسوية لفروع أخرى' });
     }
 
     const items = await query(`SELECT * FROM stock_adjustment_items WHERE adjustment_id = $1`, [id]);

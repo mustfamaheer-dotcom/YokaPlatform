@@ -36,12 +36,14 @@ import {
   BookOpenCheck,
   CheckCircle2,
   Database,
-  Server
+  Server,
+  BarChart3,
+  ArrowLeft
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import api from '../api';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 export default function Dashboard({ onNavigate }) {
   const [loading, setLoading] = useState(false);
@@ -211,6 +213,96 @@ export default function Dashboard({ onNavigate }) {
             style={{ borderRadius: 8 }}
           >
             تحديث
+          </Button>
+        </div>
+      </div>
+
+      {/* ─── FEATURED MODULE CARD: COMPREHENSIVE BRANCH SALES & REPORTS (لوحة مبيعات وتقارير الفروع الشاملة) ─── */}
+      <div
+        className="unified-nav-card"
+        role="button"
+        tabIndex={0}
+        onClick={() => onNavigate('sales_reports')}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onNavigate('sales_reports');
+          }
+        }}
+        style={{
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+          color: '#ffffff',
+          borderRadius: 16,
+          padding: '20px 24px',
+          marginBottom: 18,
+          minHeight: 'auto',
+          height: 'auto',
+          cursor: 'pointer',
+          boxShadow: '0 8px 24px -4px rgba(49, 46, 129, 0.28)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16,
+          border: '1.5px solid #4338ca',
+          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 14,
+              background: 'rgba(255, 255, 255, 0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              backdropFilter: 'blur(8px)'
+            }}
+          >
+            <BarChart3 size={28} color="#38bdf8" />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <span style={{ fontSize: 17, fontWeight: 800, color: '#ffffff' }}>
+                بطاقة تقارير ومبيعات الفرع الشاملة والتحليلات (Comprehensive Sales & Reports)
+              </span>
+              <Tag color="cyan" style={{ fontWeight: 700, fontSize: 11, borderRadius: 6, margin: 0 }}>
+                لوحة المدير حصرياً
+              </Tag>
+            </div>
+            <Paragraph style={{ color: '#c7d2fe', fontSize: 13, margin: 0, maxWidth: 660, lineHeight: 1.5 }}>
+              تحليلات المبيعات وصافي الإيرادات، الرسوم البيانية التفاعلية (Recharts)، أداء البائعين، تدقيق المرتجعات، ودفتر المصروفات بنطاق زمني مخصص.
+            </Paragraph>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.08)', padding: '6px 14px', borderRadius: 10 }}>
+            <span style={{ fontSize: 11, color: '#93c5fd', display: 'block' }}>إجمالي المبيعات المحققة</span>
+            <strong style={{ fontSize: 17, color: '#ffffff', fontWeight: 800 }}>
+              {kpi.totalInflow.toLocaleString('ar-EG')} ج.م
+            </strong>
+          </div>
+          <Button
+            type="primary"
+            icon={<ArrowLeft size={16} />}
+            style={{
+              backgroundColor: '#38bdf8',
+              borderColor: '#38bdf8',
+              color: '#0f172a',
+              borderRadius: 10,
+              fontWeight: 800,
+              height: 42,
+              padding: '0 18px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              boxShadow: '0 4px 12px rgba(56, 189, 248, 0.35)'
+            }}
+          >
+            فتح التقارير والرسوم
           </Button>
         </div>
       </div>
@@ -577,6 +669,27 @@ export default function Dashboard({ onNavigate }) {
         styles={{ body: { padding: '16px' } }}
       >
         <Row gutter={[12, 12]}>
+          <Col xs={12} sm={8} md={6}>
+            <Button
+              block
+              onClick={() => onNavigate('sales_reports')}
+              style={{
+                height: 52,
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                gap: 8,
+                padding: '0 12px',
+                border: '1px solid #c7d2fe',
+                background: '#eef2ff'
+              }}
+            >
+              <BarChart3 size={18} color="#4f46e5" />
+              <span style={{ fontWeight: 600, fontSize: 13, color: '#3730a3' }}>التقارير الشاملة</span>
+            </Button>
+          </Col>
+
           <Col xs={12} sm={8} md={6}>
             <Button
               block

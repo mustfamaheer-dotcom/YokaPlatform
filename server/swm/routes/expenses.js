@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireBranchScope } = require('../../shared/authMiddleware');
+const { requireAuth, requireBranchScope, requireRole } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 
 /**
@@ -18,7 +18,7 @@ async function getBranchRegister(branchId) {
  * GET /api/swm/expenses/analytics
  * Comprehensive visual analytics, trend data, and decision-making insights
  */
-router.get('/analytics', requireAuth, requireBranchScope, async (req, res) => {
+router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), requireBranchScope, async (req, res) => {
   try {
     const branchId = req.scopedBranchId;
     const { days = 14 } = req.query;
@@ -273,26 +273,21 @@ router.post('/', requireAuth, requireBranchScope, async (req, res) => {
       });
     }
 
-    const CATEGORY_MAP = {
-      'صرف نقدية': 'sales_withdrawal',
-      'سحب البائعين': 'sales_withdrawal',
-      'sales_withdrawal': 'sales_withdrawal',
-      'دفع فواتير': 'utility_bill',
-      'فواتير': 'utility_bill',
-      'utility_bill': 'utility_bill',
-      'مصروف مرتد': 'refunded_expense',
-      'مرتد': 'refunded_expense',
-      'refunded_expense': 'refunded_expense'
-    };
-
-    const finalCategory = CATEGORY_MAP[category] || category;
-    const ALLOWED_CATEGORIES = ['sales_withdrawal', 'utility_bill', 'refunded_expense'];
-    if (!ALLOWED_CATEGORIES.includes(finalCategory)) {
-      return res.status(400).json({
-        success: false,
-        message: 'بند المصروف غير صالح. الخيارات المتاحة: صرف نقدية، دفع فواتير، مصروف مرتد'
-      });
+    const isReturned = category === 'refunded_expense' || category === 'مصروف مرتد' || req.body.operational_type === 'returned_expense';
+    let finalCategory = 'utility_bill';
+    if (isReturned) {
+      finalCategory = 'refunded_expense';
+    } else if (
+      category === 'sales_withdrawal' ||
+      category === 'صرف نقدية' ||
+      category === 'سحب البائعين' ||
+      (typeof category === 'string' && (category.includes('بائع') || category.includes('سحب') || category.includes('موظف'))) ||
+      salesperson_id
+    ) {
+      finalCategory = 'sales_withdrawal';
     }
+
+    const assignedSubcategory = subcategory || (typeof category === 'string' ? category : undefined);
 
     // Determine effective user ID for recorded_by (foreign key to users)
     let effectiveUserId = salesperson_id ? parseInt(salesperson_id, 10) : null;
@@ -360,7 +355,7 @@ router.post('/', requireAuth, requireBranchScope, async (req, res) => {
           expRef,
           branchId,
           finalCategory,
-          subcategory || null,
+          assignedSubcategory || null,
           parsedAmount,
           fullDescription || null,
           effectiveUserId

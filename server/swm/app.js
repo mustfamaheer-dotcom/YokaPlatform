@@ -133,10 +133,17 @@ const adminJournalsRoutes = require('./routes/adminJournals');
 app.use('/api/swm/admin-journals', adminJournalsRoutes);
 const treasuryRoutes = require('./routes/treasury');
 app.use('/api/swm/treasury', treasuryRoutes);
+app.use('/api/v1/treasury', treasuryRoutes);
+app.use('/api/v1', treasuryRoutes); // mounts POST /api/v1/cash-transfers and GET /api/v1/cash-transfers
 const analyticsRoutes = require('./routes/analytics');
 app.use('/api/swm/analytics', analyticsRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/reports', analyticsRoutes);
+app.use('/api/swm/reports', analyticsRoutes);
 const storeSettingsRoutes = require('./routes/storeSettings');
 app.use('/api/swm/store-settings', storeSettingsRoutes);
+const systemRoutes = require('./routes/systemBackup');
+app.use('/api/swm/system', systemRoutes);
 const visitorAnalyticsRoutes = require('./routes/visitorAnalytics');
 app.use('/api/swm/visitor-analytics', visitorAnalyticsRoutes);
 
@@ -294,6 +301,12 @@ const PORT = parseInt(process.env.PORT || process.env.PORT_SWM || '3001', 10);
 if (require.main === module || process.env.PORT) {
   app.listen(PORT, () => {
     console.log(`🚀 [Yoka SWM API] Hardened service running on port ${PORT} (Environment: ${process.env.NODE_ENV || 'development'})`);
+    try {
+      const { scheduleDaily1AmShiftClose } = require('./cron/shiftClosingJob');
+      scheduleDaily1AmShiftClose();
+    } catch (cronErr) {
+      console.error('Failed to initialize shift closing cron job:', cronErr);
+    }
   });
 }
 

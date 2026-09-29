@@ -76,8 +76,19 @@ export default function ThermalReceipt({ invoice, onClose }) {
           <div style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
             شركة يوكا ستور (YOKA STORE)
           </div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', marginTop: 2 }}>
-            أرقى ملابس المحجبات والأزياء الراقية
+          <div style={{
+            display: 'inline-block',
+            fontSize: '11px',
+            fontWeight: 800,
+            color: (invoice.isReturn || invoice.status === 'returned' || invoice.invoice_number?.startsWith('RET-')) ? '#b91c1c' : '#15803d',
+            background: (invoice.isReturn || invoice.status === 'returned' || invoice.invoice_number?.startsWith('RET-')) ? '#fee2e2' : '#f0fdf4',
+            padding: '2px 10px',
+            borderRadius: 6,
+            marginTop: 4
+          }}>
+            {(invoice.isReturn || invoice.status === 'returned' || invoice.invoice_number?.startsWith('RET-'))
+              ? 'إيصال مرتجع مبيعات (Return)'
+              : 'إيصال استلام مبيعات (Sale)'}
           </div>
           <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: 2 }}>
             {invoice.branch_name || 'الفرع الرئيسي'}
@@ -92,7 +103,7 @@ export default function ThermalReceipt({ invoice, onClose }) {
         {/* Invoice Metadata Box */}
         <div style={{ fontSize: '10.5px', background: '#f8fafc', padding: '6px 8px', borderRadius: 6, marginBottom: 8, border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#64748b', fontWeight: 600 }}>رقم الفاتورة:</span>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>رقم الفاتورة / المرتجع:</span>
             <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontSize: '11.5px' }}>{invoice.invoice_number}</strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>

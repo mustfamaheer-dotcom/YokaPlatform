@@ -47,7 +47,8 @@ import {
   ArrowUpRight,
   Zap,
   Building2,
-  DollarSign
+  DollarSign,
+  ArrowRight
 } from 'lucide-react';
 import api from '../api';
 import BarcodeImage from '../components/BarcodeImage';
@@ -371,6 +372,291 @@ export default function Home({ currentUser, onNavigate }) {
             >
               تحديث
             </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* MAIN DASHBOARD SCREEN (CARD-BASED NAVIGATION)             */}
+      {/* ========================================================= */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 4, height: 20, background: '#4f46e5', borderRadius: 2 }} />
+            <div>
+              <Title level={4} style={{ margin: 0, fontWeight: 800, fontSize: 17, color: '#0f172a' }}>
+                بوابة العمليات الرئيسية (Card-Based Navigation)
+              </Title>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                شاشات العمليات الأساسية لنقاط البيع وإدارة الخزينة والوردية اليومية
+              </Text>
+            </div>
+          </div>
+          <Tag color="geekblue" style={{ fontSize: 12, padding: '3px 10px', borderRadius: 8, fontWeight: 600 }}>
+            ⚡ لوحة التحكم والوصول السريع
+          </Tag>
+        </div>
+
+        <div className="pos-nav-hero-grid">
+          {/* Card 1: New Sales Invoice (فاتورة بيع جديدة) */}
+          <div
+            role="button"
+            tabIndex={0}
+            className="pos-nav-hero-card pos-nav-card-sale"
+            onClick={() => onNavigate('pos')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onNavigate('pos');
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 16,
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 18px rgba(16, 185, 129, 0.3)'
+                  }}
+                >
+                  <ScanLine size={32} strokeWidth={2.2} />
+                </div>
+                <Tag
+                  color="green"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                    margin: 0,
+                    border: 'none',
+                    background: '#dcfce7',
+                    color: '#15803d'
+                  }}
+                >
+                  نقطة البيع (POS) • F11
+                </Tag>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <Title level={3} style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 22, color: '#065f46' }}>
+                  فاتورة بيع جديدة
+                </Title>
+                <Text style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>
+                  New Sales Invoice
+                </Text>
+              </div>
+
+              <p style={{ color: '#475569', fontSize: 14, lineHeight: 1.6, margin: '0 0 20px' }}>
+                فتح شاشة الكاشير السريعة، إدخال الباركود بالماسح أو يدوياً، محاسبة العملاء (كاش، فيزا، تحويل)، وإصدار فواتير البيع أو المرتجعات.
+              </p>
+            </div>
+
+            <div
+              style={{
+                paddingTop: 16,
+                borderTop: '1px solid #d1fae5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>
+                بدء فاتورة بيع جديدة
+              </span>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: '#dcfce7',
+                  color: '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <ArrowRight size={18} style={{ transform: 'rotate(180deg)' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Expense Management (إدارة المصروفات) */}
+          <div
+            role="button"
+            tabIndex={0}
+            className="pos-nav-hero-card pos-nav-card-expense"
+            onClick={() => onNavigate('expenses_selection')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onNavigate('expenses_selection');
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 16,
+                    background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 18px rgba(234, 88, 12, 0.3)'
+                  }}
+                >
+                  <Wallet size={32} strokeWidth={2.2} />
+                </div>
+                <Tag
+                  color="orange"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                    margin: 0,
+                    border: 'none',
+                    background: '#ffedd5',
+                    color: '#c2410c'
+                  }}
+                >
+                  حركات الخزينة والدرج
+                </Tag>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <Title level={3} style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 22, color: '#9a3412' }}>
+                  إدارة المصروفات
+                </Title>
+                <Text style={{ fontSize: 12, color: '#ea580c', fontWeight: 600 }}>
+                  Expense Management
+                </Text>
+              </div>
+
+              <p style={{ color: '#475569', fontSize: 14, lineHeight: 1.6, margin: '0 0 20px' }}>
+                تسجيل مصروفات التشغيل اليومية، فواتير ومرافق، سحب نقدية للبائعين مع الخصم من الدرج، أو تسجيل استرداد المصروف المرتد.
+              </p>
+            </div>
+
+            <div
+              style={{
+                paddingTop: 16,
+                borderTop: '1px solid #ffedd5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}>
+                اختيار نوع المصروف وتسجيل الحركة
+              </span>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: '#ffedd5',
+                  color: '#ea580c',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <ArrowRight size={18} style={{ transform: 'rotate(180deg)' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Seller's Daily Report (صفحة يومية البائع) */}
+          <div
+            role="button"
+            tabIndex={0}
+            className="pos-nav-hero-card pos-nav-card-shift"
+            onClick={() => onNavigate('daily_shift')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onNavigate('daily_shift');
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 16,
+                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 8px 18px rgba(99, 102, 241, 0.3)'
+                  }}
+                >
+                  <CalendarCheck size={32} strokeWidth={2.2} />
+                </div>
+                <Tag
+                  color="purple"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                    margin: 0,
+                    border: 'none',
+                    background: '#ede9fe',
+                    color: '#6d28d9'
+                  }}
+                >
+                  تقرير الوردية والتقفيل
+                </Tag>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <Title level={3} style={{ margin: '0 0 2px', fontWeight: 800, fontSize: 22, color: '#3730a3' }}>
+                  صفحة يومية البائع
+                </Title>
+                <Text style={{ fontSize: 12, color: '#4f46e5', fontWeight: 600 }}>
+                  Seller's Daily Report
+                </Text>
+              </div>
+
+              <p style={{ color: '#475569', fontSize: 14, lineHeight: 1.6, margin: '0 0 20px' }}>
+                متابعة إجمالي مبيعات اليوم، مطابقة تفاصيل الدفع (كاش، فيزا، تحويل)، مراقبة رصيد الدرج الفعلي، وإنهاء وإغلاق وردية البائع.
+              </p>
+            </div>
+
+            <div
+              style={{
+                paddingTop: 16,
+                borderTop: '1px solid #e0e7ff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#4f46e5' }}>
+                عرض اليومية وجرد النقدية
+              </span>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: '#ede9fe',
+                  color: '#4f46e5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <ArrowRight size={18} style={{ transform: 'rotate(180deg)' }} />
+              </div>
+            </div>
           </div>
         </div>
       </div>

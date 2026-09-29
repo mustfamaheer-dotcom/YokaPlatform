@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Select, Button, Alert, Space, Typography, message } from 'antd';
+import { Modal, Form, Input, Select, Button, Alert, Space, Typography } from 'antd';
 import { LockOutlined, UserOutlined, CrownOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import api from '../api';
+import { antMessage } from '../utils/antAppBridge';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -47,14 +48,14 @@ export default function SupervisorUnlockModal({ open, onCancel, onSuccess, curre
         if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
         localStorage.setItem('user', JSON.stringify(user));
 
-        message.success(res.data.message || 'تم تفعيل وضع المشرف بنجاح');
+        antMessage.success(res.data.message || 'تم تفعيل وضع المشرف بنجاح');
         form.resetFields();
         if (onSuccess) onSuccess(user);
       } else {
-        message.error(res.data.message || 'فشل التحقق من بيانات المشرف');
+        antMessage.error(res.data.message || 'فشل التحقق من بيانات المشرف');
       }
     } catch (err) {
-      message.error(err.response?.data?.message || 'بيانات المشرف غير صحيحة');
+      antMessage.error(err.response?.data?.message || 'بيانات المشرف غير صحيحة');
     } finally {
       setLoading(false);
     }

@@ -1,13 +1,13 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole } = require('../../shared/authMiddleware');
 
 /**
  * GET /api/swm/visitor-analytics
  * Strategic telemetry report on visitor behavior, geographic distribution (cities),
  * conversion funnel, and real-time live presence.
  */
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
   try {
     const { days, startDate, endDate } = req.query;
 

@@ -100,6 +100,116 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/swm/products/stock-alerts
+ * Dedicated stock alert dashboard endpoint:
+ * Lists products based on inventory_balances:
+ * a) Out of Stock: Quantity = 0
+ * b) Low Stock: Remaining quantity of 2 pieces or fewer (1 <= Quantity <= 2)
+ */
+router.get('/stock-alerts', requireAuth, async (req, res) => {
+  try {
+    let branchId = req.query.branch_id;
+    if (['salesperson', 'supervisor'].includes(req.user?.role) && req.user?.branchId) {
+      branchId = req.user.branchId;
+    }
+    const targetBranchId = parseInt(branchId || req.user?.branchId || 1, 10);
+
+    const { search, category_id, filter_type = 'all' } = req.query;
+
+    const whereClauses = [
+      `p.status = 'active'`,
+      `COALESCE(ib.available_qty, 0) <= 2`
+    ];
+    const params = [targetBranchId];
+    let pIdx = 2;
+
+    if (search && search.trim()) {
+      whereClauses.push(`(p.product_name ILIKE $${pIdx} OR p.product_code ILIKE $${pIdx} OR p.barcode ILIKE $${pIdx})`);
+      params.push(`%${search.trim()}%`);
+      pIdx++;
+    }
+
+    if (category_id) {
+      whereClauses.push(`p.category_id = $${pIdx}`);
+      params.push(parseInt(category_id, 10));
+      pIdx++;
+    }
+
+    if (filter_type === 'out_of_stock') {
+      whereClauses.push(`COALESCE(ib.available_qty, 0) = 0`);
+    } else if (filter_type === 'low_stock') {
+      whereClauses.push(`COALESCE(ib.available_qty, 0) > 0 AND COALESCE(ib.available_qty, 0) <= 2`);
+    }
+
+    const whereSql = whereClauses.join(' AND ');
+
+    const sql = `
+      SELECT 
+        p.id,
+        p.product_name,
+        p.product_code,
+        p.barcode,
+        p.cost_price,
+        p.selling_price,
+        COALESCE(c.category_name, 'عام') AS category_name,
+        v.id AS variant_id,
+        v.variant_sku,
+        COALESCE(v.color, p.color) AS color,
+        COALESCE(v.size, p.size) AS size,
+        COALESCE(ib.available_qty, 0)::int AS system_qty,
+        COALESCE(ib.reserved_qty, 0)::int AS reserved_qty,
+        b.id AS branch_id,
+        b.branch_name,
+        CASE 
+          WHEN COALESCE(ib.available_qty, 0) = 0 THEN 'out_of_stock'
+          ELSE 'low_stock'
+        END AS alert_type
+      FROM products p
+      LEFT JOIN product_categories c ON c.id = p.category_id
+      LEFT JOIN product_variants v ON v.product_id = p.id
+      LEFT JOIN inventory_balances ib ON ib.product_id = p.id
+        AND (ib.variant_id = v.id OR (ib.variant_id IS NULL AND v.id IS NULL))
+        AND ib.branch_id = $1
+      LEFT JOIN branches b ON b.id = $1
+      WHERE ${whereSql}
+      ORDER BY COALESCE(ib.available_qty, 0) ASC, p.product_name ASC
+    `;
+
+    const items = await query(sql, params);
+
+    // Global counts across the branch without search/filter restriction
+    const [counts] = await query(`
+      SELECT 
+        COUNT(CASE WHEN COALESCE(ib.available_qty, 0) = 0 THEN 1 END)::int AS out_of_stock,
+        COUNT(CASE WHEN COALESCE(ib.available_qty, 0) > 0 AND COALESCE(ib.available_qty, 0) <= 2 THEN 1 END)::int AS low_stock,
+        COUNT(*)::int AS total_alerts
+      FROM products p
+      LEFT JOIN product_variants v ON v.product_id = p.id
+      LEFT JOIN inventory_balances ib ON ib.product_id = p.id
+        AND (ib.variant_id = v.id OR (ib.variant_id IS NULL AND v.id IS NULL))
+        AND ib.branch_id = $1
+      WHERE p.status = 'active'
+        AND COALESCE(ib.available_qty, 0) <= 2
+    `, [targetBranchId]);
+
+    return res.json({
+      success: true,
+      data: {
+        summary: {
+          total_alerts: parseInt(counts?.total_alerts || 0, 10),
+          out_of_stock_count: parseInt(counts?.out_of_stock || 0, 10),
+          low_stock_count: parseInt(counts?.low_stock || 0, 10)
+        },
+        items
+      }
+    });
+  } catch (err) {
+    console.error('Stock alerts error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * GET /api/swm/products/ecom-warehouse-stock
  * Retrieve inventory stock and e-commerce listing status for the E-Commerce Warehouse
  */
@@ -120,7 +230,14 @@ router.get('/ecom-warehouse-stock', requireAuth, requireRole(['super_admin', 'ad
       const [ecomBranch] = await query(
         `SELECT id FROM branches WHERE branch_type = 'ecom_warehouse' OR branch_code = 'BR-ECOM' ORDER BY id ASC LIMIT 1`
       );
-      targetBranchId = ecomBranch ? ecomBranch.id : 1;
+      if (ecomBranch) {
+        targetBranchId = ecomBranch.id;
+      } else {
+        const [mainBranch] = await query(
+          `SELECT id FROM branches WHERE branch_type = 'main_warehouse' ORDER BY id ASC LIMIT 1`
+        );
+        targetBranchId = mainBranch ? mainBranch.id : 1;
+      }
     }
 
     const pageNum = Math.max(1, parseInt(page, 10));

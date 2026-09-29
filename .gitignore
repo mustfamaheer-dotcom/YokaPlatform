@@ -12,3 +12,5 @@ client-swm/node_modules/
 client-ecp/node_modules/
 dist-deploy/
 dist-server/
+server/swm/backups/
+scratch/

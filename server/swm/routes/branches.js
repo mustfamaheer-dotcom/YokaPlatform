@@ -119,16 +119,42 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
 
     const newBranch = rows[0];
 
+    // Auto-provision infrastructure for retail branches
+    const effectiveBranchType = branch_type || 'retail_branch';
+    if (effectiveBranchType === 'retail_branch') {
+      try {
+        // 1. Create a main cash register for the new branch
+        const registerCode = `REG-${branchCodeClean}-01`;
+        await query(
+          `INSERT INTO cash_registers (register_code, branch_id, register_name, is_main, current_balance, opening_balance, status, created_at, updated_at)
+           VALUES ($1, $2, $3, true, 0, 0, 'open', NOW(), NOW())
+           ON CONFLICT DO NOTHING`,
+          [registerCode, newBranch.id, `درج نقدية ${branch_name.trim()}`]
+        );
+
+        // 2. Create a branch safe with zero balances
+        await query(
+          `INSERT INTO branch_safes (branch_id, safe_name, cash_balance, visa_balance, transfer_balance)
+           VALUES ($1, $2, 0, 0, 0)
+           ON CONFLICT DO NOTHING`,
+          [newBranch.id, `خزينة ${branch_name.trim()}`]
+        );
+      } catch (provisionErr) {
+        console.error(`[Branch Creation] Auto-provision warning for branch #${newBranch.id}:`, provisionErr.message);
+        // Non-blocking: branch is created even if provisioning partially fails
+      }
+    }
+
     logActivity({
       userId: req.user.id,
       branchId: newBranch.id,
       actionType: 'CREATE_BRANCH',
       entityType: 'branches',
       entityId: newBranch.id,
-      newValue: { branch_code: branchCodeClean, branch_name, branch_type, login_username: branchUserClean },
+      newValue: { branch_code: branchCodeClean, branch_name, branch_type: effectiveBranchType, login_username: branchUserClean },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-      notes: `Branch ${branch_name} created with login username: ${branchUserClean || 'None'}`
+      notes: `Branch ${branch_name} (${effectiveBranchType}) created with login username: ${branchUserClean || 'None'}`
     });
 
     return res.status(201).json({ success: true, data: newBranch, message: 'تم إنشاء الفرع وبيانات تسجيل الدخول بنجاح' });

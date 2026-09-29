@@ -2145,7 +2145,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 >
                   {it.loadingVariants ? (
                     <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                      <Spin tip="جاري جلب تفاصيل المقاسات والألوان وأسعار الصنف..." />
+                      <Spin />
+                      <div style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>جاري جلب تفاصيل المقاسات والألوان وأسعار الصنف...</div>
                     </div>
                   ) : !it.product_id ? (
                     <Alert
@@ -3573,7 +3574,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         confirmLoading={quickVariantSubmitting}
         okText="حفظ وإضافة إلى الفاتورة"
         cancelText="إلغاء"
-        destroyOnClose
+        destroyOnHidden
         width={550}
       >
         <Alert
@@ -3784,7 +3785,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         confirmLoading={masterProductSubmitting}
         okText={masterProductMode === 'create' ? 'حفظ الصنف وإدراجه بالفاتورة' : 'حفظ وتحديث بيانات الصنف'}
         cancelText="إلغاء"
-        destroyOnClose
+        destroyOnHidden
         width={780}
       >
         <Form

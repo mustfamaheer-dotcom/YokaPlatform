@@ -196,7 +196,7 @@ router.get('/staff-preparers', requireAuth, async (req, res) => {
       FROM users u
       JOIN branches b ON b.id = u.branch_id
       WHERE u.status = 'active'
-        AND (b.branch_type = 'ecom_warehouse' OR b.branch_code = 'BR-ECOM' OR b.id = 2)
+        AND (b.branch_type = 'ecom_warehouse' OR b.branch_code = 'BR-ECOM')
       ORDER BY COALESCE(u.full_name, u.username) ASC
     `);
 

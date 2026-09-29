@@ -136,7 +136,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
     // 2. Fetch Expenses for the same scope
     const expensesSql = `
       SELECT e.id, e.branch_id, e.amount, e.category, e.description, e.expense_date,
-             b.branch_name, b.branch_code
+             b.branch_name, b.branch_code, b.branch_type
       FROM expenses e
       JOIN branches b ON b.id = e.branch_id
       ${expWhereSql}
@@ -227,7 +227,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
           branch_id: bId,
           branch_name: exp.branch_name,
           branch_code: exp.branch_code,
-          branch_type: 'retail_branch',
+          branch_type: exp.branch_type || 'retail_branch',
           invoices_count: 0,
           items_sold: 0,
           total_inflow: 0,

@@ -10,21 +10,16 @@ import {
   Typography,
   Space,
   Statistic,
-  message,
-  Timeline,
-  Tabs,
-  Badge,
-  Divider,
-  Modal,
-  Descriptions,
   Segmented,
-  Tooltip
+  Tooltip,
+  Modal,
+  Input
 } from 'antd';
+import { antMessage as message } from '../utils/antAppBridge';
 import {
   ScheduleOutlined,
   DollarOutlined,
   CreditCardOutlined,
-  SwapOutlined,
   ArrowDownOutlined,
   CheckCircleOutlined,
   PrinterOutlined,
@@ -32,16 +27,11 @@ import {
   UserOutlined,
   ShoppingCartOutlined,
   WalletOutlined,
+  RollbackOutlined,
+  CalendarOutlined,
+  SearchOutlined,
   FileTextOutlined,
-  RiseOutlined,
-  InboxOutlined,
-  CarOutlined,
-  EyeOutlined,
-  FilterOutlined,
-  EnvironmentOutlined,
-  PhoneOutlined,
-  CopyOutlined,
-  CalendarOutlined
+  BankOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../api';
@@ -57,35 +47,57 @@ export default function DailyShift({ currentUser }) {
   const [data, setData] = useState(null);
   const [staff, setStaff] = useState([]);
   const [selectedSalesperson, setSelectedSalesperson] = useState(null);
-  const selectedStaffId = selectedSalesperson;
 
-  // Filter for Completed Orders Tab (POS vs ECP)
-  const [orderFilterType, setOrderFilterType] = useState('all'); // 'all' | 'pos' | 'ecp'
+  // Table Filter: 'all' | 'sale' | 'return' | 'expense'
+  const [txFilterType, setTxFilterType] = useState('all');
+  const [txSearchText, setTxSearchText] = useState('');
 
-  // POS Invoice detail modal
+  // POS Invoice / Return detail modal for reprint
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
 
-  // ECP Order detail modal
-  const [selectedEcpOrder, setSelectedEcpOrder] = useState(null);
-  const [ecpModalVisible, setEcpModalVisible] = useState(false);
+  // Shift Print Modal
   const [shiftPrintModalVisible, setShiftPrintModalVisible] = useState(false);
   const shiftPrintRef = useRef(null);
-  const ecpPrintRef = useRef(null);
 
-  // Fetch branch staff
+  // Fetch branch staff for filter (strictly filtered to active branch)
   const fetchStaff = async () => {
     try {
-      const res = await api.get('/api/swm/users');
+      let bId = currentUser?.branch_id || currentUser?.branchId;
+      if (!bId) {
+        try {
+          const stored = localStorage.getItem('user');
+          if (stored) {
+            const u = JSON.parse(stored);
+            bId = u?.branch_id || u?.branchId;
+          }
+        } catch (e) {}
+      }
+      if (!bId) {
+        try {
+          const sRes = await api.get('/api/swm/pos/session/current');
+          bId = sRes.data?.data?.register?.branch_id;
+        } catch (e) {}
+      }
+
+      const params = { status: 'active' };
+      if (bId) {
+        params.branch_id = bId;
+      }
+      const res = await api.get('/api/swm/users', { params });
       if (res.data.success) {
-        setStaff(res.data.data || []);
+        const allUsers = res.data.data || [];
+        const branchStaff = bId
+          ? allUsers.filter((u) => Number(u.branch_id) === Number(bId))
+          : allUsers;
+        setStaff(branchStaff);
       }
     } catch (err) {
       console.error('Fetch staff error:', err);
     }
   };
 
-  // Fetch shift summary for today only
+  // Fetch shift summary for today
   const fetchSummary = async () => {
     setLoading(true);
     try {
@@ -113,7 +125,7 @@ export default function DailyShift({ currentUser }) {
     fetchSummary();
   }, [selectedSalesperson]);
 
-  // View & reprint POS invoice
+  // View & reprint POS invoice or return receipt
   const handleViewInvoice = async (invoiceId) => {
     try {
       const res = await api.get(`/api/swm/pos/invoices/${invoiceId}`);
@@ -126,58 +138,77 @@ export default function DailyShift({ currentUser }) {
     }
   };
 
-  // View ECP Order details
-  const handleViewEcpOrder = (order) => {
-    setSelectedEcpOrder(order);
-    setEcpModalVisible(true);
-  };
-
-  // Print shift closing summary
-  const handlePrintShift = () => {
-    setShiftPrintModalVisible(true);
-  };
-
   const kpi = data?.kpi || {};
+  const allTransactions = data?.all_transactions || [];
 
-  // Today's completed orders
-  const baseOrdersList = data?.completed_orders || [];
+  // Filtered transactions for the detailed table
+  const filteredTransactions = allTransactions.filter((tx) => {
+    // Type filter
+    if (txFilterType === 'sale' && tx.type !== 'sale') return false;
+    if (txFilterType === 'return' && tx.type !== 'return') return false;
+    if (txFilterType === 'expense' && !['expense', 'refunded_expense'].includes(tx.type)) return false;
 
-  const filteredCompletedOrders = baseOrdersList.filter(o => {
-    if (orderFilterType === 'all') return true;
-    return o.orderType === orderFilterType;
+    // Keyword search filter
+    if (txSearchText && txSearchText.trim()) {
+      const q = txSearchText.trim().toLowerCase();
+      const matchNumber = (tx.number || '').toLowerCase().includes(q);
+      const matchCustomer = (tx.customerOrRecipient || '').toLowerCase().includes(q);
+      const matchPhone = (tx.phone || '').toLowerCase().includes(q);
+      const matchStaff = (tx.salesperson || '').toLowerCase().includes(q);
+      return matchNumber || matchCustomer || matchPhone || matchStaff;
+    }
+
+    return true;
   });
 
-  // Completed Orders Table Columns
-  const completedOrderColumns = [
+  // Detailed Transactions Table Columns
+  const transactionColumns = [
     {
-      title: 'نوع الطلب',
-      dataIndex: 'orderType',
-      key: 'orderType',
+      title: 'نوع الحركة',
+      dataIndex: 'type',
+      key: 'type',
       width: 140,
-      render: (type) => (
-        type === 'ecp' ? (
-          <Tag color="purple" icon={<InboxOutlined />} style={{ padding: '2px 8px', fontWeight: 600 }}>
-            متجر إلكتروني (ECP)
+      render: (type, row) => {
+        if (type === 'sale') {
+          return (
+            <Tag color="green" icon={<ShoppingCartOutlined />} style={{ fontWeight: 600, padding: '3px 8px' }}>
+              فاتورة بيع
+            </Tag>
+          );
+        }
+        if (type === 'return') {
+          return (
+            <Tag color="error" icon={<RollbackOutlined />} style={{ fontWeight: 700, padding: '3px 8px' }}>
+              فاتورة مرتجع
+            </Tag>
+          );
+        }
+        if (type === 'refunded_expense') {
+          return (
+            <Tag color="cyan" icon={<ArrowDownOutlined style={{ transform: 'rotate(180deg)' }} />} style={{ fontWeight: 600, padding: '3px 8px' }}>
+              مصروف مرتد للدرج
+            </Tag>
+          );
+        }
+        return (
+          <Tag color="orange" icon={<WalletOutlined />} style={{ fontWeight: 600, padding: '3px 8px' }}>
+            {row.typeLabel || 'سحب مصروف'}
           </Tag>
-        ) : (
-          <Tag color="green" icon={<ShoppingCartOutlined />} style={{ padding: '2px 8px', fontWeight: 600 }}>
-            صالة بيع (POS)
-          </Tag>
-        )
-      )
+        );
+      }
     },
     {
-      title: 'رقم المعاملة / الطلب',
-      dataIndex: 'orderNumber',
-      key: 'orderNumber',
-      width: 170,
+      title: 'رقم المعاملة / السند',
+      dataIndex: 'number',
+      key: 'number',
+      width: 160,
       render: (num) => <Text strong code style={{ fontSize: 13 }}>{num}</Text>
     },
     {
-      title: 'التوقيت والتاريخ',
+      title: 'الوقت والتاريخ',
       dataIndex: 'time',
       key: 'time',
-      width: 150,
+      width: 140,
       render: (t) => (
         <div>
           <Text strong>{dayjs(t).format('HH:mm:ss')}</Text>
@@ -186,89 +217,96 @@ export default function DailyShift({ currentUser }) {
       )
     },
     {
-      title: 'العميل وبيانات التواصل',
-      dataIndex: 'customerName',
-      key: 'customerName',
-      render: (name, row) => (
-        <div>
-          <Text strong>{name || 'عميل نقدي'}</Text>
-          {row.customerPhone && row.customerPhone !== '-' && (
-            <div style={{ fontSize: 12, color: '#059669', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <PhoneOutlined />
-              <span>{row.customerPhone}</span>
+      title: 'البيان / العميل / الموظف المعني',
+      dataIndex: 'customerOrRecipient',
+      key: 'customerOrRecipient',
+      render: (text, row) => {
+        if (row.type === 'expense' || row.type === 'refunded_expense') {
+          return (
+            <div>
+              <div style={{ fontWeight: 700, color: '#0f172a' }}>{text || '-'}</div>
+              {row.notes && row.notes !== text && (
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{row.notes}</div>
+              )}
             </div>
-          )}
-          {row.city && row.city !== '-' && (
-            <div style={{ fontSize: 11, color: '#0284c7', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <EnvironmentOutlined />
-              <span>{row.city}</span>
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      title: 'طريقة الدفع',
-      dataIndex: 'paymentMethod',
-      key: 'paymentMethod',
-      width: 160,
-      render: (pm, row) => {
-        const pmStr = String(pm || '').toLowerCase();
-        let tagColor = 'green';
-        let label = pm || 'كاش';
-
-        if (pmStr.includes('card') || pmStr.includes('فيزا') || pmStr.includes('visa')) {
-          tagColor = 'blue';
-          label = 'بطاقة / فيزا';
-        } else if (pmStr.includes('insta') || pmStr.includes('wallet') || pmStr.includes('تحويل') || pmStr.includes('فودافون')) {
-          tagColor = 'purple';
-          label = 'تحويل / إنستاباي';
-        } else if (pmStr.includes('cod') || pmStr.includes('استلام')) {
-          tagColor = 'orange';
-          label = 'دفع عند الاستلام (COD)';
+          );
         }
-
         return (
-          <Space direction="vertical" size={2}>
-            <Tag color={tagColor}>{label}</Tag>
-            {row.carrier && (
-              <Tag icon={<CarOutlined />} color="cyan" style={{ fontSize: 11 }}>
-                {row.carrier}
-              </Tag>
+          <div>
+            <Text strong>{text || '-'}</Text>
+            {row.phone && row.phone !== '-' && (
+              <div style={{ fontSize: 11, color: '#059669' }}>هاتف: {row.phone}</div>
             )}
-          </Space>
+          </div>
         );
       }
     },
     {
-      title: 'إجمالي المبلغ',
-      dataIndex: 'amount',
-      key: 'amount',
+      title: 'البائع / المسؤول',
+      dataIndex: 'salesperson',
+      key: 'salesperson',
       width: 140,
-      render: (amt) => (
-        <Text strong style={{ color: '#16a34a', fontSize: 16 }}>
-          {parseFloat(amt).toFixed(2)} ج.م
-        </Text>
+      render: (sp) => (
+        <Space size={4}>
+          <UserOutlined style={{ color: '#2563eb' }} />
+          <span>{sp || 'الفرع'}</span>
+        </Space>
       )
     },
     {
-      title: 'الحالة',
-      dataIndex: 'status',
-      key: 'status',
-      width: 110,
-      render: (st) => (
-        <Tag color="green" icon={<CheckCircleOutlined />}>
-          {st === 'delivered' ? 'تم التسليم' : 'مكتمل'}
-        </Tag>
+      title: 'طريقة الدفع / التفصيل',
+      dataIndex: 'paymentBreakdown',
+      key: 'paymentBreakdown',
+      width: 170,
+      render: (bd, row) => {
+        let parsed = bd;
+        if (typeof bd === 'string') {
+          try { parsed = JSON.parse(bd); } catch (e) { parsed = {}; }
+        }
+
+        if (parsed && typeof parsed === 'object' && (parsed.cash || parsed.card || parsed.transfer)) {
+          return (
+            <Space direction="vertical" size={2}>
+              {parseFloat(parsed.cash || 0) > 0 && (
+                <Tag color="green">كاش: {parseFloat(parsed.cash).toFixed(2)} ج.م</Tag>
+              )}
+              {parseFloat(parsed.card || 0) > 0 && (
+                <Tag color="blue">فيزا: {parseFloat(parsed.card).toFixed(2)} ج.م</Tag>
+              )}
+              {parseFloat(parsed.transfer || 0) > 0 && (
+                <Tag color="purple">تحويل: {parseFloat(parsed.transfer).toFixed(2)} ج.م</Tag>
+              )}
+            </Space>
+          );
+        }
+
+        return <Tag>{row.paymentMethod || 'نقدًا'}</Tag>;
+      }
+    },
+    {
+      title: 'المبلغ',
+      dataIndex: 'amount',
+      key: 'amount',
+      width: 140,
+      render: (amt, row) => (
+        <Text
+          strong
+          style={{
+            color: row.isPositive ? '#16a34a' : '#dc2626',
+            fontSize: 15
+          }}
+        >
+          {row.displayAmount || `${row.isPositive ? '+' : '-'}${Math.abs(parseFloat(amt)).toFixed(2)} ج.م`}
+        </Text>
       )
     },
     {
       title: 'إجراءات',
       key: 'actions',
-      width: 110,
-      render: (_, row) => (
-        <Space size="small">
-          {row.orderType === 'pos' ? (
+      width: 90,
+      render: (_, row) => {
+        if (row.type === 'sale' || row.type === 'return') {
+          return (
             <Button
               size="small"
               icon={<PrinterOutlined />}
@@ -276,174 +314,19 @@ export default function DailyShift({ currentUser }) {
             >
               طباعة
             </Button>
-          ) : (
-            <Button
-              size="small"
-              type="primary"
-              ghost
-              icon={<EyeOutlined />}
-              onClick={() => handleViewEcpOrder(row.details || row)}
-            >
-              التفاصيل
-            </Button>
-          )}
-        </Space>
-      )
-    }
-  ];
-
-  // Invoices table columns
-  const invoiceColumns = [
-    {
-      title: 'رقم الفاتورة',
-      dataIndex: 'invoice_number',
-      key: 'invoice_number',
-      width: 150,
-      render: (num) => <Text strong code>{num}</Text>
-    },
-    {
-      title: 'الوقت',
-      dataIndex: 'invoice_date',
-      key: 'invoice_date',
-      width: 100,
-      render: (d) => dayjs(d).format('HH:mm:ss')
-    },
-    {
-      title: 'العميل',
-      dataIndex: 'customer_name',
-      key: 'customer_name',
-      render: (name, row) => (
-        <div>
-          <Text strong>{name || 'نقدي'}</Text>
-          {row.customer_phone && (
-            <div style={{ fontSize: 11, color: '#64748b' }}>{row.customer_phone}</div>
-          )}
-        </div>
-      )
-    },
-    {
-      title: 'البائع',
-      dataIndex: 'cashier_name',
-      key: 'cashier_name',
-      width: 140,
-      render: (name, row) => name || row.cashier_username || 'الفرع'
-    },
-    {
-      title: 'طريقة الدفع والتفصيل',
-      dataIndex: 'payment_breakdown',
-      key: 'payment_breakdown',
-      render: (bd) => {
-        let parsed = bd;
-        if (typeof bd === 'string') {
-          try { parsed = JSON.parse(bd); } catch (e) { parsed = {}; }
+          );
         }
         return (
-          <Space direction="vertical" size={2}>
-            {parseFloat(parsed?.cash || 0) > 0 && (
-              <Tag color="green">كاش: {parseFloat(parsed.cash).toFixed(2)} ج.م</Tag>
-            )}
-            {parseFloat(parsed?.card || 0) > 0 && (
-              <Tag color="blue">فيزا: {parseFloat(parsed.card).toFixed(2)} ج.م</Tag>
-            )}
-            {parseFloat(parsed?.transfer || 0) > 0 && (
-              <Tag color="purple">تحويل: {parseFloat(parsed.transfer).toFixed(2)} ج.م</Tag>
-            )}
-          </Space>
+          <Tooltip title={row.notes || row.customerOrRecipient}>
+            <Button size="small" type="text" icon={<FileTextOutlined />} />
+          </Tooltip>
         );
       }
-    },
-    {
-      title: 'الإجمالي النهائي',
-      dataIndex: 'final_amount',
-      key: 'final_amount',
-      width: 130,
-      render: (amt) => <Text strong style={{ color: '#16a34a', fontSize: 15 }}>{parseFloat(amt).toFixed(2)} ج.م</Text>
-    },
-    {
-      title: 'إجراءات',
-      key: 'actions',
-      width: 90,
-      render: (_, row) => (
-        <Button
-          size="small"
-          icon={<PrinterOutlined />}
-          onClick={() => handleViewInvoice(row.id)}
-        >
-          طباعة
-        </Button>
-      )
     }
   ];
-
-  // Expenses table columns
-  const expenseColumns = [
-    {
-      title: 'رقم السند',
-      dataIndex: 'expense_ref',
-      key: 'expense_ref',
-      width: 140,
-      render: (ref) => <Text strong code>{ref}</Text>
-    },
-    {
-      title: 'الوقت',
-      dataIndex: 'expense_date',
-      key: 'expense_date',
-      width: 100,
-      render: (d, row) => dayjs(row.created_at || d).format('HH:mm:ss')
-    },
-    {
-      title: 'نوع المصروف',
-      dataIndex: 'category',
-      key: 'category',
-      width: 180,
-      render: (cat, row) => {
-        const catMap = {
-          sales_withdrawal: <Tag color="orange">صرف نقدية (سحب بائع)</Tag>,
-          utility_bill: <Tag color="blue">دفع فواتير</Tag>,
-          refunded_expense: <Tag color="green">مصروف مرتد</Tag>
-        };
-        return (
-          <div>
-            {catMap[cat] || <Tag>{cat}</Tag>}
-            {row.subcategory && <Tag color="cyan" style={{ marginTop: 2 }}>{row.subcategory}</Tag>}
-          </div>
-        );
-      }
-    },
-    {
-      title: 'المبلغ',
-      dataIndex: 'amount',
-      key: 'amount',
-      width: 120,
-      render: (amt, row) => (
-        <Text strong style={{ color: row.category === 'refunded_expense' ? '#16a34a' : '#dc2626', fontSize: 15 }}>
-          {row.category === 'refunded_expense' ? '+' : '-'}{parseFloat(amt).toFixed(2)} ج.م
-        </Text>
-      )
-    },
-    {
-      title: 'البيان',
-      dataIndex: 'description',
-      key: 'description'
-    },
-    {
-      title: 'المسجل / البائع',
-      dataIndex: 'created_by_name',
-      key: 'created_by_name',
-      width: 140,
-      render: (name, row) => name || row.created_by_username || 'الفرع'
-    }
-  ];
-
-  // Parsed address for selected ECP order
-  const selectedEcpAddr = selectedEcpOrder
-    ? (typeof selectedEcpOrder.shipping_address === 'string'
-        ? JSON.parse(selectedEcpOrder.shipping_address || '{}')
-        : selectedEcpOrder.shipping_address || {})
-    : {};
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Top Filter and Actions Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
@@ -452,7 +335,7 @@ export default function DailyShift({ currentUser }) {
             صفحة يومية البائع والوردية (Daily Shift Closing)
           </Title>
           <Text type="secondary">
-            متابعة دقيقة لمبيعات الشيفت، الطلبات المكتملة، حركات الخزينة والدرج، وتفصيل وسائل الدفع
+            متابعة دقيقة لمبيعات الفرع، المرتجعات، المصروفات، وتسوية رصيد الدرج
           </Text>
         </div>
 
@@ -477,7 +360,7 @@ export default function DailyShift({ currentUser }) {
           </Tag>
 
           <Select
-            placeholder="جميع البائعين"
+            placeholder="جميع بائعي الفرع"
             value={selectedSalesperson}
             onChange={(val) => setSelectedSalesperson(val)}
             allowClear
@@ -497,333 +380,294 @@ export default function DailyShift({ currentUser }) {
           <Button
             type="primary"
             icon={<PrinterOutlined />}
-            onClick={handlePrintShift}
+            onClick={() => setShiftPrintModalVisible(true)}
             style={{ backgroundColor: '#0f172a' }}
           >
-            طباعة تقرير الشيفت
+            طباعة تقرير الشيفت (A4)
           </Button>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* Primary Financial & Operational KPIs Row 1 */}
+      {/* Summary Cards Row (KPIs) with DISTINCT RETURN CARD        */}
       {/* ========================================================= */}
       <Row gutter={[12, 12]}>
-        {/* KPI 1: Total Completed Sales */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        {/* KPI 1: Total Sales */}
+        <Col xs={24} sm={12} md={5}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
             <Statistic
               title="إجمالي المبيعات المحققة"
               value={kpi.total_sales || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: 22 }}
+              valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: 20 }}
               prefix={<ShoppingCartOutlined />}
             />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-              <span>صالة: <strong>{(kpi.pos_sales || 0).toFixed(0)} ج.م</strong></span>
-              <span>أونلاين: <strong>{(kpi.ecp_sales || 0).toFixed(0)} ج.م</strong></span>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+              عدد فواتير البيع: <strong>{kpi.completed_count || 0}</strong>
             </div>
           </Card>
         </Col>
 
-        {/* KPI 2: Completed Orders Count */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #2563eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        {/* KPI 2: DISTINCT RETURN CARD (مرتجع مبيعات) */}
+        <Col xs={24} sm={12} md={5}>
+          <Card
+            size="small"
+            style={{
+              borderRadius: 10,
+              borderTop: '4px solid #dc2626',
+              background: (kpi.returns_total || 0) > 0 ? '#fff5f5' : '#ffffff',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}
+          >
             <Statistic
-              title="الطلبات والمعاملات المكتملة"
-              value={kpi.completed_count || 0}
-              suffix="طلب / فاتورة"
-              valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: 22 }}
-              prefix={<InboxOutlined />}
-            />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-              <span>صالة: <strong>{data?.pos_count || 0}</strong></span>
-              <span>متجر أونلاين: <strong>{data?.ecp_count || 0}</strong></span>
-            </div>
-          </Card>
-        </Col>
-
-        {/* KPI 3: Average Order Value (AOV) */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <Statistic
-              title="متوسط قيمة الطلب (AOV)"
-              value={kpi.average_order_value || 0}
+              title={
+                <span style={{ color: '#991b1b', fontWeight: 600 }}>
+                  إجمالي المرتجعات (Returns)
+                </span>
+              }
+              value={kpi.returns_total || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#0284c7', fontWeight: 'bold', fontSize: 22 }}
-              prefix={<RiseOutlined />}
+              valueStyle={{ color: '#dc2626', fontWeight: 'bold', fontSize: 20 }}
+              prefix={<RollbackOutlined style={{ color: '#dc2626' }} />}
             />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
-              معدل إنفاق العميل بالمعاملة
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
+              <span>عدد المرتجعات: <strong style={{ color: '#dc2626' }}>{kpi.returns_count || 0}</strong></span>
+              <span style={{ color: '#dc2626' }}>مخصوم من الدرج</span>
+            </div>
+          </Card>
+        </Col>
+
+        {/* KPI 3: Total Expenses */}
+        <Col xs={24} sm={12} md={4}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #ea580c', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+            <Statistic
+              title="صافي المصروفات والسحوبات"
+              value={kpi.net_expenses || 0}
+              precision={2}
+              suffix="ج.م"
+              valueStyle={{ color: '#ea580c', fontWeight: 'bold', fontSize: 20 }}
+              prefix={<WalletOutlined />}
+            />
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+              عدد السندات: <strong>{kpi.total_expenses ? data?.expenses_count || 0 : 0}</strong>
             </div>
           </Card>
         </Col>
 
         {/* KPI 4: Net Shift Revenue */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #059669', background: '#f0fdf4', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        <Col xs={24} sm={12} md={5}>
+          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #059669', background: '#f0fdf4', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
             <Statistic
               title="صافي إيراد الوردية (Net Revenue)"
               value={kpi.net_revenue || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#059669', fontWeight: 'bold', fontSize: 22 }}
+              valueStyle={{ color: '#059669', fontWeight: 'bold', fontSize: 20 }}
               prefix={<CheckCircleOutlined />}
             />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
-              إجمالي المبيعات - المصروفات
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* ========================================================= */}
-      {/* Payment & Drawer Breakdown Row 2 */}
-      {/* ========================================================= */}
-      <Row gutter={[12, 12]}>
-        {/* KPI 5: Cash in Drawer */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #10b981' }}>
-            <Statistic
-              title="المقبوضات النقدية (كاش)"
-              value={kpi.cash_sales || 0}
-              precision={2}
-              suffix="ج.م"
-              valueStyle={{ color: '#10b981', fontWeight: 600 }}
-              prefix={<DollarOutlined />}
-            />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-              كاش المعرض + تحصيل المندوب (COD)
+              المبيعات - المرتجعات - المصروفات
             </div>
           </Card>
         </Col>
 
-        {/* KPI 6: Cards & Digital Transfers */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #9333ea' }}>
+        {/* KPI 5: Expected Drawer Cash */}
+        <Col xs={24} sm={12} md={5}>
+          <Card size="small" style={{ borderRadius: 10, background: '#fffbeb', borderTop: '4px solid #d97706', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
             <Statistic
-              title="المدفوعات الإلكترونية والمحافظ"
-              value={(kpi.card_sales || 0) + (kpi.transfer_sales || 0)}
-              precision={2}
-              suffix="ج.م"
-              valueStyle={{ color: '#9333ea', fontWeight: 600 }}
-              prefix={<CreditCardOutlined />}
-            />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
-              <span>فيزا: <strong>{(kpi.card_sales || 0).toFixed(0)} ج.م</strong></span>
-              <span>إنستاباي/محافظ: <strong>{(kpi.transfer_sales || 0).toFixed(0)} ج.م</strong></span>
-            </div>
-          </Card>
-        </Col>
-
-        {/* KPI 7: Total Expenses */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, borderTop: '4px solid #dc2626' }}>
-            <Statistic
-              title="إجمالي المصروفات والسحوبات"
-              value={kpi.total_expenses || 0}
-              precision={2}
-              suffix="ج.م"
-              valueStyle={{ color: '#dc2626', fontWeight: 600 }}
-              prefix={<ArrowDownOutlined />}
-            />
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-              عدد السندات المسجلة: <strong>{data?.expenses_count || 0}</strong>
-            </div>
-          </Card>
-        </Col>
-
-        {/* KPI 8: Expected Drawer Cash */}
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small" style={{ borderRadius: 10, background: '#fffbeb', borderTop: '4px solid #ea580c' }}>
-            <Statistic
-              title="النقدية المتوقعة بالدرج"
+              title="النقدية المتوقعة بالدرج (Cash)"
               value={kpi.expected_drawer_cash || 0}
               precision={2}
               suffix="ج.م"
-              valueStyle={{ color: '#ea580c', fontWeight: 'bold' }}
-              prefix={<WalletOutlined />}
+              valueStyle={{ color: '#b45309', fontWeight: 'bold', fontSize: 20 }}
+              prefix={<DollarOutlined />}
             />
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-              رصيد البداية: <strong>{(kpi.opening_balance || 0).toFixed(2)} ج.م</strong>
+              رصيد البداية: <strong>{(kpi.opening_balance || 0).toFixed(0)} ج.م</strong> | كاش صافي
             </div>
           </Card>
         </Col>
       </Row>
 
       {/* ========================================================= */}
-      {/* Tabs Section: Completed Orders, Timeline, Invoices, Expenses */}
+      {/* 2. Net Revenue Breakdown by Payment Methods (كاش، فيزا، تحويل) */}
       {/* ========================================================= */}
-      <Card size="small" style={{ borderRadius: 10 }}>
-        <Tabs
-          defaultActiveKey="completed_orders"
-          items={[
-            {
-              key: 'completed_orders',
-              label: (
-                <span>
-                  <CheckCircleOutlined style={{ marginLeft: 6, color: '#16a34a' }} />
-                  الطلبات المكتملة (Completed Orders)
-                  <Badge count={filteredCompletedOrders.length} style={{ marginRight: 8, backgroundColor: '#16a34a' }} />
-                </span>
-              ),
-              children: (
-                <div>
-                  {/* Filters Bar inside Completed Orders */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-                    <Space wrap>
-                      <Segmented
-                        value={orderFilterType}
-                        onChange={setOrderFilterType}
-                        options={[
-                          { label: 'الكل (All)', value: 'all' },
-                          { label: 'فواتير الصالة (POS)', value: 'pos' },
-                          { label: 'طلبات المتجر (ECP)', value: 'ecp' }
-                        ]}
-                      />
-                    </Space>
+      {(() => {
+        const netCash = kpi.net_cash_revenue !== undefined
+          ? Number(kpi.net_cash_revenue)
+          : (Number(kpi.cash_sales || 0) - Number(kpi.cash_returns || 0));
+        const netCard = kpi.net_card_revenue !== undefined
+          ? Number(kpi.net_card_revenue)
+          : (Number(kpi.card_sales || 0) - Number(kpi.card_returns || 0));
+        const netTransfer = kpi.net_transfer_revenue !== undefined
+          ? Number(kpi.net_transfer_revenue)
+          : (Number(kpi.transfer_sales || 0) - Number(kpi.transfer_returns || 0));
+        const netTotalSalesRevenue = netCash + netCard + netTransfer;
 
-                    <Text type="secondary" style={{ fontSize: 13 }}>
-                      طلبات وردية اليوم المكتملة: <strong>{filteredCompletedOrders.length}</strong> طلب بقيمة{' '}
-                      <strong style={{ color: '#16a34a' }}>
-                        {filteredCompletedOrders.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0).toFixed(2)} ج.م
-                      </strong>
-                    </Text>
-                  </div>
-
-                  <Table
-                    dataSource={filteredCompletedOrders}
-                    columns={completedOrderColumns}
-                    rowKey="id"
-                    loading={loading}
-                    pagination={{ pageSize: 12 }}
-                    size="middle"
-                    bordered
-                  />
-                </div>
-              )
-            },
-            {
-              key: 'timeline',
-              label: (
-                <span>
-                  <ScheduleOutlined style={{ marginLeft: 6 }} />
-                  السجل الزمني للوردية (Timeline)
-                  <Badge count={data?.timeline?.length || 0} style={{ marginRight: 8, backgroundColor: '#2563eb' }} />
-                </span>
-              ),
-              children: (
-                <div style={{ padding: '16px 8px', maxHeight: 520, overflowY: 'auto' }}>
-                  {data?.timeline?.length > 0 ? (
-                    <Timeline
-                      mode="right"
-                      items={data.timeline.map((event) => {
-                        const isSale = event.type === 'sale';
-                        return {
-                          color: isSale ? 'green' : 'red',
-                          dot: isSale ? (
-                            <ShoppingCartOutlined style={{ fontSize: 16, color: '#16a34a' }} />
-                          ) : (
-                            <WalletOutlined style={{ fontSize: 16, color: '#dc2626' }} />
-                          ),
-                          children: (
-                            <Card
-                              size="small"
-                              style={{
-                                marginBottom: 12,
-                                borderRadius: 8,
-                                borderRight: `4px solid ${isSale ? '#16a34a' : '#dc2626'}`
-                              }}
-                              styles={{ body: { padding: 10 } }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                <Space>
-                                  <Text strong style={{ fontSize: 14 }}>
-                                    {isSale ? `فاتورة بيع #${event.number}` : `سند صرف #${event.number}`}
-                                  </Text>
-                                  {isSale ? (
-                                    <Tag color={event.source === 'ecp' ? 'purple' : 'green'}>
-                                      {event.source === 'ecp' ? 'متجر أونلاين' : 'فاتورة صالة'}
-                                    </Tag>
-                                  ) : (
-                                    <Tag color="orange">{event.category || 'مصروف'}</Tag>
-                                  )}
-                                </Space>
-                                <Text strong style={{ fontSize: 16, color: isSale ? '#16a34a' : '#dc2626' }}>
-                                  {isSale ? '+' : '-'}{event.amount?.toFixed(2)} ج.م
-                                </Text>
-                              </div>
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: 12 }}>
-                                <span>
-                                  {isSale ? `العميل: ${event.customer_name || 'نقدي'}` : event.description}
-                                </span>
-                                <span>
-                                  <UserOutlined style={{ marginLeft: 4 }} />
-                                  {event.salesperson_name || 'الفرع'}
-                                </span>
-                                <span>{dayjs(event.time).format('YYYY-MM-DD HH:mm:ss')}</span>
-                              </div>
-                            </Card>
-                          )
-                        };
-                      })}
-                    />
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
-                      لا توجد حركات مسجلة لهذه الوردية حتى الآن
-                    </div>
-                  )}
-                </div>
-              )
-            },
-            {
-              key: 'invoices',
-              label: (
-                <span>
-                  <ShoppingCartOutlined style={{ marginLeft: 6 }} />
-                  فواتير الصالة (POS Invoices)
-                  <Badge count={data?.invoices?.length || 0} style={{ marginRight: 8, backgroundColor: '#16a34a' }} />
-                </span>
-              ),
-              children: (
-                <Table
-                  dataSource={data?.invoices || []}
-                  columns={invoiceColumns}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ pageSize: 10 }}
-                  size="middle"
-                />
-              )
-            },
-            {
-              key: 'expenses',
-              label: (
-                <span>
-                  <WalletOutlined style={{ marginLeft: 6 }} />
-                  المصروفات والسحوبات
-                  <Badge count={data?.expenses?.length || 0} style={{ marginRight: 8, backgroundColor: '#dc2626' }} />
-                </span>
-              ),
-              children: (
-                <Table
-                  dataSource={data?.expenses || []}
-                  columns={expenseColumns}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ pageSize: 10 }}
-                  size="middle"
-                />
-              )
+        return (
+          <Card
+            size="small"
+            style={{
+              borderRadius: 10,
+              background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+            }}
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <Space>
+                  <WalletOutlined style={{ color: '#0284c7' }} />
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>
+                    تقسيم صافي إيراد الوردية حسب وسائل الدفع (Net Revenue = Net Cash + Net Visa + Net Transfers)
+                  </span>
+                </Space>
+                <Tag color="green" style={{ fontSize: 13, padding: '3px 10px', borderRadius: 6, fontWeight: 700 }}>
+                  صافي الإيراد المحقق: {(kpi.net_revenue !== undefined ? Number(kpi.net_revenue) : netTotalSalesRevenue).toFixed(2)} ج.م
+                </Tag>
+              </div>
             }
-          ]}
+          >
+            <Row gutter={[12, 12]}>
+              {/* Metric 1: Net Cash (صافي الكاش) */}
+              <Col xs={24} md={8}>
+                <Card
+                  size="small"
+                  style={{
+                    borderRadius: 8,
+                    borderLeft: '5px solid #16a34a',
+                    background: '#f0fdf4',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <Statistic
+                    title={<span style={{ color: '#166534', fontWeight: 700 }}>💵 صافي الكاش (Net Cash)</span>}
+                    value={netCash}
+                    precision={2}
+                    suffix="ج.م"
+                    valueStyle={{ color: '#16a34a', fontWeight: 'bold', fontSize: 22 }}
+                    prefix={<DollarOutlined />}
+                  />
+                  <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
+                    مبيعات: +{(kpi.cash_sales || 0).toFixed(2)} | مرتجع: -{(kpi.cash_returns || 0).toFixed(2)} | مصاريف نقدية: -{(kpi.net_cash_expenses !== undefined ? kpi.net_cash_expenses : (kpi.net_expenses || 0)).toFixed(2)}
+                  </div>
+                </Card>
+              </Col>
+
+              {/* Metric 2: Net Visa / Card (صافي الفيزا) */}
+              <Col xs={24} md={8}>
+                <Card
+                  size="small"
+                  style={{
+                    borderRadius: 8,
+                    borderLeft: '5px solid #2563eb',
+                    background: '#eff6ff',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <Statistic
+                    title={<span style={{ color: '#1e40af', fontWeight: 700 }}>💳 صافي الفيزا (Net Visa / Card)</span>}
+                    value={netCard}
+                    precision={2}
+                    suffix="ج.م"
+                    valueStyle={{ color: '#2563eb', fontWeight: 'bold', fontSize: 22 }}
+                    prefix={<CreditCardOutlined />}
+                  />
+                  <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
+                    مبيعات: +{(kpi.card_sales || 0).toFixed(2)} | مرتجع: -{(kpi.card_returns || 0).toFixed(2)}
+                  </div>
+                </Card>
+              </Col>
+
+              {/* Metric 3: Net Bank Transfers (صافي التحويلات) */}
+              <Col xs={24} md={8}>
+                <Card
+                  size="small"
+                  style={{
+                    borderRadius: 8,
+                    borderLeft: '5px solid #9333ea',
+                    background: '#faf5ff',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <Statistic
+                    title={<span style={{ color: '#6b21a8', fontWeight: 700 }}>📱 صافي التحويلات (Net Bank Transfers)</span>}
+                    value={netTransfer}
+                    precision={2}
+                    suffix="ج.م"
+                    valueStyle={{ color: '#9333ea', fontWeight: 'bold', fontSize: 22 }}
+                    prefix={<BankOutlined style={{ color: '#9333ea' }} />}
+                  />
+                  <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4 }}>
+                    مبيعات: +{(kpi.transfer_sales || 0).toFixed(2)} | مرتجع: -{(kpi.transfer_returns || 0).toFixed(2)}
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+
+            {/* End-of-Day Drawer Cash Reconciliation Note */}
+            <div style={{ marginTop: 10, padding: '8px 12px', background: '#fffbeb', borderRadius: 6, border: '1px solid #fde68a', fontSize: 12, color: '#92400e', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <span>
+                <strong>مطابقة وموازنة نهاية اليوم (Accounting Audit):</strong> صافي الإيراد ({((kpi.net_revenue !== undefined ? Number(kpi.net_revenue) : (netCash + netCard + netTransfer))).toFixed(2)} ج.م) = صافي كاش ({netCash.toFixed(2)}) + صافي فيزا ({netCard.toFixed(2)}) + صافي تحويلات ({netTransfer.toFixed(2)})
+              </span>
+              <Tag color="orange" style={{ fontWeight: 600 }}>النقدية بالدرج: {(kpi.expected_drawer_cash || 0).toFixed(2)} ج.م (رصيد الافتتاح + صافي الكاش)</Tag>
+            </div>
+          </Card>
+        );
+      })()}
+
+      {/* ========================================================= */}
+      {/* Detailed Transactions Table (Directly below summary cards) */}
+      {/* ========================================================= */}
+      <Card
+        size="small"
+        style={{ borderRadius: 10 }}
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '4px 0' }}>
+            <Space size="middle" wrap>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>
+                <ScheduleOutlined style={{ marginLeft: 6, color: '#2563eb' }} />
+                جدول حركات ومعاملات الوردية التفصيلي (Detailed Transactions)
+              </span>
+
+              {/* Type Filter Buttons */}
+              <Segmented
+                value={txFilterType}
+                onChange={setTxFilterType}
+                options={[
+                  { label: `الكل (${allTransactions.length})`, value: 'all' },
+                  { label: `مبيعات (${kpi.completed_count || 0})`, value: 'sale' },
+                  { label: `مرتجعات (${kpi.returns_count || 0})`, value: 'return' },
+                  { label: `مصروفات (${data?.expenses_count || 0})`, value: 'expense' }
+                ]}
+              />
+            </Space>
+
+            <Input
+              size="middle"
+              placeholder="بحث برقم الفاتورة، العميل، أو البائع..."
+              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+              value={txSearchText}
+              onChange={(e) => setTxSearchText(e.target.value)}
+              style={{ width: 260 }}
+              allowClear
+            />
+          </div>
+        }
+      >
+        <Table
+          dataSource={filteredTransactions}
+          columns={transactionColumns}
+          rowKey="id"
+          loading={loading}
+          pagination={{ pageSize: 12 }}
+          size="middle"
+          bordered
         />
       </Card>
 
-      {/* POS Invoice Thermal Receipt Modal */}
+      {/* Thermal Receipt Print Modal */}
       <Modal
         open={receiptModalVisible}
         onCancel={() => setReceiptModalVisible(false)}
@@ -838,117 +682,13 @@ export default function DailyShift({ currentUser }) {
         />
       </Modal>
 
-      {/* ECP Order Details Modal */}
-      <Modal
-        title={
-          <Space>
-            <InboxOutlined style={{ color: '#7c3aed' }} />
-            <span>تفاصيل طلب المتجر الإلكتروني: {selectedEcpOrder?.order_number || selectedEcpOrder?.orderNumber}</span>
-          </Space>
-        }
-        open={ecpModalVisible}
-        onCancel={() => setEcpModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setEcpModalVisible(false)}>
-            إغلاق
-          </Button>,
-          <Button
-            key="print"
-            type="primary"
-            icon={<PrinterOutlined />}
-            onClick={() => {
-              if (ecpPrintRef.current) {
-                printHtmlContent({
-                  title: `تفاصيل الطلب - ${selectedEcpOrder?.order_number || selectedEcpOrder?.orderNumber}`,
-                  htmlContent: ecpPrintRef.current.innerHTML,
-                  pageType: 'a4'
-                });
-              }
-            }}
-            style={{ backgroundColor: '#7c3aed' }}
-          >
-            طباعة تفاصيل الطلب (A4)
-          </Button>
-        ]}
-        width={680}
-        destroyOnHidden
-      >
-        {selectedEcpOrder && (
-          <div ref={ecpPrintRef} className="printable-order" style={{ padding: '6px', direction: 'rtl', color: '#0f172a' }}>
-            {/* Header */}
-            <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 10, marginBottom: 12 }}>
-              <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <img src={yokaLogo} alt="Yoka Store" style={{ height: 44, maxWidth: 110, objectFit: 'contain' }} />
-                <div>
-                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h2>
-                  <div style={{ fontSize: 11, color: '#475569' }}>تفاصيل طلب شحن وتوصيل متجر أونلاين</div>
-                </div>
-              </div>
-              <div className="doc-badge-box" style={{ textAlign: 'left' }}>
-                <div style={{ display: 'inline-block', background: '#0f172a', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 6 }}>
-                  طلب متجر إلكتروني
-                </div>
-                <div style={{ marginTop: 4, fontSize: 11.5, fontFamily: 'monospace', fontWeight: 700 }}>
-                  #{selectedEcpOrder.order_number || selectedEcpOrder.orderNumber}
-                </div>
-              </div>
-            </div>
-
-            <Descriptions bordered size="small" column={2} style={{ marginBottom: 12 }}>
-              <Descriptions.Item label="رقم الطلب">
-                <Text strong code>{selectedEcpOrder.order_number || selectedEcpOrder.orderNumber}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="الحالة">
-                <Tag color="green">تم التسليم والتحصيل</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="اسم المستلم">
-                {selectedEcpAddr.recipient_name || selectedEcpOrder.customerName || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="رقم الهاتف">
-                {selectedEcpAddr.phone || selectedEcpOrder.customerPhone || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="المحافظة / المدينة">
-                {selectedEcpAddr.city || selectedEcpOrder.city || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="العنوان التفصيلي">
-                {selectedEcpAddr.street_address || selectedEcpAddr.address || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="شركة الشحن">
-                <Tag color="cyan">{selectedEcpOrder.shipping_carrier || selectedEcpOrder.carrier || 'مندوب المتجر'}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="رقم البوليصة">
-                {selectedEcpOrder.tracking_number || selectedEcpOrder.trackingNumber || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="عدد الطرود">
-                {selectedEcpOrder.parcel_count || selectedEcpOrder.parcelCount || 1} طرد
-              </Descriptions.Item>
-              <Descriptions.Item label="وسيلة الدفع">
-                <Tag color="purple">{selectedEcpOrder.payment_method || selectedEcpOrder.paymentMethod || 'الدفع عند الاستلام'}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="إجمالي الطلب" span={2}>
-                <Text strong style={{ color: '#16a34a', fontSize: 16, fontFamily: 'monospace' }}>
-                  {parseFloat(selectedEcpOrder.total_amount || selectedEcpOrder.amount || 0).toFixed(2)} ج.م
-                </Text>
-              </Descriptions.Item>
-            </Descriptions>
-
-            {selectedEcpOrder.customer_notes && (
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px' }}>
-                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>ملاحظات العميل:</div>
-                <div style={{ fontSize: 12, color: '#334155', marginTop: 2 }}>{selectedEcpOrder.customer_notes}</div>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
-
       {/* ========================================================= */}
-      {/* SHIFT CLOSING SUMMARY PRINT MODAL (A4)                   */}
+      {/* Shift Closing Summary Print Modal (A4)                   */}
       {/* ========================================================= */}
       <Modal
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '96%' }}>
-            <span style={{ fontWeight: 800, fontSize: 16 }}>معاينة وطباعة تقرير تقفيل الوردية والكاشير (A4)</span>
+            <span style={{ fontWeight: 800, fontSize: 16 }}>معاينة وطباعة تقرير تقفيل وردية الفرع (A4)</span>
             <Button
               type="primary"
               icon={<PrinterOutlined />}
@@ -999,7 +739,7 @@ export default function DailyShift({ currentUser }) {
               <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
               <div>
                 <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
-                <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>تقرير تقفيل الوردية وجرد النقدية وحركة المبيعات اليومية</div>
+                <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>تقرير تقفيل الوردية وجرد النقدية وحركة المبيعات والمرتجعات اليومية</div>
                 <div style={{ fontSize: 10.5, color: '#64748b' }}>
                   المسؤول / الكاشير: <strong>{selectedSalesperson ? staff.find(s => s.id === selectedSalesperson)?.full_name || 'موظف محدد' : 'كافة كاشيرات الفرع'}</strong>
                 </div>
@@ -1016,68 +756,127 @@ export default function DailyShift({ currentUser }) {
           </div>
 
           {/* Operational KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
-            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
-              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي مبيعات الوردية</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 14 }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 6px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي المبيعات</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
                 {parseFloat(kpi.total_sales || 0).toLocaleString()} ج.م
               </div>
             </div>
-            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
-              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>عدد المعاملات والطلبات</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
-                {kpi.completed_count || 0} معاملة
+            <div style={{ border: '1px solid #fecaca', padding: '10px 6px', borderRadius: 8, textAlign: 'center', background: '#fff5f5' }}>
+              <div style={{ fontSize: 10.5, color: '#dc2626', fontWeight: 700 }}>إجمالي المرتجعات</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#dc2626', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.returns_total || 0).toLocaleString()} ج.م
               </div>
             </div>
-            <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
-              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>متوسط قيمة المعاملة</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#0284c7', fontFamily: 'monospace', marginTop: 2 }}>
-                {parseFloat(kpi.average_order_value || 0).toLocaleString()} ج.م
+            <div style={{ border: '1px solid #cbd5e1', padding: '10px 6px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>صافي المصروفات</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#ea580c', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.net_expenses || 0).toLocaleString()} ج.م
               </div>
             </div>
-            <div style={{ border: '2px solid #059669', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#ecfdf5' }}>
+            <div style={{ border: '2px solid #059669', padding: '10px 6px', borderRadius: 8, textAlign: 'center', background: '#ecfdf5' }}>
               <div style={{ fontSize: 10.5, color: '#065f46', fontWeight: 800 }}>صافي إيراد الوردية</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>
                 {parseFloat(kpi.net_revenue || 0).toLocaleString()} ج.م
+              </div>
+            </div>
+            <div style={{ border: '1px solid #fde68a', padding: '10px 6px', borderRadius: 8, textAlign: 'center', background: '#fffbeb' }}>
+              <div style={{ fontSize: 10.5, color: '#b45309', fontWeight: 800 }}>النقدية بالدرج</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#b45309', fontFamily: 'monospace', marginTop: 2 }}>
+                {parseFloat(kpi.expected_drawer_cash || 0).toLocaleString()} ج.م
               </div>
             </div>
           </div>
 
-          {/* Cash Drawer Reconciliation Box */}
+          {/* Net Revenue Breakdown by Payment Method Box */}
+          {(() => {
+            const netCash = kpi.net_cash_revenue !== undefined
+              ? Number(kpi.net_cash_revenue)
+              : (Number(kpi.cash_sales || 0) - Number(kpi.cash_returns || 0));
+            const netCard = kpi.net_card_revenue !== undefined
+              ? Number(kpi.net_card_revenue)
+              : (Number(kpi.card_sales || 0) - Number(kpi.card_returns || 0));
+            const netTransfer = kpi.net_transfer_revenue !== undefined
+              ? Number(kpi.net_transfer_revenue)
+              : (Number(kpi.transfer_sales || 0) - Number(kpi.transfer_returns || 0));
+
+            return (
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+                  تقسيم صافي إيراد الوردية (Net Revenue = Net Cash + Net Visa + Net Transfers):
+                </div>
+                <Row gutter={[12, 10]}>
+                  <Col span={8}>
+                    <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6 }}>
+                      <div style={{ fontSize: 10.5, color: '#166534', fontWeight: 700 }}>صافي الكاش (Net Cash):</div>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
+                        {netCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م
+                      </div>
+                      <div style={{ fontSize: 9.5, color: '#64748b' }}>مبيعات: +{parseFloat(kpi.cash_sales || 0).toFixed(1)} | مرتجع: -{parseFloat(kpi.cash_returns || 0).toFixed(1)} | مصاريف: -{parseFloat(kpi.net_cash_expenses !== undefined ? kpi.net_cash_expenses : (kpi.net_expenses || 0)).toFixed(1)}</div>
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ padding: '8px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6 }}>
+                      <div style={{ fontSize: 10.5, color: '#1e40af', fontWeight: 700 }}>صافي الفيزا (Net Visa):</div>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
+                        {netCard.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م
+                      </div>
+                      <div style={{ fontSize: 9.5, color: '#64748b' }}>مبيعات: +{parseFloat(kpi.card_sales || 0).toFixed(1)} | مرتجع: -{parseFloat(kpi.card_returns || 0).toFixed(1)}</div>
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ padding: '8px 10px', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 6 }}>
+                      <div style={{ fontSize: 10.5, color: '#6b21a8', fontWeight: 700 }}>صافي التحويلات (Net Transfers):</div>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: '#9333ea', fontFamily: 'monospace', marginTop: 2 }}>
+                        {netTransfer.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م
+                      </div>
+                      <div style={{ fontSize: 9.5, color: '#64748b' }}>مبيعات: +{parseFloat(kpi.transfer_sales || 0).toFixed(1)} | مرتجع: -{parseFloat(kpi.transfer_returns || 0).toFixed(1)}</div>
+                    </div>
+                  </Col>
+                </Row>
+                <div style={{ marginTop: 8, textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#0f172a', background: '#e2e8f0', padding: '4px 8px', borderRadius: 4 }}>
+                  صافي الإيراد = {netCash.toFixed(2)} (كاش) + {netCard.toFixed(2)} (فيزا) + {netTransfer.toFixed(2)} (تحويلات) = {((kpi.net_revenue !== undefined ? Number(kpi.net_revenue) : (netCash + netCard + netTransfer))).toFixed(2)} ج.م
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Drawer Reconciliation Box */}
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
               مطابقة وتسوية درج الكاش والمتحصلات المالية (Cashier Drawer Reconciliation):
             </div>
-            <Row gutter={[16, 10]}>
+            <Row gutter={[12, 10]}>
               <Col span={6}>
                 <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                  <div style={{ fontSize: 10.5, color: '#64748b' }}>النقدية المستلمة (كاش بالدرج):</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
-                    {parseFloat(kpi.cash_sales || 0).toLocaleString()} ج.م
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>كاش مبيعات:</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
+                    +{parseFloat(kpi.cash_sales || 0).toLocaleString()} ج.م
+                  </div>
+                </div>
+              </Col>
+              <Col span={6}>
+                <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #fecaca', borderRadius: 6 }}>
+                  <div style={{ fontSize: 10.5, color: '#dc2626' }}>رد نقدية مرتجعات:</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: '#dc2626', fontFamily: 'monospace', marginTop: 2 }}>
+                    -{parseFloat(kpi.cash_returns || 0).toLocaleString()} ج.م
                   </div>
                 </div>
               </Col>
               <Col span={6}>
                 <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                  <div style={{ fontSize: 10.5, color: '#64748b' }}>مدفوعات البطاقات والفيزا:</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>مدفوعات فيزا وبطاقات:</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
                     {parseFloat(kpi.card_sales || 0).toLocaleString()} ج.م
                   </div>
                 </div>
               </Col>
               <Col span={6}>
                 <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                  <div style={{ fontSize: 10.5, color: '#64748b' }}>إنستاباي والتحويلات:</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#7c3aed', fontFamily: 'monospace', marginTop: 2 }}>
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>تحويلات ومحافظ:</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: '#7c3aed', fontFamily: 'monospace', marginTop: 2 }}>
                     {parseFloat(kpi.transfer_sales || 0).toLocaleString()} ج.م
-                  </div>
-                </div>
-              </Col>
-              <Col span={6}>
-                <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
-                  <div style={{ fontSize: 10.5, color: '#64748b' }}>محافظ إلكترونية:</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#d97706', fontFamily: 'monospace', marginTop: 2 }}>
-                    {parseFloat(kpi.wallet_sales || 0).toLocaleString()} ج.م
                   </div>
                 </div>
               </Col>
@@ -1100,7 +899,7 @@ export default function DailyShift({ currentUser }) {
             </div>
           </div>
 
-          {/* Verification Footer */}
+          {/* Footer */}
           <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
             <span>تقرير تقفيل وردية رسمي صادر من منظومة Yoka SWM</span>
             <span>وقت وتاريخ الاستخراج: {dayjs().format('YYYY-MM-DD HH:mm:ss')}</span>

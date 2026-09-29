@@ -8,19 +8,23 @@ const { logActivity } = require('../../shared/activityLogger');
  * GET /api/swm/users
  * Paginated staff list with branch name joins
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'branch_account']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'branch_account', 'salesperson']), async (req, res) => {
   try {
     const { role, branch_id, status, search, page = 1, limit = 100 } = req.query;
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
-    // If requester is a supervisor or retail branch account, restrict strictly to their own branch
+    // If requester is a supervisor, salesperson, or retail branch account, restrict strictly to their own branch
     const isAdmin = ['super_admin', 'admin'].includes(req.user.role) || req.user.isMainWarehouse;
     const isSupervisor = req.user.role === 'supervisor';
+    const isSalesperson = req.user.role === 'salesperson';
     const isRetailBranch = req.user.isBranchAccount && !isAdmin;
 
-    const effectiveBranchId = (!isAdmin && (isSupervisor || isRetailBranch))
-      ? req.user.branchId
-      : (branch_id && branch_id !== 'all' && branch_id !== 'unassigned' ? parseInt(branch_id, 10) : null);
+    const userBranchId = req.user.branchId || req.user.branch_id;
+    const requestedBranchId = (branch_id && branch_id !== 'all' && branch_id !== 'unassigned') ? parseInt(branch_id, 10) : null;
+
+    const effectiveBranchId = (!isAdmin && (isSupervisor || isSalesperson || isRetailBranch))
+      ? userBranchId
+      : requestedBranchId;
 
     let sql = `
       SELECT u.id, u.username, u.email, u.full_name, u.phone, u.national_id, u.role, u.branch_id,

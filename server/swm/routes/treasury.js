@@ -48,7 +48,7 @@ function genTransferRef() {
 //  GET /api/swm/treasury/registers
 //  Returns cash registers: all (admin) or own branch (supervisor/branch)
 // ────────────────────────────────────────────────────
-router.get('/registers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.get('/registers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), async (req, res) => {
   try {
     const isAdmin = ['super_admin', 'admin'].includes(req.user.role) || req.user.isMainWarehouse;
 
@@ -74,10 +74,77 @@ router.get('/registers', requireAuth, requireRole(['super_admin', 'admin', 'supe
     }
 
     sql += ` ORDER BY b.branch_type ASC, cr.id ASC`;
-    const rows = await query(sql, params);
-    return res.json({ success: true, data: rows });
+    let rows = await query(sql, params);
+
+    if (!isAdmin && rows.length === 0 && req.user.branchId) {
+      await getOrCreateRegister(req.user.branchId);
+      rows = await query(sql, params);
+    }
+
+    return res.json({
+      success: true,
+      registers: rows,
+      data: rows
+    });
   } catch (err) {
     console.error('Treasury registers error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ────────────────────────────────────────────────────
+//  GET /api/swm/treasury/branch-safe
+//  Returns the branch safe accounts (Cash, Visa, Transfer) and recent transfer entries
+// ────────────────────────────────────────────────────
+router.get('/branch-safe', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), async (req, res) => {
+  try {
+    const branchId = req.query.branch_id || req.user.branchId;
+    if (!branchId) {
+      return res.status(400).json({ success: false, message: 'Branch ID is required' });
+    }
+
+    let [safe] = await query(`SELECT * FROM branch_safes WHERE branch_id = $1`, [branchId]);
+    if (!safe) {
+      const [branch] = await query(`SELECT branch_name FROM branches WHERE id = $1`, [branchId]);
+      const [created] = await query(
+        `INSERT INTO branch_safes (branch_id, safe_name, cash_balance, visa_balance, transfer_balance)
+         VALUES ($1, $2, 0, 0, 0) RETURNING *`,
+        [branchId, `خزينة ${branch?.branch_name || branchId}`]
+      );
+      safe = created;
+    }
+
+    const cash = parseFloat(safe.cash_balance || 0);
+    const visa = parseFloat(safe.visa_balance || 0);
+    const transfer = parseFloat(safe.transfer_balance || 0);
+    const total = Math.round((cash + visa + transfer) * 100) / 100;
+
+    const recentTransactions = await query(
+      `SELECT tt.*, u.full_name AS created_by_name
+       FROM treasury_transactions tt
+       LEFT JOIN users u ON u.id = tt.created_by
+       WHERE tt.branch_id = $1
+       ORDER BY tt.created_at DESC LIMIT 20`,
+      [branchId]
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        safe: {
+          id: safe.id,
+          branch_id: safe.branch_id,
+          safe_name: safe.safe_name,
+          cash_balance: cash,
+          visa_balance: visa,
+          transfer_balance: transfer,
+          total_balance: total
+        },
+        recent_transactions: recentTransactions
+      }
+    });
+  } catch (err) {
+    console.error('Treasury branch safe error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -146,10 +213,10 @@ router.get('/kpis', requireAuth, requireRole(['super_admin', 'admin']), async (r
 });
 
 // ────────────────────────────────────────────────────
-//  GET /api/swm/treasury/transfers
+//  GET /api/swm/treasury/transfers & GET /api/v1/cash-transfers
 //  List transfers — admin sees all, branch sees own
 // ────────────────────────────────────────────────────
-router.get('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+const handleGetTransfers = async (req, res) => {
   try {
     const isAdmin = ['super_admin', 'admin'].includes(req.user.role) || req.user.isMainWarehouse;
     const { status, page = 1, limit = 30 } = req.query;
@@ -198,13 +265,16 @@ router.get('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'supe
     console.error('Treasury transfers list error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
-});
+};
+
+router.get('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), handleGetTransfers);
+router.get('/cash-transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), handleGetTransfers);
 
 // ────────────────────────────────────────────────────
 //  POST /api/swm/treasury/transfers
 //  Branch supervisor requests a cash transfer to main
 // ────────────────────────────────────────────────────
-router.post('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.post('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), async (req, res) => {
   try {
     const branchId = req.user.branchId || req.body.from_branch_id;
     if (!branchId) {
@@ -218,12 +288,25 @@ router.post('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'sup
     }
 
     const fromRegister = await getOrCreateRegister(branchId);
-    const available = parseFloat(fromRegister.current_balance || 0);
+    let [branchSafe] = await query(`SELECT * FROM branch_safes WHERE branch_id = $1`, [branchId]);
+    if (!branchSafe) {
+      const [bInfo] = await query(`SELECT branch_name FROM branches WHERE id = $1`, [branchId]);
+      const [createdSafe] = await query(
+        `INSERT INTO branch_safes (branch_id, safe_name, cash_balance, visa_balance, transfer_balance)
+         VALUES ($1, $2, 0, 0, 0) RETURNING *`,
+        [branchId, `خزينة ${bInfo?.branch_name || branchId}`]
+      );
+      branchSafe = createdSafe;
+    }
+
+    const availableInSafe = parseFloat(branchSafe.cash_balance || 0);
+    const availableInRegister = parseFloat(fromRegister.current_balance || 0);
+    const available = Math.max(availableInSafe, availableInRegister);
 
     if (amt > available) {
       return res.status(400).json({
         success: false,
-        message: `الرصيد غير كافٍ. الرصيد المتاح: ${available.toFixed(2)} ج.م`
+        message: `الرصيد غير كافٍ في خزينة الفرع. الرصيد المتاح: ${available.toFixed(2)} ج.م`
       });
     }
 
@@ -236,9 +319,15 @@ router.post('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'sup
     const transferRef = genTransferRef();
 
     const result = await transaction(async (client) => {
-      // Deduct from branch register immediately (hold)
+      // Deduct from branch safe
+      await client.query(
+        `UPDATE branch_safes SET cash_balance = GREATEST(0, cash_balance - $1), updated_at = NOW() WHERE id = $2`,
+        [amt, branchSafe.id]
+      );
+
+      // Deduct from branch register
       const [updatedFrom] = (await client.query(
-        `UPDATE cash_registers SET current_balance = current_balance - $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+        `UPDATE cash_registers SET current_balance = GREATEST(0, current_balance - $1), updated_at = NOW() WHERE id = $2 RETURNING *`,
         [amt, fromRegister.id]
       )).rows;
 
@@ -259,6 +348,21 @@ router.post('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'sup
           req.user.id
         ]
       )).rows;
+
+      // Create audit entry in treasury_transactions
+      const entryNum = `TRF-${Date.now()}`;
+      await client.query(
+        `INSERT INTO treasury_transactions (
+           entry_number, branch_id, register_id, safe_id,
+           source_account, destination_account, payment_method, amount,
+           previous_safe_balance, new_safe_balance, created_by, notes, created_at
+         ) VALUES ($1, $2, $3, $4, 'branch_safe_cash', 'main_warehouse_safe', 'cash', $5, $6, $7, $8, $9, NOW())`,
+        [
+          entryNum, branchId, fromRegister.id, branchSafe.id,
+          amt, availableInSafe, Math.max(0, availableInSafe - amt), req.user.id,
+          `تسليم نقدية من الفرع للخزينة الرئيسية (${transferRef}): ${notes || ''}`
+        ]
+      );
 
       return { transfer, updatedFrom };
     });
@@ -285,6 +389,207 @@ router.post('/transfers', requireAuth, requireRole(['super_admin', 'admin', 'sup
     return res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// ────────────────────────────────────────────────────
+//  POST /api/v1/cash-transfers & POST /api/swm/treasury/handover-to-main
+//  100% MANUAL Handover: supervisor executes db.transaction to:
+//  1. Deduct specified breakdown (cash, visa, transfers) from branch_safes
+//  2. Deduct total amount from branch cash_registers
+//  3. Add total amount to HQ main safe cash_registers
+//  4. Record the transaction in cash_transfers (with payment_breakdown JSONB) and treasury_transactions
+// ────────────────────────────────────────────────────
+const handleManualCashTransfer = async (req, res) => {
+  try {
+    const branchId = req.body.from_branch_id || req.user.branch_id || req.user.branchId;
+    if (!branchId) {
+      return res.status(400).json({ success: false, message: 'تعذّر تحديد فرع المشرف.' });
+    }
+
+    const fromRegister = await getOrCreateRegister(branchId);
+    let [branchSafe] = await query(`SELECT * FROM branch_safes WHERE branch_id = $1`, [branchId]);
+    if (!branchSafe) {
+      const [bInfo] = await query(`SELECT branch_name FROM branches WHERE id = $1`, [branchId]);
+      const [createdSafe] = await query(
+        `INSERT INTO branch_safes (branch_id, safe_name, cash_balance, visa_balance, transfer_balance)
+         VALUES ($1, $2, 0, 0, 0) RETURNING *`,
+        [branchId, `خزينة ${bInfo?.branch_name || branchId}`]
+      );
+      branchSafe = createdSafe;
+    }
+
+    const availableCash = parseFloat(branchSafe.cash_balance || 0);
+    const availableVisa = parseFloat(branchSafe.visa_balance || 0);
+    const availableTransfers = parseFloat(branchSafe.transfer_balance || 0);
+
+    // Extract breakdown amounts
+    let cashAmt = 0;
+    let visaAmt = 0;
+    let transferAmt = 0;
+
+    const b = req.body.payment_breakdown || req.body.breakdown;
+    if (b && typeof b === 'object') {
+      cashAmt = b.cash !== undefined && b.cash !== '' ? parseFloat(b.cash) : 0;
+      visaAmt = b.visa !== undefined && b.visa !== '' ? parseFloat(b.visa) : 0;
+      transferAmt = b.transfers !== undefined && b.transfers !== ''
+        ? parseFloat(b.transfers)
+        : (b.transfer !== undefined && b.transfer !== '' ? parseFloat(b.transfer) : 0);
+    } else if (req.body.cash !== undefined || req.body.visa !== undefined || req.body.transfers !== undefined) {
+      cashAmt = req.body.cash !== undefined && req.body.cash !== '' ? parseFloat(req.body.cash) : 0;
+      visaAmt = req.body.visa !== undefined && req.body.visa !== '' ? parseFloat(req.body.visa) : 0;
+      transferAmt = req.body.transfers !== undefined && req.body.transfers !== ''
+        ? parseFloat(req.body.transfers)
+        : (req.body.transfer !== undefined && req.body.transfer !== '' ? parseFloat(req.body.transfer) : 0);
+    } else if (req.body.amount !== undefined && req.body.amount !== '') {
+      // Fallback: entire amount attributed to cash
+      cashAmt = parseFloat(req.body.amount);
+    } else {
+      // Default: settle all available balances
+      cashAmt = availableCash;
+      visaAmt = availableVisa;
+      transferAmt = availableTransfers;
+    }
+
+    if (isNaN(cashAmt) || cashAmt < 0) cashAmt = 0;
+    if (isNaN(visaAmt) || visaAmt < 0) visaAmt = 0;
+    if (isNaN(transferAmt) || transferAmt < 0) transferAmt = 0;
+
+    const totalAmt = Number((cashAmt + visaAmt + transferAmt).toFixed(2));
+
+    if (totalAmt <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'إجمالي المبلغ المطلوب تسليمه يجب أن يكون أكبر من 0 ج.م'
+      });
+    }
+
+    // Validate amounts against branch available balances (with 0.01 tolerance)
+    if (cashAmt > availableCash + 0.01) {
+      return res.status(400).json({
+        success: false,
+        message: `مبلغ الكاش المطلوب (${cashAmt.toLocaleString()} ج.م) يتجاوز رصيد الكاش المتاح بالفرع (${availableCash.toLocaleString()} ج.م)`
+      });
+    }
+    if (visaAmt > availableVisa + 0.01) {
+      return res.status(400).json({
+        success: false,
+        message: `مبلغ الفيزا المطلوب (${visaAmt.toLocaleString()} ج.م) يتجاوز رصيد الفيزا المتاح بالفرع (${availableVisa.toLocaleString()} ج.م)`
+      });
+    }
+    if (transferAmt > availableTransfers + 0.01) {
+      return res.status(400).json({
+        success: false,
+        message: `مبلغ التحويلات المطلوب (${transferAmt.toLocaleString()} ج.م) يتجاوز رصيد التحويلات المتاح بالفرع (${availableTransfers.toLocaleString()} ج.م)`
+      });
+    }
+
+    const mainRegister = await getMainWarehouseRegister();
+    const [mainBranch] = await query(`SELECT id FROM branches WHERE branch_type = 'main_warehouse' LIMIT 1`);
+    const transferRef = genTransferRef();
+
+    const breakdownObj = {
+      cash: cashAmt,
+      visa: visaAmt,
+      transfers: transferAmt
+    };
+    const breakdownJson = JSON.stringify(breakdownObj);
+    const breakdownSummary = `[كاش: ${cashAmt.toLocaleString()} ج.م | فيزا: ${visaAmt.toLocaleString()} ج.م | تحويلات: ${transferAmt.toLocaleString()} ج.م]`;
+    const fullNotes = req.body.notes ? `${req.body.notes} - ${breakdownSummary}` : breakdownSummary;
+
+    const result = await transaction(async (client) => {
+      // 1. Deduct breakdown from branch safe balances
+      await client.query(
+        `UPDATE branch_safes 
+         SET cash_balance = GREATEST(0, cash_balance - $1),
+             visa_balance = GREATEST(0, visa_balance - $2),
+             transfer_balance = GREATEST(0, transfer_balance - $3),
+             updated_at = NOW() 
+         WHERE id = $4`,
+        [cashAmt, visaAmt, transferAmt, branchSafe.id]
+      );
+
+      // 2. Deduct totalAmt from branch cash_registers record
+      await client.query(
+        `UPDATE cash_registers 
+         SET current_balance = GREATEST(0, current_balance - $1), 
+             last_transfer_at = NOW(), 
+             updated_at = NOW() 
+         WHERE id = $2`,
+        [totalAmt, fromRegister.id]
+      );
+
+      // 3. Add totalAmt to HQ main safe cash_registers record
+      await client.query(
+        `UPDATE cash_registers 
+         SET current_balance = current_balance + $1, 
+             updated_at = NOW() 
+         WHERE id = $2`,
+        [totalAmt, mainRegister.id]
+      );
+
+      // 4. Create completed transfer record in cash_transfers table with payment_breakdown JSON
+      const [transfer] = (await client.query(
+        `INSERT INTO cash_transfers
+           (transfer_ref, from_register_id, to_register_id, from_branch_id, to_branch_id,
+            amount, transfer_method, reference_no, notes, requested_by, confirmed_by,
+            status, payment_breakdown, requested_at, confirmed_at, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,'completed',$11,NOW(),NOW(),NOW(),NOW())
+         RETURNING *`,
+        [
+          transferRef,
+          fromRegister.id, mainRegister.id,
+          parseInt(branchId, 10), mainBranch.id,
+          totalAmt, req.body.transfer_method || 'multi_method',
+          req.body.reference_no || null,
+          fullNotes,
+          req.user.id,
+          breakdownJson
+        ]
+      )).rows;
+
+      // 5. Audit entry in treasury_transactions
+      const entryNum = `TRF-MANUAL-${Date.now()}`;
+      const totalPrev = availableCash + availableVisa + availableTransfers;
+      await client.query(
+        `INSERT INTO treasury_transactions (
+           entry_number, branch_id, register_id, safe_id,
+           source_account, destination_account, payment_method, amount,
+           previous_safe_balance, new_safe_balance, created_by, notes, created_at
+         ) VALUES ($1, $2, $3, $4, 'branch_safe_multi', 'main_warehouse_safe', 'multi_method', $5, $6, $7, $8, $9, NOW())`,
+        [
+          entryNum, branchId, fromRegister.id, branchSafe.id,
+          totalAmt, totalPrev, Math.max(0, totalPrev - totalAmt), req.user.id,
+          `تسليم خزن يدوي شامل للفرع الرئيسي (${transferRef}): ${breakdownSummary}`
+        ]
+      );
+
+      return { transfer, totalAmt, breakdown: breakdownObj };
+    });
+
+    logActivity({
+      userId: req.user.id,
+      branchId: parseInt(branchId, 10),
+      actionType: 'CASH_HANDOVER_TO_MAIN',
+      entityType: 'cash_transfers',
+      entityId: result.transfer.id,
+      newValue: { transfer_ref: transferRef, amount: totalAmt, payment_breakdown: result.breakdown },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `تسليم خزن يدوي ${totalAmt} ج.م للفرع الرئيسي ${breakdownSummary}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `تم تسليم إجمالي ${result.totalAmt.toLocaleString()} ج.م بنجاح ${breakdownSummary} وإيداعها في الخزينة الرئيسية`,
+      data: result.transfer
+    });
+  } catch (err) {
+    console.error('Handover to main safe error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+router.post('/cash-transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), handleManualCashTransfer);
+router.post('/handover-to-main', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), handleManualCashTransfer);
 
 // ────────────────────────────────────────────────────
 //  PUT /api/swm/treasury/transfers/:id/confirm
@@ -356,7 +661,7 @@ router.put('/transfers/:id/confirm', requireAuth, requireRole(['super_admin', 'a
 //  PUT /api/swm/treasury/transfers/:id/cancel
 //  Cancel a pending transfer — refunds amount to source register
 // ────────────────────────────────────────────────────
-router.put('/transfers/:id/cancel', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.put('/transfers/:id/cancel', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -372,7 +677,7 @@ router.put('/transfers/:id/cancel', requireAuth, requireRole(['super_admin', 'ad
 
     // Only admin or the requester can cancel
     const isAdmin = ['super_admin', 'admin'].includes(req.user.role) || req.user.isMainWarehouse;
-    if (!isAdmin && req.user.id !== transfer.requested_by) {
+    if (!isAdmin && parseInt(req.user.id, 10) !== parseInt(transfer.requested_by, 10)) {
       return res.status(403).json({ success: false, message: 'غير مصرح لك بإلغاء هذا الطلب' });
     }
 
@@ -385,8 +690,14 @@ router.put('/transfers/:id/cancel', requireAuth, requireRole(['super_admin', 'ad
         [amt, transfer.from_register_id]
       );
 
+      // Refund amount back to source branch safe
+      await client.query(
+        `UPDATE branch_safes SET cash_balance = cash_balance + $1, updated_at = NOW() WHERE branch_id = $2`,
+        [amt, transfer.from_branch_id]
+      );
+
       const [updated] = (await client.query(
-        `UPDATE cash_transfers SET status = 'cancelled', notes = CONCAT(COALESCE(notes,''), $1), updated_at = NOW()
+        `UPDATE cash_transfers SET status = 'cancelled', notes = CONCAT(COALESCE(notes,''), $1::text), updated_at = NOW()
          WHERE id = $2 RETURNING *`,
         [reason ? `\n[إلغاء: ${reason}]` : '\n[تم الإلغاء]', id]
       )).rows;

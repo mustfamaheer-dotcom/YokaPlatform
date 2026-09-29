@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Typography, Alert, Tabs, Space, Divider, Tag } from 'antd';
 import {
   ShieldCheck,
@@ -21,6 +22,7 @@ import yokaLogo from '../assets/yokaStoreTransparent.png';
 const { Title, Text, Paragraph } = Typography;
 
 export default function Login({ onLoginSuccess }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loginType, setLoginType] = useState('admin'); // 'admin' | 'branch'
@@ -52,11 +54,25 @@ export default function Login({ onLoginSuccess }) {
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
         localStorage.setItem('user', JSON.stringify(user));
+
+        // Evaluate user role immediately
+        const isSupervisor = user.role === 'supervisor' || user.isSupervisor === true;
+        const isAdmin = ['admin', 'super_admin'].includes(user.role);
+
+        let targetRoute = '/pos';
+        if (isSupervisor && !isAdmin) {
+          targetRoute = '/supervisor-dashboard';
+        } else if (isAdmin) {
+          targetRoute = '/dashboard';
+        } else if (user.role === 'salesperson') {
+          targetRoute = '/pos';
+        }
+
         if (onLoginSuccess) {
           onLoginSuccess(user);
-        } else {
-          window.location.href = '/swm-admin/';
         }
+
+        navigate(targetRoute, { replace: true });
       } else {
         setErrorMessage(response.data.message || 'فشل تسجيل الدخول');
       }

@@ -13,11 +13,16 @@ import {
   InputNumber,
   Select,
   Radio,
-  message,
   Divider,
   Badge,
-  Tooltip
+  Tooltip,
+  Alert,
+  Segmented,
+  Table,
+  Switch,
+  List
 } from 'antd';
+import { antMessage as message } from '../utils/antAppBridge';
 import {
   BarcodeOutlined,
   SearchOutlined,
@@ -34,8 +39,14 @@ import {
   PhoneOutlined,
   HomeOutlined,
   CreditCardOutlined,
-  QrcodeOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  RollbackOutlined,
+  SettingOutlined,
+  ExclamationCircleOutlined,
+  ShoppingOutlined,
+  AppstoreOutlined,
+  ThunderboltOutlined,
+  CheckOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import ThermalReceipt from '../components/ThermalReceipt';
@@ -43,39 +54,70 @@ import ThermalReceipt from '../components/ThermalReceipt';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function POS() {
+export default function POS({ currentUser }) {
   // Session State
   const [sessionData, setSessionData] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
-  // Staff / Salesperson State
-  const [staff, setStaff] = useState([]);
+  // Active user and Role-Based Access Control
+  const activeUser = currentUser || (() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch (e) { return null; }
+  })();
+
+  const isSupervisor = Boolean(
+    activeUser && (
+      activeUser.role === 'supervisor' ||
+      ['super_admin', 'admin'].includes(activeUser.role) ||
+      activeUser.isSupervisor === true
+    )
+  );
+
+  // Transaction Mode: 'sale' (فاتورة بيع) or 'return' (مرتجع مبيعات)
+  const [invoiceType, setInvoiceType] = useState('sale'); // 'sale' | 'return'
+
+  // Staff / Salesperson State (Filtered strictly to current active branch)
+  const [branchSellers, setBranchSellers] = useState([]);
   const [selectedSalesperson, setSelectedSalesperson] = useState(null);
 
-  // Cart State
+  // Supervisor Dynamic Validation Settings
+  const [supervisorSettings, setSupervisorSettings] = useState({
+    require_customer_name: false,
+    require_customer_phone: false
+  });
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  // Cart / Invoice Items State
+  // Item structure: { key, product_id, variant_id, product_name, product_code, barcode, unit_price, available_qty, quantity, line_total, isManualRow }
   const [cart, setCart] = useState([]);
-  const [invoiceDiscount, setInvoiceDiscount] = useState(0);
+  const [invoiceDiscount, setInvoiceDiscount] = useState(0); // Global Invoice Discount
   const [taxAmount, setTaxAmount] = useState(0);
 
   // Customer Information
-  const [customerName, setCustomerName] = useState('عميل نقدي');
+  const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [saleNotes, setSaleNotes] = useState('');
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
 
-  // Multi-Payment State (Cash, Card, Transfer)
+  // Multi-Payment State (Cash, Card, Transfer) - Initialized to 0
   const [cashTendered, setCashTendered] = useState(0);
   const [cardTendered, setCardTendered] = useState(0);
   const [transferTendered, setTransferTendered] = useState(0);
 
-  // Product Search State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const searchInputRef = useRef(null);
+  // F1 Product Search Modal State
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
+  const [modalProducts, setModalProducts] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
+  const modalSearchInputRef = useRef(null);
 
-  // Drawer Modals
+  // Refs for manual empty rows
+  const manualRowInputRefs = useRef({});
+
+  // Drawer & Cash Session Modals
   const [openModalVisible, setOpenModalVisible] = useState(false);
   const [closeModalVisible, setCloseModalVisible] = useState(false);
   const [cashMovModalVisible, setCashMovModalVisible] = useState(false);
@@ -94,6 +136,7 @@ export default function POS() {
       const res = await api.get('/api/swm/pos/session/current');
       if (res.data.success) {
         setSessionData(res.data.data);
+        return res.data.data;
       }
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في استعلام الخزينة والوردية');
@@ -102,86 +145,270 @@ export default function POS() {
     }
   };
 
-  // Fetch Staff for Salesperson selector
-  const fetchStaff = async () => {
+  // Fetch Sellers assigned ONLY to the current active branch
+  const fetchBranchSellers = async (branchId) => {
     try {
-      const res = await api.get('/api/swm/users');
+      let bId = branchId;
+      if (!bId) {
+        bId = currentUser?.branch_id || currentUser?.branchId;
+        if (!bId) {
+          try {
+            const stored = localStorage.getItem('user');
+            if (stored) {
+              const u = JSON.parse(stored);
+              bId = u?.branch_id || u?.branchId;
+            }
+          } catch (e) {}
+        }
+      }
+
+      const params = { status: 'active' };
+      if (bId) {
+        params.branch_id = bId;
+      }
+      const res = await api.get('/api/swm/users', { params });
       if (res.data.success) {
-        const staffList = res.data.data || [];
-        setStaff(staffList);
-        if (staffList.length > 0 && !selectedSalesperson) {
-          // Default to first salesperson or user
-          setSelectedSalesperson(staffList[0].id);
+        const allUsers = res.data.data || [];
+        // Filter strictly to staff assigned to this active branch ONLY
+        const sellers = bId
+          ? allUsers.filter((u) => Number(u.branch_id) === Number(bId))
+          : allUsers;
+        setBranchSellers(sellers);
+        if (sellers.length > 0 && !selectedSalesperson) {
+          setSelectedSalesperson(sellers[0].id);
         }
       }
     } catch (err) {
-      console.error('Fetch staff error:', err);
+      console.error('Fetch branch sellers error:', err);
+    }
+  };
+
+  // Fetch Product Categories/Groups for F1 Modal Sidebar
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get('/api/swm/categories');
+      if (res.data.success) {
+        setCategories(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Fetch categories error:', err);
+    }
+  };
+
+  // Fetch supervisor dynamic validation rules and permissions from store settings
+  const fetchSupervisorSettings = async () => {
+    try {
+      const res = await api.get('/api/swm/store-settings');
+      if (res.data.success && Array.isArray(res.data.data)) {
+        const map = {};
+        res.data.data.forEach((item) => {
+          map[item.key] = item.value;
+        });
+        setSupervisorSettings({
+          require_customer_name: map['pos_require_client_name'] !== 'false',
+          require_customer_phone: map['pos_require_client_phone'] !== 'false',
+          pos_allow_salesperson_discount: map['pos_allow_salesperson_discount'] !== 'false',
+          pos_max_salesperson_discount_pct: map['pos_max_salesperson_discount_pct'] !== undefined
+            ? parseFloat(map['pos_max_salesperson_discount_pct'])
+            : 5,
+          pos_allow_salesperson_return: map['pos_allow_salesperson_return'] === 'true'
+        });
+      }
+    } catch (err) {
+      console.error('Fetch supervisor settings error:', err);
+    }
+  };
+
+  const handleSaveSupervisorSettings = async (values) => {
+    setSavingSettings(true);
+    try {
+      const res = await api.put('/api/swm/pos/settings', values);
+      if (res.data.success) {
+        message.success('تم حفظ إعدادات مشرف الفرع بنجاح');
+        setSupervisorSettings(values);
+        setSettingsModalVisible(false);
+      }
+    } catch (err) {
+      message.error('فشل في حفظ إعدادات المشرف');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
   useEffect(() => {
-    fetchSession();
-    fetchStaff();
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
+    fetchSession().then((session) => {
+      const bId = session?.register?.branch_id;
+      fetchBranchSellers(bId);
+    });
+    fetchCategories();
+    fetchSupervisorSettings();
   }, []);
 
-  // Keyboard Shortcuts: F1 (Search), F11 (Add Line / Search Focus), F4 (Submit)
+  // Strict Keyboard Workflow:
+  // Step 1: F11 => Add empty row
+  // Step 2: F1  => Open Product Search Modal
+  // Step 3: F4  => Execute Complete Sale / Return
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'F1') {
+      if (e.key === 'F11') {
         e.preventDefault();
-        searchInputRef.current?.focus();
-        message.info('F1: تم التركيز على حقل البحث عن صنف');
-      } else if (e.key === 'F11') {
+        handleStep1AddEmptyRow();
+      } else if (e.key === 'F1') {
         e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select?.();
-        message.info('F11: إضافة سطر جديد / مسح الباركود');
+        handleStep2OpenSearchModal();
       } else if (e.key === 'F4') {
         e.preventDefault();
-        handleCompleteSale();
+        handleStep3CompleteSale();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   });
 
-  // Live Barcode / Catalog Search
-  const handleSearch = async (val) => {
-    setSearchQuery(val);
-    if (!val || val.trim().length < 1) {
-      setSearchResults([]);
-      return;
-    }
+  // Step 1: Pressing F11 dynamically appends a new empty row
+  const handleStep1AddEmptyRow = () => {
+    const tempKey = `empty-${Date.now()}`;
+    setCart((prev) => [
+      ...prev,
+      {
+        key: tempKey,
+        isManualRow: true,
+        product_id: null,
+        variant_id: null,
+        product_name: '',
+        product_code: '',
+        barcode: '',
+        unit_price: 0,
+        available_qty: 0,
+        quantity: 1,
+        discount_amount: 0,
+        line_total: 0
+      }
+    ]);
+    message.info('خطوة 1 [F11]: تمت إضافة سطر جديد للإدخال اليدوي. اضغط F1 للبحث أو امسح الباركود.');
+    setTimeout(() => {
+      if (manualRowInputRefs.current[tempKey]) {
+        manualRowInputRefs.current[tempKey].focus();
+      }
+    }, 100);
+  };
 
-    setSearchLoading(true);
+  // Step 2: Pressing F1 opens the Product Search Modal
+  const handleStep2OpenSearchModal = () => {
+    setSearchModalVisible(true);
+    fetchModalProducts(modalSearchQuery, selectedCategory);
+    setTimeout(() => {
+      modalSearchInputRef.current?.focus();
+    }, 150);
+  };
+
+  // Fetch products inside F1 modal based on search query and category
+  const fetchModalProducts = async (q = '', catId = 'all') => {
+    setModalLoading(true);
     try {
-      const res = await api.get('/api/swm/pos/search', { params: { query: val.trim() } });
-      if (res.data.success) {
-        setSearchResults(res.data.data);
+      const params = {};
+      if (q && q.trim()) params.query = q.trim();
+      if (catId && catId !== 'all') params.category_id = catId;
 
-        // If exact barcode match with 1 item, auto add to cart!
-        if (
-          res.data.data.length === 1 &&
-          (res.data.data[0].barcode === val.trim() || res.data.data[0].product_code === val.trim())
-        ) {
-          addToCart(res.data.data[0]);
-          setSearchQuery('');
-          setSearchResults([]);
-        }
+      const res = await api.get('/api/swm/pos/search', { params });
+      if (res.data.success) {
+        setModalProducts(res.data.data || []);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Fetch modal products error:', err);
     } finally {
-      setSearchLoading(false);
+      setModalLoading(false);
     }
   };
 
-  // Add Item to Cart
+  // Category clicked in F1 modal sidebar
+  const handleCategorySelect = (catId) => {
+    setSelectedCategory(catId);
+    fetchModalProducts(modalSearchQuery, catId);
+  };
+
+  // Search input changed in F1 modal
+  const handleModalSearchChange = (val) => {
+    setModalSearchQuery(val);
+    fetchModalProducts(val, selectedCategory);
+  };
+
+  // Product selected from F1 modal: automatically appended/populated into current row
+  const handleSelectProductFromModal = (product) => {
+    if (invoiceType === 'sale' && product.available_qty <= 0) {
+      return message.warning(`الصنف "${product.display_name}" غير متوفر في مخزون الفرع!`);
+    }
+
+    // Check if there is an empty manual row to fill
+    const emptyRow = cart.find((item) => item.isManualRow);
+    if (emptyRow) {
+      populateProductIntoRow(emptyRow.key, product);
+    } else {
+      addToCart(product);
+    }
+
+    setSearchModalVisible(false);
+    setModalSearchQuery('');
+    message.success(`تم اختيار الصنف: ${product.display_name}`);
+  };
+
+  // Populate product into a specific row
+  const populateProductIntoRow = (rowKey, product) => {
+    const unitPrice = parseFloat(product.unit_price) || 0;
+    const finalKey = `${product.product_id}-${product.variant_id || 'base'}`;
+
+    setCart((prev) => {
+      const existingOther = prev.find((item) => item.key === finalKey && item.key !== rowKey);
+      if (existingOther) {
+        const newQty = existingOther.quantity + 1;
+        const lineTotal = newQty * existingOther.unit_price;
+        return prev
+          .filter((item) => item.key !== rowKey)
+          .map((item) => (item.key === finalKey ? { ...item, quantity: newQty, line_total: lineTotal } : item));
+      }
+
+      return prev.map((item) => {
+        if (item.key === rowKey) {
+          return {
+            key: finalKey,
+            isManualRow: false,
+            product_id: product.product_id,
+            variant_id: product.variant_id,
+            product_name: product.display_name,
+            product_code: product.product_code,
+            barcode: product.barcode,
+            unit_price: unitPrice,
+            available_qty: product.available_qty,
+            quantity: 1,
+            line_total: unitPrice
+          };
+        }
+        return item;
+      });
+    });
+  };
+
+  // Manual barcode/code entered directly in empty row
+  const handleManualRowBarcodeSubmit = async (rowKey, inputCode) => {
+    if (!inputCode || !inputCode.trim()) return;
+
+    try {
+      const res = await api.get('/api/swm/pos/search', { params: { query: inputCode.trim() } });
+      if (res.data.success && res.data.data.length > 0) {
+        const product = res.data.data[0];
+        populateProductIntoRow(rowKey, product);
+        message.success(`تم إدراج: ${product.display_name}`);
+      } else {
+        message.warning(`لم يتم العثور على صنف بالباركود أو الكود: ${inputCode}`);
+      }
+    } catch (err) {
+      message.error('خطأ أثناء البحث عن الصنف');
+    }
+  };
+
+  // Add Item directly to cart
   const addToCart = (product) => {
-    if (product.available_qty <= 0) {
+    if (invoiceType === 'sale' && product.available_qty <= 0) {
       return message.warning(`عذراً، الصنف "${product.display_name}" غير متوفر في مخزون الفرع حالياً!`);
     }
 
@@ -190,25 +417,26 @@ export default function POS() {
       const existing = prev.find((item) => item.key === itemKey);
 
       if (existing) {
-        if (existing.quantity >= product.available_qty) {
+        if (invoiceType === 'sale' && existing.quantity >= product.available_qty) {
           message.warning(`الكمية المتاحة في المخزون (${product.available_qty}) فقط!`);
           return prev;
         }
         return prev.map((item) => {
           if (item.key === itemKey) {
             const newQty = item.quantity + 1;
-            const lineTotal = Math.max(0, newQty * item.unit_price - (item.discount_amount || 0));
+            const lineTotal = newQty * item.unit_price;
             return { ...item, quantity: newQty, line_total: lineTotal };
           }
           return item;
         });
       }
 
-      const unitPrice = parseFloat(product.unit_price);
+      const unitPrice = parseFloat(product.unit_price) || 0;
       return [
         ...prev,
         {
           key: itemKey,
+          isManualRow: false,
           product_id: product.product_id,
           variant_id: product.variant_id,
           product_name: product.display_name,
@@ -217,15 +445,10 @@ export default function POS() {
           unit_price: unitPrice,
           available_qty: product.available_qty,
           quantity: 1,
-          discount_amount: 0,
           line_total: unitPrice
         }
       ];
     });
-
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
   };
 
   // Update item quantity
@@ -236,25 +459,31 @@ export default function POS() {
           if (item.key !== key) return item;
           const newQty = item.quantity + delta;
           if (newQty <= 0) return null;
-          if (newQty > item.available_qty) {
+          if (invoiceType === 'sale' && newQty > item.available_qty) {
             message.warning(`الكمية المتاحة في المخزون (${item.available_qty}) فقط!`);
             return item;
           }
-          const lineTotal = Math.max(0, newQty * item.unit_price - (item.discount_amount || 0));
+          const lineTotal = newQty * item.unit_price;
           return { ...item, quantity: newQty, line_total: lineTotal };
         })
         .filter(Boolean)
     );
   };
 
-  // Update item line discount
-  const updateLineDiscount = (key, discountVal) => {
+  // Set item quantity directly
+  const setCartQtyDirect = (key, qtyVal) => {
+    const val = parseInt(qtyVal, 10);
+    if (isNaN(val) || val <= 0) return;
+
     setCart((prev) =>
       prev.map((item) => {
         if (item.key !== key) return item;
-        const discount = Math.max(0, parseFloat(discountVal || 0));
-        const lineTotal = Math.max(0, item.quantity * item.unit_price - discount);
-        return { ...item, discount_amount: discount, line_total: lineTotal };
+        if (invoiceType === 'sale' && val > item.available_qty) {
+          message.warning(`الكمية المتاحة في المخزون (${item.available_qty}) فقط!`);
+          return item;
+        }
+        const lineTotal = val * item.unit_price;
+        return { ...item, quantity: val, line_total: lineTotal };
       })
     );
   };
@@ -270,14 +499,17 @@ export default function POS() {
     setCashTendered(0);
     setCardTendered(0);
     setTransferTendered(0);
-    setCustomerName('عميل نقدي');
+    setCustomerName('');
     setCustomerPhone('');
     setCustomerAddress('');
     setSaleNotes('');
   };
 
-  // Cart calculations
-  const subtotal = cart.reduce((sum, item) => sum + item.line_total, 0);
+  // Active items in invoice
+  const validItems = cart.filter((item) => !item.isManualRow && item.product_id);
+
+  // Financial calculations
+  const subtotal = validItems.reduce((sum, item) => sum + item.line_total, 0);
   const netTotal = Math.max(
     0,
     subtotal - parseFloat(invoiceDiscount || 0) + parseFloat(taxAmount || 0)
@@ -290,9 +522,9 @@ export default function POS() {
     parseFloat(transferTendered || 0);
 
   const remainingDue = Math.max(0, netTotal - totalTendered);
-  const changeDue = Math.max(0, totalTendered - netTotal);
+  const isOverpaid = totalTendered > netTotal && netTotal > 0;
 
-  // Quick payment presets
+  // Convenience quick-pay buttons
   const handleQuickPayCash = () => {
     setCashTendered(netTotal);
     setCardTendered(0);
@@ -311,21 +543,26 @@ export default function POS() {
     setCardTendered(0);
   };
 
-  // Auto-fill cash when cart updates if no payment has been typed yet
-  useEffect(() => {
-    if (netTotal > 0 && totalTendered === 0) {
-      setCashTendered(netTotal);
-    } else if (netTotal === 0) {
-      setCashTendered(0);
-      setCardTendered(0);
-      setTransferTendered(0);
+  // Step 3: Pressing F4 executes the Complete Sale / Return action
+  const handleStep3CompleteSale = async () => {
+    if (validItems.length === 0) {
+      return message.error('الفاتورة لا تحتوي على أصناف صالحة. اضغط F11 ثم F1 لإضافة أصناف.');
     }
-  }, [netTotal]);
 
-  // Submit Fast Sale
-  const handleCompleteSale = async () => {
-    if (cart.length === 0) {
-      return message.error('سلة المشتريات فارغة');
+    // Dynamic Client Data Validation
+    if (supervisorSettings.require_customer_name && (!customerName || !customerName.trim())) {
+      return message.error('اسم العميل حقل إلزامي بحسب إعدادات مشرف الفرع');
+    }
+
+    if (supervisorSettings.require_customer_phone && (!customerPhone || !customerPhone.trim())) {
+      return message.error('رقم هاتف العميل حقل إلزامي بحسب إعدادات مشرف الفرع');
+    }
+
+    // Multi-Payment Validation
+    if (isOverpaid) {
+      return message.error(
+        `المبلغ المدفوع (${totalTendered.toFixed(2)} ج.م) يتجاوز إجمالي الفاتورة (${netTotal.toFixed(2)} ج.م)! يرجى ضبط المبلغ بدقة.`
+      );
     }
 
     if (totalTendered < netTotal) {
@@ -338,9 +575,9 @@ export default function POS() {
     try {
       const payload = {
         salesperson_id: selectedSalesperson,
-        customer_name: customerName || 'عميل نقدي',
-        customer_phone: customerPhone || undefined,
-        customer_address: customerAddress || undefined,
+        customer_name: customerName.trim() || (invoiceType === 'return' ? 'عميل مرتجع' : 'عميل نقدي'),
+        customer_phone: customerPhone.trim() || undefined,
+        customer_address: customerAddress.trim() || undefined,
         discount_amount: parseFloat(invoiceDiscount) || 0,
         tax_amount: parseFloat(taxAmount) || 0,
         payment_method: 'multi',
@@ -349,32 +586,41 @@ export default function POS() {
           card: parseFloat(cardTendered || 0),
           transfer: parseFloat(transferTendered || 0)
         },
-        notes: saleNotes || undefined,
-        items: cart.map((item) => ({
+        notes: saleNotes || (invoiceType === 'return' ? 'فاتورة مرتجع مبيعات' : undefined),
+        items: validItems.map((item) => ({
           product_id: item.product_id,
           variant_id: item.variant_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          discount_amount: item.discount_amount || 0,
+          discount_amount: 0,
           product_name: item.product_name,
           product_code: item.product_code
         }))
       };
 
-      const res = await api.post('/api/swm/pos/sale', payload);
+      const endpoint = invoiceType === 'return' ? '/api/swm/pos/return' : '/api/swm/pos/sale';
+      const res = await api.post(endpoint, payload);
+
       if (res.data.success) {
-        message.success(`تم حفظ الفاتورة بنجاح: ${res.data.data.invoice_number}`);
+        const invNum = res.data.data.invoice_number;
+        message.success(
+          invoiceType === 'return'
+            ? `تم حفظ فاتورة المرتجع بنجاح: ${invNum}`
+            : `تم حفظ فاتورة البيع بنجاح: ${invNum}`
+        );
+
         setLastInvoice({
           ...res.data.data,
           items: res.data.items,
-          branch_name: sessionData?.register?.register_name
+          branch_name: sessionData?.register?.register_name,
+          isReturn: invoiceType === 'return'
         });
         setReceiptModalVisible(true);
         clearCart();
         fetchSession();
       }
     } catch (err) {
-      message.error(err.response?.data?.message || 'فشل في إتمام عملية البيع');
+      message.error(err.response?.data?.message || 'فشل في حفظ الفاتورة');
     } finally {
       setIsSubmittingSale(false);
     }
@@ -425,382 +671,427 @@ export default function POS() {
   };
 
   return (
-    <div style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
-      {/* Top POS Status Bar & Shortcuts Badges */}
-      <Card
-        size="small"
+    <div style={{ minHeight: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* ========================================================= */}
+      {/* 1. Top Bar: Transaction Type Toggle (Right Side Kept)     */}
+      {/* ========================================================= */}
+      <div
         style={{
-          marginBottom: 8,
-          background: '#0f172a',
-          borderColor: '#1e293b',
-          color: '#fff'
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+          padding: '10px 16px',
+          background: '#ffffff',
+          borderRadius: 10,
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
         }}
-        styles={{ body: { padding: '8px 16px' } }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <Space size="middle" wrap>
-            <div>
-              <Text style={{ color: '#94a3b8', fontSize: 12 }}>حالة الخزينة: </Text>
-              {sessionData?.is_open ? (
-                <Tag icon={<UnlockOutlined />} color="success" style={{ fontWeight: 'bold' }}>
-                  مفتوحة
-                </Tag>
-              ) : (
-                <Tag icon={<LockOutlined />} color="error" style={{ fontWeight: 'bold' }}>
-                  مغلقة
-                </Tag>
-              )}
-            </div>
+        {/* Right Side: Transaction Type Segmented Toggle (STRICTLY KEPT) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Segmented
+            size="large"
+            value={invoiceType}
+            onChange={(val) => {
+              if (val === 'return' && !isSupervisor && supervisorSettings.pos_allow_salesperson_return === false) {
+                message.error('غير مصرح للبائعين بإجراء فواتير مرتجع. يتطلب تسجيل دخول أو موافقة المشرف.');
+                return;
+              }
+              setInvoiceType(val);
+            }}
+            options={[
+              {
+                label: (
+                  <span style={{ fontWeight: 700, padding: '0 12px', color: invoiceType === 'sale' ? '#16a34a' : '#475569' }}>
+                    <ShoppingOutlined style={{ marginLeft: 6 }} />
+                    فاتورة بيع (Sale)
+                  </span>
+                ),
+                value: 'sale'
+              },
+              {
+                label: (
+                  <span style={{ fontWeight: 700, padding: '0 12px', color: invoiceType === 'return' ? '#dc2626' : '#475569' }}>
+                    <RollbackOutlined style={{ marginLeft: 6 }} />
+                    مرتجع مبيعات (Return)
+                  </span>
+                ),
+                value: 'return'
+              }
+            ]}
+          />
 
-            <div>
-              <Text style={{ color: '#94a3b8', fontSize: 12 }}>رصيد الدرج: </Text>
-              <Text strong style={{ color: '#38bdf8', fontSize: 15 }}>
-                {(sessionData?.current_balance || 0).toLocaleString()} ج.م
-              </Text>
-            </div>
-
-            <div>
-              <Text style={{ color: '#94a3b8', fontSize: 12 }}>مبيعات اليوم: </Text>
-              <Text strong style={{ color: '#4ade80' }}>
-                {sessionData?.today_sales_count || 0} عملية ({(sessionData?.today_sales_total || 0).toLocaleString()} ج.م)
-              </Text>
-            </div>
-
-            {/* Keyboard Shortcuts Visual Guide */}
-            <Space size={4}>
-              <Tag color="#1e3a8a" style={{ border: '1px solid #3b82f6', color: '#93c5fd' }}>
-                F1: بحث عن صنف
-              </Tag>
-              <Tag color="#4c1d95" style={{ border: '1px solid #8b5cf6', color: '#c4b5fd' }}>
-                F11: إضافة سطر جديد
-              </Tag>
-              <Tag color="#064e3b" style={{ border: '1px solid #10b981', color: '#6ee7b7' }}>
-                F4: إتمام البيع
-              </Tag>
-            </Space>
-          </Space>
-
-          <Space size="small">
-            {!sessionData?.is_open ? (
-              <Button
-                type="primary"
-                size="small"
-                icon={<UnlockOutlined />}
-                style={{ backgroundColor: '#16a34a' }}
-                onClick={() => {
-                  openForm.resetFields();
-                  setOpenModalVisible(true);
-                }}
-              >
-                فتح الوردية
-              </Button>
-            ) : (
-              <>
-                <Button
-                  size="small"
-                  icon={<SwapOutlined />}
-                  style={{ color: '#e2e8f0', borderColor: '#475569', background: '#1e293b' }}
-                  onClick={() => {
-                    cashMovForm.resetFields();
-                    setCashMovModalVisible(true);
-                  }}
-                >
-                  حركة نقدية
-                </Button>
-                <Button
-                  size="small"
-                  danger
-                  icon={<LockOutlined />}
-                  onClick={() => {
-                    closeForm.resetFields();
-                    setCloseModalVisible(true);
-                  }}
-                >
-                  إغلاق الوردية
-                </Button>
-              </>
-            )}
-            <Button
-              icon={<ReloadOutlined />}
-              shape="circle"
-              size="small"
-              type="text"
-              style={{ color: '#94a3b8' }}
-              onClick={fetchSession}
-            />
-          </Space>
+          {invoiceType === 'return' && (
+            <Tag color="error" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
+              ⚠️ وضع المرتجع: استرجاع للمخزون ورد النقدية
+            </Tag>
+          )}
         </div>
-      </Card>
 
-      {/* Main Terminal Grid: Right = Search & Catalog, Left = Active Invoice & Multi-Payment */}
-      <Row gutter={10} style={{ flex: 1, minHeight: 0 }}>
-        {/* Right Section: Product Search & Quick Catalog */}
-        <Col xs={24} lg={13} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Left Side: Clean Workflow Shortcuts Only (Financial Controls completely removed) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Tag color="purple" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
+            1️⃣ F11: إضافة سطر
+          </Tag>
+          <Tag color="blue" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
+            2️⃣ F1: بحث المجاميع
+          </Tag>
+          <Tag color="green" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
+            3️⃣ F4: إتمام وحفظ
+          </Tag>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. Main Work Area: 2-Column Responsive Layout             */}
+      {/* Right Column: Invoice Items & Client Data                 */}
+      {/* Left Column: Financials, Discount, Multi-Pay, Checkout   */}
+      {/* ========================================================= */}
+      <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 0, alignItems: 'stretch' }}>
+        {/* Right Side: Seller, Client Data, Action Buttons, and Items Table */}
+        <Col xs={24} lg={15} xl={16} style={{ display: 'flex', flexDirection: 'column' }}>
           <Card
-            style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            styles={{ body: { padding: 10, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: 10,
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}
+            styles={{
+              body: {
+                padding: 16,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }
+            }}
           >
-            {/* Fast Barcode / Keyword input */}
-            <div style={{ marginBottom: 10 }}>
-              <Input
-                ref={searchInputRef}
-                size="large"
-                prefix={<BarcodeOutlined style={{ fontSize: 20, color: '#2563eb' }} />}
-                suffix={
-                  <Tag color="blue" style={{ cursor: 'pointer' }} onClick={() => searchInputRef.current?.focus()}>
-                    F1 / F11
-                  </Tag>
-                }
-                placeholder="امسح الباركود أو ابحث باسم الصنف / الكود (اضغط F1 للبحث أو F11 لإضافة سطر)..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                allowClear
-                autoFocus
-                style={{ borderRadius: 8, fontSize: 14 }}
-              />
-            </div>
-
-            {/* Search Results list / Grid */}
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              {searchResults.length > 0 ? (
-                <Row gutter={[8, 8]}>
-                  {searchResults.map((item) => (
-                    <Col xs={12} sm={8} key={`${item.product_id}-${item.variant_id || '0'}`}>
-                      <Card
-                        hoverable
-                        size="small"
-                        onClick={() => addToCart(item)}
-                        style={{
-                          borderRadius: 8,
-                          cursor: 'pointer',
-                          borderColor: item.available_qty > 0 ? '#e2e8f0' : '#fecaca',
-                          background: item.available_qty > 0 ? '#fff' : '#fff1f2'
-                        }}
-                        styles={{ body: { padding: 10 } }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <Text code style={{ fontSize: 11 }}>{item.barcode || item.product_code}</Text>
-                          <Badge
-                            count={`${item.available_qty} متاح`}
-                            style={{
-                              backgroundColor:
-                                item.available_qty > 5
-                                  ? '#52c41a'
-                                  : item.available_qty > 0
-                                  ? '#fa8c16'
-                                  : '#f5222d',
-                              fontSize: 10
-                            }}
-                          />
-                        </div>
-                        <Text strong ellipsis style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
-                          {item.display_name}
-                        </Text>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text strong style={{ color: '#16a34a', fontSize: 15 }}>
-                            {item.unit_price} ج.م
-                          </Text>
-                          <Button size="small" type="primary" shape="circle" icon={<PlusOutlined />} />
-                        </div>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '50px 0', color: '#94a3b8' }}>
-                  <BarcodeOutlined style={{ fontSize: 44, marginBottom: 10, display: 'block', color: '#cbd5e1' }} />
-                  <Text type="secondary" style={{ fontSize: 14 }}>
-                    جاهز لمسح الباركود أو البحث لإضافة المنتجات للفاتورة (اضغط F1 للبحث أو F11 لإضافة سطر)
-                  </Text>
-                </div>
-              )}
-            </div>
-          </Card>
-        </Col>
-
-        {/* Left Section: Active Invoice Header, Item Details Table & Multi-Payment */}
-        <Col xs={24} lg={11} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Card
-            style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-            styles={{ body: { padding: 10, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}
-          >
-            {/* Salesperson Selector */}
-            <div style={{ marginBottom: 8, background: '#f8fafc', padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-              <Row gutter={8} align="middle">
-                <Col span={7}>
-                  <Text strong style={{ fontSize: 12, color: '#334155' }}>
+            {/* Top Controls: Seller Selection (Branch-specific) & Client Details */}
+            <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+              <Col xs={24} md={8}>
+                <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <Text strong style={{ fontSize: 12, color: '#334155', display: 'block', marginBottom: 4 }}>
                     <UserOutlined style={{ marginLeft: 4, color: '#2563eb' }} />
-                    البائع المسؤول:
+                    البائع المسؤول (طاقم الفرع):
                   </Text>
-                </Col>
-                <Col span={17}>
                   <Select
-                    size="small"
-                    placeholder="اختر البائع صاحب الفاتورة"
+                    size="middle"
+                    placeholder="اختر البائع المسؤول"
                     value={selectedSalesperson}
                     onChange={setSelectedSalesperson}
                     style={{ width: '100%' }}
                   >
-                    {staff.map((u) => (
+                    {branchSellers.map((u) => (
                       <Option key={u.id} value={u.id}>
-                        {u.full_name || u.username} ({u.role === 'supervisor' ? 'مشرف' : 'بائع / كاشير'})
+                        {u.full_name || u.username} ({u.role === 'supervisor' ? 'مشرف فرع' : 'بائع / كاشير'})
                       </Option>
                     ))}
                   </Select>
-                </Col>
-              </Row>
-            </div>
+                </div>
+              </Col>
 
-            {/* Customer Details Row: Name, Phone, Address */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-              <Input
-                size="small"
-                prefix={<UserOutlined style={{ color: '#94a3b8' }} />}
-                placeholder="اسم العميل"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <Input
-                size="small"
-                prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />}
-                placeholder="رقم الهاتف"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                style={{ width: 120 }}
-              />
-              <Input
-                size="small"
-                prefix={<HomeOutlined style={{ color: '#94a3b8' }} />}
-                placeholder="العنوان (اختياري)"
-                value={customerAddress}
-                onChange={(e) => setCustomerAddress(e.target.value)}
-                style={{ flex: 1 }}
-              />
-            </div>
+              <Col xs={24} md={16}>
+                <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                      اسم العميل {supervisorSettings.require_customer_name ? <span style={{ color: 'red' }}>*</span> : '(اختياري)'}:
+                    </Text>
+                    <Input
+                      size="middle"
+                      prefix={<UserOutlined style={{ color: '#94a3b8' }} />}
+                      placeholder="اسم العميل..."
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      status={supervisorSettings.require_customer_name && !customerName.trim() ? 'warning' : ''}
+                    />
+                  </div>
 
-            {/* Cart Items Table (كود، كمية، سعر تلقائي، خصم، سعر نهائي) */}
-            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: 6, marginBottom: 8 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 12 }}>
+                  <div style={{ width: 140 }}>
+                    <Text style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                      الهاتف {supervisorSettings.require_customer_phone ? <span style={{ color: 'red' }}>*</span> : '(اختياري)'}:
+                    </Text>
+                    <Input
+                      size="middle"
+                      prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />}
+                      placeholder="الهاتف..."
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      status={supervisorSettings.require_customer_phone && !customerPhone.trim() ? 'warning' : ''}
+                    />
+                  </div>
+
+                  <div style={{ paddingTop: 18 }}>
+                    <Space size={6}>
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={handleStep1AddEmptyRow}
+                        style={{ backgroundColor: '#7c3aed' }}
+                      >
+                        سطر (F11)
+                      </Button>
+                      <Button
+                        icon={<SearchOutlined />}
+                        onClick={handleStep2OpenSearchModal}
+                        style={{ borderColor: '#2563eb', color: '#2563eb' }}
+                      >
+                        بحث (F1)
+                      </Button>
+                    </Space>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Invoice Items Table (Item-level discount removed completely) */}
+            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
                 <thead style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                    <th style={{ padding: '6px 8px' }}>كود / اسم الصنف</th>
-                    <th style={{ padding: '6px 6px', textAlign: 'center' }}>الكمية</th>
-                    <th style={{ padding: '6px 6px', textAlign: 'center' }}>السعر</th>
-                    <th style={{ padding: '6px 6px', textAlign: 'center', width: 75 }}>الخصم</th>
-                    <th style={{ padding: '6px 8px', textAlign: 'center' }}>النهائي</th>
-                    <th style={{ padding: '6px 4px', width: 24 }}></th>
+                  <tr style={{ borderBottom: '1.5px solid #cbd5e1', color: '#334155' }}>
+                    <th style={{ padding: '10px 10px', width: 36, textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '10px 10px', width: 140 }}>كود / باركود</th>
+                    <th style={{ padding: '10px 10px' }}>اسم الصنف والمواصفات</th>
+                    <th style={{ padding: '10px 10px', width: 95, textAlign: 'center' }}>المخزون</th>
+                    <th style={{ padding: '10px 10px', width: 130, textAlign: 'center' }}>الكمية</th>
+                    <th style={{ padding: '10px 10px', width: 105, textAlign: 'center' }}>السعر</th>
+                    <th style={{ padding: '10px 10px', width: 115, textAlign: 'center' }}>الإجمالي</th>
+                    <th style={{ padding: '10px 6px', width: 44, textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {cart.map((item) => (
-                    <tr key={item.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '6px 8px' }}>
-                        <div style={{ fontWeight: 600, fontSize: 12 }}>{item.product_name}</div>
-                        <Text code style={{ fontSize: 10 }}>{item.product_code}</Text>
-                      </td>
-                      <td style={{ padding: '6px 6px', textAlign: 'center' }}>
-                        <Space size={1}>
-                          <Button
-                            size="small"
-                            type="text"
-                            icon={<MinusOutlined style={{ fontSize: 9 }} />}
-                            onClick={() => updateCartQty(item.key, -1)}
+                  {cart.map((item, index) => {
+                    if (item.isManualRow) {
+                      return (
+                        <tr key={item.key} style={{ background: '#fefce8', borderBottom: '1px dashed #fde047' }}>
+                          <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#ca8a04' }}>
+                            {index + 1}
+                          </td>
+                          <td colSpan={6} style={{ padding: '8px 10px' }}>
+                            <Input
+                              ref={(el) => (manualRowInputRefs.current[item.key] = el)}
+                              size="middle"
+                              placeholder="أدخل باركود أو كود الصنف واضغط Enter، أو اضغط F1 لاختيار الصنف..."
+                              prefix={<BarcodeOutlined style={{ color: '#ca8a04', fontSize: 16 }} />}
+                              onPressEnter={(e) => handleManualRowBarcodeSubmit(item.key, e.target.value)}
+                              style={{ width: '100%', borderRadius: 6 }}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <Button
+                              type="text"
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => removeFromCart(item.key)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return (
+                      <tr key={item.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ textAlign: 'center', color: '#64748b', fontSize: 12 }}>
+                          {index + 1}
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <Text code style={{ fontSize: 11 }}>{item.barcode || item.product_code}</Text>
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{item.product_name}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>كود: {item.product_code}</div>
+                        </td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          <Badge
+                            count={`${item.available_qty}`}
+                            style={{
+                              backgroundColor: item.available_qty > 5 ? '#52c41a' : item.available_qty > 0 ? '#fa8c16' : '#f5222d',
+                              fontSize: 11
+                            }}
                           />
-                          <Text strong style={{ minWidth: 18, textAlign: 'center', display: 'inline-block' }}>
-                            {item.quantity}
-                          </Text>
+                        </td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          <Space size={2}>
+                            <Button
+                              size="small"
+                              icon={<MinusOutlined style={{ fontSize: 10 }} />}
+                              onClick={() => updateCartQty(item.key, -1)}
+                            />
+                            <InputNumber
+                              size="small"
+                              min={1}
+                              max={invoiceType === 'sale' ? item.available_qty : 9999}
+                              value={item.quantity}
+                              onChange={(val) => setCartQtyDirect(item.key, val)}
+                              style={{ width: 50, textAlign: 'center' }}
+                            />
+                            <Button
+                              size="small"
+                              icon={<PlusOutlined style={{ fontSize: 10 }} />}
+                              onClick={() => updateCartQty(item.key, 1)}
+                            />
+                          </Space>
+                        </td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600, color: '#334155' }}>
+                          {item.unit_price.toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: '8px 10px',
+                            textAlign: 'center',
+                            fontWeight: 700,
+                            fontSize: 14,
+                            color: invoiceType === 'return' ? '#dc2626' : '#16a34a'
+                          }}
+                        >
+                          {item.line_total.toFixed(2)}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
                           <Button
-                            size="small"
                             type="text"
-                            icon={<PlusOutlined style={{ fontSize: 9 }} />}
-                            onClick={() => updateCartQty(item.key, 1)}
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => removeFromCart(item.key)}
                           />
-                        </Space>
-                      </td>
-                      <td style={{ padding: '6px 6px', textAlign: 'center', color: '#334155' }}>
-                        {item.unit_price}
-                      </td>
-                      <td style={{ padding: '6px 6px', textAlign: 'center' }}>
-                        <InputNumber
-                          size="small"
-                          min={0}
-                          max={item.quantity * item.unit_price}
-                          value={item.discount_amount || 0}
-                          onChange={(v) => updateLineDiscount(item.key, v)}
-                          style={{ width: 65, fontSize: 11 }}
-                        />
-                      </td>
-                      <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 'bold', color: '#16a34a' }}>
-                        {item.line_total.toFixed(2)}
-                      </td>
-                      <td style={{ padding: '6px 4px' }}>
-                        <Button
-                          type="text"
-                          danger
-                          size="small"
-                          icon={<DeleteOutlined style={{ fontSize: 11 }} />}
-                          onClick={() => removeFromCart(item.key)}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
                   {cart.length === 0 && (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '25px 0', color: '#94a3b8' }}>
-                        الفاتورة فارغة - استخدم الباركود أو اضغط F1/F11 للإضافة
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+                        <div style={{ fontSize: 15, marginBottom: 8 }}>لا توجد أصناف في الفاتورة حالياً</div>
+                        <Space size="middle">
+                          <Button type="primary" icon={<PlusOutlined />} onClick={handleStep1AddEmptyRow} style={{ backgroundColor: '#7c3aed' }}>
+                            إضافة سطر فارغ (F11)
+                          </Button>
+                          <Button icon={<SearchOutlined />} onClick={handleStep2OpenSearchModal} style={{ borderColor: '#2563eb', color: '#2563eb' }}>
+                            فتح بحث المجاميع (F1)
+                          </Button>
+                        </Space>
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+          </Card>
+        </Col>
 
-            {/* Financial Summary & Multi-Payment Section */}
-            <div style={{ background: '#f8fafc', padding: 8, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              {/* Totals Header */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  background: '#0f172a',
-                  color: '#fff',
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  marginBottom: 8
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: 12, color: '#94a3b8' }}>إجمالي الفاتورة: </span>
-                  <span style={{ fontSize: 20, fontWeight: 'bold', color: '#4ade80' }}>
+        {/* Left Side: Relocated Financials, Global Invoice Discount, Multi-Payment, and Checkout */}
+        <Col xs={24} lg={9} xl={8} style={{ display: 'flex', flexDirection: 'column' }}>
+          <Card
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <DollarOutlined style={{ color: '#16a34a' }} />
+                <span style={{ fontWeight: 700, fontSize: 14 }}>الحساب والدفع (Financials & Payment)</span>
+              </div>
+            }
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: 10,
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}
+            styles={{
+              body: {
+                padding: 16,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }
+            }}
+          >
+            <div>
+              {/* Single Global Invoice Discount */}
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <Text strong style={{ fontSize: 12, color: '#92400e' }}>
+                    خصم كامل على الفاتورة (Global Discount):
+                  </Text>
+                  {invoiceDiscount > 0 && (
+                    <Button size="small" type="link" danger onClick={() => setInvoiceDiscount(0)} style={{ padding: 0, height: 'auto', fontSize: 11 }}>
+                      إلغاء الخصم
+                    </Button>
+                  )}
+                </div>
+                <InputNumber
+                  size="large"
+                  min={0}
+                  max={subtotal}
+                  precision={2}
+                  disabled={!isSupervisor && supervisorSettings.pos_allow_salesperson_discount === false}
+                  value={invoiceDiscount}
+                  onChange={(v) => {
+                    const discountVal = v || 0;
+                    const maxPct = supervisorSettings.pos_max_salesperson_discount_pct !== undefined
+                      ? supervisorSettings.pos_max_salesperson_discount_pct
+                      : 5;
+                    const maxAllowedVal = (subtotal * maxPct) / 100;
+                    if (!isSupervisor && discountVal > maxAllowedVal) {
+                      message.warning(`سقف الخصم المسموح به للبائع هو ${maxPct}% (أقصى خصم: ${maxAllowedVal.toFixed(2)} ج.م).`);
+                      setInvoiceDiscount(maxAllowedVal);
+                      return;
+                    }
+                    setInvoiceDiscount(discountVal);
+                  }}
+                  placeholder="0.00 ج.م"
+                  prefix={<DollarOutlined style={{ color: '#d97706' }} />}
+                  style={{ width: '100%', borderRadius: 6 }}
+                />
+              </div>
+
+              {/* Totals Breakdown Display */}
+              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
+                  <span style={{ color: '#64748b' }}>إجمالي الأصناف:</span>
+                  <span style={{ fontWeight: 600 }}>{subtotal.toFixed(2)} ج.م</span>
+                </div>
+                {invoiceDiscount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#dc2626' }}>
+                    <span>الخصم العام:</span>
+                    <span style={{ fontWeight: 600 }}>-{invoiceDiscount.toFixed(2)} ج.م</span>
+                  </div>
+                )}
+                <Divider style={{ margin: '8px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>
+                    {invoiceType === 'return' ? 'إجمالي المرتجع:' : 'المطلوب سداده:'}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 26,
+                      fontWeight: 900,
+                      color: invoiceType === 'return' ? '#dc2626' : '#16a34a'
+                    }}
+                  >
                     {netTotal.toFixed(2)} ج.م
                   </span>
                 </div>
-
-                <Space size="small">
-                  <Button size="small" type="dashed" ghost onClick={handleQuickPayCash}>
-                    كاش كامل
-                  </Button>
-                  <Button size="small" type="dashed" ghost onClick={handleQuickPayCard}>
-                    فيزا كاملة
-                  </Button>
-                  <Button size="small" type="dashed" ghost onClick={handleQuickPayTransfer}>
-                    تحويل كامل
-                  </Button>
-                </Space>
               </div>
 
-              {/* Multi-Payment Inputs Row (Cash, Visa, Transfers) */}
-              <div style={{ marginBottom: 8, background: '#fff', padding: 8, borderRadius: 6, border: '1px solid #cbd5e1' }}>
-                <div style={{ fontSize: 11, fontWeight: 'bold', color: '#475569', marginBottom: 6 }}>
-                  الدفع المتعدد (Multi-Payment) - حدد المبالغ المدفوعة:
+              {/* Multi-Payment Controls */}
+              <div style={{ background: '#fff', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text strong style={{ fontSize: 12, color: '#334155' }}>الدفع المتعدد (Multi-Payment):</Text>
+                  <Space size={4}>
+                    <Button size="small" onClick={handleQuickPayCash} style={{ fontSize: 11, padding: '0 6px' }}>كاش</Button>
+                    <Button size="small" onClick={handleQuickPayCard} style={{ fontSize: 11, padding: '0 6px' }}>فيزا</Button>
+                    <Button size="small" onClick={handleQuickPayTransfer} style={{ fontSize: 11, padding: '0 6px' }}>تحويل</Button>
+                  </Space>
                 </div>
-                <Row gutter={6}>
-                  <Col span={8}>
-                    <Text style={{ fontSize: 11, color: '#16a34a', display: 'block', marginBottom: 2 }}>
-                      💵 نقدًا (كاش):
-                    </Text>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div>
+                    <Text style={{ fontSize: 11, color: '#16a34a', display: 'block', marginBottom: 2 }}>💵 نقدًا (كاش):</Text>
                     <InputNumber
                       size="middle"
                       min={0}
@@ -809,100 +1100,325 @@ export default function POS() {
                       onChange={(v) => setCashTendered(v || 0)}
                       style={{ width: '100%' }}
                     />
-                  </Col>
-                  <Col span={8}>
-                    <Text style={{ fontSize: 11, color: '#2563eb', display: 'block', marginBottom: 2 }}>
-                      💳 فيزا / بطاقة:
-                    </Text>
-                    <InputNumber
-                      size="middle"
-                      min={0}
-                      precision={2}
-                      value={cardTendered}
-                      onChange={(v) => setCardTendered(v || 0)}
-                      style={{ width: '100%' }}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Text style={{ fontSize: 11, color: '#9333ea', display: 'block', marginBottom: 2 }}>
-                      📱 تحويل / محفظة:
-                    </Text>
-                    <InputNumber
-                      size="middle"
-                      min={0}
-                      precision={2}
-                      value={transferTendered}
-                      onChange={(v) => setTransferTendered(v || 0)}
-                      style={{ width: '100%' }}
-                    />
-                  </Col>
-                </Row>
+                  </div>
 
-                {/* Tender Balance Indicators */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginTop: 6,
-                    paddingTop: 6,
-                    borderTop: '1px dashed #e2e8f0',
-                    fontSize: 12
-                  }}
-                >
-                  <span>
-                    المدفوع: <strong>{totalTendered.toFixed(2)} ج.م</strong>
-                  </span>
+                  <Row gutter={8}>
+                    <Col span={12}>
+                      <Text style={{ fontSize: 11, color: '#2563eb', display: 'block', marginBottom: 2 }}>💳 فيزا / بطاقة:</Text>
+                      <InputNumber
+                        size="middle"
+                        min={0}
+                        precision={2}
+                        value={cardTendered}
+                        onChange={(v) => setCardTendered(v || 0)}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <Text style={{ fontSize: 11, color: '#9333ea', display: 'block', marginBottom: 2 }}>📱 تحويل / محفظة:</Text>
+                      <InputNumber
+                        size="middle"
+                        min={0}
+                        precision={2}
+                        value={transferTendered}
+                        onChange={(v) => setTransferTendered(v || 0)}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                  </Row>
+                </div>
+
+                {isOverpaid && (
+                  <Alert
+                    type="error"
+                    showIcon
+                    icon={<ExclamationCircleOutlined />}
+                    message={`المبلغ المدفوع يتجاوز الإجمالي بمقدار ${(totalTendered - netTotal).toFixed(2)} ج.م`}
+                    style={{ marginTop: 8, padding: '4px 8px', fontSize: 11, borderRadius: 6 }}
+                  />
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 12, borderTop: '1px solid #f1f5f9', paddingTop: 6 }}>
+                  <span>المدفوع: <strong>{totalTendered.toFixed(2)} ج.م</strong></span>
                   {remainingDue > 0 ? (
-                    <span style={{ color: '#dc2626', fontWeight: 'bold' }}>
-                      المتبقي: {remainingDue.toFixed(2)} ج.م
-                    </span>
+                    <span style={{ color: '#dc2626', fontWeight: 'bold' }}>المتبقي: {remainingDue.toFixed(2)} ج.م</span>
+                  ) : isOverpaid ? (
+                    <span style={{ color: '#dc2626', fontWeight: 'bold' }}>زيادة غير مقبولة</span>
                   ) : (
-                    <span style={{ color: '#16a34a', fontWeight: 'bold' }}>
-                      الباقي للعميل: {changeDue.toFixed(2)} ج.م
-                    </span>
+                    <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ مسدد بالكامل</span>
                   )}
                 </div>
               </div>
+            </div>
 
-              {/* Action Buttons */}
-              <Row gutter={6}>
-                <Col span={18}>
-                  <Button
-                    type="primary"
-                    size="large"
-                    icon={<CheckCircleOutlined />}
-                    loading={isSubmittingSale}
-                    disabled={cart.length === 0 || remainingDue > 0}
-                    onClick={handleCompleteSale}
-                    style={{
-                      width: '100%',
-                      backgroundColor: remainingDue > 0 ? '#94a3b8' : '#16a34a',
-                      borderColor: remainingDue > 0 ? '#94a3b8' : '#16a34a',
-                      fontWeight: 'bold',
-                      fontSize: 15,
-                      height: 42
-                    }}
-                  >
-                    إتمام البيع وطباعة الفاتورة (F4)
-                  </Button>
-                </Col>
-                <Col span={6}>
-                  <Button
-                    danger
-                    type="dashed"
-                    size="large"
-                    onClick={clearCart}
-                    disabled={cart.length === 0}
-                    style={{ width: '100%', height: 42 }}
-                  >
-                    مسح
-                  </Button>
-                </Col>
-              </Row>
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+              <Button
+                type="primary"
+                size="large"
+                icon={invoiceType === 'return' ? <RollbackOutlined /> : <CheckCircleOutlined />}
+                loading={isSubmittingSale}
+                disabled={validItems.length === 0 || remainingDue > 0 || isOverpaid}
+                onClick={handleStep3CompleteSale}
+                style={{
+                  backgroundColor:
+                    validItems.length === 0 || remainingDue > 0 || isOverpaid
+                      ? '#94a3b8'
+                      : invoiceType === 'return'
+                      ? '#dc2626'
+                      : '#16a34a',
+                  borderColor:
+                    validItems.length === 0 || remainingDue > 0 || isOverpaid
+                      ? '#94a3b8'
+                      : invoiceType === 'return'
+                      ? '#dc2626'
+                      : '#16a34a',
+                  fontWeight: 'bold',
+                  fontSize: 16,
+                  height: 48,
+                  borderRadius: 8
+                }}
+              >
+                {invoiceType === 'return'
+                  ? 'إتمام المرتجع ورد المبلغ (F4)'
+                  : 'إتمام البيع وطباعة الفاتورة (F4)'}
+              </Button>
+
+              <Button
+                danger
+                type="dashed"
+                size="middle"
+                onClick={clearCart}
+                disabled={cart.length === 0}
+                style={{ borderRadius: 6 }}
+              >
+                مسح الفاتورة
+              </Button>
             </div>
           </Card>
         </Col>
       </Row>
+
+      {/* ========================================================= */}
+      {/* 3. Enhanced Product Search Modal with Categories Sidebar  */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SearchOutlined style={{ color: '#2563eb', fontSize: 18 }} />
+            <span style={{ fontWeight: 800, fontSize: 16 }}>
+              نافذة البحث السريع عن الأصناف والمجاميع (F1)
+            </span>
+          </div>
+        }
+        open={searchModalVisible}
+        onCancel={() => setSearchModalVisible(false)}
+        footer={null}
+        width={920}
+        destroyOnHidden
+      >
+        <div style={{ display: 'flex', gap: 14, height: 480, direction: 'rtl' }}>
+          {/* Right Sidebar: Product Categories / Groups (المجاميع) */}
+          <div
+            style={{
+              width: 220,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              overflowY: 'auto'
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#334155', padding: '6px 8px', borderBottom: '1px solid #cbd5e1', marginBottom: 6 }}>
+              <AppstoreOutlined style={{ marginLeft: 6, color: '#2563eb' }} />
+              المجاميع والتصنيفات
+            </div>
+
+            <Button
+              type={selectedCategory === 'all' ? 'primary' : 'text'}
+              style={{
+                textAlign: 'right',
+                justifyContent: 'flex-start',
+                marginBottom: 4,
+                borderRadius: 6,
+                fontWeight: selectedCategory === 'all' ? 700 : 500,
+                backgroundColor: selectedCategory === 'all' ? '#2563eb' : undefined
+              }}
+              onClick={() => handleCategorySelect('all')}
+            >
+              جميع الأصناف
+            </Button>
+
+            {categories.map((cat) => (
+              <Button
+                key={cat.id}
+                type={selectedCategory === cat.id ? 'primary' : 'text'}
+                style={{
+                  textAlign: 'right',
+                  justifyContent: 'flex-start',
+                  marginBottom: 3,
+                  borderRadius: 6,
+                  fontWeight: selectedCategory === cat.id ? 700 : 500,
+                  backgroundColor: selectedCategory === cat.id ? '#2563eb' : undefined,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+                onClick={() => handleCategorySelect(cat.id)}
+              >
+                {cat.category_name}
+              </Button>
+            ))}
+          </div>
+
+          {/* Left / Main Section: Search Input & Product Results */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ marginBottom: 10 }}>
+              <Input
+                ref={modalSearchInputRef}
+                size="large"
+                placeholder="ابحث بالاسم، كود الصنف، الموديل، أو الباركود..."
+                prefix={<SearchOutlined style={{ color: '#2563eb' }} />}
+                value={modalSearchQuery}
+                onChange={(e) => handleModalSearchChange(e.target.value)}
+                allowClear
+                autoFocus
+                style={{ borderRadius: 8 }}
+              />
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <Table
+                dataSource={modalProducts}
+                rowKey={(r) => `${r.product_id}-${r.variant_id || '0'}`}
+                loading={modalLoading}
+                pagination={false}
+                size="middle"
+                onRow={(record) => ({
+                  onClick: () => handleSelectProductFromModal(record),
+                  style: { cursor: 'pointer' }
+                })}
+                columns={[
+                  {
+                    title: 'كود / باركود',
+                    dataIndex: 'barcode',
+                    key: 'barcode',
+                    width: 140,
+                    render: (b, r) => <Text code>{b || r.product_code}</Text>
+                  },
+                  {
+                    title: 'اسم الصنف والمواصفات',
+                    dataIndex: 'display_name',
+                    key: 'display_name',
+                    render: (name, r) => (
+                      <div>
+                        <Text strong style={{ display: 'block', fontSize: 13 }}>{name}</Text>
+                        {r.category_name && <Tag color="blue" style={{ fontSize: 10 }}>{r.category_name}</Tag>}
+                      </div>
+                    )
+                  },
+                  {
+                    title: 'السعر',
+                    dataIndex: 'unit_price',
+                    key: 'unit_price',
+                    width: 110,
+                    render: (p) => <Text strong style={{ color: '#16a34a', fontSize: 14 }}>{p.toFixed(2)} ج.م</Text>
+                  },
+                  {
+                    title: 'المخزون',
+                    dataIndex: 'available_qty',
+                    key: 'available_qty',
+                    width: 110,
+                    render: (qty) => (
+                      <Badge
+                        count={`${qty} متاح`}
+                        style={{
+                          backgroundColor: qty > 5 ? '#52c41a' : qty > 0 ? '#fa8c16' : '#f5222d',
+                          fontSize: 10
+                        }}
+                      />
+                    )
+                  },
+                  {
+                    title: '',
+                    key: 'action',
+                    width: 90,
+                    render: (_, r) => (
+                      <Button
+                        size="small"
+                        type="primary"
+                        icon={<CheckOutlined />}
+                        style={{ backgroundColor: '#16a34a', borderRadius: 6 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectProductFromModal(r);
+                        }}
+                      >
+                        اختيار
+                      </Button>
+                    )
+                  }
+                ]}
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Supervisor Settings Modal */}
+      <Modal
+        title="إعدادات مشرف الفرع لبيانات العملاء"
+        open={settingsModalVisible}
+        onCancel={() => setSettingsModalVisible(false)}
+        footer={null}
+        width={420}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            تحكم بديناميكية الحقول المطلوبة لبيانات العميل عند تسجيل فاتورة البيع في هذا الفرع:
+          </Text>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>إلزامية إدخال اسم العميل (Required):</span>
+            <Switch
+              checked={supervisorSettings.require_customer_name}
+              onChange={(checked) =>
+                setSupervisorSettings((prev) => ({ ...prev, require_customer_name: checked }))
+              }
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>إلزامية إدخال رقم هاتف العميل (Required):</span>
+            <Switch
+              checked={supervisorSettings.require_customer_phone}
+              onChange={(checked) =>
+                setSupervisorSettings((prev) => ({ ...prev, require_customer_phone: checked }))
+              }
+            />
+          </div>
+
+          <Divider style={{ margin: '8px 0' }} />
+
+          <div style={{ textAlign: 'left' }}>
+            <Space>
+              <Button onClick={() => setSettingsModalVisible(false)}>إلغاء</Button>
+              <Button
+                type="primary"
+                loading={savingSettings}
+                onClick={() => handleSaveSupervisorSettings(supervisorSettings)}
+                style={{ backgroundColor: '#2563eb' }}
+              >
+                حفظ الإعدادات
+              </Button>
+            </Space>
+          </div>
+        </div>
+      </Modal>
 
       {/* Thermal Receipt Print Modal */}
       <Modal

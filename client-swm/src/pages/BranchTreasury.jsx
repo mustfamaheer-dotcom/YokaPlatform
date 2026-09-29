@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card, Row, Col, Table, Button, Modal, Form, InputNumber,
-  Select, Input, Tag, Space, Typography, message, Statistic,
-  Divider, Badge, Alert, Empty, Spin
+  Select, Input, Tag, Space, Typography, Statistic,
+  Divider, Badge, Alert, Empty, Spin, App
 } from 'antd';
 import {
   BankOutlined, SendOutlined, ClockCircleOutlined,
@@ -23,9 +23,11 @@ const STATUS_MAP = {
 };
 
 export default function BranchTreasury({ currentUser, autoOpenCreate, onResetAction }) {
+  const { message } = App.useApp();
   const [register, setRegister]         = useState(null);
   const [transfers, setTransfers]       = useState([]);
   const [loading, setLoading]           = useState(false);
+  const [fetchError, setFetchError]     = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [submitting, setSubmitting]     = useState(false);
   const [form]                          = Form.useForm();
@@ -33,17 +35,26 @@ export default function BranchTreasury({ currentUser, autoOpenCreate, onResetAct
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const [regRes, trfRes] = await Promise.all([
         api.get('/api/swm/treasury/registers'),
         api.get('/api/swm/treasury/transfers', { params: { limit: 50 } })
       ]);
-      if (regRes.data.success && regRes.data.data.length > 0) {
-        setRegister(regRes.data.data[0]);
+
+      const regList = regRes.data?.data || regRes.data?.registers || [];
+      if (regRes.data?.success && regList.length > 0) {
+        setRegister(regList[0]);
       }
-      if (trfRes.data.success) setTransfers(trfRes.data.data || []);
+
+      const trfList = trfRes.data?.data || trfRes.data?.transfers || [];
+      if (trfRes.data?.success) {
+        setTransfers(trfList);
+      }
     } catch (err) {
-      message.error(err.response?.data?.message || 'فشل في تحميل بيانات الخزنة');
+      const errMsg = err.response?.data?.message || 'فشل في تحميل بيانات الخزنة';
+      setFetchError(errMsg);
+      message.error(errMsg);
     } finally {
       setLoading(false);
     }
