@@ -34,7 +34,9 @@ import {
   TeamOutlined,
   UserOutlined,
   CheckOutlined,
-  LockOutlined
+  LockOutlined,
+  ShoppingCartOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import api from '../api';
 
@@ -64,6 +66,9 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
+
+  const selectedCreateBranchId = Form.useWatch('branch_id', createForm);
+  const selectedEditBranchId = Form.useWatch('branch_id', editForm);
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const isAdmin = ['super_admin', 'admin'].includes(currentUser?.role) || currentUser?.isMainWarehouse;
@@ -296,12 +301,27 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
       key: 'portal_type',
       render: (_, record) => {
         const isAdminRole = ['super_admin', 'admin'].includes(record.role);
+        const isEcom = record.branch_type === 'ecom_warehouse' || record.branch_code === 'BR-ECOM';
+
+        if (isAdminRole) {
+          return (
+            <Tag icon={<CrownOutlined />} color="purple">
+              بوابة الإدارة (Admin)
+            </Tag>
+          );
+        }
+
+        if (isEcom) {
+          return (
+            <Tag icon={<ShoppingCartOutlined />} color="magenta">
+              بوابة المتجر (E-Com)
+            </Tag>
+          );
+        }
+
         return (
-          <Tag
-            icon={isAdminRole ? <CrownOutlined /> : <ShopOutlined />}
-            color={isAdminRole ? 'purple' : 'cyan'}
-          >
-            {isAdminRole ? 'بوابة الإدارة (Admin)' : 'بوابة الفروع (Branch)'}
+          <Tag icon={<ShopOutlined />} color="cyan">
+            بوابة الكاشير (POS)
           </Tag>
         );
       }
@@ -458,7 +478,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
       </Row>
 
       {/* Branch Selector & Search Filter Card */}
-      <Card style={{ marginBottom: 16, borderRadius: 8 }} bodyStyle={{ padding: '16px' }}>
+      <Card style={{ marginBottom: 16, borderRadius: 8 }} styles={{ body: { padding: '16px' } }}>
         {/* Quick Branch Filter Bar */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
@@ -636,6 +656,26 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             </Select>
           </Form.Item>
 
+          {(() => {
+            const b = branches.find(item => item.id === selectedCreateBranchId);
+            if (!b) return null;
+            if (b.branch_type === 'ecom_warehouse' || b.branch_code === 'BR-ECOM') {
+              return (
+                <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#7e22ce' }}>
+                  🛒 <strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها (بدون شاشة كاشير POS).
+                </div>
+              );
+            }
+            if (b.branch_type === 'retail_branch') {
+              return (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#15803d' }}>
+                  🏪 <strong>فرع تجزئة:</strong> هذا الموظف سيعمل في كاشير نقطة البيع (POS) ونظام الورديات النقدية للفرع.
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           <Form.Item label="رقم الهاتف" name="phone">
             <Input placeholder="+201000000000" />
           </Form.Item>
@@ -690,6 +730,26 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
               ))}
             </Select>
           </Form.Item>
+
+          {(() => {
+            const b = branches.find(item => item.id === selectedEditBranchId);
+            if (!b) return null;
+            if (b.branch_type === 'ecom_warehouse' || b.branch_code === 'BR-ECOM') {
+              return (
+                <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#7e22ce' }}>
+                  🛒 <strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها (بدون شاشة كاشير POS).
+                </div>
+              );
+            }
+            if (b.branch_type === 'retail_branch') {
+              return (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#15803d' }}>
+                  🏪 <strong>فرع تجزئة:</strong> هذا الموظف سيعمل في كاشير نقطة البيع (POS) ونظام الورديات النقدية للفرع.
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           <Form.Item label="حالة الحساب" name="status" rules={[{ required: true }]}>
             <Select>

@@ -772,7 +772,7 @@ export default function Analytics({ currentUser, onNavigate }) {
           <Card
             size="small"
             style={{ borderRadius: 10, height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-            bodyStyle={{ padding: '8px 12px' }}
+            styles={{ body: { padding: '8px 12px' } }}
           >
             <Tabs
               defaultActiveKey={['retail', '3', '5', '6'].includes(selectedBranch) ? 'staff' : (selectedBranch === '2' ? 'shipping' : 'staff')}

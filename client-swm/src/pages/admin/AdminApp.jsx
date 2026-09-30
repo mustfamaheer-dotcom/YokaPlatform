@@ -369,6 +369,15 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
               <Button
                 size="small"
                 type="primary"
+                icon={<ShoppingBag size={14} style={{ marginLeft: 4 }} />}
+                onClick={() => navigate('/ecom')}
+                style={{ borderRadius: 6, fontWeight: 600, backgroundColor: '#9333ea', borderColor: '#9333ea' }}
+              >
+                مستودع المتجر (E-Com)
+              </Button>
+              <Button
+                size="small"
+                type="primary"
                 icon={<ScanLine size={14} style={{ marginLeft: 4 }} />}
                 onClick={() => {
                   if (onSwitchToPos) onSwitchToPos();

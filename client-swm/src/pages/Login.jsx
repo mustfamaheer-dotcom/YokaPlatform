@@ -55,15 +55,18 @@ export default function Login({ onLoginSuccess }) {
         localStorage.setItem('refreshToken', refreshToken);
         localStorage.setItem('user', JSON.stringify(user));
 
-        // Evaluate user role immediately
+        // Evaluate branch type & user role for dedicated portal navigation
+        const isEcom = user.branchType === 'ecom_warehouse' || user.branchCode === 'BR-ECOM';
         const isSupervisor = user.role === 'supervisor' || user.isSupervisor === true;
         const isAdmin = ['admin', 'super_admin'].includes(user.role);
 
         let targetRoute = '/pos';
-        if (isSupervisor && !isAdmin) {
-          targetRoute = '/supervisor-dashboard';
+        if (isEcom) {
+          targetRoute = '/ecom';
         } else if (isAdmin) {
           targetRoute = '/dashboard';
+        } else if (isSupervisor) {
+          targetRoute = '/supervisor-dashboard';
         } else if (user.role === 'salesperson') {
           targetRoute = '/pos';
         }

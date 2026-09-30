@@ -10,60 +10,88 @@ import InventoryPage from './pages/admin/supervisor/InventoryPage';
 import SettingsPage from './pages/admin/supervisor/SettingsPage';
 import StockAlertsPage from './pages/admin/supervisor/StockAlertsPage';
 import AdminApp from './pages/admin/AdminApp';
+import EcomWarehouseApp from './pages/ecom/EcomWarehouseApp';
 import api from './api';
+
+/**
+ * Helper to identify if user belongs to an E-Commerce warehouse
+ */
+export function isEcomWarehouseUser(user) {
+  if (!user) return false;
+  return user.branchType === 'ecom_warehouse' || user.branchCode === 'BR-ECOM';
+}
 
 /**
  * Strict Role-Based Protected Route Guard
  * Never blindly falls back to lower-privileged routes.
  * If unauthorized, bounces the user directly to their respective role-based home.
  */
-function ProtectedRoute({ currentUser, allowedRoles, children }) {
+function ProtectedRoute({ currentUser, allowedRoles, requiredBranchType, children }) {
   const { message } = AntApp.useApp();
+  const location = useLocation();
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
-  const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
+  const isEcom = isEcomWarehouseUser(currentUser);
   const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
+  const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
+
+  // 1. Guard against E-Commerce users trying to access Retail POS / Shift screens
+  if (isEcom && !isAdmin && (location.pathname === '/pos' || location.pathname.startsWith('/supervisor'))) {
+    message.info('تم توجيهك إلى بوابة مستودع المتجر الإلكتروني المخصصة لفرعك.');
+    return <Navigate to="/ecom" replace />;
+  }
+
+  // 2. Guard for routes specifically requiring ecom_warehouse (unless admin)
+  if (requiredBranchType === 'ecom_warehouse' && !isEcom && !isAdmin) {
+    message.warning('هذه البوابة مخصصة لمستودع المتجر الإلكتروني فقط.');
+    return <RoleRootRedirect currentUser={currentUser} />;
+  }
+
   const isAllowed = allowedRoles.includes(currentUser.role) || (isSupervisor && allowedRoles.includes('supervisor'));
 
   if (!isAllowed) {
     message.warning('غير مصرح لك بالوصول إلى هذه الصفحة. تم توجيهك إلى شاشتك المخصصة.');
-
-    if (isSupervisor && !isAdmin) {
-      return <Navigate to="/supervisor-dashboard" replace />;
-    } else if (isAdmin) {
-      return <Navigate to="/dashboard" replace />;
-    } else if (currentUser.role === 'salesperson') {
-      return <Navigate to="/pos" replace />;
-    }
-    return <Navigate to="/login" replace />;
+    return <RoleRootRedirect currentUser={currentUser} />;
   }
 
   return children;
 }
 
 /**
- * Root Redirection helper based on user authentication and role
+ * Root Redirection helper based on user authentication, branch type, and role
  */
 function RoleRootRedirect({ currentUser }) {
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
+  // 1. E-Commerce Warehouse Portal (Orders, Inventory, Analytics)
+  if (isEcomWarehouseUser(currentUser)) {
+    return <Navigate to="/ecom" replace />;
+  }
+
   const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
   const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
 
-  if (isSupervisor && !isAdmin) {
-    return <Navigate to="/supervisor-dashboard" replace />;
-  } else if (isAdmin) {
+  // 2. Main Admin Portal
+  if (isAdmin) {
     return <Navigate to="/dashboard" replace />;
-  } else if (currentUser.role === 'salesperson') {
+  }
+
+  // 3. Retail Branch Supervisor Dashboard
+  if (isSupervisor) {
+    return <Navigate to="/supervisor-dashboard" replace />;
+  }
+
+  // 4. Retail Branch POS Cashier
+  if (currentUser.role === 'salesperson') {
     return <Navigate to="/pos" replace />;
   }
 
-  return <Navigate to="/supervisor-dashboard" replace />;
+  return <Navigate to="/pos" replace />;
 }
 
 export default function App() {
@@ -139,6 +167,44 @@ export default function App() {
           ) : (
             <Login onLoginSuccess={handleLoginSuccess} />
           )
+        }
+      />
+
+      {/* E-Commerce Warehouse Portal Route (Orders, Inventory, Analytics) */}
+      <Route
+        path="/ecom/*"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['salesperson', 'supervisor', 'admin', 'super_admin']}
+            requiredBranchType="ecom_warehouse"
+          >
+            <EcomWarehouseApp
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              onSupervisorUnlock={(elevatedUser) => {
+                setCurrentUser(elevatedUser);
+              }}
+            />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/ecom"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['salesperson', 'supervisor', 'admin', 'super_admin']}
+            requiredBranchType="ecom_warehouse"
+          >
+            <EcomWarehouseApp
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              onSupervisorUnlock={(elevatedUser) => {
+                setCurrentUser(elevatedUser);
+              }}
+            />
+          </ProtectedRoute>
         }
       />
 
@@ -298,30 +364,14 @@ export default function App() {
         }
       />
 
-      {/* /admin smart aliases based on role */}
+      {/* /admin smart aliases based on role & branch type */}
       <Route
         path="/admin"
-        element={
-          currentUser?.role === 'salesperson' ? (
-            <Navigate to="/pos" replace />
-          ) : currentUser?.role === 'supervisor' || currentUser?.isSupervisor ? (
-            <Navigate to="/supervisor-dashboard" replace />
-          ) : (
-            <Navigate to="/dashboard" replace />
-          )
-        }
+        element={<RoleRootRedirect currentUser={currentUser} />}
       />
       <Route
         path="/admin/*"
-        element={
-          currentUser?.role === 'salesperson' ? (
-            <Navigate to="/pos" replace />
-          ) : currentUser?.role === 'supervisor' || currentUser?.isSupervisor ? (
-            <Navigate to="/supervisor-dashboard" replace />
-          ) : (
-            <Navigate to="/dashboard" replace />
-          )
-        }
+        element={<RoleRootRedirect currentUser={currentUser} />}
       />
 
       {/* Root Route Smart Role Redirection */}

@@ -73,7 +73,7 @@ function requireBranchScope(req, res, next) {
   if (ADMIN_ROLES.includes(req.user.role)) {
     // Admin has global access; can optionally filter by query/body branch_id
     const rawBranch = req.query.branch_id || req.body.branch_id;
-    if (rawBranch === 'all' || rawBranch === 'retail') {
+    if (rawBranch === 'all' || rawBranch === 'retail' || rawBranch === 'ecom' || rawBranch === 'ecs') {
       req.scopedBranchId = rawBranch;
     } else if (rawBranch) {
       req.scopedBranchId = parseInt(rawBranch, 10);
@@ -90,6 +90,18 @@ function requireBranchScope(req, res, next) {
       success: false,
       message: 'هذا الحساب غير مرتبط بأي فرع مصرح به.'
     });
+  }
+
+  // E-Commerce warehouse users requesting ecom store data
+  if (req.user.branchType === 'ecom_warehouse' || req.user.branchCode === 'BR-ECOM') {
+    const rawBranch = req.query.branch_id || req.body.branch_id;
+    if (rawBranch === 'ecom' || rawBranch === 'ecs' || !rawBranch) {
+      req.scopedBranchId = 'ecom';
+    } else {
+      req.scopedBranchId = req.user.branchId;
+    }
+    req.isCrossBranchAdmin = false;
+    return next();
   }
 
   req.scopedBranchId = req.user.branchId;

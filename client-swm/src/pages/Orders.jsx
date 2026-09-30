@@ -57,9 +57,21 @@ import VisitorAnalytics from '../components/VisitorAnalytics';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function Orders({ currentUser }) {
+export default function Orders({
+  currentUser,
+  activeTab: controlledActiveTab,
+  onTabChange,
+  hideTabs = false,
+  hideHeader = false
+}) {
   const { message } = AntdApp.useApp();
-  const [activeTab, setActiveTab] = useState('orders');
+  const [internalActiveTab, setInternalActiveTab] = useState('orders');
+
+  const currentTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
+  const handleTabChange = (key) => {
+    setInternalActiveTab(key);
+    if (onTabChange) onTabChange(key);
+  };
 
   // ==========================================
   // TAB 1: ORDERS STATE & HANDLERS
@@ -1004,18 +1016,27 @@ export default function Orders({ currentUser }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>إدارة المتجر الإلكتروني (ECP Store Management)</Title>
-          <Text type="secondary">متابعة طلبات العملاء، تجهيز الشحنات بالبوليصة والطرود، وضبط أسعار وشركات الشحن والتوصيل</Text>
+      {!hideHeader && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <Title level={4} style={{ margin: 0 }}>إدارة المتجر الإلكتروني (ECP Store Management)</Title>
+            <Text type="secondary">متابعة طلبات العملاء، تجهيز الشحنات بالبوليصة والطرود، وضبط أسعار وشركات الشحن والتوصيل</Text>
+          </div>
         </div>
-      </div>
+      )}
 
       <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
+        activeKey={currentTab}
+        onChange={handleTabChange}
+        renderTabBar={hideTabs ? () => null : undefined}
         type="card"
-        style={{ background: '#fff', padding: 16, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+        style={{
+          background: '#fff',
+          padding: hideTabs ? '20px 24px' : 16,
+          borderRadius: 12,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          border: '1px solid #e2e8f0'
+        }}
         items={[
           {
             key: 'orders',

@@ -9,7 +9,7 @@ import {
   Typography,
   Space,
   Statistic,
-  message,
+  App as AntdApp,
   Progress,
   Badge,
   Alert,
@@ -49,6 +49,7 @@ import VisitorAnalytics from '../components/VisitorAnalytics';
 const { Title, Text } = Typography;
 
 export default function EcomAnalytics({ currentUser, onNavigate }) {
+  const { message } = AntdApp.useApp();
   const [activeSection, setActiveSection] = useState('overview'); // 'overview' | 'visitors'
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState([dayjs().subtract(29, 'day'), dayjs()]);
@@ -854,7 +855,7 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
           <Card
             size="small"
             style={{ borderRadius: 10, height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-            bodyStyle={{ paddingTop: 8 }}
+            styles={{ body: { paddingTop: 8 } }}
           >
             <Tabs
               defaultActiveKey="shipping"

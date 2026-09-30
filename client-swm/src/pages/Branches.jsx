@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, message, Card, Popconfirm, Divider, Tooltip } from 'antd';
-import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, message, Card, Popconfirm, Divider, Tooltip, Alert } from 'antd';
+import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import api from '../api';
 
 const { Title, Text } = Typography;
@@ -10,6 +10,30 @@ const BRANCH_TYPES = {
   main_warehouse: { label: 'مستودع رئيسي (Main Warehouse)', color: 'volcano' },
   retail_branch: { label: 'فرع تجزئة (Retail Branch)', color: 'blue' },
   ecom_warehouse: { label: 'مستودع المتجر الإلكتروني (E-Com Warehouse)', color: 'purple' }
+};
+
+const BRANCH_TYPE_DESCRIPTIONS = {
+  retail_branch: {
+    title: 'فرع تجزئة ونقاط بيع (Retail Branch)',
+    description: 'نقطة بيع فعلية للجمهور. يتم تلقائياً تهيئة درج نقدية (Cash Register) وخزينة فرع (Safe)، ويدخل الموظفون مباشرة إلى شاشة الكاشير السريع (POS) ونظام الورديات النقدية.',
+    portalLabel: 'بوابة الكاشير (POS)',
+    color: 'blue',
+    accountTitle: 'بيانات دخول كاشير نقطة البيع (POS)'
+  },
+  ecom_warehouse: {
+    title: 'مستودع المتجر الإلكتروني (E-Com Warehouse)',
+    description: 'مستودع مخصص لتجهيز وتعبئة وشحن طلبات الأونلاين. لن يتم إنشاء درج كاشير نقاط بيع أو وردية كاشير، ويدخل الموظفون مباشرة إلى بوابة (الطلبات، المخزون، الإحصائيات).',
+    portalLabel: 'بوابة المتجر (Orders/Inv/Stats)',
+    color: 'purple',
+    accountTitle: 'بيانات دخول مسؤول مستودع وتجهيز المتجر الإلكتروني'
+  },
+  main_warehouse: {
+    title: 'المستودع الرئيسي (Main Warehouse)',
+    description: 'المركز اللوجستي الرئيسي لاستلام فواتير المشتريات من الموردين وتوزيع البضائع على الفروع ومستودع الأونلاين.',
+    portalLabel: 'المستودع الرئيسي والعمليات',
+    color: 'volcano',
+    accountTitle: 'بيانات دخول إدارة المستودع الرئيسي'
+  }
 };
 
 export default function Branches({ autoOpenCreate, onResetAction }) {
@@ -22,6 +46,9 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
 
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
+
+  const selectedCreateType = Form.useWatch('branch_type', createForm) || 'retail_branch';
+  const selectedEditType = Form.useWatch('branch_type', editForm) || 'retail_branch';
 
   const fetchBranches = async () => {
     setLoading(true);
@@ -115,14 +142,18 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
       render: (name) => <Text strong>{name}</Text>
     },
     {
-      title: 'بيانات الدخول لبوابة الفروع (POS)',
+      title: 'بيانات الدخول والنظام المخصص',
       key: 'credentials',
       render: (_, record) => {
+        const typeInfo = BRANCH_TYPE_DESCRIPTIONS[record.branch_type] || BRANCH_TYPE_DESCRIPTIONS.retail_branch;
         if (!record.login_username) {
           return <Tag color="warning">لم يتم تعيين حساب</Tag>;
         }
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <Tag color={typeInfo.color} style={{ width: 'fit-content', margin: 0, fontSize: 11, fontWeight: 700, borderRadius: 4 }}>
+              {typeInfo.portalLabel}
+            </Tag>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Text type="secondary" style={{ fontSize: 11 }}>اليوزر:</Text>
               <Tag color="geekblue" icon={<KeyOutlined />} style={{ margin: 0, fontWeight: 600 }}>
@@ -274,25 +305,42 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
           >
             <Select>
               <Option value="retail_branch">فرع تجزئة (Retail Branch)</Option>
-              <Option value="main_warehouse">مستودع رئيسي (Main Warehouse)</Option>
               <Option value="ecom_warehouse">مستودع المتجر الإلكتروني (E-Com Warehouse)</Option>
+              <Option value="main_warehouse">مستودع رئيسي (Main Warehouse)</Option>
             </Select>
           </Form.Item>
 
-          <Divider style={{ margin: '12px 0' }}>بيانات تسجيل دخول الفرع (بوابة الفروع)</Divider>
+          {/* Dynamic Branch Type Guide */}
+          {(() => {
+            const info = BRANCH_TYPE_DESCRIPTIONS[selectedCreateType] || BRANCH_TYPE_DESCRIPTIONS.retail_branch;
+            return (
+              <Alert
+                message={info.title}
+                description={info.description}
+                type={selectedCreateType === 'ecom_warehouse' ? 'warning' : (selectedCreateType === 'main_warehouse' ? 'error' : 'info')}
+                showIcon
+                icon={<InfoCircleOutlined />}
+                style={{ marginBottom: 16, borderRadius: 8 }}
+              />
+            );
+          })()}
+
+          <Divider style={{ margin: '12px 0' }}>
+            {(BRANCH_TYPE_DESCRIPTIONS[selectedCreateType] || BRANCH_TYPE_DESCRIPTIONS.retail_branch).accountTitle}
+          </Divider>
 
           <Form.Item
-            label="اسم مستخدم الفرع (Username)"
+            label="اسم المستخدم (Username)"
             name="login_username"
-            rules={[{ required: true, message: 'يرجى إدخال اسم مستخدم الفرع لتسجيل الدخول' }]}
+            rules={[{ required: true, message: 'يرجى إدخال اسم المستخدم لتسجيل الدخول' }]}
           >
-            <Input prefix={<KeyOutlined style={{ color: '#6366f1' }} />} placeholder="مثال: branch_nasr_city" />
+            <Input prefix={<KeyOutlined style={{ color: '#6366f1' }} />} placeholder="مثال: branch_user" />
           </Form.Item>
 
           <Form.Item
-            label="كلمة مرور الفرع (Password)"
+            label="كلمة المرور (Password)"
             name="password"
-            rules={[{ required: true, message: 'يرجى إدخال كلمة مرور الفرع' }]}
+            rules={[{ required: true, message: 'يرجى إدخال كلمة مرور الحساب' }]}
           >
             <Input.Password prefix={<LockOutlined style={{ color: '#6366f1' }} />} placeholder="••••••••" />
           </Form.Item>
@@ -345,15 +393,32 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
           >
             <Select>
               <Option value="retail_branch">فرع تجزئة (Retail Branch)</Option>
-              <Option value="main_warehouse">مستودع رئيسي (Main Warehouse)</Option>
               <Option value="ecom_warehouse">مستودع المتجر الإلكتروني (E-Com Warehouse)</Option>
+              <Option value="main_warehouse">مستودع رئيسي (Main Warehouse)</Option>
             </Select>
           </Form.Item>
 
-          <Divider style={{ margin: '12px 0' }}>بيانات تسجيل دخول الفرع (بوابة الفروع)</Divider>
+          {/* Dynamic Branch Type Guide */}
+          {(() => {
+            const info = BRANCH_TYPE_DESCRIPTIONS[selectedEditType] || BRANCH_TYPE_DESCRIPTIONS.retail_branch;
+            return (
+              <Alert
+                message={info.title}
+                description={info.description}
+                type={selectedEditType === 'ecom_warehouse' ? 'warning' : (selectedEditType === 'main_warehouse' ? 'error' : 'info')}
+                showIcon
+                icon={<InfoCircleOutlined />}
+                style={{ marginBottom: 16, borderRadius: 8 }}
+              />
+            );
+          })()}
+
+          <Divider style={{ margin: '12px 0' }}>
+            {(BRANCH_TYPE_DESCRIPTIONS[selectedEditType] || BRANCH_TYPE_DESCRIPTIONS.retail_branch).accountTitle}
+          </Divider>
 
           <Form.Item
-            label="اسم مستخدم الفرع (Username)"
+            label="اسم المستخدم (Username)"
             name="login_username"
             rules={[{ required: true, message: 'يرجى إدخال اسم مستخدم الفرع' }]}
           >
@@ -361,7 +426,7 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
           </Form.Item>
 
           <Form.Item
-            label="كلمة مرور الفرع (Password)"
+            label="كلمة المرور (Password)"
             name="password"
             rules={[{ required: true, message: 'يرجى إدخال كلمة المرور' }]}
           >

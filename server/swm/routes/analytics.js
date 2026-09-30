@@ -3,12 +3,10 @@ const { query } = require('../../shared/db');
 const { requireAuth, requireBranchScope, requireRole } = require('../../shared/authMiddleware');
 
 // ─────────────────────────────────────────────────────────────
-// Strict RBAC: Analytics and reports are accessible to Supervisor and Manager/Admin:
-// ['super_admin', 'admin', 'supervisor'].
-// Salesperson / POS tokens are strictly blocked with 403 Forbidden.
+// RBAC: Managerial analytics are restricted to Supervisor and Admin,
+// while E-Commerce store overview is accessible to E-Com staff as well.
 // ─────────────────────────────────────────────────────────────
 router.use(requireAuth);
-router.use(requireRole(['super_admin', 'admin', 'supervisor']));
 
 /**
  * GET /api/swm/analytics/sales-dashboard
@@ -440,18 +438,35 @@ const handleSalesDashboard = async (req, res) => {
   }
 };
 
-// Route and aliases for sales dashboard and reports
-router.get('/sales-dashboard', requireBranchScope, handleSalesDashboard);
-router.get('/dashboard', requireBranchScope, handleSalesDashboard);
-router.get('/reports/sales', requireBranchScope, handleSalesDashboard);
-router.get('/sales', requireBranchScope, handleSalesDashboard);
+// Route and aliases for sales dashboard and reports (Manager / Admin / Supervisor only)
+const requireManagerialRole = requireRole(['super_admin', 'admin', 'supervisor']);
+router.get('/sales-dashboard', requireManagerialRole, requireBranchScope, handleSalesDashboard);
+router.get('/dashboard', requireManagerialRole, requireBranchScope, handleSalesDashboard);
+router.get('/reports/sales', requireManagerialRole, requireBranchScope, handleSalesDashboard);
+router.get('/sales', requireManagerialRole, requireBranchScope, handleSalesDashboard);
+
+/**
+ * Access guard for /overview:
+ * Allows super_admin, admin, supervisor, or any staff assigned to an E-Commerce warehouse.
+ */
+const allowAnalyticsOverview = (req, res, next) => {
+  const isEcom = req.user && (req.user.branchType === 'ecom_warehouse' || req.user.branchCode === 'BR-ECOM');
+  const isPrivileged = ['super_admin', 'admin', 'supervisor'].includes(req.user?.role);
+  if (!isPrivileged && !isEcom) {
+    return res.status(403).json({
+      success: false,
+      message: 'Forbidden: requires supervisor/admin role or E-Commerce warehouse access.'
+    });
+  }
+  next();
+};
 
 /**
  * GET /api/swm/analytics/overview
  * Returns comprehensive business intelligence: Top Products, Payment Methods,
  * Sales Trend, Geographic Demand, and Strategic KPIs for decision making.
  */
-router.get('/overview', requireAuth, requireBranchScope, async (req, res) => {
+router.get('/overview', allowAnalyticsOverview, requireBranchScope, async (req, res) => {
   try {
     const branchId = req.scopedBranchId;
     const { days, startDate, endDate } = req.query;
