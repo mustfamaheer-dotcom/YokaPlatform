@@ -75,8 +75,8 @@ exports.up = async function(knex) {
     t.integer('category_id').unsigned().notNullable().references('id').inTable('product_categories');
     t.integer('sub_category_id').unsigned().references('id').inTable('product_categories');
     t.string('material', 100);
-    t.string('color', 50);
-    t.string('size', 50);
+    t.string('color', 255);
+    t.string('size', 255);
     t.string('model_number', 100);
     t.decimal('weight_grams', 10, 3);
     t.json('dimensions');
@@ -116,9 +116,9 @@ exports.up = async function(knex) {
   await knex.schema.createTable('product_variants', (t) => {
     t.increments('id').primary();
     t.integer('product_id').unsigned().notNullable().references('id').inTable('products').onDelete('CASCADE');
-    t.string('variant_sku', 150).notNullable().unique();
-    t.string('color', 50);
-    t.string('size', 50);
+    t.string('variant_sku', 255).notNullable().unique();
+    t.string('color', 255);
+    t.string('size', 255);
     t.string('material', 100);
     t.json('additional_attrs');
     t.decimal('price_modifier', 10, 4).defaultTo(0);

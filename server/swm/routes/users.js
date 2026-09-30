@@ -111,47 +111,61 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
       hire_date
     } = req.body;
 
-    if (!username || !password || !full_name || !role) {
+    if (!full_name || !full_name.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'اسم المستخدم، كلمة المرور، الاسم الكامل، والدور الوظيفي حقول مطلوبة'
+        message: 'اسم الموظف بالكامل حقل مطلوب'
       });
+    }
+
+    const effectiveRole = role || 'salesperson';
+    const effectivePhone = phone ? phone.trim() : null;
+    const effectivePassword = (password && password.trim()) ? password.trim() : '123456';
+
+    let effectiveUsername = username ? username.trim() : '';
+    if (!effectiveUsername) {
+      if (effectivePhone) {
+        effectiveUsername = effectivePhone.replace(/[^a-zA-Z0-9_]/g, '');
+      } else {
+        effectiveUsername = `emp_${Date.now().toString().slice(-6)}`;
+      }
     }
 
     // Role elevation guard: only super_admin can create super_admin or admin accounts
     const ELEVATED_ROLES = ['super_admin', 'admin'];
-    if (ELEVATED_ROLES.includes(role) && req.user.role !== 'super_admin') {
+    if (ELEVATED_ROLES.includes(effectiveRole) && req.user.role !== 'super_admin') {
       return res.status(403).json({
         success: false,
         message: 'فقط المدير العام (Super Admin) يملك صلاحية إنشاء حسابات إدارية جديدة.'
       });
     }
 
-    const existing = await query(
-      `SELECT id FROM users WHERE username = $1 OR (email IS NOT NULL AND email = $2)`,
-      [username.trim(), email ? email.trim() : null]
-    );
-    if (existing.length) {
-      return res.status(409).json({ success: false, message: 'اسم المستخدم أو البريد الإلكتروني مستخدم بالفعل' });
+    // Ensure username uniqueness
+    let finalUsername = effectiveUsername;
+    let counter = 1;
+    while (true) {
+      const existing = await query(`SELECT id FROM users WHERE username = $1`, [finalUsername]);
+      if (!existing.length) break;
+      finalUsername = `${effectiveUsername}_${counter++}`;
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(effectivePassword, 12);
 
     const rows = await query(
       `INSERT INTO users (
         username, email, password_hash, password_plain, full_name, phone, national_id,
         role, branch_id, salary, hire_date, status, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', NOW(), NOW())
-      RETURNING id, username, full_name, role, branch_id, password_plain`,
+      RETURNING id, username, full_name, role, branch_id, salary, password_plain`,
       [
-        username.trim(),
+        finalUsername,
         email ? email.trim() : null,
         passwordHash,
-        password.trim(),
+        effectivePassword,
         full_name.trim(),
-        phone || null,
+        effectivePhone,
         national_id || null,
-        role,
+        effectiveRole,
         branch_id ? parseInt(branch_id, 10) : null,
         salary ? parseFloat(salary) : null,
         hire_date || null

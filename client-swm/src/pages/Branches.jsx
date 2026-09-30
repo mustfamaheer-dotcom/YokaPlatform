@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, message, Card, Popconfirm, Divider, Tooltip, Alert } from 'antd';
 import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import api from '../api';
+import SellerPayrollAndExpenseCategoriesCards from '../components/SellerPayrollAndExpenseCategoriesCards';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -36,19 +37,41 @@ const BRANCH_TYPE_DESCRIPTIONS = {
   }
 };
 
-export default function Branches({ autoOpenCreate, onResetAction }) {
+export default function Branches({ autoOpenCreate, onResetAction, currentUser }) {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
 
   const selectedCreateType = Form.useWatch('branch_type', createForm) || 'retail_branch';
   const selectedEditType = Form.useWatch('branch_type', editForm) || 'retail_branch';
+
+  const fetchNextBranchCode = async (type = 'retail_branch') => {
+    setGeneratingCode(true);
+    try {
+      const res = await api.get('/api/swm/branches/next-code', { params: { branch_type: type } });
+      if (res.data.success && res.data.next_code) {
+        createForm.setFieldsValue({ branch_code: res.data.next_code });
+      }
+    } catch (e) {
+      console.error('Error fetching next branch code:', e);
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
+  const handleOpenCreateModal = () => {
+    createForm.resetFields();
+    createForm.setFieldsValue({ branch_type: 'retail_branch' });
+    setIsCreateModalOpen(true);
+    fetchNextBranchCode('retail_branch');
+  };
 
   const fetchBranches = async () => {
     setLoading(true);
@@ -77,8 +100,7 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
 
   useEffect(() => {
     if (autoOpenCreate) {
-      createForm.resetFields();
-      setIsCreateModalOpen(true);
+      handleOpenCreateModal();
       if (onResetAction) onResetAction();
     }
   }, [autoOpenCreate]);
@@ -253,15 +275,17 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => {
-              createForm.resetFields();
-              setIsCreateModalOpen(true);
-            }}
+            onClick={handleOpenCreateModal}
             style={{ backgroundColor: '#4f46e5' }}
           >
             إضافة فرع / مخزن
           </Button>
         </Space>
+      </div>
+
+      {/* ─── CARDS: SELLER PAYROLL & EXPENSE CATEGORIES ─────────────────────────── */}
+      <div style={{ marginBottom: 28 }}>
+        <SellerPayrollAndExpenseCategoriesCards currentUser={currentUser} />
       </div>
 
       <Table
@@ -282,11 +306,30 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreate}>
           <Form.Item
-            label="كود الفرع (Branch Code)"
+            label={
+              <Space>
+                <span>كود الفرع (Branch Code)</span>
+                <Tag color="purple">توليد تلقائي</Tag>
+              </Space>
+            }
             name="branch_code"
             rules={[{ required: true, message: 'يرجى إدخال كود الفرع' }]}
+            extra="تم توليد كود الفرع تلقائياً، ويمكنك تعديله يدوياً إن أردت."
           >
-            <Input placeholder="مثال: BR-NASR-CITY" style={{ textTransform: 'uppercase' }} />
+            <Input
+              placeholder="مثال: BR-008"
+              style={{ textTransform: 'uppercase', fontWeight: 600, letterSpacing: 1 }}
+              suffix={
+                <Tooltip title="إعادة توليد كود جديد">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ReloadOutlined spin={generatingCode} />}
+                    onClick={() => fetchNextBranchCode(createForm.getFieldValue('branch_type') || 'retail_branch')}
+                  />
+                </Tooltip>
+              }
+            />
           </Form.Item>
 
           <Form.Item
@@ -303,7 +346,7 @@ export default function Branches({ autoOpenCreate, onResetAction }) {
             initialValue="retail_branch"
             rules={[{ required: true }]}
           >
-            <Select>
+            <Select onChange={(val) => fetchNextBranchCode(val)}>
               <Option value="retail_branch">فرع تجزئة (Retail Branch)</Option>
               <Option value="ecom_warehouse">مستودع المتجر الإلكتروني (E-Com Warehouse)</Option>
               <Option value="main_warehouse">مستودع رئيسي (Main Warehouse)</Option>

@@ -48,7 +48,8 @@ import {
   BankOutlined,
   TeamOutlined,
   AppstoreOutlined,
-  FundViewOutlined
+  FundViewOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../api';
@@ -62,6 +63,15 @@ const { RangePicker } = DatePicker;
 export default function AdminJournals() {
   const [loading, setLoading] = useState(false);
   const [branchesList, setBranchesList] = useState([]);
+
+  // Inspection / Review Modal State
+  const [inspectModalVisible, setInspectModalVisible] = useState(false);
+  const [inspectRecord, setInspectRecord] = useState(null);
+
+  const handleInspectOperation = (record) => {
+    setInspectRecord(record);
+    setInspectModalVisible(true);
+  };
 
   // Filters State
   const [selectedBranch, setSelectedBranch] = useState('all');
@@ -77,8 +87,8 @@ export default function AdminJournals() {
   // Expenses Tab: Category filter dropdown ('all' | 'payroll' | 'utility_bill' | 'other')
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('all');
 
-  // Operations Tab: Active sub-section ('transfers' | 'supplier_payments' | 'purchases')
-  const [activeOpSection, setActiveOpSection] = useState('transfers');
+  // Operations Tab: Active sub-section ('all' | 'stock_adjustments' | 'cash_transfers' | 'supplier_payments' | 'transfers' | 'purchases')
+  const [activeOpSection, setActiveOpSection] = useState('all');
 
   // Backend Data State
   const [data, setData] = useState({
@@ -88,6 +98,9 @@ export default function AdminJournals() {
       payrollByEmployee: []
     },
     operations: {
+      allOperations: [],
+      stockAdjustments: [],
+      cashTransfers: [],
       transfers: [],
       supplierPayments: [],
       purchaseInvoices: [],
@@ -291,6 +304,22 @@ export default function AdminJournals() {
       key: 'recorded_by_name',
       width: 150,
       render: (name) => name ? <span style={{ fontSize: 12 }}><UserOutlined /> {name}</span> : <Text type="secondary">—</Text>
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة ومراجعة حركة المصروف">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 15 }} />}
+            onClick={() => handleInspectOperation({ ...r, operation_type: 'expense' })}
+          />
+        </Tooltip>
+      )
     }
   ];
 
@@ -431,6 +460,332 @@ export default function AdminJournals() {
       dataIndex: 'status',
       key: 'status',
       render: (st) => st === 'completed' ? <Tag color="green">مكتمل ومستلم</Tag> : <Tag color="orange">{st}</Tag>
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة ومراجعة إذن الصرف">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 15 }} />}
+            onClick={() => handleInspectOperation({ ...r, operation_type: 'stock_transfer' })}
+          />
+        </Tooltip>
+      )
+    }
+  ];
+
+  // Columns for All Administrative Operations Unified Timeline
+  const allOperationsColumns = [
+    {
+      title: 'نوع العملية الإدارية',
+      key: 'operation_title',
+      width: 220,
+      render: (_, r) => {
+        let tagColor = 'blue';
+        let icon = <SwapOutlined />;
+        if (r.operation_type === 'stock_adjustment') {
+          tagColor = 'purple';
+          icon = <AuditOutlined />;
+        } else if (r.operation_type === 'cash_transfer') {
+          tagColor = 'gold';
+          icon = <BankOutlined />;
+        } else if (r.operation_type === 'supplier_payment') {
+          tagColor = 'cyan';
+          icon = <DollarOutlined />;
+        } else if (r.operation_type === 'purchase_invoice') {
+          tagColor = 'green';
+          icon = <FileTextOutlined />;
+        }
+        return (
+          <Tag color={tagColor} style={{ fontWeight: 700, padding: '3px 8px', fontSize: 13 }}>
+            {icon} {r.operation_title}
+          </Tag>
+        );
+      }
+    },
+    {
+      title: 'رقم السند / الإذن',
+      dataIndex: 'reference_no',
+      key: 'reference_no',
+      width: 170,
+      render: (ref) => <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ref || '—'}</Tag>
+    },
+    {
+      title: 'الفرع / الجهة المعنية',
+      dataIndex: 'branch_name',
+      key: 'branch_name',
+      render: (b) => <Text strong style={{ color: '#334155' }}>{b || 'المستودع الرئيسي'}</Text>
+    },
+    {
+      title: 'الأثر المالي / الكمية',
+      key: 'impact',
+      align: 'right',
+      width: 180,
+      render: (_, r) => {
+        if (r.operation_type === 'stock_adjustment') {
+          const isSurplus = (r.quantity_impact || 0) >= 0;
+          return (
+            <div>
+              <Text strong style={{ color: isSurplus ? '#16a34a' : '#dc2626' }}>
+                {isSurplus ? `+${r.quantity_impact}` : r.quantity_impact} قطعة
+              </Text>
+              {r.amount !== 0 && (
+                <div style={{ fontSize: 11, color: '#64748b' }}>
+                  قيمة: {parseFloat(r.amount || 0).toLocaleString()} ج.م
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (r.operation_type === 'stock_transfer') {
+          return (
+            <Tag color="geekblue" style={{ fontWeight: 800 }}>
+              {r.quantity_impact} صنف
+            </Tag>
+          );
+        }
+        const amt = parseFloat(r.amount || 0);
+        return (
+          <Text strong style={{ fontSize: 14, color: r.operation_type === 'cash_transfer' ? '#d97706' : '#059669' }}>
+            {amt.toLocaleString()} ج.م
+          </Text>
+        );
+      }
+    },
+    {
+      title: 'التاريخ',
+      dataIndex: 'date',
+      key: 'date',
+      width: 130,
+      render: (d) => dayjs(d).format('YYYY-MM-DD')
+    },
+    {
+      title: 'الحالة',
+      dataIndex: 'status',
+      key: 'status',
+      width: 130,
+      render: (st) => {
+        if (['approved', 'completed', 'confirmed'].includes(st)) {
+          return <Tag color="green"><CheckCircleOutlined /> معتمد ومكتمل</Tag>;
+        }
+        if (st === 'pending') {
+          return <Tag color="gold">معلق بالانتظار</Tag>;
+        }
+        return <Tag color="default">{st}</Tag>;
+      }
+    },
+    {
+      title: 'البيان / المسؤول',
+      key: 'details',
+      render: (_, r) => (
+        <div>
+          <div style={{ fontSize: 13 }}>{r.notes || '—'}</div>
+          {r.user_name && <div style={{ fontSize: 11, color: '#64748b' }}>المسؤول: {r.user_name}</div>}
+        </div>
+      )
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة وتدقيق العملية الإدارية">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 15 }} />}
+            onClick={() => handleInspectOperation(r)}
+          />
+        </Tooltip>
+      )
+    }
+  ];
+
+  // Columns for Stock Adjustments Table (سندات التسوية المخزنية)
+  const stockAdjustmentColumns = [
+    {
+      title: 'رقم سند التسوية',
+      dataIndex: 'adjustment_number',
+      key: 'adjustment_number',
+      render: (num) => <Tag color="purple" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{num}</Tag>
+    },
+    {
+      title: 'الفرع / المخزن',
+      dataIndex: 'branch_name',
+      key: 'branch_name',
+      render: (b) => <Tag color="blue"><ShopOutlined /> {b || 'المستودع الرئيسي'}</Tag>
+    },
+    {
+      title: 'تاريخ التسوية',
+      dataIndex: 'adjustment_date',
+      key: 'adjustment_date',
+      render: (d) => dayjs(d).format('YYYY-MM-DD')
+    },
+    {
+      title: 'عدد الأصناف',
+      dataIndex: 'total_items',
+      key: 'total_items',
+      align: 'center',
+      render: (n) => <Tag color="default">{n} صنف</Tag>
+    },
+    {
+      title: 'فروقات الكمية',
+      key: 'qty_changes',
+      render: (_, r) => {
+        const surplus = parseInt(r.total_surplus_qty || 0, 10);
+        const deficit = parseInt(r.total_deficit_qty || 0, 10);
+        const net = parseInt(r.net_qty_change || 0, 10);
+        return (
+          <Space wrap size="small">
+            {surplus > 0 && <Tag color="green">فائض (+{surplus})</Tag>}
+            {deficit > 0 && <Tag color="red">عجز (-{deficit})</Tag>}
+            <Tag color={net >= 0 ? 'success' : 'error'} style={{ fontWeight: 800 }}>
+              صافي: {net >= 0 ? `+${net}` : net}
+            </Tag>
+          </Space>
+        );
+      }
+    },
+    {
+      title: 'الفارق المالي (بالتكلفة)',
+      dataIndex: 'total_variance_cost',
+      key: 'total_variance_cost',
+      align: 'right',
+      render: (cost) => {
+        const c = parseFloat(cost || 0);
+        return (
+          <Text strong style={{ color: c >= 0 ? '#16a34a' : '#dc2626', fontSize: 13 }}>
+            {c >= 0 ? `+${c.toLocaleString()}` : c.toLocaleString()} ج.م
+          </Text>
+        );
+      }
+    },
+    {
+      title: 'البيان / المعتمد',
+      key: 'reason',
+      render: (_, r) => (
+        <div>
+          <div>{r.reason || r.notes || 'تسوية جرد'}</div>
+          {(r.approved_by_name || r.created_by_name) && (
+            <div style={{ fontSize: 11, color: '#64748b' }}>
+              المعتمد: {r.approved_by_name || r.created_by_name}
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'الحالة',
+      dataIndex: 'status',
+      key: 'status',
+      render: (st) => st === 'approved' ? <Tag color="green"><CheckCircleOutlined /> معتمد</Tag> : <Tag color="orange">{st}</Tag>
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة وتدقيق سند التسوية">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 15 }} />}
+            onClick={() => handleInspectOperation({ ...r, operation_type: 'stock_adjustment' })}
+          />
+        </Tooltip>
+      )
+    }
+  ];
+
+  // Columns for Cash Transfers Table (تحويلات الفرع للخزنة الرئيسية)
+  const cashTransferColumns = [
+    {
+      title: 'رقم الإذن',
+      dataIndex: 'reference_no',
+      key: 'reference_no',
+      render: (ref) => <Tag color="gold" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ref}</Tag>
+    },
+    {
+      title: 'الفرع المُسلِّم (المصدر)',
+      dataIndex: 'from_branch_name',
+      key: 'from_branch_name',
+      render: (b) => <Tag color="blue"><ShopOutlined /> {b}</Tag>
+    },
+    {
+      title: 'الخزينة المستلمة',
+      dataIndex: 'to_branch_name',
+      key: 'to_branch_name',
+      render: (b) => <Tag color="purple"><BankOutlined /> {b || 'الخزينة الرئيسية'}</Tag>
+    },
+    {
+      title: 'المبلغ المحول',
+      dataIndex: 'amount',
+      key: 'amount',
+      align: 'right',
+      render: (amt) => (
+        <Text strong style={{ color: '#d97706', fontSize: 15 }}>
+          {parseFloat(amt || 0).toLocaleString()} ج.م
+        </Text>
+      )
+    },
+    {
+      title: 'طريقة التحويل',
+      dataIndex: 'transfer_method',
+      key: 'transfer_method',
+      render: (m) => <Tag color="cyan">{m === 'manual_cash' ? 'تسليم نقدي (كاش)' : m}</Tag>
+    },
+    {
+      title: 'تاريخ وتوقيت الطلب',
+      dataIndex: 'requested_at',
+      key: 'requested_at',
+      render: (d) => dayjs(d).format('YYYY-MM-DD HH:mm')
+    },
+    {
+      title: 'مشرف الفرع / المعتمد',
+      key: 'users',
+      render: (_, r) => (
+        <div>
+          <div>بواسطة: {r.requested_by_name || 'مشرف الفرع'}</div>
+          {r.confirmed_by_name && (
+            <div style={{ fontSize: 11, color: '#059669' }}>
+              مستلم الخزينة: {r.confirmed_by_name}
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'الحالة',
+      dataIndex: 'status',
+      key: 'status',
+      render: (st) => st === 'confirmed'
+        ? <Tag color="green"><CheckCircleOutlined /> مؤكد بالخزينة</Tag>
+        : st === 'pending'
+          ? <Tag color="gold">معلق بالانتظار</Tag>
+          : <Tag color="red">{st}</Tag>
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة وتدقيق تحويل النقدية">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 15 }} />}
+            onClick={() => handleInspectOperation({ ...r, operation_type: 'cash_transfer' })}
+          />
+        </Tooltip>
+      )
     }
   ];
 
@@ -481,6 +836,22 @@ export default function AdminJournals() {
           <div>{r.notes || '—'}</div>
           {r.recorded_by_name && <div style={{ fontSize: 11, color: '#64748b' }}>بواسطة: {r.recorded_by_name}</div>}
         </div>
+      )
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة وتدقيق دفعة سداد المورد">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 15 }} />}
+            onClick={() => handleInspectOperation({ ...r, operation_type: 'supplier_payment' })}
+          />
+        </Tooltip>
       )
     }
   ];
@@ -538,6 +909,22 @@ export default function AdminJournals() {
       dataIndex: 'status',
       key: 'status',
       render: (st) => st === 'completed' ? <Tag color="green">مكتملة ومستلمة</Tag> : <Tag color="orange">{st}</Tag>
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة وتدقيق فاتورة الشراء والتوريد">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 15 }} />}
+            onClick={() => handleInspectOperation({ ...r, operation_type: 'purchase_invoice' })}
+          />
+        </Tooltip>
+      )
     }
   ];
 
@@ -802,7 +1189,7 @@ export default function AdminJournals() {
                         dataSource={expenses.payrollByEmployee || []}
                         columns={employeePayrollColumns}
                         rowKey={(r) => `${r.branch_id}-${r.employee_name}`}
-                        pagination={{ pageSize: 5 }}
+                        pagination={false}
                         size="small"
                       />
                     </Card>
@@ -829,7 +1216,7 @@ export default function AdminJournals() {
                       columns={expenseColumns}
                       rowKey="id"
                       loading={loading}
-                      pagination={{ pageSize: 20, showTotal: (t) => `إجمالي الحركات: ${t}` }}
+                      pagination={false}
                       size="middle"
                     />
                   </Card>
@@ -911,27 +1298,95 @@ export default function AdminJournals() {
                     />
                   </Card>
 
+                  {/* Operations Quick Summary KPI Cards */}
+                  <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+                    <Col xs={12} sm={8} lg={4}>
+                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                        <Statistic
+                          title={<Text style={{ fontSize: 12, color: '#475569' }}>📋 إجمالي العمليات</Text>}
+                          value={operations.summary?.totalAllOperationsCount || operations.allOperations?.length || 0}
+                          valueStyle={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={8} lg={4}>
+                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#faf5ff', border: '1px solid #e9d5ff' }}>
+                        <Statistic
+                          title={<Text style={{ fontSize: 12, color: '#7e22ce' }}>⚖️ سندات التسوية</Text>}
+                          value={operations.stockAdjustments?.length || 0}
+                          valueStyle={{ fontSize: 18, fontWeight: 800, color: '#6b21a8' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={8} lg={4}>
+                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#fffbeb', border: '1px solid #fde68a' }}>
+                        <Statistic
+                          title={<Text style={{ fontSize: 12, color: '#b45309' }}>💰 تحويلات الخزنة</Text>}
+                          value={operations.cashTransfers?.length || 0}
+                          valueStyle={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={8} lg={4}>
+                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#ecfeff', border: '1px solid #a5f3fc' }}>
+                        <Statistic
+                          title={<Text style={{ fontSize: 12, color: '#0e7490' }}>💳 سداد الموردين</Text>}
+                          value={operations.supplierPayments?.length || 0}
+                          valueStyle={{ fontSize: 18, fontWeight: 800, color: '#0891b2' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={8} lg={4}>
+                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                        <Statistic
+                          title={<Text style={{ fontSize: 12, color: '#1d4ed8' }}>🚚 أذون الصرف والنقل</Text>}
+                          value={operations.transfers?.length || 0}
+                          valueStyle={{ fontSize: 18, fontWeight: 800, color: '#2563eb' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={8} lg={4}>
+                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                        <Statistic
+                          title={<Text style={{ fontSize: 12, color: '#15803d' }}>📥 فواتير الشراء</Text>}
+                          value={operations.purchaseInvoices?.length || 0}
+                          valueStyle={{ fontSize: 18, fontWeight: 800, color: '#16a34a' }}
+                        />
+                      </Card>
+                    </Col>
+                  </Row>
+
                   {/* Administrative Operations Sub-Tabs */}
                   <Card
                     title={
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                         <Space>
                           <SwapOutlined style={{ color: '#4f46e5' }} />
-                          <span>يومية العمليات الإدارية المركزية</span>
+                          <span>سجل العمليات الإدارية والرقابة الشاملة</span>
                         </Space>
                         <Radio.Group
                           value={activeOpSection}
                           onChange={(e) => setActiveOpSection(e.target.value)}
                           buttonStyle="solid"
+                          style={{ flexWrap: 'wrap' }}
                         >
-                          <Radio.Button value="transfers">
-                            🚚 نقل بين المخازن ({operations.transfers?.length || 0})
+                          <Radio.Button value="all">
+                            🌐 كافة العمليات ({operations.allOperations?.length || 0})
+                          </Radio.Button>
+                          <Radio.Button value="stock_adjustments">
+                            ⚖️ سندات التسوية ({operations.stockAdjustments?.length || 0})
+                          </Radio.Button>
+                          <Radio.Button value="cash_transfers">
+                            💰 تحويلات الخزنة ({operations.cashTransfers?.length || 0})
                           </Radio.Button>
                           <Radio.Button value="supplier_payments">
                             💳 سداد موردين ({operations.supplierPayments?.length || 0})
                           </Radio.Button>
+                          <Radio.Button value="transfers">
+                            🚚 أذون الصرف ({operations.transfers?.length || 0})
+                          </Radio.Button>
                           <Radio.Button value="purchases">
-                            📥 إضافة مشتريات ({operations.purchaseInvoices?.length || 0})
+                            📥 فواتير التوريد ({operations.purchaseInvoices?.length || 0})
                           </Radio.Button>
                         </Radio.Group>
                       </div>
@@ -939,13 +1394,43 @@ export default function AdminJournals() {
                     styles={{ body: { padding: 0 } }}
                     style={{ borderRadius: 8 }}
                   >
+                    {activeOpSection === 'all' && (
+                      <Table
+                        dataSource={operations.allOperations || []}
+                        columns={allOperationsColumns}
+                        rowKey="id"
+                        loading={loading}
+                        pagination={false}
+                        size="middle"
+                      />
+                    )}
+                    {activeOpSection === 'stock_adjustments' && (
+                      <Table
+                        dataSource={operations.stockAdjustments || []}
+                        columns={stockAdjustmentColumns}
+                        rowKey="id"
+                        loading={loading}
+                        pagination={false}
+                        size="middle"
+                      />
+                    )}
+                    {activeOpSection === 'cash_transfers' && (
+                      <Table
+                        dataSource={operations.cashTransfers || []}
+                        columns={cashTransferColumns}
+                        rowKey="id"
+                        loading={loading}
+                        pagination={false}
+                        size="middle"
+                      />
+                    )}
                     {activeOpSection === 'transfers' && (
                       <Table
                         dataSource={operations.transfers || []}
                         columns={transferColumns}
                         rowKey="id"
                         loading={loading}
-                        pagination={{ pageSize: 15 }}
+                        pagination={false}
                         size="middle"
                       />
                     )}
@@ -955,7 +1440,7 @@ export default function AdminJournals() {
                         columns={supplierPaymentColumns}
                         rowKey="id"
                         loading={loading}
-                        pagination={{ pageSize: 15 }}
+                        pagination={false}
                         size="middle"
                       />
                     )}
@@ -965,7 +1450,7 @@ export default function AdminJournals() {
                         columns={purchaseColumns}
                         rowKey="id"
                         loading={loading}
-                        pagination={{ pageSize: 15 }}
+                        pagination={false}
                         size="middle"
                       />
                     )}
@@ -1359,6 +1844,164 @@ export default function AdminJournals() {
             <span>تاريخ الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}</span>
           </div>
         </div>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 👁️ OPERATION INSPECTION & REVIEW MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ background: '#ede9fe', color: '#7c3aed', padding: '6px 10px', borderRadius: 8, fontSize: 18 }}>
+              <EyeOutlined />
+            </div>
+            <div>
+              <span style={{ fontSize: 17, fontWeight: 'bold' }}>معاينة وتدقيق العملية الإدارية والرقابية</span>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                {inspectRecord?.operation_title || inspectRecord?.reference_no || inspectRecord?.adjustment_number || inspectRecord?.transfer_number || inspectRecord?.payment_ref || inspectRecord?.invoice_number || 'تفاصيل المعاملة'}
+              </div>
+            </div>
+          </div>
+        }
+        open={inspectModalVisible}
+        onCancel={() => setInspectModalVisible(false)}
+        footer={<Button type="primary" onClick={() => setInspectModalVisible(false)}>إغلاق [Esc]</Button>}
+        width={720}
+        destroyOnHidden
+      >
+        {inspectRecord && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Summary Highlights */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>نوع الحركة / العملية:</Text>
+                <div style={{ fontWeight: 'bold', fontSize: 15, color: '#0f172a', marginTop: 2 }}>
+                  {inspectRecord.operation_title || (
+                    inspectRecord.adjustment_number ? 'سند تسوية مخزنية' :
+                    inspectRecord.reference_no ? 'تحويل نقدية للخزينة' :
+                    inspectRecord.transfer_number ? 'إذن صرف ونقل بضائع' :
+                    inspectRecord.payment_ref ? 'سداد دفعة لمورد' :
+                    inspectRecord.invoice_number ? 'فاتورة شراء وتوريد' :
+                    inspectRecord.category ? 'حركة مصروفات' : 'عملية إدارية'
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>الحالة الرسمية:</Text>
+                <div style={{ marginTop: 2 }}>
+                  {['approved', 'confirmed', 'completed'].includes(inspectRecord.status) ? (
+                    <Tag color="green" icon={<CheckCircleOutlined />}>معتمد ومكتمل</Tag>
+                  ) : inspectRecord.status === 'pending' ? (
+                    <Tag color="gold">معلق بالانتظار</Tag>
+                  ) : (
+                    <Tag color="blue">{inspectRecord.status || 'معتمد'}</Tag>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Properties Grid */}
+            <Card size="small" style={{ borderRadius: 8 }}>
+              <Row gutter={[16, 14]}>
+                {/* Reference No */}
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>رقم المرجع / الإذن:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 14, fontFamily: 'monospace', color: '#4f46e5', marginTop: 2 }}>
+                    {inspectRecord.reference_no || inspectRecord.adjustment_number || inspectRecord.transfer_number || inspectRecord.payment_ref || inspectRecord.invoice_number || inspectRecord.id || '—'}
+                  </div>
+                </Col>
+
+                {/* Date */}
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>التاريخ المسجل:</Text>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2 }}>
+                    {dayjs(inspectRecord.date || inspectRecord.adjustment_date || inspectRecord.transfer_date || inspectRecord.payment_date || inspectRecord.invoice_date || inspectRecord.expense_date || inspectRecord.requested_at).format('YYYY-MM-DD HH:mm')}
+                  </div>
+                </Col>
+
+                {/* Branch Info */}
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>الفرع أو المخزن المرتبط:</Text>
+                  <div style={{ fontWeight: 600, marginTop: 2 }}>
+                    <ShopOutlined style={{ marginLeft: 4, color: '#2563eb' }} />
+                    {inspectRecord.branch_name || inspectRecord.from_branch_name || inspectRecord.warehouse_name || 'المستودع الرئيسي'}
+                  </div>
+                </Col>
+
+                {/* Destination if applicable */}
+                {inspectRecord.to_branch_name && (
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>الجهة المستلمة:</Text>
+                    <div style={{ fontWeight: 600, color: '#16a34a', marginTop: 2 }}>
+                      <BankOutlined style={{ marginLeft: 4 }} />
+                      {inspectRecord.to_branch_name}
+                    </div>
+                  </Col>
+                )}
+
+                {/* Amount if applicable */}
+                {(inspectRecord.amount !== undefined || inspectRecord.total_variance_cost !== undefined || inspectRecord.final_amount !== undefined) && (
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>القيمة المالية:</Text>
+                    <div style={{ fontWeight: 'bold', fontSize: 16, color: '#059669', marginTop: 2 }}>
+                      {parseFloat(inspectRecord.amount || inspectRecord.total_variance_cost || inspectRecord.final_amount || 0).toLocaleString()} ج.م
+                    </div>
+                  </Col>
+                )}
+
+                {/* Quantity impact if applicable */}
+                {(inspectRecord.quantity_impact !== undefined || inspectRecord.total_units !== undefined || inspectRecord.net_qty_change !== undefined) && (
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>الأثر الكمي بالمخزن:</Text>
+                    <div style={{ fontWeight: 'bold', fontSize: 15, marginTop: 2 }}>
+                      <Tag color="cyan" style={{ fontSize: 13, padding: '2px 8px' }}>
+                        {inspectRecord.quantity_impact || inspectRecord.total_units || inspectRecord.net_qty_change} قطعة
+                      </Tag>
+                    </div>
+                  </Col>
+                )}
+
+                {/* Surplus and deficit for stock adjustments */}
+                {inspectRecord.surplus_qty !== undefined && inspectRecord.deficit_qty !== undefined && (
+                  <Col span={24}>
+                    <Space size="large">
+                      <span>فائض: <strong style={{ color: '#16a34a' }}>+{inspectRecord.surplus_qty || 0}</strong></span>
+                      <span>عجز: <strong style={{ color: '#dc2626' }}>-{inspectRecord.deficit_qty || 0}</strong></span>
+                    </Space>
+                  </Col>
+                )}
+
+                {/* User / Responsible */}
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>المسؤول / المعتمد:</Text>
+                  <div style={{ fontWeight: 600, marginTop: 2 }}>
+                    <UserOutlined style={{ marginLeft: 4, color: '#64748b' }} />
+                    {inspectRecord.user_name || inspectRecord.approved_by_name || inspectRecord.created_by_name || inspectRecord.requested_by_name || inspectRecord.recorded_by_name || 'الإدارة'}
+                  </div>
+                </Col>
+
+                {/* Driver / Transport */}
+                {inspectRecord.driver_name && (
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>مندوب النقل / السائق:</Text>
+                    <div style={{ fontWeight: 600, marginTop: 2 }}>
+                      {inspectRecord.driver_name} {inspectRecord.vehicle_number ? `(${inspectRecord.vehicle_number})` : ''}
+                    </div>
+                  </Col>
+                )}
+
+                {/* Notes / Description */}
+                <Col span={24}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>البيان والتفاصيل والملاحظات:</Text>
+                  <div style={{ background: '#f1f5f9', padding: '8px 12px', borderRadius: 6, marginTop: 4, fontSize: 13 }}>
+                    {inspectRecord.notes || inspectRecord.reason || inspectRecord.description || 'لا توجد ملاحظات إضافية مسجلة.'}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          </div>
+        )}
       </Modal>
     </div>
   );

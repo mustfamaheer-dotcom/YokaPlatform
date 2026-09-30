@@ -148,7 +148,16 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
   const [itemSearch, setItemSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState(undefined);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(undefined);
-  const [itemsPagination, setItemsPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+  const [itemsPagination, setItemsPagination] = useState({ current: 1, pageSize: 5000, total: 0 });
+
+  // Product Inspection / Review Modal State
+  const [productReviewModalVisible, setProductReviewModalVisible] = useState(false);
+  const [reviewedProduct, setReviewedProduct] = useState(null);
+
+  const handleViewProductReview = (product) => {
+    setReviewedProduct(product);
+    setProductReviewModalVisible(true);
+  };
 
   // Item Create/Edit Modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -1118,11 +1127,21 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
     {
       title: 'إجراءات',
       key: 'actions',
-      width: 160,
+      width: 210,
       fixed: 'left',
       align: 'center',
       render: (_, record) => (
         <Space size="small">
+          <Tooltip title="معاينة ومراجعة بطاقة الصنف">
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewProductReview(record)}
+              style={{ borderColor: '#6366f1', color: '#6366f1' }}
+            >
+              معاينة
+            </Button>
+          </Tooltip>
           <Button
             type="primary"
             size="small"
@@ -1300,7 +1319,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                   columns={groupColumns}
                   rowKey="id"
                   loading={categoriesLoading}
-                  pagination={{ pageSize: 10 }}
+                  pagination={false}
                   bordered
                   size="middle"
                 />
@@ -1345,7 +1364,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                         columns={sizeColumns}
                         rowKey="id"
                         loading={attributesLoading}
-                        pagination={{ pageSize: 8 }}
+                        pagination={false}
                         size="small"
                         bordered
                       />
@@ -1379,7 +1398,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                         columns={colorColumns}
                         rowKey="id"
                         loading={attributesLoading}
-                        pagination={{ pageSize: 8 }}
+                        pagination={false}
                         size="small"
                         bordered
                       />
@@ -1448,12 +1467,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                   rowKey="id"
                   loading={itemsLoading}
                   scroll={{ x: 'max-content' }}
-                  pagination={{
-                    current: itemsPagination.current,
-                    pageSize: itemsPagination.pageSize,
-                    total: itemsPagination.total,
-                    onChange: (page) => fetchItems(page)
-                  }}
+                  pagination={false}
                   bordered
                   size="middle"
                 />
@@ -2265,6 +2279,111 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
 
 
         </Form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 👁️ PRODUCT CARD REVIEW & INSPECTION MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <EyeOutlined style={{ color: '#6366f1', fontSize: 18 }} />
+            <span style={{ fontSize: 16, fontWeight: 'bold' }}>
+              معاينة وتدقيق بطاقة الصنف: {reviewedProduct?.product_name}
+            </span>
+          </div>
+        }
+        open={productReviewModalVisible}
+        onCancel={() => setProductReviewModalVisible(false)}
+        footer={<Button type="primary" onClick={() => setProductReviewModalVisible(false)}>إغلاق [Esc]</Button>}
+        width={700}
+        destroyOnHidden
+      >
+        {reviewedProduct && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Header info */}
+            <div style={{ display: 'flex', gap: 16, background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ width: 85, height: 85, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                {reviewedProduct.featured_image ? (
+                  <img src={reviewedProduct.featured_image} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <TagsOutlined style={{ fontSize: 32, color: '#94a3b8' }} />
+                )}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 'bold', fontSize: 16, color: '#0f172a' }}>{reviewedProduct.product_name}</div>
+                <Space size={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>
+                  {reviewedProduct.category_name && <Tag color="purple">{reviewedProduct.category_name}</Tag>}
+                  {reviewedProduct.brand && <Tag color="blue">{reviewedProduct.brand}</Tag>}
+                  <Tag color={reviewedProduct.status === 'active' ? 'green' : 'orange'}>
+                    {reviewedProduct.status === 'active' ? 'نشط' : 'معطل'}
+                  </Tag>
+                </Space>
+                <div style={{ marginTop: 6, fontSize: 12 }}>
+                  كود الصنف: <code style={{ fontWeight: 600 }}>{reviewedProduct.product_code}</code> | باركود: <code style={{ fontWeight: 600 }}>{reviewedProduct.barcode || '—'}</code>
+                </div>
+              </div>
+            </div>
+
+            {/* Financials & Stock */}
+            <Card size="small" style={{ borderRadius: 8 }}>
+              <Row gutter={[16, 12]}>
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>سعر تكلفة الشراء:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#0f172a', marginTop: 2 }}>
+                    {parseFloat(reviewedProduct.cost_price || 0).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>سعر البيع للجمهور:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#2563eb', marginTop: 2 }}>
+                    {parseFloat(reviewedProduct.selling_price || 0).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>سعر الجملة:</Text>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#7c3aed', marginTop: 2 }}>
+                    {parseFloat(reviewedProduct.wholesale_price || 0).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>إجمالي الرصيد بالمخازن:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 16, marginTop: 2 }}>
+                    <Tag color={parseInt(reviewedProduct.total_stock || 0, 10) > 0 ? 'green' : 'red'} style={{ fontSize: 14, fontWeight: 'bold', padding: '2px 8px' }}>
+                      {reviewedProduct.total_stock || 0} قطعة
+                    </Tag>
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>هامش الربح التقديري:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#16a34a', marginTop: 2 }}>
+                    {(parseFloat(reviewedProduct.selling_price || 0) - parseFloat(reviewedProduct.cost_price || 0)).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>عدد المتغيرات المعرفة:</Text>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2 }}>
+                    <Tag color="cyan">{reviewedProduct.variant_count || 0} متغير</Tag>
+                  </div>
+                </Col>
+
+                {reviewedProduct.description && (
+                  <Col span={24}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>وصف الصنف:</Text>
+                    <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: 6, marginTop: 2, fontSize: 13 }}>
+                      {reviewedProduct.description}
+                    </div>
+                  </Col>
+                )}
+              </Row>
+            </Card>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -10,9 +10,9 @@ const redis = require('../../shared/redis');
  */
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, category_id, branch_id, status } = req.query;
+    const { page = 1, limit = 5000, search, category_id, branch_id, status } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(1000, parseInt(limit, 10)));
+    const limitNum = Math.max(1, Math.min(10000, parseInt(limit, 10) || 5000));
     const offset = (pageNum - 1) * limitNum;
 
     const whereClauses = [];
@@ -554,6 +554,13 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
       variants = []
     } = req.body;
 
+    if (!featured_image || String(featured_image).trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'صورة الموديل مطلوبة كشرط أساسي ولا يمكن حفظ الصنف بدونها'
+      });
+    }
+
     // Auto-generate code & barcode if not explicitly supplied
     const cleanCode = product_code
       ? String(product_code).trim().toUpperCase()
@@ -641,6 +648,9 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
           usedSkusInBatch.add(finalSku);
 
+          // Inheritance Logic: If no variant-specific image is provided, inherit the model's featured_image
+          const variantImage = v.image_url || featured_image || null;
+
           await client.query(
             `INSERT INTO product_variants (
               product_id, variant_sku, color, size, material, price_modifier, image_url, status, created_at, updated_at
@@ -652,7 +662,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
               v.size || null,
               v.material || null,
               v.price_modifier ? parseFloat(v.price_modifier) : 0,
-              v.image_url || null
+              variantImage
             ]
           );
         }

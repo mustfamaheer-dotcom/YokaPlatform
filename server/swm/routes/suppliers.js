@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
 const { requireAuth, requireRole } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+const { deductFromMainTreasury } = require('../services/treasuryService');
 
 /**
  * GET /api/swm/suppliers
@@ -421,6 +422,17 @@ router.post('/:id/pay', requireAuth, requireRole(['super_admin', 'admin', 'inven
       : null;
 
     const result = await transaction(async (client) => {
+      // Deduct from Main Treasury with strict solvency check
+      await deductFromMainTreasury(client, {
+        amount: payAmount,
+        paymentMethod: finalPaymentMethod,
+        paymentBreakdown: payment_breakdown,
+        destinationAccount: 'supplier_payment',
+        reason: `سداد مستحقات مورد: ${supplier.supplier_name}`,
+        refNumber: paymentRef,
+        userId: req.user.id
+      });
+
       const [payment] = (await client.query(
         `INSERT INTO supplier_payments (
           payment_ref, supplier_id, invoice_id, amount, payment_method,
@@ -484,7 +496,7 @@ router.post('/:id/pay', requireAuth, requireRole(['super_admin', 'admin', 'inven
     return res.status(201).json({ success: true, data: result.payment, current_balance: result.updatedSupplier.current_balance });
   } catch (err) {
     console.error('Supplier payment error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.message && err.message.includes('غير كافٍ') ? 400 : 500).json({ success: false, message: err.message });
   }
 });
 

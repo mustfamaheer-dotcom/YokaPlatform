@@ -39,7 +39,8 @@ import {
   FilterOutlined,
   StopOutlined,
   BarsOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../api';
@@ -56,6 +57,16 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
+
+  // Review & Inspect Item Modal State
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewedItem, setReviewedItem] = useState(null);
+
+  const handleViewItemReview = (item) => {
+    setReviewedItem(item);
+    setReviewModalVisible(true);
+  };
+
   const [kpi, setKpi] = useState({
     totalItems: 0,
     totalUnits: 0,
@@ -74,20 +85,16 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
 
   // Filters
   const [selectedBranch, setSelectedBranch] = useState(
-    isRetailBranch && currentUser?.branchId ? currentUser.branchId : 'all'
+    currentUser?.branchId ? String(currentUser.branchId) : 'all'
   );
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [pagination, setPagination] = useState({ current: 1, pageSize: 50, total: 0 });
 
-  useEffect(() => {
-    if (isRetailBranch && currentUser?.branchId) {
-      setSelectedBranch(currentUser.branchId);
-    }
-  }, [isRetailBranch, currentUser?.branchId]);
-
-  // In-table physical actual count overrides map: { [uniqueKey]: actualQty }
-  const [actualCounts, setActualCounts] = useState({});
+  // Local state for modified actual inventory count rows: { [rowKey]: { ... } }
+  const [modifiedRows, setModifiedRows] = useState({});
+  const [submittingReconciliation, setSubmittingReconciliation] = useState(false);
+  const [branchesLoading, setBranchesLoading] = useState(false);
 
   // Print modal
   const [printModalVisible, setPrintModalVisible] = useState(false);
@@ -96,22 +103,36 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
   const [exportAllItems, setExportAllItems] = useState([]);
   const printAreaRef = useRef(null);
 
-  // Fetch Lookups
-  const fetchLookups = async () => {
+  // Fetch Branches from GET /api/swm/branches
+  const fetchBranches = async () => {
+    setBranchesLoading(true);
     try {
-      const [brRes, catRes] = await Promise.all([
-        api.get('/api/swm/branches'),
-        api.get('/api/swm/categories')
-      ]);
-      if (brRes.data.success) setBranchesList(brRes.data.data || []);
-      if (catRes.data.success) setCategoriesList(catRes.data.data || []);
+      const res = await api.get('/api/swm/branches');
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setBranchesList(res.data.data);
+      }
     } catch (err) {
-      console.error('Fetch lookups error:', err);
+      console.error('Fetch branches error:', err);
+      message.error('فشل في تحميل قائمة الفروع');
+    } finally {
+      setBranchesLoading(false);
     }
   };
 
-  // Fetch Stocktaking Sheet Data
-  const fetchData = async (page = 1, currentTab = activeTab) => {
+  // Fetch Categories
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get('/api/swm/categories');
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setCategoriesList(res.data.data);
+      }
+    } catch (err) {
+      console.error('Fetch categories error:', err);
+    }
+  };
+
+  // Fetch Stocktaking Sheet Data with branch_id query parameter
+  const fetchData = async (page = 1, currentTab = activeTab, branchOverride = selectedBranch) => {
     setLoading(true);
     try {
       let mappedStatus = 'all';
@@ -119,13 +140,18 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
       else if (currentTab === 'zero_stock') mappedStatus = 'out_of_stock';
       else if (currentTab === 'all') mappedStatus = 'all';
 
+      const branchParam =
+        branchOverride !== 'all' && branchOverride !== undefined && branchOverride !== null && branchOverride !== ''
+          ? branchOverride
+          : undefined;
+
       const params = {
-        branch_id: selectedBranch !== 'all' ? selectedBranch : undefined,
+        branch_id: branchParam,
         category_id: selectedCategory !== 'all' ? selectedCategory : undefined,
         status_filter: mappedStatus,
         search: searchKeyword.trim() || undefined,
         page,
-        limit: pagination.pageSize
+        limit: 5000
       };
 
       const res = await api.get('/api/swm/stock-audit', { params });
@@ -145,25 +171,112 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
     }
   };
 
+  // Fetch branches and lookups on mount
   useEffect(() => {
-    fetchLookups();
+    fetchBranches();
+    fetchCategories();
   }, []);
 
+  // Re-fetch when category or tab changes
   useEffect(() => {
-    fetchData(1, activeTab);
-  }, [selectedBranch, selectedCategory, activeTab]);
+    fetchData(1, activeTab, selectedBranch);
+  }, [selectedCategory, activeTab]);
+
+  // Handle Branch Selector onChange: updates state and immediately triggers re-fetch with branch_id
+  const handleBranchChange = (branchId) => {
+    const val = String(branchId);
+    setSelectedBranch(val);
+    setPagination(prev => ({ ...prev, current: 1 }));
+    fetchData(1, activeTab, val);
+  };
+
+  // Branch Options List
+  const branchOptions = useMemo(() => [
+    { value: 'all', label: '🌐 جميع الفروع والمخازن' },
+    ...branchesList.map((branch) => ({
+      value: String(branch.id),
+      label: `${branch.branch_name} (${branch.branch_code || branch.id})`
+    }))
+  ], [branchesList]);
 
   // Handle Search Input Submit
   const handleSearchSubmit = () => {
-    fetchData(1, activeTab);
+    fetchData(1, activeTab, selectedBranch);
   };
 
-  // Update physical count input for a row
-  const handleCountChange = (rowKey, val) => {
-    setActualCounts(prev => ({
-      ...prev,
-      [rowKey]: val
-    }));
+  // Update physical actual count for a specific row
+  const handleActualQtyChange = (record, newVal) => {
+    const rowKey = `${record.product_id}-${record.variant_id || 'base'}-${record.branch_id || selectedBranch}`;
+    setModifiedRows(prev => {
+      const next = { ...prev };
+      if (newVal === null || newVal === undefined || newVal === '') {
+        delete next[rowKey];
+      } else {
+        const parsedQty = Math.max(0, parseInt(newVal, 10) || 0);
+        const sysQty = parseInt(record.system_qty || 0, 10);
+        next[rowKey] = {
+          key: rowKey,
+          branch_id: record.branch_id || (selectedBranch !== 'all' ? selectedBranch : (branchesList[0]?.id || 1)),
+          product_id: record.product_id,
+          variant_id: record.variant_id || null,
+          product_name: record.product_name,
+          variant_sku: record.variant_sku || record.product_code,
+          system_qty: sysQty,
+          actual_qty: parsedQty,
+          variance: parsedQty - sysQty
+        };
+      }
+      return next;
+    });
+  };
+
+  // Submit Reconciliation Action: POST /api/swm/inventory-counts/submit
+  const onSubmitReconciliation = async () => {
+    const modifiedList = Object.values(modifiedRows);
+
+    if (modifiedList.length === 0) {
+      return message.warning('لم تقم بتعديل الرصيد الفعلي لأي صنف بعد لاعتماد جرد التسوية');
+    }
+
+    let targetBranchId = selectedBranch !== 'all' ? parseInt(selectedBranch, 10) : null;
+    if (!targetBranchId && modifiedList[0]?.branch_id) {
+      targetBranchId = parseInt(modifiedList[0].branch_id, 10);
+    }
+    if (!targetBranchId && branchesList.length > 0) {
+      targetBranchId = branchesList[0].id;
+    }
+
+    if (!targetBranchId) {
+      return message.error('يرجى اختيار الفرع المستهدف لإتمام اعتماد جرد التسوية');
+    }
+
+    const payload = {
+      branch_id: targetBranchId,
+      items: modifiedList.map(item => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id || null,
+        system_qty: item.system_qty,
+        actual_qty: item.actual_qty,
+        notes: item.variance !== 0 ? `فارق تسوية (${item.variance > 0 ? '+' : ''}${item.variance})` : 'جرد مطابق'
+      }))
+    };
+
+    setSubmittingReconciliation(true);
+    try {
+      const res = await api.post('/api/swm/inventory-counts/submit', payload);
+      if (res.data?.success) {
+        message.success(res.data.message || `تم اعتماد جرد التسوية بعدد ${modifiedList.length} صنف بنجاح!`);
+        setModifiedRows({});
+        fetchData(pagination.current, activeTab, selectedBranch);
+      } else {
+        message.error(res.data?.message || 'فشل في حفظ واعتماد جرد التسوية');
+      }
+    } catch (err) {
+      console.error('Submit reconciliation error:', err);
+      message.error(err.response?.data?.message || 'حدث خطأ أثناء اعتماد جرد التسوية');
+    } finally {
+      setSubmittingReconciliation(false);
+    }
   };
 
   // Open Printable Stock Audit Sheet Modal (fetches all items for printing)
@@ -303,20 +416,27 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
       }
     },
     {
-      title: 'الرصيد الفعلي (المحصي)',
+      title: 'الرصيد الفعلي (المحصى)',
       key: 'actual_count_input',
-      width: 130,
+      width: 140,
       align: 'center',
       render: (_, r) => {
         const rowKey = `${r.product_id}-${r.variant_id || 'base'}-${r.branch_id || selectedBranch}`;
-        const currentVal = actualCounts[rowKey];
+        const item = modifiedRows[rowKey];
+        const currentVal = item !== undefined ? item.actual_qty : undefined;
+
         return (
           <InputNumber
             min={0}
-            placeholder="الفعلي..."
+            placeholder="أدخل الفعلي..."
             value={currentVal}
-            onChange={(val) => handleCountChange(rowKey, val)}
-            style={{ width: '100%', borderColor: currentVal !== undefined ? '#4f46e5' : undefined }}
+            onChange={(val) => handleActualQtyChange(r, val)}
+            style={{
+              width: '100%',
+              borderRadius: 6,
+              borderColor: currentVal !== undefined ? '#4f46e5' : undefined,
+              boxShadow: currentVal !== undefined ? '0 0 0 2px rgba(79, 70, 229, 0.12)' : undefined
+            }}
           />
         );
       }
@@ -324,24 +444,86 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
     {
       title: 'الفارق (عجز / زيادة)',
       key: 'variance',
-      width: 120,
+      width: 140,
       align: 'center',
       render: (_, r) => {
         const rowKey = `${r.product_id}-${r.variant_id || 'base'}-${r.branch_id || selectedBranch}`;
-        const actualVal = actualCounts[rowKey];
-        if (actualVal === undefined || actualVal === null) {
-          return <Text type="secondary">—</Text>;
-        }
-        const sys = parseInt(r.system_qty || 0, 10);
-        const diff = actualVal - sys;
+        const item = modifiedRows[rowKey];
 
-        if (diff < 0) {
-          return <Tag color="red" style={{ fontWeight: 700 }}>عجز ({diff})</Tag>;
-        } else if (diff > 0) {
-          return <Tag color="green" style={{ fontWeight: 700 }}>زيادة (+{diff})</Tag>;
+        if (!item || item.actual_qty === undefined || item.actual_qty === null) {
+          return <span style={{ color: '#9ca3af' }}>—</span>;
         }
-        return <Tag color="blue">متطابق (0)</Tag>;
+
+        const variance = item.variance;
+
+        if (variance < 0) {
+          return (
+            <span
+              className="text-red-500 font-bold"
+              style={{
+                color: '#ef4444',
+                fontWeight: 700,
+                backgroundColor: '#fef2f2',
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: '1px solid #fecaca',
+                display: 'inline-block'
+              }}
+            >
+              عجز ({variance})
+            </span>
+          );
+        } else if (variance > 0) {
+          return (
+            <span
+              className="text-green-500 font-bold"
+              style={{
+                color: '#22c55e',
+                fontWeight: 700,
+                backgroundColor: '#f0fdf4',
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: '1px solid #bbf7d0',
+                display: 'inline-block'
+              }}
+            >
+              زيادة (+{variance})
+            </span>
+          );
+        }
+
+        return (
+          <span
+            style={{
+              color: '#6b7280',
+              fontWeight: 600,
+              backgroundColor: '#f3f4f6',
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid #e5e7eb',
+              display: 'inline-block'
+            }}
+          >
+            متطابق (0)
+          </span>
+        );
       }
+    },
+    {
+      title: 'معاينة',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, r) => (
+        <Tooltip title="معاينة وتدقيق بطاقة الصنف">
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 16 }} />}
+            onClick={() => handleViewItemReview(r)}
+          />
+        </Tooltip>
+      )
     }
   ];
 
@@ -352,10 +534,10 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
         <div>
           <Title level={3} style={{ margin: 0, color: '#1e293b' }}>
             <FileSearchOutlined style={{ marginLeft: 8, color: '#4f46e5' }} />
-            الجرد المجمع (Comprehensive Stock Audit)
+            الجرد الفعلي وسندات التسوية (Stock Audit & Reconciliation)
           </Title>
           <Text type="secondary" style={{ fontSize: 14 }}>
-            استعراض وطباعة الأرصدة المتوفرة لإجراء الجرد الفعلي الميداني، ومطابقة الأرصدة مع كشوفات التسوية
+            استعراض الأرصدة، تسجيل الجرد الفعلي الميداني، ومطابقة الفروقات واعتماد سندات التسوية فورياً
           </Text>
         </div>
 
@@ -371,16 +553,20 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
           >
             طباعة كشف الجرد الميداني (A4 Sheet)
           </Button>
-          {onNavigateToAdjustments && (
-            <Button
-              type="primary"
-              icon={<DiffOutlined />}
-              onClick={() => onNavigateToAdjustments('stock_adjustments')}
-              style={{ backgroundColor: '#4f46e5' }}
-            >
-              الانتقال إلى سندات التسوية
-            </Button>
-          )}
+          <Button
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            onClick={onSubmitReconciliation}
+            loading={submittingReconciliation}
+            style={{
+              backgroundColor: '#16a34a',
+              borderColor: '#16a34a',
+              fontWeight: 700,
+              boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)'
+            }}
+          >
+            اعتماد جرد التسوية {Object.keys(modifiedRows).length > 0 && `(${Object.keys(modifiedRows).length})`}
+          </Button>
         </Space>
       </div>
 
@@ -390,30 +576,18 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
           {/* Branch Filter */}
           <Col xs={24} sm={12} lg={8}>
             <Text strong style={{ display: 'block', marginBottom: 6 }}>
-              <ShopOutlined /> {isRetailBranch ? 'الفرع:' : 'الفرع المستهدف:'}
+              <ShopOutlined /> الفرع المستهدف:
             </Text>
-            {isRetailBranch ? (
-              <div style={{ display: 'flex', alignItems: 'center', height: 32 }}>
-                <Tag color="blue" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6 }}>
-                  <ShopOutlined style={{ marginLeft: 4 }} />
-                  {currentUser?.branchName || 'فرع التجزئة الحالي'}
-                </Tag>
-              </div>
-            ) : (
-              <Select
-                style={{ width: '100%' }}
-                value={selectedBranch}
-                onChange={(val) => setSelectedBranch(val)}
-                placeholder="اختر الفرع..."
-              >
-                <Option value="all">🌐 جميع الفروع والمخازن</Option>
-                {branchesList.map((b) => (
-                  <Option key={b.id} value={b.id}>
-                    {b.branch_name} ({b.branch_code})
-                  </Option>
-                ))}
-              </Select>
-            )}
+            <Select
+              style={{ width: '100%' }}
+              value={String(selectedBranch || 'all')}
+              onChange={handleBranchChange}
+              placeholder="اختر الفرع المستهدف..."
+              loading={branchesLoading}
+              showSearch
+              optionFilterProp="label"
+              options={branchOptions}
+            />
           </Col>
 
           {/* Category Filter */}
@@ -606,18 +780,43 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
           />
         )}
 
+        {/* Pending Reconciliation Modifications Alert */}
+        {Object.keys(modifiedRows).length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            message={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <span>
+                  تم تعديل الرصيد الفعلي لـ <strong style={{ color: '#15803d' }}>{Object.keys(modifiedRows).length}</strong> صنف جاهزة للاعتماد والمطابقة.
+                </span>
+                <Space>
+                  <Button size="small" onClick={() => setModifiedRows({})}>
+                    إلغاء التعديلات
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    onClick={onSubmitReconciliation}
+                    loading={submittingReconciliation}
+                    style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', fontWeight: 700 }}
+                  >
+                    اعتماد جرد التسوية الآن ({Object.keys(modifiedRows).length})
+                  </Button>
+                </Space>
+              </div>
+            }
+            style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #86efac', backgroundColor: '#f0fdf4' }}
+          />
+        )}
+
         <Table
           dataSource={items}
           columns={columns}
           rowKey={(r) => `${r.product_id}-${r.variant_id || 'base'}-${r.branch_id || '0'}`}
           loading={loading}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: (p) => fetchData(p, activeTab),
-            showTotal: (total) => `إجمالي الأصناف في هذه القائمة: ${total}`
-          }}
+          pagination={false}
           size="middle"
         />
       </Card>
@@ -802,6 +1001,113 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
                 كشف رسمي صادر من منظومة Yoka SWM • تاريخ ووقت الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}
               </div>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 👁️ STOCK ITEM REVIEW & INSPECTION MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <EyeOutlined style={{ color: '#4f46e5', fontSize: 18 }} />
+            <span style={{ fontSize: 16, fontWeight: 'bold' }}>
+              معاينة وتدقيق بطاقة الصنف بالمخزون: {reviewedItem?.product_name}
+            </span>
+          </div>
+        }
+        open={reviewModalVisible}
+        onCancel={() => setReviewModalVisible(false)}
+        footer={<Button type="primary" onClick={() => setReviewModalVisible(false)}>إغلاق [Esc]</Button>}
+        width={680}
+        destroyOnHidden
+      >
+        {reviewedItem && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', gap: 16, background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                {reviewedItem.image_url || reviewedItem.featured_image ? (
+                  <img src={reviewedItem.image_url || reviewedItem.featured_image} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <ShopOutlined style={{ fontSize: 32, color: '#94a3b8' }} />
+                )}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 'bold', fontSize: 16, color: '#0f172a' }}>{reviewedItem.product_name}</div>
+                <Space size={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>
+                  {reviewedItem.category_name && <Tag color="purple">{reviewedItem.category_name}</Tag>}
+                  {reviewedItem.brand && <Tag color="blue">{reviewedItem.brand}</Tag>}
+                  <Text code>{reviewedItem.variant_sku || reviewedItem.product_code || reviewedItem.barcode}</Text>
+                </Space>
+                <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+                  الفرع المستهدف: <strong>{reviewedItem.branch_name || currentBranchObj?.branch_name || 'المستودع الرئيسي'}</strong>
+                </div>
+              </div>
+            </div>
+
+            <Card size="small" style={{ borderRadius: 8 }}>
+              <Row gutter={[16, 12]}>
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>المقاس واللون (المتغير):</Text>
+                  <div style={{ fontWeight: 600, marginTop: 2 }}>
+                    <Space size={4}>
+                      {reviewedItem.color && <Tag color="blue">{reviewedItem.color}</Tag>}
+                      {reviewedItem.size && <Tag color="cyan">{reviewedItem.size}</Tag>}
+                      {!reviewedItem.color && !reviewedItem.size && <Text type="secondary">صنف أساسي بدون متغير</Text>}
+                    </Space>
+                  </div>
+                </Col>
+
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>الرصيد الدفتري المسجل بالنظام:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 16, marginTop: 2 }}>
+                    <Tag color={parseInt(reviewedItem.system_qty || 0, 10) > 0 ? 'green' : 'red'} style={{ fontSize: 14, fontWeight: 'bold', padding: '2px 10px' }}>
+                      {reviewedItem.system_qty || 0} قطعة
+                    </Tag>
+                  </div>
+                </Col>
+
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>سعر تكلفة الشراء:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#0f172a', marginTop: 2 }}>
+                    {parseFloat(reviewedItem.cost_price || 0).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>إجمالي قيمة الرصيد الدفتري:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#0f766e', marginTop: 2 }}>
+                    {(parseInt(reviewedItem.system_qty || 0, 10) * parseFloat(reviewedItem.cost_price || 0)).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                {reviewedItem.selling_price && (
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>سعر البيع للجمهور:</Text>
+                    <div style={{ fontWeight: 600, color: '#2563eb', marginTop: 2 }}>
+                      {parseFloat(reviewedItem.selling_price).toLocaleString()} ج.م
+                    </div>
+                  </Col>
+                )}
+
+                {/* Actual Count & Variance status if entered */}
+                {(() => {
+                  const rowKey = `${reviewedItem.product_id}-${reviewedItem.variant_id || 'base'}-${reviewedItem.branch_id || selectedBranch}`;
+                  const mod = modifiedRows[rowKey];
+                  if (!mod) return null;
+                  return (
+                    <Col span={24}>
+                      <Divider style={{ margin: '8px 0' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>الرصيد الفعلي المدخل للجرد: <strong>{mod.actual_qty} قطعة</strong></span>
+                        <span>فارق التسوية: <strong style={{ color: mod.variance < 0 ? '#ef4444' : mod.variance > 0 ? '#22c55e' : '#6b7280' }}>{mod.variance > 0 ? `+${mod.variance}` : mod.variance}</strong></span>
+                      </div>
+                    </Col>
+                  );
+                })()}
+              </Row>
+            </Card>
           </div>
         )}
       </Modal>

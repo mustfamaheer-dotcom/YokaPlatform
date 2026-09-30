@@ -120,7 +120,7 @@ const createProductSchema = z.object({
   sale_price: z.coerce.number().min(0).optional().nullable(),
   reorder_level: z.coerce.number().int().min(0).default(5),
   is_ecom_listed: z.boolean().default(false),
-  featured_image: z.string().optional().nullable(),
+  featured_image: z.string().trim().min(1, 'صورة الموديل مطلوبة ولا يمكن حفظ الصنف بدونها'),
   gallery_images: z.any().optional().nullable(),
   variants: z.array(z.object({
     sku: z.string().optional(),
@@ -142,11 +142,12 @@ function validate(schema) {
       req.body = parsed;
       next();
     } catch (err) {
-      if (err instanceof z.ZodError) {
+      if (err instanceof z.ZodError || err.issues || err.errors) {
+        const issues = err.issues || err.errors || [];
         return res.status(400).json({
           success: false,
-          message: err.errors.map(e => e.message).join(' | '),
-          errors: err.errors
+          message: issues.map(e => e.message).join(' | '),
+          errors: issues
         });
       }
       return res.status(400).json({ success: false, message: 'خطأ في التحقق من البيانات المدخلة' });

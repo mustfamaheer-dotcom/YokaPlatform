@@ -127,6 +127,8 @@ const branchesDailyRoutes = require('./routes/branchesDaily');
 app.use('/api/swm/branches-daily', branchesDailyRoutes);
 const stockAuditRoutes = require('./routes/stockAudit');
 app.use('/api/swm/stock-audit', stockAuditRoutes);
+const inventoryCountsRoutes = require('./routes/inventoryCounts');
+app.use('/api/swm/inventory-counts', inventoryCountsRoutes);
 const stockAdjustmentRoutes = require('./routes/stockAdjustments');
 app.use('/api/swm/stock-adjustments', stockAdjustmentRoutes);
 const adminJournalsRoutes = require('./routes/adminJournals');
@@ -146,6 +148,8 @@ const systemRoutes = require('./routes/systemBackup');
 app.use('/api/swm/system', systemRoutes);
 const visitorAnalyticsRoutes = require('./routes/visitorAnalytics');
 app.use('/api/swm/visitor-analytics', visitorAnalyticsRoutes);
+const uploadRoutes = require('./routes/uploads');
+app.use('/api/swm/upload', uploadRoutes);
 
 // ECP (E-Commerce Platform) Public API Routes
 const ecpCatalogRoutes = require('../ecp/routes/catalog');
@@ -217,6 +221,12 @@ const ecpPublicDir = resolveFirstExisting([
 ]);
 
 // Serve public static images & assets
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
 if (imgDir) app.use(express.static(imgDir));
 if (swmPublicDir) app.use(express.static(swmPublicDir));
 if (ecpPublicDir) app.use(express.static(ecpPublicDir));

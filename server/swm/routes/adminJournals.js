@@ -202,7 +202,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
       LEFT JOIN users u ON u.id = st.created_by
       ${transWhereSql}
       ORDER BY st.transfer_date DESC, st.id DESC
-      LIMIT 100
+      LIMIT 5000
     `;
     const transfers = await query(transfersSql, transParams);
 
@@ -229,7 +229,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
       LEFT JOIN users u ON u.id = sp.recorded_by
       ${payWhereSql}
       ORDER BY sp.payment_date DESC, sp.id DESC
-      LIMIT 100
+      LIMIT 5000
     `;
     const supplierPayments = await query(paymentsSql, payParams);
 
@@ -261,9 +261,162 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
       LEFT JOIN users u ON u.id = pi.created_by
       ${purWhereSql}
       ORDER BY pi.invoice_date DESC, pi.id DESC
-      LIMIT 100
+      LIMIT 5000
     `;
     const purchaseInvoices = await query(purchasesSql, purParams);
+
+    // 2.4 Stock Adjustments / Reconciliations (سندات التسوية المخزنية)
+    const adjWhere = [];
+    const adjParams = [];
+    let apIdx = 1;
+
+    adjWhere.push(`DATE(sa.adjustment_date) >= $${apIdx++}`);
+    adjParams.push(startDateVal);
+
+    adjWhere.push(`DATE(sa.adjustment_date) <= $${apIdx++}`);
+    adjParams.push(endDateVal);
+
+    if (branchFilter) {
+      adjWhere.push(`sa.branch_id = $${apIdx++}`);
+      adjParams.push(branchFilter);
+    }
+
+    const adjWhereSql = adjWhere.length > 0 ? `WHERE ${adjWhere.join(' AND ')}` : '';
+    const adjustmentsSql = `
+      SELECT sa.*,
+             b.branch_name, b.branch_code,
+             u.full_name AS created_by_name,
+             au.full_name AS approved_by_name
+      FROM stock_adjustments sa
+      JOIN branches b ON b.id = sa.branch_id
+      LEFT JOIN users u ON u.id = sa.created_by
+      LEFT JOIN users au ON au.id = sa.approved_by
+      ${adjWhereSql}
+      ORDER BY sa.adjustment_date DESC, sa.id DESC
+      LIMIT 5000
+    `;
+    const stockAdjustments = await query(adjustmentsSql, adjParams);
+
+    // 2.5 Branch Cash Transfers to Main Safe (تحويلات الفروع للخزنة الرئيسية)
+    const cashWhere = [];
+    const cashParams = [];
+    let cpIdx = 1;
+
+    cashWhere.push(`DATE(ct.requested_at) >= $${cpIdx++}`);
+    cashParams.push(startDateVal);
+
+    cashWhere.push(`DATE(ct.requested_at) <= $${cpIdx++}`);
+    cashParams.push(endDateVal);
+
+    if (branchFilter) {
+      cashWhere.push(`(ct.from_branch_id = $${cpIdx} OR ct.to_branch_id = $${cpIdx})`);
+      cashParams.push(branchFilter);
+      cpIdx++;
+    }
+
+    const cashWhereSql = cashWhere.length > 0 ? `WHERE ${cashWhere.join(' AND ')}` : '';
+    const cashTransfersSql = `
+      SELECT ct.*,
+             fb.branch_name AS from_branch_name, fb.branch_code AS from_branch_code,
+             tb.branch_name AS to_branch_name, tb.branch_code AS to_branch_code,
+             ru.full_name AS requested_by_name, ru.username AS requested_by_username,
+             cu.full_name AS confirmed_by_name
+      FROM cash_transfers ct
+      JOIN branches fb ON fb.id = ct.from_branch_id
+      JOIN branches tb ON tb.id = ct.to_branch_id
+      JOIN users ru ON ru.id = ct.requested_by
+      LEFT JOIN users cu ON cu.id = ct.confirmed_by
+      ${cashWhereSql}
+      ORDER BY ct.requested_at DESC, ct.id DESC
+      LIMIT 5000
+    `;
+    const cashTransfers = await query(cashTransfersSql, cashParams);
+
+    // 2.6 Consolidated All Administrative Operations Unified Timeline
+    const allOperations = [
+      ...stockAdjustments.map(sa => ({
+        id: `adj-${sa.id}`,
+        raw_id: sa.id,
+        operation_type: 'stock_adjustment',
+        operation_title: 'سند تسوية مخزنية',
+        reference_no: sa.adjustment_number,
+        date: sa.adjustment_date,
+        branch_name: sa.branch_name,
+        branch_id: sa.branch_id,
+        amount: parseFloat(sa.total_variance_cost || 0),
+        quantity_impact: parseInt(sa.net_qty_change || 0, 10),
+        surplus_qty: parseInt(sa.total_surplus_qty || 0, 10),
+        deficit_qty: parseInt(sa.total_deficit_qty || 0, 10),
+        status: sa.status,
+        user_name: sa.approved_by_name || sa.created_by_name || 'المسؤول الإداري',
+        notes: sa.reason || sa.notes || 'تسوية فروقات جرد',
+        badge_color: 'purple'
+      })),
+      ...cashTransfers.map(ct => ({
+        id: `ct-${ct.id}`,
+        raw_id: ct.id,
+        operation_type: 'cash_transfer',
+        operation_title: 'تحويل نقدية للخزنة الرئيسية',
+        reference_no: ct.reference_no,
+        date: ct.requested_at,
+        branch_name: `${ct.from_branch_name} ➔ ${ct.to_branch_name}`,
+        branch_id: ct.from_branch_id,
+        amount: parseFloat(ct.amount || 0),
+        quantity_impact: null,
+        status: ct.status,
+        user_name: ct.confirmed_by_name ? `${ct.requested_by_name || 'المشرف'} (تأكيد: ${ct.confirmed_by_name})` : (ct.requested_by_name || 'مشرف الفرع'),
+        notes: ct.notes || (ct.transfer_method === 'manual_cash' ? 'تسليم نقدية باليد' : 'تحويل إلكتروني'),
+        badge_color: 'gold'
+      })),
+      ...supplierPayments.map(sp => ({
+        id: `sp-${sp.id}`,
+        raw_id: sp.id,
+        operation_type: 'supplier_payment',
+        operation_title: 'سداد دفعة لمورد',
+        reference_no: sp.invoice_number ? `فاتورة #${sp.invoice_number}` : `سداد #${sp.id}`,
+        date: sp.payment_date,
+        branch_name: sp.supplier_name,
+        branch_id: null,
+        amount: parseFloat(sp.amount || 0),
+        quantity_impact: null,
+        status: 'completed',
+        user_name: sp.recorded_by_name || 'مسؤول الحسابات',
+        notes: sp.notes || `سداد ${sp.payment_method === 'cash' ? 'نقدي (كاش)' : sp.payment_method}`,
+        badge_color: 'cyan'
+      })),
+      ...transfers.map(st => ({
+        id: `st-${st.id}`,
+        raw_id: st.id,
+        operation_type: 'stock_transfer',
+        operation_title: 'إذن صرف / نقل بين المخازن',
+        reference_no: st.transfer_number,
+        date: st.transfer_date,
+        branch_name: `${st.from_branch_name} ➔ ${st.to_branch_name}`,
+        branch_id: st.from_branch_id,
+        amount: 0,
+        quantity_impact: parseInt(st.total_items || 0, 10),
+        status: st.status,
+        user_name: st.created_by_name || 'مسؤول المستودع',
+        notes: st.notes || `نقل بضائع (${st.total_items} صنف)`,
+        badge_color: 'blue'
+      })),
+      ...purchaseInvoices.map(pi => ({
+        id: `pi-${pi.id}`,
+        raw_id: pi.id,
+        operation_type: 'purchase_invoice',
+        operation_title: 'فاتورة شراء واستلام بضاعة',
+        reference_no: pi.invoice_number,
+        date: pi.invoice_date,
+        branch_name: `${pi.supplier_name} ➔ ${pi.warehouse_name || 'المستودع الرئيسي'}`,
+        branch_id: pi.warehouse_branch_id,
+        amount: parseFloat(pi.final_amount || 0),
+        quantity_impact: null,
+        status: pi.status || 'completed',
+        user_name: pi.created_by_name || 'مسؤول التوريد',
+        notes: `توريد بضاعة (مدفوع: ${parseFloat(pi.paid_amount || 0).toLocaleString()} ج.م)`,
+        badge_color: 'green'
+      }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // ==========================================
     // 3. BRANCH NET INFLOW & PAYMENT BREAKDOWN
@@ -438,11 +591,19 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
         },
         // Section B: Administrative Operations & Branch Net Inflow
         operations: {
+          allOperations,
+          stockAdjustments,
+          cashTransfers,
           transfers,
           supplierPayments,
           purchaseInvoices,
           branchInflows,
           summary: {
+            totalAllOperationsCount: allOperations.length,
+            totalStockAdjustmentsCount: stockAdjustments.length,
+            totalStockAdjustmentsCost: stockAdjustments.reduce((s, a) => s + parseFloat(a.total_variance_cost || 0), 0),
+            totalCashTransfersCount: cashTransfers.length,
+            totalCashTransfersAmount: cashTransfers.reduce((s, c) => s + parseFloat(c.amount || 0), 0),
             totalTransfersCount: transfers.length,
             totalSupplierPaymentsAmount: supplierPayments.reduce((s, p) => s + parseFloat(p.amount || 0), 0),
             totalPurchasesAmount: purchaseInvoices.reduce((s, p) => s + parseFloat(p.final_amount || 0), 0),

@@ -57,6 +57,15 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(undefined);
 
+  // Review & Inspect Product Modal State
+  const [productReviewModalVisible, setProductReviewModalVisible] = useState(false);
+  const [reviewedProduct, setReviewedProduct] = useState(null);
+
+  const handleViewProductReview = (product) => {
+    setReviewedProduct(product);
+    setProductReviewModalVisible(true);
+  };
+
   // Attributes list (colors & sizes)
   const [colorsList, setColorsList] = useState([]);
   const [sizesList, setSizesList] = useState([]);
@@ -66,6 +75,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
   const [submitting, setSubmitting] = useState(false);
   const [generatedVariants, setGeneratedVariants] = useState([]);
   const [createImageUrl, setCreateImageUrl] = useState('');
+  const [modelFileList, setModelFileList] = useState([]);
   const [variantMode, setVariantMode] = useState('single');
   const [selectedMultiColors, setSelectedMultiColors] = useState([]);
   const [selectedMultiSizes, setSelectedMultiSizes] = useState([]);
@@ -162,7 +172,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { limit: 5000 };
       if (search) params.search = search;
       if (selectedCategory) params.category_id = selectedCategory;
 
@@ -317,6 +327,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
     setConstructedName('');
     setGeneratedVariants([]);
     setCreateImageUrl('');
+    setModelFileList([]);
     setColorImages({});
     setVariantMode('single');
     setSelectedMultiColors([]);
@@ -383,18 +394,46 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
       return message.error('يرجى إدخال اسم الصنف الأساسي لتوليد اسم المنتج');
     }
 
+    // Pre-submission Block: Check if the Upload component's fileList is empty
+    const hasFile = modelFileList && modelFileList.length > 0;
+    const hasDirectUrl = Boolean(values.featured_image && String(values.featured_image).trim() !== '' && !String(values.featured_image).startsWith('blob:') && !String(values.featured_image).startsWith('data:'));
+
+    if (!hasFile && !hasDirectUrl) {
+      return message.error('صورة الموديل مطلوبة ولا يمكن إتمام الحفظ بدونها');
+    }
+
     setSubmitting(true);
     try {
-      let activeColorsList = [];
-      if (variantMode === 'multi') {
-        activeColorsList = selectedMultiColors;
-      } else if (values.color) {
-        activeColorsList = [values.color];
+      // Step 1 (Upload File): Upload via FormData to POST /api/swm/upload/product-image
+      let uploadedFeaturedImageUrl = null;
+
+      if (hasFile) {
+        const fileObj = modelFileList[0]?.originFileObj || modelFileList[0];
+        const formData = new FormData();
+        formData.append('image', fileObj);
+
+        message.loading({ content: 'جاري رفع صورة الموديل إلى الخادم...', key: 'modelUploadMsg' });
+        const uploadRes = await api.post('/api/swm/upload/product-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (!uploadRes.data.success || !uploadRes.data.image_url) {
+          message.destroy('modelUploadMsg');
+          throw new Error(uploadRes.data.message || 'فشل في رفع صورة الموديل إلى الخادم');
+        }
+
+        uploadedFeaturedImageUrl = uploadRes.data.image_url;
+        message.success({ content: 'تم رفع صورة الموديل بنجاح!', key: 'modelUploadMsg', duration: 2 });
+      } else if (hasDirectUrl) {
+        uploadedFeaturedImageUrl = values.featured_image.trim();
       }
 
-      const firstColorWithImg = activeColorsList.find(c => colorImages[c]);
-      const defaultFeatured = (firstColorWithImg && colorImages[firstColorWithImg]) || createImageUrl || values.featured_image || null;
+      if (!uploadedFeaturedImageUrl) {
+        setSubmitting(false);
+        return message.error('صورة الموديل مطلوبة ولا يمكن إتمام الحفظ بدونها');
+      }
 
+      // Step 2 (Save Product): Inject uploadedFeaturedImageUrl into JSON payload as featured_image
       let variantsPayload = [];
       if (variantMode === 'multi' && selectedMultiColors.length > 0 && selectedMultiSizes.length > 0) {
         variantsPayload = selectedMultiColors.flatMap((c, cIdx) =>
@@ -407,7 +446,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
               size: s,
               sku: `${rawCode}-${cClean}-${sClean}`,
               price_modifier: 0,
-              image_url: colorImages[c] || defaultFeatured || null
+              image_url: colorImages[c] || uploadedFeaturedImageUrl
             };
           })
         );
@@ -417,7 +456,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
           size: values.size || null,
           sku: autoCode || values.product_code || 'PRD',
           price_modifier: 0,
-          image_url: (values.color && colorImages[values.color]) || defaultFeatured || null
+          image_url: (values.color && colorImages[values.color]) || uploadedFeaturedImageUrl
         }];
       }
 
@@ -432,7 +471,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
         cost_price: values.cost_price,
         selling_price: values.selling_price,
         is_ecom_listed: Boolean(values.is_ecom_listed),
-        featured_image: defaultFeatured,
+        featured_image: uploadedFeaturedImageUrl,
         color_images: colorImages,
         variants: variantsPayload
       };
@@ -445,10 +484,11 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
         setGeneratedVariants([]);
         setColorImages({});
         setCreateImageUrl('');
+        setModelFileList([]);
         fetchProducts();
       }
     } catch (err) {
-      message.error(err.response?.data?.message || 'فشل في حفظ المنتج');
+      message.error(err.response?.data?.message || err.message || 'فشل في حفظ المنتج');
     } finally {
       setSubmitting(false);
     }
@@ -728,6 +768,17 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
       key: 'actions',
       render: (_, record) => (
         <Space size="small">
+          <Tooltip title="معاينة ومراجعة بطاقة المنتج">
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewProductReview(record)}
+              style={{ borderColor: '#6366f1', color: '#6366f1' }}
+            >
+              معاينة
+            </Button>
+          </Tooltip>
+
           <Button
             type="primary"
             size="small"
@@ -813,7 +864,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
         rowKey="id"
         loading={loading}
         scroll={{ x: 'max-content' }}
-        pagination={{ pageSize: 15 }}
+        pagination={false}
         bordered
       />
 
@@ -902,6 +953,104 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
           >
             <Input placeholder="مثال: قميص أكسفورد كلاسيك رجالي..." size="large" />
           </Form.Item>
+
+          {/* Mandatory Model Image (Featured Image) */}
+          <div style={{ backgroundColor: '#f0fdfa', border: '1.5px solid #99f6e4', padding: '14px 16px', borderRadius: 8, marginBottom: 16 }}>
+            <Form.Item
+              name="featured_image"
+              label={
+                <Space>
+                  <PictureOutlined style={{ color: '#0f766e', fontSize: 16 }} />
+                  <Text strong style={{ color: '#0f766e', fontSize: 14 }}>صورة الموديل الأساسية (Main Model Image) *</Text>
+                </Space>
+              }
+              rules={[{ required: true, message: 'صورة الموديل مطلوبة كشرط أساسي' }]}
+              style={{ marginBottom: 4 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    width: 70,
+                    height: 70,
+                    borderRadius: 8,
+                    border: '1.5px dashed #0f766e',
+                    backgroundColor: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    flexShrink: 0
+                  }}
+                >
+                  {createImageUrl ? (
+                    <img
+                      src={createImageUrl}
+                      alt="Featured Model"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <CameraOutlined style={{ fontSize: 26, color: '#0f766e' }} />
+                  )}
+                </div>
+
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <Space style={{ marginBottom: 6 }}>
+                    <Upload
+                      beforeUpload={(file) => {
+                        setModelFileList([file]);
+                        const previewUrl = URL.createObjectURL(file);
+                        setCreateImageUrl(previewUrl);
+                        form.setFieldsValue({ featured_image: file.name });
+                        message.success(`تم اختيار ملف الصورة: ${file.name}`);
+                        return false; // Prevent automatic HTTP post, hold manually
+                      }}
+                      fileList={modelFileList}
+                      onRemove={() => {
+                        setModelFileList([]);
+                        setCreateImageUrl('');
+                        form.setFieldsValue({ featured_image: '' });
+                      }}
+                      maxCount={1}
+                      showUploadList={false}
+                      accept="image/*"
+                    >
+                      <Button icon={<UploadOutlined />} style={{ borderRadius: 6, fontWeight: 600 }}>
+                        {modelFileList.length > 0 ? 'تغيير صورة الموديل' : 'رفع صورة الموديل من الجهاز'}
+                      </Button>
+                    </Upload>
+                    {(modelFileList.length > 0 || createImageUrl) && (
+                      <Button
+                        danger
+                        type="text"
+                        icon={<DeleteOutlined />}
+                        onClick={() => {
+                          setModelFileList([]);
+                          setCreateImageUrl('');
+                          form.setFieldsValue({ featured_image: '' });
+                        }}
+                      >
+                        مسح
+                      </Button>
+                    )}
+                  </Space>
+                  <Input
+                    placeholder="أو أدخل رابط مباشر لصورة الموديل..."
+                    value={modelFileList.length > 0 ? `ملف محدد: ${modelFileList[0]?.name || 'صورة'}` : (createImageUrl || '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setModelFileList([]);
+                      setCreateImageUrl(val);
+                      form.setFieldsValue({ featured_image: val });
+                    }}
+                    style={{ fontSize: 12 }}
+                  />
+                </div>
+              </div>
+            </Form.Item>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', color: '#115e59', marginTop: 4 }}>
+              💡 صورة الموديل إلزامية وسيتم توريثها تلقائياً لكافة مقاسات وألوان الصنف المتولدة إذا لم تخصص صورة للون.
+            </Text>
+          </div>
 
           {/* 3. Group / Category with ON-THE-FLY Quick Add (matching Image 2) */}
           <div style={{ backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', padding: '12px 16px', borderRadius: 8, marginBottom: 16 }}>
@@ -1718,6 +1867,109 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
             </Space>
           </div>
         </Form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 👁️ PRODUCT CARD REVIEW & INSPECTION MODAL */}
+      {/* ========================================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <EyeOutlined style={{ color: '#6366f1', fontSize: 18 }} />
+            <span style={{ fontSize: 16, fontWeight: 'bold' }}>
+              معاينة وتدقيق بطاقة المنتج: {reviewedProduct?.product_name}
+            </span>
+          </div>
+        }
+        open={productReviewModalVisible}
+        onCancel={() => setProductReviewModalVisible(false)}
+        footer={<Button type="primary" onClick={() => setProductReviewModalVisible(false)}>إغلاق [Esc]</Button>}
+        width={700}
+        destroyOnHidden
+      >
+        {reviewedProduct && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', gap: 16, background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ width: 85, height: 85, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                {reviewedProduct.featured_image ? (
+                  <img src={reviewedProduct.featured_image} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <TagsOutlined style={{ fontSize: 32, color: '#94a3b8' }} />
+                )}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 'bold', fontSize: 16, color: '#0f172a' }}>{reviewedProduct.product_name}</div>
+                <Space size={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>
+                  {reviewedProduct.category_name && <Tag color="purple">{reviewedProduct.category_name}</Tag>}
+                  {reviewedProduct.brand && <Tag color="blue">{reviewedProduct.brand}</Tag>}
+                  <Tag color={reviewedProduct.status === 'active' ? 'green' : 'orange'}>
+                    {reviewedProduct.status === 'active' ? 'نشط' : 'معطل'}
+                  </Tag>
+                </Space>
+                <div style={{ marginTop: 6, fontSize: 12 }}>
+                  كود المنتج: <code style={{ fontWeight: 600 }}>{reviewedProduct.product_code}</code> | باركود: <code style={{ fontWeight: 600 }}>{reviewedProduct.barcode || '—'}</code>
+                </div>
+              </div>
+            </div>
+
+            <Card size="small" style={{ borderRadius: 8 }}>
+              <Row gutter={[16, 12]}>
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>سعر تكلفة الشراء:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#0f172a', marginTop: 2 }}>
+                    {parseFloat(reviewedProduct.cost_price || 0).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>سعر البيع للجمهور:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#2563eb', marginTop: 2 }}>
+                    {parseFloat(reviewedProduct.selling_price || 0).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>سعر الجملة:</Text>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#7c3aed', marginTop: 2 }}>
+                    {parseFloat(reviewedProduct.wholesale_price || 0).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>إجمالي الرصيد بالمخازن:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 16, marginTop: 2 }}>
+                    <Tag color={parseInt(reviewedProduct.total_stock || 0, 10) > 0 ? 'green' : 'red'} style={{ fontSize: 14, fontWeight: 'bold', padding: '2px 8px' }}>
+                      {reviewedProduct.total_stock || 0} قطعة
+                    </Tag>
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>هامش الربح التقديري:</Text>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#16a34a', marginTop: 2 }}>
+                    {(parseFloat(reviewedProduct.selling_price || 0) - parseFloat(reviewedProduct.cost_price || 0)).toLocaleString()} ج.م
+                  </div>
+                </Col>
+
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>عدد المتغيرات المعرفة:</Text>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2 }}>
+                    <Tag color="cyan">{reviewedProduct.variant_count || 0} متغير</Tag>
+                  </div>
+                </Col>
+
+                {reviewedProduct.description && (
+                  <Col span={24}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>وصف المنتج:</Text>
+                    <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: 6, marginTop: 2, fontSize: 13 }}>
+                      {reviewedProduct.description}
+                    </div>
+                  </Col>
+                )}
+              </Row>
+            </Card>
+          </div>
+        )}
       </Modal>
     </div>
   );

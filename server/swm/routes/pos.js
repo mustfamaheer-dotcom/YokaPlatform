@@ -523,7 +523,12 @@ router.post('/session/cash-in-out', requireAuth, requireBranchScope, async (req,
  */
 router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    let branchId = req.scopedBranchId;
+    if (!branchId || branchId === 'all' || isNaN(parseInt(branchId, 10))) {
+      branchId = 1;
+    } else {
+      branchId = parseInt(branchId, 10);
+    }
     const { query: searchQuery, category_id } = req.query;
 
     const whereClauses = [`p.status = 'active'`];
@@ -1265,6 +1270,116 @@ router.put('/settings', requireAuth, requireRole(['super_admin', 'admin', 'super
     }
 
     return res.json({ success: true, message: 'تم حفظ إعدادات الـ POS بنجاح' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/swm/pos/expense-categories
+ * Get expense categories synchronized across all branches
+ */
+router.get('/expense-categories', requireAuth, async (req, res) => {
+  try {
+    const rows = await query(`SELECT value FROM store_settings WHERE key = 'pos_allowed_expense_recipients'`);
+    let categories = [
+      'سلفة موظف / بائع (Employee Advance)',
+      'مصروف عام (General Expense)',
+      'صيانة وتجهيزات (Maintenance)',
+      'فواتير ومرافق (كهرباء / مياه / إنترنت)',
+      'ضيافة ونثريات وبوفيه (Hospitality)',
+      'شحن ونقل بضاعة عاجلة (Shipping)',
+      'نظافة ومهمات',
+      'مصروفات تشغيلية أخرى (Other)'
+    ];
+    if (rows.length > 0 && rows[0].value) {
+      try {
+        const parsed = JSON.parse(rows[0].value);
+        if (Array.isArray(parsed) && parsed.length > 0) categories = parsed;
+      } catch (e) {}
+    }
+    return res.json({ success: true, data: categories });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/swm/pos/expense-categories
+ * Add an expense category across all branches
+ */
+router.post('/expense-categories', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { category } = req.body;
+    if (!category || !category.trim()) {
+      return res.status(400).json({ success: false, message: 'يرجى إدخال اسم تصنيف المصروف' });
+    }
+    const cleanCat = category.trim();
+
+    const rows = await query(`SELECT value FROM store_settings WHERE key = 'pos_allowed_expense_recipients'`);
+    let categories = [];
+    if (rows.length > 0 && rows[0].value) {
+      try {
+        categories = JSON.parse(rows[0].value);
+      } catch (e) {}
+    }
+    if (!Array.isArray(categories) || categories.length === 0) {
+      categories = [
+        'سلفة موظف / بائع (Employee Advance)',
+        'مصروف عام (General Expense)',
+        'صيانة وتجهيزات (Maintenance)',
+        'فواتير ومرافق (كهرباء / مياه / إنترنت)',
+        'ضيافة ونثريات وبوفيه (Hospitality)',
+        'شحن ونقل بضاعة عاجلة (Shipping)',
+        'نظافة ومهمات',
+        'مصروفات تشغيلية أخرى (Other)'
+      ];
+    }
+    if (!categories.includes(cleanCat)) {
+      categories.push(cleanCat);
+    }
+    await query(
+      `INSERT INTO store_settings (key, value, updated_at) VALUES ('pos_allowed_expense_recipients', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [JSON.stringify(categories)]
+    );
+
+    // Also sync with withdrawal_reasons if table exists
+    await query(
+      `INSERT INTO withdrawal_reasons (title, category) VALUES ($1, 'operational') ON CONFLICT (title) DO NOTHING`,
+      [cleanCat]
+    ).catch(() => {});
+
+    return res.json({ success: true, data: categories, message: `تم إضافة التصنيف "${cleanCat}" بنجاح وتعميمه على كافة الفروع` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * DELETE /api/swm/pos/expense-categories
+ * Remove an expense category across all branches
+ */
+router.delete('/expense-categories', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { category } = req.body;
+    if (!category) return res.status(400).json({ success: false, message: 'يرجى تحديد التصنيف المراد حذفه' });
+
+    const rows = await query(`SELECT value FROM store_settings WHERE key = 'pos_allowed_expense_recipients'`);
+    let categories = [];
+    if (rows.length > 0 && rows[0].value) {
+      try {
+        categories = JSON.parse(rows[0].value);
+      } catch (e) {}
+    }
+    categories = categories.filter(c => c !== category);
+    await query(
+      `INSERT INTO store_settings (key, value, updated_at) VALUES ('pos_allowed_expense_recipients', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [JSON.stringify(categories)]
+    );
+
+    return res.json({ success: true, data: categories, message: `تم حذف التصنيف "${category}" من كافة الفروع` });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

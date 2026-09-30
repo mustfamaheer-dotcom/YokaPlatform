@@ -52,6 +52,13 @@ router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', '
       pIdx++;
     }
 
+    const { category_id } = req.query;
+    if (category_id && category_id !== 'all') {
+      whereClauses.push(`p.category_id = $${pIdx}`);
+      params.push(parseInt(category_id, 10));
+      pIdx++;
+    }
+
     const sql = `
       SELECT
         ib.id AS balance_id,
@@ -66,16 +73,20 @@ router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', '
         pv.variant_sku,
         pv.color,
         pv.size,
+        COALESCE(pv.image_url, p.featured_image) AS image_url,
+        p.category_id,
+        c.category_name,
         CASE
           WHEN pv.id IS NOT NULL THEN CONCAT(p.product_name, ' (', COALESCE(pv.color, ''), ' - ', COALESCE(pv.size, ''), ')')
           ELSE p.product_name
         END AS display_name
       FROM inventory_balances ib
       JOIN products p ON p.id = ib.product_id
+      LEFT JOIN product_categories c ON c.id = p.category_id
       LEFT JOIN product_variants pv ON pv.id = ib.variant_id
       WHERE ${whereClauses.join(' AND ')}
       ORDER BY p.product_name ASC
-      LIMIT 100
+      LIMIT 1000
     `;
 
     const rows = await query(sql, params);
@@ -92,9 +103,9 @@ router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', '
  */
 router.get('/', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
   try {
-    const { from_branch_id, to_branch_id, date, search, page = 1, limit = 25 } = req.query;
+    const { from_branch_id, to_branch_id, date, search, page = 1, limit = 5000 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const limitNum = Math.max(1, Math.min(10000, parseInt(limit, 10) || 5000));
     const offset = (pageNum - 1) * limitNum;
 
     const whereClauses = ['1=1'];

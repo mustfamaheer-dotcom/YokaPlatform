@@ -113,7 +113,7 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
         status: filterStatus !== 'all' ? filterStatus : undefined,
         search: searchKeyword.trim() || undefined,
         page,
-        limit: pagination.pageSize
+        limit: 5000
       };
       const res = await api.get('/api/swm/stock-adjustments', { params });
       if (res.data.success) {
@@ -759,13 +759,7 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
           columns={voucherColumns}
           rowKey="id"
           loading={loading}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
-            onChange: (p) => fetchVouchers(p),
-            showTotal: (total) => `إجمالي السندات: ${total}`
-          }}
+          pagination={false}
           size="middle"
         />
       </Card>
@@ -1023,7 +1017,7 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
             dataSource={voucherItems}
             columns={drawerItemColumns}
             rowKey="key"
-            pagination={{ pageSize: 50 }}
+            pagination={false}
             scroll={{ y: 380 }}
             locale={{ emptyText: 'لم تتم إضافة أية أصناف بعد. ابحث عن صنف لإضافته، أو انقر على "إضافة الأصناف المتاح منها رصيد"' }}
           />

@@ -18,7 +18,8 @@ import {
   Col,
   Statistic,
   Radio,
-  Divider
+  Divider,
+  InputNumber
 } from 'antd';
 import {
   UserAddOutlined,
@@ -139,6 +140,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
       phone: user.phone,
       role: user.role,
       branch_id: user.branch_id || undefined,
+      salary: user.salary ? parseFloat(user.salary) : undefined,
       status: user.status,
       password: ''
     });
@@ -349,6 +351,16 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
       dataIndex: 'phone',
       key: 'phone',
       render: (p) => p || '—'
+    },
+    {
+      title: 'المرتب الشهري',
+      dataIndex: 'salary',
+      key: 'salary',
+      render: (s) => s ? (
+        <Text strong style={{ color: '#15803d', fontSize: 13 }}>
+          {parseFloat(s).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+        </Text>
+      ) : <Text type="secondary">—</Text>
     },
     {
       title: 'الحالة',
@@ -590,68 +602,63 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
       {/* CREATE USER MODAL */}
       <Modal
-        title="إضافة موظف / مستخدم جديد للنظام"
+        title="إضافة موظف جديد"
         open={isCreateModalOpen}
         onCancel={() => setIsCreateModalOpen(false)}
         footer={null}
         destroyOnHidden
+        width={540}
       >
-        <Form form={createForm} layout="vertical" onFinish={handleCreate}>
+        <Form
+          form={createForm}
+          layout="vertical"
+          onFinish={handleCreate}
+          initialValues={{
+            role: 'salesperson',
+            password: '123456'
+          }}
+        >
+          {/* 1. اسم الموظف */}
           <Form.Item
-            label="اسم المستخدم (Username - لتسجيل الدخول)"
-            name="username"
-            rules={[{ required: true, message: 'يرجى إدخال اسم المستخدم' }]}
-          >
-            <Input placeholder="مثال: ahmed_pos" />
-          </Form.Item>
-
-          <Form.Item
-            label="الاسم بالكامل"
+            label="اسم الموظف بالكامل"
             name="full_name"
-            rules={[{ required: true, message: 'يرجى إدخال الاسم بالكامل' }]}
+            rules={[{ required: true, message: 'يرجى إدخال اسم الموظف بالكامل' }]}
           >
-            <Input placeholder="أحمد محمود" />
+            <Input placeholder="مثال: أحمد محمد علي" size="large" />
           </Form.Item>
 
+          {/* 2. رقم الهاتف */}
           <Form.Item
-            label="كلمة المرور"
-            name="password"
-            rules={[{ required: true, message: 'يرجى إدخال كلمة المرور' }]}
-          >
-            <Input.Password placeholder="••••••••" />
-          </Form.Item>
-
-          <Form.Item
-            label="الدور الوظيفي (Role)"
-            name="role"
-            rules={[{ required: true, message: 'يرجى اختيار الدور' }]}
-            initialValue="salesperson"
-          >
-            <Select>
-              {assignableRoles.map((r) => (
-                <Option key={r.value} value={r.value}>{r.label}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="الفرع المعين به"
-            name="branch_id"
+            label="رقم الهاتف"
+            name="phone"
             rules={[
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  const role = getFieldValue('role');
-                  if (['supervisor', 'salesperson'].includes(role) && !value) {
-                    return Promise.reject(new Error('يجب تحديد فرع العمل لموظفي الفروع (مشرف / بائع).'));
-                  }
-                  return Promise.resolve();
-                }
-              })
+              { required: true, message: 'يرجى إدخال رقم الهاتف' },
+              { pattern: /^[0-9+]{8,15}$/, message: 'يرجى إدخال رقم هاتف صحيح' }
             ]}
           >
-            <Select placeholder="اختر الفرع التابع له الموظف" allowClear>
+            <Input
+              placeholder="مثال: 01012345678"
+              size="large"
+              onChange={(e) => {
+                const phoneVal = e.target.value.trim();
+                if (phoneVal) {
+                  createForm.setFieldsValue({ username: phoneVal });
+                }
+              }}
+            />
+          </Form.Item>
+
+          {/* 3. الفرع المعين له */}
+          <Form.Item
+            label="الفرع المعين له"
+            name="branch_id"
+            rules={[{ required: true, message: 'يرجى تحديد الفرع المعين له الموظف' }]}
+          >
+            <Select placeholder="اختر الفرع التابع له الموظف" size="large" allowClear>
               {branches.map((b) => (
-                <Option key={b.id} value={b.id}>{b.branch_name} ({b.branch_code})</Option>
+                <Option key={b.id} value={b.id}>
+                  {b.branch_name} ({b.branch_code}) - {b.branch_type === 'main_warehouse' ? 'مستودع رئيسي' : (b.branch_type === 'ecom_warehouse' ? 'متجر إلكتروني' : 'فرع تجزئة')}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -662,7 +669,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             if (b.branch_type === 'ecom_warehouse' || b.branch_code === 'BR-ECOM') {
               return (
                 <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#7e22ce' }}>
-                  🛒 <strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها (بدون شاشة كاشير POS).
+                  🛒 <strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها.
                 </div>
               );
             }
@@ -676,15 +683,66 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             return null;
           })()}
 
-          <Form.Item label="رقم الهاتف" name="phone">
-            <Input placeholder="+201000000000" />
+          {/* 4. المرتب الشهري */}
+          <Form.Item
+            label="المرتب الشهري"
+            name="salary"
+            rules={[{ required: true, message: 'يرجى إدخال المرتب الشهري' }]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              size="large"
+              placeholder="مثال: 5000"
+              precision={2}
+              addonAfter="ج.م"
+              min={0}
+            />
           </Form.Item>
 
-          <div style={{ textAlign: 'left', marginTop: 16 }}>
+          <Divider style={{ margin: '16px 0 12px', fontSize: 13, color: '#64748b' }}>
+            بيانات الدخول للنظام (اختيارية / مولدة تلقائياً)
+          </Divider>
+
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item
+                label="اسم المستخدم (Username)"
+                name="username"
+                rules={[{ required: true, message: 'يرجى إدخال اسم المستخدم' }]}
+                extra="افتراضياً رقم هاتف الموظف"
+              >
+                <Input placeholder="اسم المستخدم" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="كلمة المرور"
+                name="password"
+                rules={[{ required: true, message: 'يرجى إدخال كلمة المرور' }]}
+                extra="الافتراضية: 123456"
+              >
+                <Input.Password placeholder="123456" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            label="الدور الوظيفي (Role)"
+            name="role"
+            rules={[{ required: true, message: 'يرجى اختيار الدور' }]}
+          >
+            <Select>
+              {assignableRoles.map((r) => (
+                <Option key={r.value} value={r.value}>{r.label}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <div style={{ textAlign: 'left', marginTop: 20 }}>
             <Space>
               <Button onClick={() => setIsCreateModalOpen(false)}>إلغاء</Button>
               <Button type="primary" htmlType="submit" style={{ backgroundColor: '#4f46e5' }}>
-                حفظ الحساب وتفعيله
+                حفظ بيانات الموظف
               </Button>
             </Space>
           </div>
@@ -760,6 +818,16 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
           <Form.Item label="رقم الهاتف" name="phone">
             <Input placeholder="+201000000000" />
+          </Form.Item>
+
+          <Form.Item label="المرتب الشهري" name="salary">
+            <InputNumber
+              style={{ width: '100%' }}
+              placeholder="5000"
+              precision={2}
+              addonAfter="ج.م"
+              min={0}
+            />
           </Form.Item>
 
           <Form.Item

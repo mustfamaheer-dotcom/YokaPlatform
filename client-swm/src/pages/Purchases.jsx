@@ -36,6 +36,8 @@ import {
   EyeOutlined,
   PrinterOutlined,
   CheckCircleOutlined,
+  CheckOutlined,
+  MinusOutlined,
   DollarCircleOutlined,
   RollbackOutlined,
   ShoppingOutlined,
@@ -74,7 +76,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   const [search, setSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 1000, total: 0 });
 
   // Lookup data
   const [suppliersList, setSuppliersList] = useState([]);
@@ -156,7 +158,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   const [returnsList, setReturnsList] = useState([]);
   const [returnsLoading, setReturnsLoading] = useState(false);
   const [returnsSearch, setReturnsSearch] = useState('');
-  const [returnsPagination, setReturnsPagination] = useState({ current: 1, pageSize: 15, total: 0 });
+  const [returnsPagination, setReturnsPagination] = useState({ current: 1, pageSize: 1000, total: 0 });
 
   // 2.1 Standalone Return Invoice Drawer State (WITHOUT needing past invoice)
   const [isStandaloneReturnOpen, setIsStandaloneReturnOpen] = useState(false);
@@ -184,6 +186,22 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [returnDetailsOpen, setReturnDetailsOpen] = useState(false);
   const [returnDetailsLoading, setReturnDetailsLoading] = useState(false);
+
+  // 3. F1 Product Search & Picker Modal State (POS-Style)
+  const [f1ModalOpen, setF1ModalOpen] = useState(false);
+  const [f1SearchTarget, setF1SearchTarget] = useState('invoice'); // 'invoice' | 'return'
+  const [f1TargetItemKey, setF1TargetItemKey] = useState(null);
+  const [f1SearchQuery, setF1SearchQuery] = useState('');
+  const [f1CategoryFilter, setF1CategoryFilter] = useState('all');
+  const [f1SearchResults, setF1SearchResults] = useState([]);
+  const [f1Loading, setF1Loading] = useState(false);
+  const f1SearchInputRef = useRef(null);
+
+  // POS Direct Barcode Station & Row Input Refs
+  const [topBarcodeInput, setTopBarcodeInput] = useState('');
+  const topBarcodeInputRef = useRef(null);
+  const manualRowInputRefs = useRef({});
+  const manualReturnRowInputRefs = useRef({});
 
   const printAreaRef = useRef(null);
   const printReturnAreaRef = useRef(null);
@@ -246,9 +264,9 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   const fetchLookups = async () => {
     try {
       const [supRes, brRes, prodRes, catRes, colorsRes, sizesRes] = await Promise.all([
-        api.get('/api/swm/suppliers', { params: { limit: 100 } }),
+        api.get('/api/swm/suppliers', { params: { limit: 200 } }),
         api.get('/api/swm/branches'),
-        api.get('/api/swm/products', { params: { limit: 500, status: 'active', has_category: 'true' } }),
+        api.get('/api/swm/products', { params: { limit: 5000, status: 'active', has_category: 'true' } }),
         api.get('/api/swm/categories'),
         api.get('/api/swm/attributes', { params: { type: 'color' } }),
         api.get('/api/swm/attributes', { params: { type: 'size' } })
@@ -286,7 +304,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   const handleRefreshProductsList = async () => {
     setRefreshingProducts(true);
     try {
-      const res = await api.get('/api/swm/products', { params: { limit: 500, status: 'active', has_category: 'true' } });
+      const res = await api.get('/api/swm/products', { params: { limit: 5000, status: 'active', has_category: 'true' } });
       if (res.data.success) {
         const registeredProds = (res.data.data || []).filter(p => p.status === 'active' && p.category_id);
         setProductsList(registeredProds);
@@ -310,22 +328,14 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   // ==========================================
 
   const calculateSubtotal = () => {
-    return items.reduce((sum, it) => {
-      const itTotal = (it.variantRows || []).reduce((vSum, row) => {
-        if (!row.enabled || !row.quantity || row.quantity <= 0) return vSum;
-        return vSum + (parseFloat(row.line_total) || 0);
-      }, 0);
-      return sum + itTotal;
+    return items.filter(it => !it.isManualRow).reduce((sum, it) => {
+      return sum + (parseFloat(it.line_total) || 0);
     }, 0);
   };
 
   const calculateTotalPieces = () => {
-    return items.reduce((sum, it) => {
-      const itQty = (it.variantRows || []).reduce((vSum, row) => {
-        if (!row.enabled || !row.quantity || row.quantity <= 0) return vSum;
-        return vSum + (parseInt(row.quantity, 10) || 0);
-      }, 0);
-      return sum + itQty;
+    return items.filter(it => !it.isManualRow).reduce((sum, it) => {
+      return sum + (parseInt(it.quantity, 10) || 0);
     }, 0);
   };
 
@@ -335,151 +345,418 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
     calculatedSubtotal - (parseFloat(discountTotal) || 0) + (parseFloat(taxTotal) || 0) + (parseFloat(shippingCost) || 0)
   );
 
+  // Step 1 [F11]: Add empty row for manual typing or barcode scan
   const handleAddItem = () => {
+    const newKey = `manual-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     setItems(prev => [
       ...prev,
       {
-        key: Date.now() + Math.random(),
+        key: newKey,
+        isManualRow: true,
         product_id: null,
+        variant_id: null,
         product_name: '',
         product_code: '',
+        barcode: '',
+        color: null,
+        size: null,
+        display_name: '',
         category_name: '',
-        loadingVariants: false,
-        batchQty: null,
-        batchCost: null,
-        batchSelling: null,
-        variantRows: []
+        quantity: 1,
+        unit_cost: 0,
+        selling_price: 0,
+        discount_pct: 0,
+        line_total: 0
       }
     ]);
+    message.info('سطر جديد [F11]: اكتب الباركود واضغط Enter، أو اضغط F1 للبحث بالمجاميع');
+    setTimeout(() => {
+      manualRowInputRefs.current[newKey]?.focus();
+    }, 100);
   };
 
-  const handleSelectProduct = async (itemKey, productId) => {
-    const prodMeta = productsList.find(p => p.id === productId);
-    if (!prodMeta) return;
+  // Populate product / variant into specified row
+  const populateProductIntoRow = (rowKey, prod) => {
+    const cost = parseFloat(prod.cost_price) || 0;
+    const selling = parseFloat(prod.selling_price || prod.unit_price) || 0;
+    const finalKey = `${prod.product_id || prod.id}-${prod.variant_id || 'base'}`;
 
-    // Set loading indicator for this item
-    setItems(prev => prev.map(it => it.key === itemKey ? {
-      ...it,
-      product_id: productId,
-      product_name: prodMeta.product_name,
-      product_code: prodMeta.product_code || prodMeta.barcode || '',
-      category_name: prodMeta.category_name || '',
-      loadingVariants: true,
-      variantRows: []
-    } : it));
+    setItems(prev => {
+      const existing = prev.find(it => it.key === finalKey && it.key !== rowKey);
+      if (existing) {
+        const newQty = (parseInt(existing.quantity, 10) || 0) + 1;
+        const lineTotal = newQty * (parseFloat(existing.unit_cost) || 0);
+        return prev
+          .filter(it => it.key !== rowKey)
+          .map(it => it.key === finalKey ? { ...it, quantity: newQty, line_total: lineTotal } : it);
+      }
 
-    try {
-      const res = await api.get(`/api/swm/products/${productId}`);
-      const fullProd = res.data?.data;
-      const variants = fullProd?.variants || [];
-      const baseCost = parseFloat(fullProd?.cost_price || prodMeta.cost_price) || 0;
-      const baseSelling = parseFloat(fullProd?.selling_price || prodMeta.selling_price) || 0;
-
-      let variantRows = [];
-      if (variants.length > 0) {
-        variantRows = variants.map(v => {
-          const cost = parseFloat(v.cost_price) || baseCost;
-          const selling = parseFloat(v.selling_price) || baseSelling;
+      return prev.map(it => {
+        if (it.key === rowKey) {
+          const qty = it.quantity > 0 ? it.quantity : 1;
           return {
-            key: v.id,
-            variant_id: v.id,
-            color: v.color || '',
-            size: v.size || '',
-            sku: v.variant_sku || '',
-            enabled: true,
-            quantity: 1,
+            key: finalKey,
+            isManualRow: false,
+            product_id: prod.product_id || prod.id,
+            variant_id: prod.variant_id || null,
+            product_name: prod.product_name,
+            product_code: prod.product_code || '',
+            barcode: prod.variant_sku || prod.barcode || '',
+            color: prod.color || null,
+            size: prod.size || null,
+            display_name: prod.display_name || (prod.variant_sku ? `${prod.product_name} (${prod.color || ''} / ${prod.size || ''})` : prod.product_name),
+            category_name: prod.category_name || '',
+            quantity: qty,
             unit_cost: cost,
             selling_price: selling,
             discount_pct: 0,
-            line_total: cost
+            line_total: qty * cost
           };
-        });
-      } else {
-        // Fallback for simple product without variants
-        variantRows = [
-          {
-            key: 'base',
-            variant_id: null,
-            color: null,
-            size: null,
-            sku: fullProd?.product_code || prodMeta.product_code || '—',
-            enabled: true,
-            quantity: 1,
-            unit_cost: baseCost,
-            selling_price: baseSelling,
-            discount_pct: 0,
-            line_total: baseCost
-          }
-        ];
-      }
+        }
+        return it;
+      });
+    });
+  };
 
-      setItems(prev => prev.map(it => it.key === itemKey ? {
-        ...it,
-        loadingVariants: false,
-        variantRows
-      } : it));
-    } catch (err) {
-      message.error('تعذر جلب تفاصيل مقاسات وألوان الصنف');
-      setItems(prev => prev.map(it => it.key === itemKey ? { ...it, loadingVariants: false } : it));
+  // Add Product directly into invoice (auto targets empty manual row or appends new)
+  const addProductToInvoice = (prod) => {
+    const emptyRow = items.find(it => it.isManualRow);
+    if (emptyRow) {
+      populateProductIntoRow(emptyRow.key, prod);
+    } else {
+      const tempKey = `temp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      setItems(prev => [
+        ...prev,
+        {
+          key: tempKey,
+          isManualRow: true,
+          product_id: null,
+          variant_id: null,
+          product_name: '',
+          product_code: '',
+          barcode: '',
+          quantity: 1,
+          unit_cost: 0,
+          selling_price: 0,
+          discount_pct: 0,
+          line_total: 0
+        }
+      ]);
+      populateProductIntoRow(tempKey, prod);
     }
   };
 
-  const handleUpdateVariantRow = (itemKey, variantKey, field, value) => {
+  // Update item fields in table
+  const handleUpdateItemRow = (rowKey, field, val) => {
     setItems(prev => prev.map(it => {
-      if (it.key !== itemKey) return it;
-      const updatedVariantRows = it.variantRows.map(row => {
-        if (row.key !== variantKey) return row;
-        const updated = { ...row, [field]: value };
-        const qty = parseInt(updated.quantity, 10) || 0;
-        const cost = parseFloat(updated.unit_cost) || 0;
-        const disc = parseFloat(updated.discount_pct) || 0;
-        const discAmount = (qty * cost) * (disc / 100);
-        updated.line_total = Math.max(0, (qty * cost) - discAmount);
-        return updated;
-      });
-      return { ...it, variantRows: updatedVariantRows };
+      if (it.key !== rowKey) return it;
+      const updated = { ...it, [field]: val };
+      const qty = parseInt(updated.quantity, 10) || 0;
+      const cost = parseFloat(updated.unit_cost) || 0;
+      const disc = parseFloat(updated.discount_pct) || 0;
+      const discAmount = (qty * cost) * (disc / 100);
+      updated.line_total = Math.max(0, (qty * cost) - discAmount);
+      return updated;
     }));
   };
 
-  const handleBatchUpdate = (itemKey, field, val) => {
+  // Plus / Minus Quantity Buttons
+  const updateItemQty = (key, delta) => {
     setItems(prev => prev.map(it => {
-      if (it.key !== itemKey) return it;
-      return { ...it, [field]: val };
-    }));
-  };
-
-  const handleApplyBatch = (itemKey, targetField, val) => {
-    if (val === undefined || val === null || val === '') return;
-    const numVal = parseFloat(val) || 0;
-    setItems(prev => prev.map(it => {
-      if (it.key !== itemKey) return it;
-      const updatedRows = (it.variantRows || []).map(row => {
-        const updated = { ...row, [targetField]: numVal };
-        const qty = parseInt(updated.quantity, 10) || 0;
-        const cost = parseFloat(updated.unit_cost) || 0;
-        const disc = parseFloat(updated.discount_pct) || 0;
-        const discAmount = (qty * cost) * (disc / 100);
-        updated.line_total = Math.max(0, (qty * cost) - discAmount);
-        return updated;
-      });
-      return { ...it, variantRows: updatedRows };
-    }));
-    message.success('تم تطبيق القيمة بنجاح على كافة المتغيرات');
-  };
-
-  const handleToggleSelectAll = (itemKey, enabled) => {
-    setItems(prev => prev.map(it => {
-      if (it.key !== itemKey) return it;
-      const updatedVariantRows = (it.variantRows || []).map(row => ({
-        ...row,
-        enabled
-      }));
-      return { ...it, variantRows: updatedVariantRows };
+      if (it.key !== key) return it;
+      const newQty = Math.max(1, (parseInt(it.quantity, 10) || 0) + delta);
+      const cost = parseFloat(it.unit_cost) || 0;
+      const disc = parseFloat(it.discount_pct) || 0;
+      const discAmount = (newQty * cost) * (disc / 100);
+      return {
+        ...it,
+        quantity: newQty,
+        line_total: Math.max(0, (newQty * cost) - discAmount)
+      };
     }));
   };
 
   const handleRemoveItem = (key) => {
-    setItems(items.filter(it => it.key !== key));
+    setItems(prev => prev.filter(it => it.key !== key));
+  };
+
+  // Barcode scanned / typed in row input
+  const handleManualRowBarcodeSubmit = async (rowKey, inputCode) => {
+    if (!inputCode || !inputCode.trim()) return;
+    const clean = inputCode.trim();
+
+    try {
+      const effectiveBranch = selectedBranch || defaultBranchId || 1;
+      const res = await api.get('/api/swm/pos/search', {
+        params: { query: clean, branch_id: effectiveBranch }
+      });
+
+      if (res.data.success && res.data.data.length > 0) {
+        const results = res.data.data;
+        if (results.length === 1) {
+          populateProductIntoRow(rowKey, results[0]);
+          message.success(`تم إدراج الصنف: ${results[0].display_name}`);
+        } else {
+          handleOpenF1SearchModal('invoice', rowKey, clean);
+        }
+      } else {
+        const localMatches = productsList.filter(p =>
+          (p.barcode && p.barcode.toLowerCase() === clean.toLowerCase()) ||
+          (p.product_code && p.product_code.toLowerCase() === clean.toLowerCase()) ||
+          (p.product_name && p.product_name.toLowerCase().includes(clean.toLowerCase()))
+        );
+
+        if (localMatches.length === 1) {
+          const prodRes = await api.get(`/api/swm/products/${localMatches[0].id}`);
+          const fullProd = prodRes.data?.data;
+          const variants = fullProd?.variants || [];
+          if (variants.length <= 1) {
+            populateProductIntoRow(rowKey, {
+              product_id: fullProd.id,
+              variant_id: variants[0]?.id || null,
+              product_name: fullProd.product_name,
+              product_code: fullProd.product_code,
+              barcode: variants[0]?.variant_sku || fullProd.barcode,
+              color: variants[0]?.color || null,
+              size: variants[0]?.size || null,
+              category_name: fullProd.category_name,
+              cost_price: parseFloat(variants[0]?.cost_price || fullProd.cost_price) || 0,
+              selling_price: parseFloat(variants[0]?.selling_price || fullProd.selling_price) || 0
+            });
+            message.success(`تم إدراج: ${fullProd.product_name}`);
+          } else {
+            handleOpenF1SearchModal('invoice', rowKey, clean);
+          }
+        } else {
+          handleOpenF1SearchModal('invoice', rowKey, clean);
+          message.warning(`لم يتم العثور على صنف مطابق للكود "${clean}". تم فتح نافذة البحث الموسع (F1)...`);
+        }
+      }
+    } catch (err) {
+      handleOpenF1SearchModal('invoice', rowKey, clean);
+    }
+  };
+
+  // Barcode scanned / typed in Top POS Barcode Station
+  const handleTopBarcodeScan = async (inputVal) => {
+    if (!inputVal || !inputVal.trim()) return;
+    const clean = inputVal.trim();
+    setTopBarcodeInput('');
+
+    try {
+      const effectiveBranch = selectedBranch || defaultBranchId || 1;
+      const res = await api.get('/api/swm/pos/search', {
+        params: { query: clean, branch_id: effectiveBranch }
+      });
+
+      if (res.data.success && res.data.data.length > 0) {
+        const results = res.data.data;
+        if (results.length === 1) {
+          addProductToInvoice(results[0]);
+          message.success(`تم إدراج: ${results[0].display_name}`);
+        } else {
+          handleOpenF1SearchModal('invoice', null, clean);
+        }
+      } else {
+        const localMatches = productsList.filter(p =>
+          (p.barcode && p.barcode.toLowerCase() === clean.toLowerCase()) ||
+          (p.product_code && p.product_code.toLowerCase() === clean.toLowerCase()) ||
+          (p.product_name && p.product_name.toLowerCase().includes(clean.toLowerCase()))
+        );
+
+        if (localMatches.length === 1) {
+          const prodRes = await api.get(`/api/swm/products/${localMatches[0].id}`);
+          const fullProd = prodRes.data?.data;
+          const variants = fullProd?.variants || [];
+          if (variants.length <= 1) {
+            addProductToInvoice({
+              product_id: fullProd.id,
+              variant_id: variants[0]?.id || null,
+              product_name: fullProd.product_name,
+              product_code: fullProd.product_code,
+              barcode: variants[0]?.variant_sku || fullProd.barcode,
+              color: variants[0]?.color || null,
+              size: variants[0]?.size || null,
+              display_name: fullProd.product_name,
+              category_name: fullProd.category_name,
+              cost_price: parseFloat(variants[0]?.cost_price || fullProd.cost_price) || 0,
+              selling_price: parseFloat(variants[0]?.selling_price || fullProd.selling_price) || 0
+            });
+            message.success(`تم إدراج: ${fullProd.product_name}`);
+          } else {
+            handleOpenF1SearchModal('invoice', null, clean);
+          }
+        } else {
+          handleOpenF1SearchModal('invoice', null, clean);
+          message.warning(`لم يتم العثور على تطابق فوري للكود "${clean}". تم فتح نافذة البحث الموسع (F1)...`);
+        }
+      }
+    } catch (e) {
+      handleOpenF1SearchModal('invoice', null, clean);
+    }
+  };
+
+  // ==========================================
+  // F1 PRODUCT SEARCH & SELECT MODAL (POS-Style)
+  // ==========================================
+
+  const fetchF1ModalCatalog = async (q = '', catId = 'all') => {
+    setF1Loading(true);
+    try {
+      const effectiveBranch = selectedBranch || defaultBranchId || 1;
+      const res = await api.get('/api/swm/pos/search', {
+        params: {
+          query: q?.trim() || undefined,
+          category_id: catId !== 'all' ? catId : undefined,
+          branch_id: effectiveBranch
+        }
+      });
+      if (res.data.success && Array.isArray(res.data.data)) {
+        setF1SearchResults(res.data.data);
+        setF1Loading(false);
+        return;
+      }
+    } catch (err) {
+      console.warn('POS search fallback:', err);
+    }
+
+    const qLower = (q || '').trim().toLowerCase();
+    const filtered = productsList.filter(p => {
+      if (catId !== 'all' && p.category_id !== catId) return false;
+      if (!qLower) return true;
+      return (p.product_name || '').toLowerCase().includes(qLower) ||
+             (p.product_code || '').toLowerCase().includes(qLower) ||
+             (p.barcode || '').toLowerCase().includes(qLower);
+    }).map(p => ({
+      product_id: p.id,
+      variant_id: null,
+      product_code: p.product_code,
+      barcode: p.barcode,
+      product_name: p.product_name,
+      display_name: p.product_name,
+      color: null,
+      size: null,
+      category_id: p.category_id,
+      category_name: p.category_name,
+      unit_price: parseFloat(p.selling_price) || 0,
+      cost_price: parseFloat(p.cost_price) || 0,
+      available_qty: parseInt(p.total_stock, 10) || 0
+    }));
+    setF1SearchResults(filtered);
+    setF1Loading(false);
+  };
+
+  const handleOpenF1SearchModal = (target = 'invoice', itemKey = null, initialQuery = '') => {
+    setF1SearchTarget(target);
+    setF1TargetItemKey(itemKey);
+    setF1SearchQuery(initialQuery);
+    setF1CategoryFilter('all');
+    setF1ModalOpen(true);
+    fetchF1ModalCatalog(initialQuery, 'all');
+    setTimeout(() => {
+      f1SearchInputRef.current?.focus();
+    }, 150);
+  };
+
+  const handleF1CategoryChange = (catId) => {
+    setF1CategoryFilter(catId);
+    fetchF1ModalCatalog(f1SearchQuery, catId);
+  };
+
+  const handleF1SearchQueryChange = (val) => {
+    setF1SearchQuery(val);
+    fetchF1ModalCatalog(val, f1CategoryFilter);
+  };
+
+  const handleSelectProductFromF1Modal = async (prod) => {
+    if (!prod) return;
+
+    if (f1SearchTarget === 'invoice') {
+      let targetKey = f1TargetItemKey;
+      if (targetKey) {
+        populateProductIntoRow(targetKey, prod);
+      } else {
+        addProductToInvoice(prod);
+      }
+      setF1ModalOpen(false);
+      message.success(`تم اختيار الصنف "${prod.display_name || prod.product_name}" للفاتورة بنجاح [F1]`);
+    } else if (f1SearchTarget === 'return') {
+      let targetKey = f1TargetItemKey;
+      if (!targetKey) {
+        const emptyItem = standaloneItems.find(it => it.isManualRow || !it.product_id);
+        if (emptyItem) {
+          targetKey = emptyItem.key;
+        } else {
+          targetKey = `ret-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          setStandaloneItems(prev => [
+            ...prev,
+            {
+              key: targetKey,
+              isManualRow: false,
+              product_id: null,
+              variant_id: null,
+              product_name: '',
+              product_code: '',
+              barcode: '',
+              quantity: 1,
+              unit_cost: 0,
+              line_total: 0
+            }
+          ]);
+        }
+      }
+      populateProductIntoReturnRow(targetKey, prod);
+      setF1ModalOpen(false);
+      message.success(`تم اختيار الصنف "${prod.display_name || prod.product_name}" للمرتجع بنجاح [F1]`);
+    }
+  };
+
+  // Add all variants of a product into the invoice at once
+  const handleAddAllVariantsOfProduct = async (productId) => {
+    try {
+      const res = await api.get(`/api/swm/products/${productId}`);
+      const fullProd = res.data?.data;
+      const variants = fullProd?.variants || [];
+      const baseCost = parseFloat(fullProd?.cost_price) || 0;
+      const baseSelling = parseFloat(fullProd?.selling_price) || 0;
+
+      if (variants.length > 0) {
+        variants.forEach(v => {
+          addProductToInvoice({
+            product_id: fullProd.id,
+            variant_id: v.id,
+            product_name: fullProd.product_name,
+            product_code: fullProd.product_code,
+            barcode: v.variant_sku || fullProd.barcode,
+            color: v.color,
+            size: v.size,
+            display_name: `${fullProd.product_name} (${v.color || ''} / ${v.size || ''})`,
+            category_name: fullProd.category_name,
+            cost_price: parseFloat(v.cost_price) || baseCost,
+            selling_price: parseFloat(v.selling_price) || baseSelling
+          });
+        });
+        message.success(`تم إدراج جميع مقاسات وألوان "${fullProd.product_name}" (${variants.length} صنف/متغير) بالفاتورة`);
+      } else {
+        addProductToInvoice({
+          product_id: fullProd.id,
+          variant_id: null,
+          product_name: fullProd.product_name,
+          product_code: fullProd.product_code,
+          barcode: fullProd.barcode,
+          color: null,
+          size: null,
+          display_name: fullProd.product_name,
+          category_name: fullProd.category_name,
+          cost_price: baseCost,
+          selling_price: baseSelling
+        });
+        message.success(`تم إدراج الصنف "${fullProd.product_name}" بالفاتورة`);
+      }
+      setF1ModalOpen(false);
+    } catch (e) {
+      message.error('فشل في جلب متغيرات الصنف');
+    }
   };
 
   // ==========================================
@@ -977,27 +1254,35 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
           const newProd = res.data.data;
           message.success(`تم إنشاء الصنف الجديد "${newProd.product_name}" بنجاح وإدراجه في الفاتورة!`);
           await fetchLookups();
+          await fetchProductsList();
+          fetchF1ModalCatalog(f1CategoryFilter, f1SearchQuery);
 
           if (targetInvoiceItemKey) {
-            await handleSelectProduct(targetInvoiceItemKey, newProd.id);
+            populateProductIntoRow(targetInvoiceItemKey, {
+              product_id: newProd.id,
+              variant_id: null,
+              product_name: newProd.product_name,
+              product_code: newProd.product_code,
+              barcode: newProd.barcode,
+              color: values.color || null,
+              size: values.size || null,
+              category_name: categoriesList.find(c => c.id === newProd.category_id)?.category_name || '',
+              cost_price: Number(values.cost_price || 0),
+              selling_price: Number(values.selling_price || 0)
+            });
           } else {
-            const newKey = Date.now();
-            setItems(prev => [
-              ...prev,
-              {
-                key: newKey,
-                product_id: newProd.id,
-                product_name: newProd.product_name,
-                product_code: newProd.product_code,
-                category_name: categoriesList.find(c => c.id === newProd.category_id)?.category_name || '',
-                loadingVariants: true,
-                batchQty: null,
-                batchCost: null,
-                batchSelling: null,
-                variantRows: []
-              }
-            ]);
-            await handleSelectProduct(newKey, newProd.id);
+            addProductToInvoice({
+              product_id: newProd.id,
+              variant_id: null,
+              product_name: newProd.product_name,
+              product_code: newProd.product_code,
+              barcode: newProd.barcode,
+              color: values.color || null,
+              size: values.size || null,
+              category_name: categoriesList.find(c => c.id === newProd.category_id)?.category_name || '',
+              cost_price: Number(values.cost_price || 0),
+              selling_price: Number(values.selling_price || 0)
+            });
           }
 
           setMasterProductModalOpen(false);
@@ -1047,13 +1332,22 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
           await fetchLookups();
 
           // Refresh all invoice items pointing to this product
-          const matchingItems = items.filter(it => it.product_id === editingMasterProduct.id);
-          for (const item of matchingItems) {
-            await handleSelectProduct(item.key, editingMasterProduct.id);
-          }
-          if (targetInvoiceItemKey && !matchingItems.some(it => it.key === targetInvoiceItemKey)) {
-            await handleSelectProduct(targetInvoiceItemKey, editingMasterProduct.id);
-          }
+          setItems(prev => prev.map(it => {
+            if (it.product_id !== editingMasterProduct.id) return it;
+            const cost = Number(values.cost_price ?? it.unit_cost);
+            const disc = parseFloat(it.discount_pct) || 0;
+            const qty = parseInt(it.quantity, 10) || 1;
+            const discAmount = (qty * cost) * (disc / 100);
+            return {
+              ...it,
+              product_name: values.product_name || it.product_name,
+              product_code: values.product_code || it.product_code,
+              barcode: values.barcode || it.barcode,
+              unit_cost: cost,
+              selling_price: Number(values.selling_price ?? it.selling_price),
+              line_total: Math.max(0, (qty * cost) - discAmount)
+            };
+          }));
 
           setMasterProductModalOpen(false);
           setEditingMasterProduct(null);
@@ -1069,27 +1363,21 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
   // Barcode Printing Helpers
   const handleOpenBarcodePrintFromCurrentDrawer = () => {
-    const printItems = [];
-    items.forEach(it => {
-      (it.variantRows || []).forEach(row => {
-        if (row.enabled && row.quantity > 0) {
-          printItems.push({
-            product_id: it.product_id,
-            product_name: it.product_name,
-            product_code: it.product_code || row.sku || '',
-            barcode: row.sku || it.product_code || '',
-            color: row.color || '',
-            size: row.size || '',
-            unit_cost: row.unit_cost,
-            selling_price: row.selling_price,
-            quantity: parseInt(row.quantity, 10) || 1
-          });
-        }
-      });
-    });
-    if (printItems.length === 0) {
+    const validItems = items.filter(it => !it.isManualRow && it.product_id && (parseInt(it.quantity, 10) || 0) > 0);
+    if (validItems.length === 0) {
       return message.warning('لا توجد أصناف وكميات صالحة لطباعة الباركود في الفاتورة الحالية');
     }
+    const printItems = validItems.map(it => ({
+      product_id: it.product_id,
+      product_name: it.product_name,
+      product_code: it.product_code || '',
+      barcode: it.barcode || it.product_code || '',
+      color: it.color || '',
+      size: it.size || '',
+      unit_cost: it.unit_cost,
+      selling_price: it.selling_price,
+      quantity: parseInt(it.quantity, 10) || 1
+    }));
     setBarcodeModalItems(printItems);
     setBarcodeModalOpen(true);
   };
@@ -1115,24 +1403,25 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
   const handleOpenCreateDrawer = () => {
     fetchLookups();
-    if (defaultBranchId) setSelectedBranch(defaultBranchId);
-    setItems([
-      {
-        key: Date.now(),
-        product_id: null,
-        product_name: '',
-        product_code: '',
-        category_name: '',
-        loadingVariants: false,
-        batchQty: null,
-        batchCost: null,
-        batchSelling: null,
-        variantRows: []
-      }
-    ]);
+    const main = branchesList.find(b =>
+      b.branch_type === 'main_warehouse' ||
+      b.branch_name.includes('الرئيسي') ||
+      b.branch_name.toLowerCase().includes('main') ||
+      b.is_main === true
+    ) || branchesList[0];
+    if (main) {
+      setSelectedBranch(main.id);
+    } else if (defaultBranchId) {
+      setSelectedBranch(defaultBranchId);
+    }
+    setItems([]); // Starts completely empty as requested
     setSplitPaymentBreakdown([]);
     setPaidAmount(0);
+    setTopBarcodeInput('');
     setIsCreateOpen(true);
+    setTimeout(() => {
+      topBarcodeInputRef.current?.focus();
+    }, 200);
   };
 
   useEffect(() => {
@@ -1143,42 +1432,47 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   }, [autoOpenCreate]);
 
   const handleCreateInvoice = async () => {
+    const mainBranchObj = branchesList.find(b =>
+      b.branch_type === 'main_warehouse' ||
+      (b.branch_name && b.branch_name.includes('الرئيسي')) ||
+      (b.branch_name && b.branch_name.toLowerCase().includes('main')) ||
+      b.is_main === true
+    ) || branchesList[0];
+    const effectiveBranchId = mainBranchObj?.id || selectedBranch || defaultBranchId;
+
     if (!selectedSupplier) return message.error('يرجى اختيار المورد');
-    if (!selectedBranch) return message.error('يرجى اختيار مستودع الاستلام');
-    if (items.length === 0) return message.error('يجب إضافة صنف واحد على الأقل في الفاتورة');
+    if (!effectiveBranchId) return message.error('يرجى اختيار مستودع الاستلام');
 
-    // Flatten all selected variants across all items
+    const validItems = items.filter(it => !it.isManualRow && it.product_id);
+    if (validItems.length === 0) return message.error('يجب إضافة صنف واحد على الأقل في الفاتورة');
+
     const flatItems = [];
-    for (const it of items) {
-      if (!it.product_id) continue;
-      for (const row of (it.variantRows || [])) {
-        if (!row.enabled) continue;
-        const qty = parseInt(row.quantity, 10);
-        if (!qty || qty <= 0) continue;
-        const cost = parseFloat(row.unit_cost) || 0;
-        const selling = parseFloat(row.selling_price) || 0;
-        const disc = parseFloat(row.discount_pct) || 0;
+    for (const it of validItems) {
+      const qty = parseInt(it.quantity, 10);
+      if (!qty || qty <= 0) continue;
+      const cost = parseFloat(it.unit_cost) || 0;
+      const selling = parseFloat(it.selling_price) || 0;
+      const disc = parseFloat(it.discount_pct) || 0;
 
-        flatItems.push({
-          product_id: it.product_id,
-          variant_id: row.variant_id || null,
-          quantity: qty,
-          unit_cost: cost,
-          selling_price: selling,
-          discount_pct: disc
-        });
-      }
+      flatItems.push({
+        product_id: it.product_id,
+        variant_id: it.variant_id || null,
+        quantity: qty,
+        unit_cost: cost,
+        selling_price: selling,
+        discount_pct: disc
+      });
     }
 
     if (flatItems.length === 0) {
-      return message.error('يرجى اختيار المنتجات وتحديد كمية أكبر من صفر لمتغير واحد على الأقل');
+      return message.error('يرجى تحديد كمية أكبر من صفر لصنف واحد على الأقل');
     }
 
     setSubmitting(true);
     try {
       const payload = {
         supplier_id: selectedSupplier,
-        warehouse_branch_id: selectedBranch,
+        warehouse_branch_id: effectiveBranchId,
         invoice_number: invoiceNumber ? invoiceNumber.trim() : undefined,
         invoice_date: invoiceDate,
         discount_amount: parseFloat(discountTotal) || 0,
@@ -1195,25 +1489,17 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       if (res.data.success) {
         message.success('تم اعتماد فاتورة المشتريات وتحديث أسعار الأصناف والمتغيرات وأرصدة المخزون وحساب المورد بنجاح');
 
-        // Prepare items for barcode sticker printing if user wants
-        const printItemsSnapshot = [];
-        items.forEach(it => {
-          (it.variantRows || []).forEach(row => {
-            if (row.enabled && row.quantity > 0) {
-              printItemsSnapshot.push({
-                product_id: it.product_id,
-                product_name: it.product_name,
-                product_code: it.product_code || row.sku || '',
-                barcode: row.sku || it.product_code || '',
-                color: row.color || '',
-                size: row.size || '',
-                unit_cost: row.unit_cost,
-                selling_price: row.selling_price,
-                quantity: parseInt(row.quantity, 10) || 1
-              });
-            }
-          });
-        });
+        const printItemsSnapshot = validItems.map(it => ({
+          product_id: it.product_id,
+          product_name: it.product_name,
+          product_code: it.product_code || '',
+          barcode: it.barcode || it.product_code || '',
+          color: it.color || '',
+          size: it.size || '',
+          unit_cost: it.unit_cost,
+          selling_price: it.selling_price,
+          quantity: parseInt(it.quantity, 10) || 1
+        }));
 
         setIsCreateOpen(false);
         setItems([]);
@@ -1285,44 +1571,141 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   // 2. STANDALONE PURCHASE RETURN (DIRECT SEARCH & ADD PRODUCTS)
   // ==============================================================
 
+  const populateProductIntoReturnRow = (rowKey, prod) => {
+    setStandaloneItems(prev => prev.map(it => {
+      if (it.key === rowKey) {
+        const qty = it.quantity || 1;
+        const cost = parseFloat(prod.cost_price) || 0;
+        return {
+          ...it,
+          isManualRow: false,
+          product_id: prod.product_id || prod.id,
+          variant_id: prod.variant_id || null,
+          product_name: prod.product_name,
+          product_code: prod.product_code || '',
+          barcode: prod.variant_sku || prod.barcode || '',
+          color: prod.color || null,
+          size: prod.size || null,
+          display_name: prod.display_name || prod.product_name,
+          category_name: prod.category_name || '',
+          quantity: qty,
+          unit_cost: cost,
+          line_total: qty * cost
+        };
+      }
+      return it;
+    }));
+  };
+
+  const handleReturnManualRowBarcodeSubmit = async (rowKey, inputCode) => {
+    if (!inputCode || !inputCode.trim()) return;
+    const clean = inputCode.trim();
+
+    try {
+      const effectiveBranch = standaloneBranch || defaultBranchId || 1;
+      const res = await api.get('/api/swm/pos/search', {
+        params: { query: clean, branch_id: effectiveBranch }
+      });
+
+      if (res.data.success && res.data.data.length > 0) {
+        const results = res.data.data;
+        if (results.length === 1) {
+          populateProductIntoReturnRow(rowKey, results[0]);
+          message.success(`تم إدراج الصنف للمرتجع: ${results[0].display_name}`);
+        } else {
+          handleOpenF1SearchModal('return', rowKey, clean);
+        }
+      } else {
+        const localMatches = productsList.filter(p =>
+          (p.barcode && p.barcode.toLowerCase() === clean.toLowerCase()) ||
+          (p.product_code && p.product_code.toLowerCase() === clean.toLowerCase()) ||
+          (p.product_name && p.product_name.toLowerCase().includes(clean.toLowerCase()))
+        );
+
+        if (localMatches.length === 1) {
+          const prodRes = await api.get(`/api/swm/products/${localMatches[0].id}`);
+          const fullProd = prodRes.data?.data;
+          const variants = fullProd?.variants || [];
+          if (variants.length <= 1) {
+            populateProductIntoReturnRow(rowKey, {
+              product_id: fullProd.id,
+              variant_id: variants[0]?.id || null,
+              product_name: fullProd.product_name,
+              product_code: fullProd.product_code,
+              barcode: variants[0]?.variant_sku || fullProd.barcode,
+              color: variants[0]?.color || null,
+              size: variants[0]?.size || null,
+              category_name: fullProd.category_name,
+              cost_price: parseFloat(variants[0]?.cost_price || fullProd.cost_price) || 0
+            });
+            message.success(`تم إدراج للمرتجع: ${fullProd.product_name}`);
+          } else {
+            handleOpenF1SearchModal('return', rowKey, clean);
+          }
+        } else {
+          handleOpenF1SearchModal('return', rowKey, clean);
+          message.warning(`لم يتم العثور على صنف مطابق للكود "${clean}". تم فتح نافذة البحث الموسع (F1)...`);
+        }
+      }
+    } catch (err) {
+      handleOpenF1SearchModal('return', rowKey, clean);
+    }
+  };
+
+  const updateReturnItemQty = (key, delta) => {
+    setStandaloneItems(prev => prev.map(it => {
+      if (it.key !== key) return it;
+      const newQty = Math.max(1, (parseInt(it.quantity, 10) || 0) + delta);
+      const cost = parseFloat(it.unit_cost) || 0;
+      return {
+        ...it,
+        quantity: newQty,
+        line_total: Math.max(0, newQty * cost)
+      };
+    }));
+  };
+
   const handleOpenStandaloneReturnDrawer = () => {
     fetchLookups();
-    if (defaultBranchId) setStandaloneBranch(defaultBranchId);
+    const mainBranch = branchesList.find(b =>
+      b.branch_type === 'main_warehouse' ||
+      b.branch_name.includes('الرئيسي') ||
+      b.is_main === true
+    ) || branchesList[0];
+    setStandaloneBranch(mainBranch?.id || defaultBranchId || 1);
     setStandaloneSupplier(null);
     setStandaloneDate(new Date().toISOString().split('T')[0]);
     setStandaloneReason('');
     setStandaloneRefundType('credit');
     setStandaloneRefundBreakdown([]);
     setStandaloneRefundAmount(0);
-    setStandaloneItems([
-      {
-        key: Date.now(),
-        product_id: null,
-        variant_id: null,
-        product_name: '',
-        product_code: '',
-        quantity: 1,
-        unit_cost: 0,
-        line_total: 0
-      }
-    ]);
+    setStandaloneItems([]);
     setIsStandaloneReturnOpen(true);
   };
 
   const handleAddStandaloneItem = () => {
-    setStandaloneItems([
-      ...standaloneItems,
+    const tempKey = `ret-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    setStandaloneItems(prev => [
+      ...prev,
       {
-        key: Date.now() + Math.random(),
+        key: tempKey,
+        isManualRow: true,
         product_id: null,
         variant_id: null,
         product_name: '',
         product_code: '',
+        barcode: '',
+        color: null,
+        size: null,
+        category_name: '',
         quantity: 1,
         unit_cost: 0,
         line_total: 0
       }
     ]);
+    setTimeout(() => {
+      manualReturnRowInputRefs.current[tempKey]?.focus();
+    }, 100);
   };
 
   const handleUpdateStandaloneItem = (key, field, value) => {
@@ -1333,8 +1716,11 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       if (field === 'product_id') {
         const prod = productsList.find(p => p.id === value);
         if (prod) {
+          updated.isManualRow = false;
           updated.product_name = prod.product_name;
           updated.product_code = prod.product_code || prod.barcode || '';
+          updated.barcode = prod.barcode || '';
+          updated.category_name = prod.category_name || '';
           updated.unit_cost = parseFloat(prod.cost_price) || 0;
         }
       }
@@ -1357,16 +1743,15 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
     if (!standaloneSupplier) {
       return message.error('يرجى اختيار المورد المرتجع إليه');
     }
-    if (!standaloneBranch) {
-      return message.error('يرجى اختيار مستودع إرجاع البضاعة');
-    }
-    if (standaloneItems.length === 0) {
+    const effectiveBranch = standaloneBranch || defaultBranchId || 1;
+    const validItems = standaloneItems.filter(it => !it.isManualRow && it.product_id);
+    if (validItems.length === 0) {
       return message.error('يجب إضافة صنف واحد على الأقل للإرجاع');
     }
 
-    for (const it of standaloneItems) {
-      if (!it.product_id || !it.quantity || it.quantity <= 0) {
-        return message.error('يرجى التأكد من اختيار المنتج وتحديد كمية أكبر من صفر لكل صنف');
+    for (const it of validItems) {
+      if (!it.quantity || it.quantity <= 0) {
+        return message.error('يرجى التأكد من تحديد كمية أكبر من صفر لكل صنف');
       }
     }
 
@@ -1562,6 +1947,69 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       window.print();
     }
   };
+
+  // --- Strict Keyboard Workflow: F11 (Add Row), F1 (Search Product), F4 (Submit Invoice / Return) ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // If F1 modal is open
+      if (f1ModalOpen) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setF1ModalOpen(false);
+        }
+        return;
+      }
+
+      if (isCreateOpen) {
+        if (e.key === 'F11') {
+          e.preventDefault();
+          handleAddItem();
+          message.info('سطر جديد [F11]: تم إضافة صنف جديد، اضغط F1 للبحث أو اختر الصنف');
+        } else if (e.key === 'F1') {
+          e.preventDefault();
+          handleOpenF1SearchModal('invoice');
+        } else if (e.key === 'F4') {
+          e.preventDefault();
+          handleCreateInvoice();
+        }
+      } else if (isStandaloneReturnOpen) {
+        if (e.key === 'F11') {
+          e.preventDefault();
+          handleAddStandaloneItem();
+          message.info('سطر مرتجع جديد [F11]: اضغط F1 للبحث واختيار الصنف');
+        } else if (e.key === 'F1') {
+          e.preventDefault();
+          handleOpenF1SearchModal('return');
+        } else if (e.key === 'F4') {
+          e.preventDefault();
+          handleSubmitStandaloneReturn();
+        }
+      } else if (linkedReturnOpen) {
+        if (e.key === 'F4') {
+          e.preventDefault();
+          handleSubmitLinkedReturn();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isCreateOpen,
+    isStandaloneReturnOpen,
+    linkedReturnOpen,
+    f1ModalOpen,
+    items,
+    standaloneItems,
+    linkedItems,
+    selectedSupplier,
+    selectedBranch,
+    standaloneSupplier,
+    standaloneBranch,
+    submitting,
+    standaloneSubmitting,
+    linkedSubmitting
+  ]);
 
   // Table Columns
   const invoiceColumns = [
@@ -1826,13 +2274,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                     dataSource={invoices}
                     rowKey="id"
                     loading={loading}
-                    pagination={{
-                      current: pagination.current,
-                      pageSize: pagination.pageSize,
-                      total: pagination.total,
-                      onChange: (p) => fetchInvoices(p),
-                      showTotal: (total) => `إجمالي الفواتير: ${total}`
-                    }}
+                    pagination={false}
                   />
                 </Card>
               </div>
@@ -1911,13 +2353,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                     dataSource={returnsList}
                     rowKey="id"
                     loading={returnsLoading}
-                    pagination={{
-                      current: returnsPagination.current,
-                      pageSize: returnsPagination.pageSize,
-                      total: returnsPagination.total,
-                      onChange: (p) => fetchReturns(p),
-                      showTotal: (total) => `إجمالي إشعارات المرتجع: ${total}`
-                    }}
+                    pagination={false}
                   />
                 </Card>
               </div>
@@ -1927,483 +2363,503 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       />
 
       {/* ========================================================= */}
-      {/* 1. CREATE PURCHASE INVOICE DRAWER                         */}
+      {/* 1. EXPANSIVE CREATE PURCHASE INVOICE MODAL (Full Desk)    */}
       {/* ========================================================= */}
-      <Drawer
-        title="تسجيل فاتورة مشتريات وتوريد بضاعة"
-        placement="left"
-        width={1150}
-        onClose={() => setIsCreateOpen(false)}
-        open={isCreateOpen}
-        extra={
-          <Space>
-            <Button
-              icon={<BarcodeOutlined />}
-              onClick={handleOpenBarcodePrintFromCurrentDrawer}
-              style={{ color: '#0f766e', borderColor: '#0f766e' }}
-              disabled={!items.some(it => (it.variantRows || []).some(r => r.enabled && r.quantity > 0))}
-            >
-              🖨️ طباعة ملصقات الباركود للبضاعة
-            </Button>
-            <Button onClick={() => setIsCreateOpen(false)}>إلغاء</Button>
-            <Button
-              type="primary"
-              loading={submitting}
-              onClick={handleCreateInvoice}
-              style={{ backgroundColor: '#16a34a' }}
-            >
-              اعتماد الفاتورة وتحديث الأسعار والمخزون
-            </Button>
-          </Space>
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ background: '#ecfdf5', color: '#16a34a', padding: '8px 12px', borderRadius: 10, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(22,163,74,0.15)' }}>
+                <ShoppingOutlined />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18, fontWeight: 'bold', color: '#0f172a' }}>تسجيل فاتورة مشتريات وتوريد بضاعة</span>
+                  <Tag color="green" style={{ fontSize: 12, fontWeight: 600 }}>توريد مخزني ومزامنة أسعار</Tag>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 'normal' }}>
+                  إدخال بضائع الموردين وتحديث التكلفة وسعر البيع تلقائياً على بطاقة الصنف
+                </div>
+              </div>
+            </div>
+
+            {/* Keyboard shortcuts ribbon */}
+            <Space size={8} style={{ direction: 'ltr' }}>
+              <Tag color="blue" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleAddItem}>
+                ⌨️ <strong style={{ color: '#1d4ed8' }}>F11</strong> إضافة صنف جديد
+              </Tag>
+              <Tag color="purple" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={() => handleOpenF1SearchModal('invoice')}>
+                🔍 <strong style={{ color: '#6d28d9' }}>F1</strong> بحث عن صنف
+              </Tag>
+              <Tag color="success" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleCreateInvoice}>
+                ⚡ <strong style={{ color: '#15803d' }}>F4</strong> اعتماد الفاتورة
+              </Tag>
+            </Space>
+          </div>
         }
+        open={isCreateOpen}
+        onCancel={() => setIsCreateOpen(false)}
+        footer={null}
+        width="96vw"
+        style={{ top: 10, maxWidth: 1480, paddingBottom: 0 }}
+        destroyOnHidden={false}
       >
         <Form layout="vertical">
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item label="المورد" required>
-                <Select
-                  showSearch
-                  placeholder="اختر المورد..."
-                  value={selectedSupplier}
-                  onChange={setSelectedSupplier}
-                  filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
-                >
-                  {suppliersList.map(s => (
-                    <Option key={s.id} value={s.id}>{s.supplier_name} ({s.supplier_code})</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="المستودع المستلم (Receiving Branch)" required>
-                <Select
-                  placeholder="اختر المستودع..."
-                  value={selectedBranch}
-                  onChange={setSelectedBranch}
-                >
-                  {branchesList.map(b => (
-                    <Option key={b.id} value={b.id}>
-                      {b.branch_name} {b.id === defaultBranchId ? '(الرئيسي الافتراضي)' : ''}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item label="تاريخ الفاتورة">
-                <Input
-                  type="date"
-                  value={invoiceDate}
-                  onChange={(e) => setInvoiceDate(e.target.value)}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item label="رقم الفاتورة اليدوي">
-                <Input
-                  placeholder="تلقائي إن تُرك فارغاً"
-                  value={invoiceNumber}
-                  onChange={(e) => setInvoiceNumber(e.target.value)}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Card
+            size="small"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              marginBottom: 14
+            }}
+          >
+            <Row gutter={[16, 12]}>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={<strong>المورد (Supplier) *</strong>} required style={{ marginBottom: 0 }}>
+                  <Select
+                    showSearch
+                    size="large"
+                    placeholder="اختر المورد..."
+                    value={selectedSupplier}
+                    onChange={setSelectedSupplier}
+                    filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
+                    style={{ width: '100%' }}
+                  >
+                    {suppliersList.map(s => (
+                      <Option key={s.id} value={s.id}>{s.supplier_name} ({s.supplier_code})</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={<strong>المستودع المستلم (Receiving Branch) *</strong>} required style={{ marginBottom: 0 }}>
+                  <Select
+                    size="large"
+                    value={selectedBranch || defaultBranchId}
+                    disabled
+                    style={{ width: '100%', fontWeight: 700 }}
+                  >
+                    {(() => {
+                      const main = branchesList.find(b =>
+                        b.id === (selectedBranch || defaultBranchId) ||
+                        b.branch_type === 'main_warehouse' ||
+                        b.branch_name.includes('الرئيسي') ||
+                        b.is_main === true
+                      ) || branchesList[0];
 
-          <Divider orientation="left" style={{ margin: '12px 0' }}>
-            أصناف الفاتورة وأسعار التكلفة والبيع (Invoice Items & Master Prices Sync)
-          </Divider>
-          <Alert
-            message="تحديث أسعار التكلفة وسعر البيع النهائي يتم مزامنته تلقائياً على بطاقة الصنف الأصلية (Master Product) وتدوينه في سجل النشاطات."
-            type="info"
-            showIcon
-            style={{ marginBottom: 12 }}
-          />
+                      return main ? (
+                        <Option key={main.id} value={main.id}>
+                          🏢 {main.branch_name} (المستودع الرئيسي المعتمد فقط)
+                        </Option>
+                      ) : (
+                        <Option value={defaultBranchId || 1}>
+                          🏢 الفرع الرئيسي (المستودع الرئيسي المعتمد فقط)
+                        </Option>
+                      );
+                    })()}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={4}>
+                <Form.Item label={<strong>تاريخ الفاتورة</strong>} style={{ marginBottom: 0 }}>
+                  <Input
+                    size="large"
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={4}>
+                <Form.Item label={<strong>رقم الفاتورة اليدوي</strong>} style={{ marginBottom: 0 }}>
+                  <Input
+                    size="large"
+                    placeholder="تلقائي إن تُرك فارغاً"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
 
-          {/* Products & Multi-Variant Matrix List */}
-          <div style={{ marginBottom: 16 }}>
-            {items.map((it, idx) => {
-              const itemTotal = (it.variantRows || []).reduce((sum, row) => {
-                if (!row.enabled || !row.quantity || row.quantity <= 0) return sum;
-                return sum + (parseFloat(row.line_total) || 0);
-              }, 0);
-              const itemPieces = (it.variantRows || []).reduce((sum, row) => {
-                if (!row.enabled || !row.quantity || row.quantity <= 0) return sum;
-                return sum + (parseInt(row.quantity, 10) || 0);
-              }, 0);
-              const allSelected = (it.variantRows || []).length > 0 && it.variantRows.every(r => r.enabled);
-
-              return (
-                <Card
-                  key={it.key}
-                  size="small"
-                  style={{
-                    marginBottom: 16,
-                    border: it.product_id ? '1px solid #93c5fd' : '1px dashed #cbd5e1',
-                    borderRadius: 10,
-                    boxShadow: it.product_id ? '0 4px 12px rgba(37, 99, 235, 0.05)' : '0 1px 3px rgba(0,0,0,0.03)',
-                    background: '#ffffff',
-                    overflow: 'hidden'
-                  }}
-                  title={
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, padding: '4px 0' }}>
-                      <Space align="center" wrap style={{ flex: 1 }}>
-                        <Badge count={idx + 1} style={{ backgroundColor: it.product_id ? '#16a34a' : '#2563eb' }} />
-                        <Text strong style={{ fontSize: 13.5 }}>الصنف {idx + 1}:</Text>
-
-                        {/* Category / Group Filter */}
-                        <Select
-                          allowClear
-                          placeholder="📁 كل المجموعات"
-                          value={it.category_filter || undefined}
-                          onChange={(catId) => {
-                            setItems(prev => prev.map(item => item.key === it.key ? {
-                              ...item,
-                              category_filter: catId,
-                              product_id: null,
-                              variantRows: []
-                            } : item));
-                          }}
-                          style={{ width: 160 }}
-                          options={[
-                            { value: '', label: '📁 كل المجموعات' },
-                            ...categoriesList.map(c => ({ value: c.id, label: `📁 ${c.category_name}` }))
-                          ]}
-                        />
-
-                        {/* Product Selector filtered by category */}
-                        <Select
-                          showSearch
-                          placeholder="🔍 ابحث بالاسم أو كود الصنف أو الباركود..."
-                          value={it.product_id}
-                          onChange={(val) => handleSelectProduct(it.key, val)}
-                          style={{ minWidth: 320 }}
-                          filterOption={(input, opt) => (opt?.label || '').toLowerCase().includes(input.toLowerCase())}
-                          options={productsList
-                            .filter(p => p.status === 'active' && p.category_id && (!it.category_filter || p.category_id === it.category_filter))
-                            .map(p => ({
-                              value: p.id,
-                              label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'بدون كود'})`
-                            }))}
-                        />
-
-                        {/* Edit Master Product button (when product is selected) */}
-                        {it.product_id && (
-                          <Tooltip title="فتح نافذة تعديل الصنف بالكامل وتحديث بياناته بالمجموعات والأصناف والفاتورة">
-                            <Button
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={() => handleOpenMasterEdit(it.product_id, it.key)}
-                              style={{ color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', fontWeight: 600 }}
-                            >
-                              تعديل الصنف
-                            </Button>
-                          </Tooltip>
-                        )}
-
-                        {/* Create new product directly into this slot if product/group not found */}
-                        <Tooltip title="إضافة صنف جديد تماماً إلى المجموعات والأصناف وربطه فوراً بهذه الخانة">
-                          <Button
-                            size="small"
-                            type="dashed"
-                            icon={<PlusOutlined />}
-                            onClick={() => handleOpenMasterCreate(it.key)}
-                            style={{ color: '#7c3aed', borderColor: '#c4b5fd', background: '#f5f3ff' }}
-                          >
-                            + صنف جديد
-                          </Button>
-                        </Tooltip>
-
-                        <Tooltip title="تحديث ومزامنة قائمة الأصناف">
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<ReloadOutlined spin={refreshingProducts} />}
-                            onClick={handleRefreshProductsList}
-                            style={{ color: '#4f46e5' }}
-                          />
-                        </Tooltip>
-                      </Space>
-
-                      <Space>
-                        {it.product_id && (
-                          <Tag color="cyan" style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, fontWeight: 700 }}>
-                            {itemPieces} قطعة مختارة | {itemTotal.toLocaleString()} ج.م
-                          </Tag>
-                        )}
-                        <Button
-                          type="text"
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={() => handleRemoveItem(it.key)}
-                          title="حذف الصنف من الفاتورة"
-                        >
-                          حذف الصنف
-                        </Button>
-                      </Space>
-                    </div>
-                  }
-                >
-                  {it.loadingVariants ? (
-                    <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                      <Spin />
-                      <div style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>جاري جلب تفاصيل المقاسات والألوان وأسعار الصنف...</div>
-                    </div>
-                  ) : !it.product_id ? (
-                    <Alert
-                      message="اختر الصنف من القائمة المنسدلة أعلاه لتظهر لك جميع ألوانه ومقاساته لتحديد الكميات وأسعار التكلفة والبيع."
-                      type="info"
-                      showIcon
-                      style={{ margin: '8px 0' }}
-                    />
-                  ) : (
-                    <div>
-                      {/* Quick Batch Apply Toolbar if more than 1 variant */}
-                      {it.variantRows.length > 1 && (
-                        <div style={{
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 6,
-                          padding: '8px 12px',
-                          marginBottom: 10,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: 8
-                        }}>
-                          <Space size="middle" wrap align="middle">
-                            <Button
-                              size="small"
-                              type={allSelected ? 'default' : 'primary'}
-                              ghost={!allSelected}
-                              icon={allSelected ? <BorderOutlined /> : <CheckSquareOutlined />}
-                              onClick={() => handleToggleSelectAll(it.key, !allSelected)}
-                            >
-                              {allSelected ? 'إلغاء تحديد الكل' : 'تحديد جميع المقاسات/الألوان'}
-                            </Button>
-
-                            <Space size="small">
-                              <Text type="secondary" style={{ fontSize: 12 }}>كمية موحدة:</Text>
-                              <InputNumber
-                                size="small"
-                                min={0}
-                                placeholder="الكمية"
-                                value={it.batchQty}
-                                onChange={(v) => handleBatchUpdate(it.key, 'batchQty', v)}
-                                style={{ width: 80 }}
-                              />
-                              <Button
-                                size="small"
-                                onClick={() => handleApplyBatch(it.key, 'quantity', it.batchQty)}
-                              >
-                                تطبيق
-                              </Button>
-                            </Space>
-
-                            <Space size="small">
-                              <Text type="secondary" style={{ fontSize: 12 }}>سعر تكلفة موحد:</Text>
-                              <InputNumber
-                                size="small"
-                                min={0}
-                                precision={2}
-                                placeholder="التكلفة"
-                                value={it.batchCost}
-                                onChange={(v) => handleBatchUpdate(it.key, 'batchCost', v)}
-                                style={{ width: 95 }}
-                              />
-                              <Button
-                                size="small"
-                                onClick={() => handleApplyBatch(it.key, 'unit_cost', it.batchCost)}
-                              >
-                                تطبيق
-                              </Button>
-                            </Space>
-
-                            <Space size="small">
-                              <Text type="secondary" style={{ fontSize: 12 }}>سعر بيع موحد:</Text>
-                              <InputNumber
-                                size="small"
-                                min={0}
-                                precision={2}
-                                placeholder="سعر البيع"
-                                value={it.batchSelling}
-                                onChange={(v) => handleBatchUpdate(it.key, 'batchSelling', v)}
-                                style={{ width: 95 }}
-                              />
-                              <Button
-                                size="small"
-                                onClick={() => handleApplyBatch(it.key, 'selling_price', it.batchSelling)}
-                              >
-                                تطبيق
-                              </Button>
-                            </Space>
-                          </Space>
-                        </div>
-                      )}
-
-                      {/* Variants Matrix Table */}
-                      <Table
-                        size="small"
-                        dataSource={it.variantRows}
-                        pagination={false}
-                        rowKey="key"
-                        columns={[
-                          {
-                            title: 'تضمين',
-                            key: 'enabled',
-                            width: 60,
-                            align: 'center',
-                            render: (_, row) => (
-                              <Checkbox
-                                checked={row.enabled}
-                                onChange={(e) => handleUpdateVariantRow(it.key, row.key, 'enabled', e.target.checked)}
-                              />
-                            )
-                          },
-                          ...(it.variantRows.some(r => r.variant_id) ? [
-                            {
-                              title: 'اللون',
-                              dataIndex: 'color',
-                              key: 'color',
-                              width: 100,
-                              render: (color, row) => row.enabled ? (
-                                <Tag color="geekblue" style={{ fontSize: 12 }}>{color || 'عام'}</Tag>
-                              ) : <Text type="secondary">{color || '—'}</Text>
-                            },
-                            {
-                              title: 'المقاس',
-                              dataIndex: 'size',
-                              key: 'size',
-                              width: 90,
-                              render: (size, row) => row.enabled ? (
-                                <Tag color="purple" style={{ fontSize: 12, fontWeight: 600 }}>{size || 'حر'}</Tag>
-                              ) : <Text type="secondary">{size || '—'}</Text>
-                            },
-                            {
-                              title: 'كود المتغير / SKU',
-                              dataIndex: 'sku',
-                              key: 'sku',
-                              width: 150,
-                              render: (sku) => sku ? <Text code style={{ fontSize: 11 }}>{sku}</Text> : <Text type="secondary">—</Text>
-                            }
-                          ] : [
-                            {
-                              title: 'اسم الصنف الأساسي',
-                              key: 'single_name',
-                              render: () => <Text strong>{it.product_name} (بدون متغيرات)</Text>
-                            }
-                          ]),
-                          {
-                            title: 'الكمية المشتراة',
-                            dataIndex: 'quantity',
-                            key: 'quantity',
-                            width: 110,
-                            render: (_, row) => (
-                              <InputNumber
-                                min={0}
-                                disabled={!row.enabled}
-                                value={row.quantity}
-                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'quantity', val || 0)}
-                                style={{ width: '100%', fontWeight: 600 }}
-                              />
-                            )
-                          },
-                          {
-                            title: 'سعر التكلفة (Cost)',
-                            dataIndex: 'unit_cost',
-                            key: 'unit_cost',
-                            width: 140,
-                            render: (_, row) => (
-                              <InputNumber
-                                min={0}
-                                precision={2}
-                                disabled={!row.enabled}
-                                value={row.unit_cost}
-                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'unit_cost', val || 0)}
-                                style={{ width: '100%' }}
-                                addonAfter="ج.م"
-                              />
-                            )
-                          },
-                          {
-                            title: 'سعر البيع النهائي (Selling)',
-                            dataIndex: 'selling_price',
-                            key: 'selling_price',
-                            width: 140,
-                            render: (_, row) => (
-                              <InputNumber
-                                min={0}
-                                precision={2}
-                                disabled={!row.enabled}
-                                value={row.selling_price}
-                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'selling_price', val || 0)}
-                                style={{ width: '100%', borderColor: '#16a34a' }}
-                                addonAfter="ج.م"
-                              />
-                            )
-                          },
-                          {
-                            title: 'نسبة الخصم %',
-                            dataIndex: 'discount_pct',
-                            key: 'discount_pct',
-                            width: 95,
-                            render: (_, row) => (
-                              <InputNumber
-                                min={0}
-                                max={100}
-                                disabled={!row.enabled}
-                                value={row.discount_pct}
-                                onChange={(val) => handleUpdateVariantRow(it.key, row.key, 'discount_pct', val || 0)}
-                                style={{ width: '100%' }}
-                              />
-                            )
-                          },
-                          {
-                            title: 'إجمالي السطر',
-                            dataIndex: 'line_total',
-                            key: 'line_total',
-                            width: 120,
-                            render: (val, row) => row.enabled ? (
-                              <Text strong style={{ color: '#15803d' }}>
-                                {(parseFloat(val) || 0).toLocaleString()} ج.م
-                              </Text>
-                            ) : (
-                              <Text type="secondary">—</Text>
-                            )
-                          }
-                        ]}
-                      />
-
-
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
-
-          <Row gutter={12} style={{ marginTop: 4, marginBottom: 8 }}>
-            <Col xs={24} sm={14}>
+          {/* Quick Shortcuts Helper Bar */}
+          <div style={{
+            background: '#f1f5f9',
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #cbd5e1',
+            marginBottom: 14,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10
+          }}>
+            <div style={{ fontSize: 13, color: '#334155' }}>
+              ⚡ <strong>طريقة العمل السريعة:</strong> اضغط <strong>[F11]</strong> لإضافة صنف جديد، <strong>[F1]</strong> للبحث السريع عن الصنف، ثم <strong>[F4]</strong> لاعتماد الفاتورة وتوريد المخزون فوراً!
+            </div>
+            <Space wrap>
               <Button
                 type="dashed"
                 icon={<PlusOutlined />}
                 onClick={handleAddItem}
-                style={{ width: '100%', height: 42, borderColor: '#2563eb', color: '#2563eb', fontWeight: 600, borderRadius: 6 }}
+                style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 600 }}
               >
-                + اختيار صنف / منتج مسجل بالفاتورة
+                + إضافة صنف [F11]
               </Button>
-            </Col>
-            <Col xs={24} sm={10}>
               <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => handleOpenMasterCreate(null)}
-                style={{ width: '100%', height: 42, backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: 600, borderRadius: 6 }}
+                icon={<SearchOutlined />}
+                onClick={() => handleOpenF1SearchModal('invoice')}
+                style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 600 }}
               >
-                ✨ إضافة صنف جديد للمنظومة والفاتورة
+                🔍 بحث سريع عن الأصناف [F1]
               </Button>
-            </Col>
-          </Row>
+              <Tooltip title="تحديث ومزامنة الأصناف من قاعدة البيانات">
+                <Button
+                  icon={<ReloadOutlined spin={refreshingProducts} />}
+                  onClick={handleRefreshProductsList}
+                >
+                  تحديث
+                </Button>
+              </Tooltip>
+            </Space>
+          </div>
+
+          <Divider orientation="left" style={{ margin: '14px 0 12px 0' }}>
+            أصناف الفاتورة وأسعار التكلفة والبيع (Invoice Items & Master Prices Sync)
+          </Divider>
+
+          {/* Products & Variants Tabular Grid (POS Cart Table Style) */}
+          <div style={{ marginBottom: 16 }}>
+            {items.length === 0 ? (
+              <Card
+                style={{
+                  textAlign: 'center',
+                  padding: '36px 20px',
+                  background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                  border: '2px dashed #cbd5e1',
+                  borderRadius: 12,
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{
+                  width: 72,
+                  height: 72,
+                  margin: '0 auto 16px',
+                  borderRadius: '50%',
+                  background: '#e0e7ff',
+                  color: '#4338ca',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 34,
+                  boxShadow: '0 4px 12px rgba(67, 56, 202, 0.15)'
+                }}>
+                  <ShoppingOutlined />
+                </div>
+                <Title level={4} style={{ margin: '0 0 6px 0', color: '#1e293b' }}>
+                  قائمة أصناف الفاتورة فارغة حالياً
+                </Title>
+                <Text type="secondary" style={{ fontSize: 14, display: 'block', maxWidth: 620, margin: '0 auto 20px' }}>
+                  ابدأ بإضافة سطر يدوي، أو استخدام اختصارات الكيبورد السريعة لتسريع إدخال فاتورة الشراء والتوريد:
+                </Text>
+
+                {/* Keyboard Shortcuts Visual Banner */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 16,
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  padding: '10px 24px',
+                  borderRadius: 30,
+                  marginBottom: 24,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                  flexWrap: 'wrap'
+                }}>
+                  <Space size={6}>
+                    <Tag color="blue" style={{ fontSize: 13, fontWeight: 'bold', padding: '2px 8px', borderRadius: 4 }}>F11</Tag>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>إضافة سطر إدخال يدوي</Text>
+                  </Space>
+                  <Divider type="vertical" style={{ height: 20 }} />
+                  <Space size={6}>
+                    <Tag color="purple" style={{ fontSize: 13, fontWeight: 'bold', padding: '2px 8px', borderRadius: 4 }}>F1</Tag>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>بحث واختيار من المجاميع والأصناف</Text>
+                  </Space>
+                  <Divider type="vertical" style={{ height: 20 }} />
+                  <Space size={6}>
+                    <Tag color="green" style={{ fontSize: 13, fontWeight: 'bold', padding: '2px 8px', borderRadius: 4 }}>F4</Tag>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>اعتماد الفاتورة وتوريد المخزون</Text>
+                  </Space>
+                </div>
+
+                {/* Action Buttons for Empty State */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<PlusOutlined />}
+                    onClick={handleAddItem}
+                    style={{
+                      height: 44,
+                      padding: '0 28px',
+                      backgroundColor: '#2563eb',
+                      borderColor: '#2563eb',
+                      fontWeight: 700,
+                      borderRadius: 8,
+                      boxShadow: '0 4px 10px rgba(37,99,235,0.25)'
+                    }}
+                  >
+                    + إضافة سطر صنف جديد [F11]
+                  </Button>
+                  <Button
+                    size="large"
+                    icon={<SearchOutlined />}
+                    onClick={() => handleOpenF1SearchModal('invoice')}
+                    style={{
+                      height: 44,
+                      padding: '0 28px',
+                      color: '#7c3aed',
+                      borderColor: '#c4b5fd',
+                      background: '#f5f3ff',
+                      fontWeight: 700,
+                      borderRadius: 8
+                    }}
+                  >
+                    🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <div>
+                {/* Clean Top Action Header above table */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                  padding: '8px 14px',
+                  background: '#f8fafc',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  flexWrap: 'wrap',
+                  gap: 8
+                }}>
+                  <Space size="middle">
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={handleAddItem}
+                      style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', fontWeight: 700, borderRadius: 6 }}
+                    >
+                      + إضافة سطر صنف جديد [F11]
+                    </Button>
+                    <Button
+                      icon={<SearchOutlined />}
+                      onClick={() => handleOpenF1SearchModal('invoice')}
+                      style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 700, borderRadius: 6 }}
+                    >
+                      🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                    </Button>
+                  </Space>
+                  <Space size={8}>
+                    <Tag color="blue" style={{ fontWeight: 600 }}>[F11] سطر جديد</Tag>
+                    <Tag color="purple" style={{ fontWeight: 600 }}>[F1] بحث الأصناف</Tag>
+                    <Tag color="green" style={{ fontWeight: 600 }}>[F4] اعتماد وتوريد</Tag>
+                  </Space>
+                </div>
+
+                <div style={{ border: '1.5px solid #cbd5e1', borderRadius: 10, overflowX: 'auto', background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
+                    <thead style={{ background: '#f1f5f9', borderBottom: '2.5px solid #cbd5e1' }}>
+                      <tr style={{ color: '#1e293b' }}>
+                        <th style={{ padding: '12px 10px', width: 44, textAlign: 'center', fontWeight: 700 }}>#</th>
+                        <th style={{ padding: '12px 10px', width: 140, fontWeight: 700 }}>كود / باركود</th>
+                        <th style={{ padding: '12px 10px', fontWeight: 700 }}>اسم الصنف والمواصفات</th>
+                        <th style={{ padding: '12px 10px', width: 100, textAlign: 'center', fontWeight: 700 }}>المجموعة</th>
+                        <th style={{ padding: '12px 10px', width: 130, textAlign: 'center', fontWeight: 700 }}>الكمية المشتراة</th>
+                        <th style={{ padding: '12px 10px', width: 130, textAlign: 'center', fontWeight: 700 }}>سعر التكلفة (ج.م)</th>
+                        <th style={{ padding: '12px 10px', width: 130, textAlign: 'center', fontWeight: 700 }}>سعر البيع النهائي (ج.م)</th>
+                        <th style={{ padding: '12px 10px', width: 95, textAlign: 'center', fontWeight: 700 }}>خصم %</th>
+                        <th style={{ padding: '12px 10px', width: 120, textAlign: 'center', fontWeight: 700 }}>إجمالي السطر</th>
+                        <th style={{ padding: '12px 6px', width: 70, textAlign: 'center', fontWeight: 700 }}>إجراء</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, index) => {
+                        if (item.isManualRow) {
+                          return (
+                            <tr
+                              key={item.key}
+                              style={{
+                                background: '#fffbeb',
+                                borderBottom: '3px solid #fde047',
+                                borderTop: index > 0 ? '1px dashed #fde047' : undefined,
+                                boxShadow: 'inset 0 1px 3px rgba(234, 179, 8, 0.06)'
+                              }}
+                            >
+                              <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#ca8a04', padding: '12px 10px' }}>
+                                <Badge count={index + 1} style={{ backgroundColor: '#eab308', color: '#ffffff', fontWeight: 'bold' }} />
+                              </td>
+                              <td colSpan={7} style={{ padding: '10px 12px' }}>
+                                <Input
+                                  ref={(el) => (manualRowInputRefs.current[item.key] = el)}
+                                  size="middle"
+                                  placeholder="أدخل باركود أو كود الصنف واضغط Enter، أو اضغط [F1] لاختيار الصنف من القائمة..."
+                                  prefix={<BarcodeOutlined style={{ color: '#d97706', fontSize: 18 }} />}
+                                  onPressEnter={(e) => handleManualRowBarcodeSubmit(item.key, e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    borderRadius: 6,
+                                    borderColor: '#facc15',
+                                    boxShadow: '0 1px 3px rgba(234, 179, 8, 0.1)',
+                                    fontSize: 13.5
+                                  }}
+                                  autoFocus
+                                />
+                              </td>
+                              <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                                <Button
+                                  size="middle"
+                                  icon={<SearchOutlined />}
+                                  onClick={() => handleOpenF1SearchModal('invoice', item.key)}
+                                  style={{
+                                    color: '#7c3aed',
+                                    borderColor: '#c4b5fd',
+                                    background: '#f5f3ff',
+                                    fontWeight: 700,
+                                    borderRadius: 6
+                                  }}
+                                >
+                                  بحث F1
+                                </Button>
+                              </td>
+                              <td style={{ textAlign: 'center', padding: '10px 6px' }}>
+                                <Button
+                                  type="text"
+                                  danger
+                                  icon={<DeleteOutlined style={{ fontSize: 16 }} />}
+                                  onClick={() => handleRemoveItem(item.key)}
+                                  title="حذف هذا السطر"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr
+                            key={item.key}
+                            style={{
+                              borderBottom: '2.5px solid #e2e8f0',
+                              background: index % 2 === 0 ? '#ffffff' : '#f8fafc',
+                              transition: 'background 0.2s ease'
+                            }}
+                          >
+                            <td style={{ textAlign: 'center', color: '#475569', fontSize: 13, fontWeight: 700, padding: '12px 10px' }}>
+                              {index + 1}
+                            </td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <Text code style={{ fontSize: 12, fontWeight: 600 }}>{item.barcode || item.product_code || '—'}</Text>
+                            </td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0f172a' }}>{item.product_name}</div>
+                              <Space size={4} style={{ marginTop: 3 }}>
+                                {item.color && <Tag color="geekblue" style={{ fontSize: 11 }}>اللون: {item.color}</Tag>}
+                                {item.size && <Tag color="purple" style={{ fontSize: 11 }}>المقاس: {item.size}</Tag>}
+                                {item.product_code && <Text type="secondary" style={{ fontSize: 11 }}>كود: {item.product_code}</Text>}
+                              </Space>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <Tag color="cyan" style={{ fontSize: 11, fontWeight: 600 }}>{item.category_name || 'عام'}</Tag>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <Space size={2}>
+                                <Button
+                                  size="small"
+                                  icon={<MinusOutlined style={{ fontSize: 10 }} />}
+                                  onClick={() => updateItemQty(item.key, -1)}
+                                />
+                                <InputNumber
+                                  size="small"
+                                  min={1}
+                                  value={item.quantity}
+                                  onChange={(val) => handleUpdateItemRow(item.key, 'quantity', val || 1)}
+                                  style={{ width: 60, textAlign: 'center', fontWeight: 'bold' }}
+                                />
+                                <Button
+                                  size="small"
+                                  icon={<PlusOutlined style={{ fontSize: 10 }} />}
+                                  onClick={() => updateItemQty(item.key, 1)}
+                                />
+                              </Space>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                precision={2}
+                                value={item.unit_cost}
+                                onChange={(val) => handleUpdateItemRow(item.key, 'unit_cost', val || 0)}
+                                style={{ width: 95 }}
+                              />
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                precision={2}
+                                value={item.selling_price}
+                                onChange={(val) => handleUpdateItemRow(item.key, 'selling_price', val || 0)}
+                                style={{ width: 95, borderColor: '#16a34a' }}
+                              />
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                max={100}
+                                value={item.discount_pct}
+                                onChange={(val) => handleUpdateItemRow(item.key, 'discount_pct', val || 0)}
+                                style={{ width: 65 }}
+                              />
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', fontWeight: 800, fontSize: 13.5, color: '#15803d' }}>
+                              {(parseFloat(item.line_total) || 0).toLocaleString()} ج.م
+                            </td>
+                            <td style={{ textAlign: 'center', padding: '12px 6px' }}>
+                              <Space size={2}>
+                                {item.product_id && (
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<EditOutlined style={{ color: '#2563eb' }} />}
+                                    onClick={() => handleOpenMasterEdit(item.product_id, item.key)}
+                                    title="تعديل بطاقة الصنف"
+                                  />
+                                )}
+                                <Button
+                                  type="text"
+                                  danger
+                                  size="small"
+                                  icon={<DeleteOutlined />}
+                                  onClick={() => handleRemoveItem(item.key)}
+                                  title="حذف هذا السطر"
+                                />
+                              </Space>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
 
           {items.length > 0 && (
             <div style={{
@@ -2420,7 +2876,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             }}>
               <Space size="large" wrap>
                 <Text strong style={{ color: '#065f46', fontSize: 13.5 }}>
-                  📦 إجمالي الأصناف بالفاتورة: {items.filter(i => i.product_id).length} منتج
+                  📦 إجمالي الأصناف بالفاتورة: {items.filter(i => !i.isManualRow && i.product_id).length} منتج
                 </Text>
                 <Text strong style={{ color: '#065f46', fontSize: 13.5 }}>
                   🔢 إجمالي عدد القطع المشتراة: {calculateTotalPieces()} قطعة
@@ -2434,7 +2890,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 icon={<BarcodeOutlined />}
                 onClick={handleOpenBarcodePrintFromCurrentDrawer}
                 style={{ color: '#0f766e', borderColor: '#0f766e', background: '#ffffff', fontWeight: 700 }}
-                disabled={!items.some(it => (it.variantRows || []).some(r => r.enabled && r.quantity > 0))}
+                disabled={!items.some(it => !it.isManualRow && it.product_id && it.quantity > 0)}
               >
                 🖨️ طباعة ملصقات الباركود للبضاعة
               </Button>
@@ -2530,179 +2986,527 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             allowZero={true}
           />
         </Form>
-      </Drawer>
 
-      {/* ========================================================= */}
-      {/* 2. STANDALONE PURCHASE RETURN INVOICE DRAWER (NEW)        */}
-      {/* ========================================================= */}
-      <Drawer
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <RollbackOutlined style={{ color: '#dc2626' }} />
-            <span>فاتورة مرتجع مشتريات مستقلة (Standalone Purchase Return Invoice)</span>
-          </div>
-        }
-        placement="left"
-        width={1050}
-        onClose={() => setIsStandaloneReturnOpen(false)}
-        open={isStandaloneReturnOpen}
-        extra={
-          <Space>
-            <Button onClick={() => setIsStandaloneReturnOpen(false)}>إلغاء</Button>
+        {/* Sticky / Prominent Bottom Action Bar */}
+        <div style={{
+          position: 'sticky',
+          bottom: -24,
+          margin: '24px -24px -24px -24px',
+          padding: '16px 24px',
+          background: '#ffffff',
+          borderTop: '2px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+          zIndex: 10,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
+        }}>
+          <Space size="large" wrap>
+            <div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>إجمالي الأصناف</Text>
+              <Text strong style={{ fontSize: 16 }}>{items.filter(i => i.product_id).length} صنف</Text>
+            </div>
+            <Divider type="vertical" style={{ height: 32 }} />
+            <div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>إجمالي القطع المشتراة</Text>
+              <Text strong style={{ fontSize: 16, color: '#2563eb' }}>{calculateTotalPieces()} قطعة</Text>
+            </div>
+            <Divider type="vertical" style={{ height: 32 }} />
+            <div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>الإجمالي النهائي المستحق</Text>
+              <span style={{ fontSize: 20, fontWeight: 'bold', color: '#16a34a' }}>
+                {calculatedFinal.toLocaleString()} ج.م
+              </span>
+            </div>
+          </Space>
+
+          <Space size="middle">
+            <Button
+              icon={<BarcodeOutlined />}
+              onClick={handleOpenBarcodePrintFromCurrentDrawer}
+              style={{ color: '#0f766e', borderColor: '#0f766e', height: 42, fontWeight: 600 }}
+              disabled={!items.some(it => !it.isManualRow && it.product_id && it.quantity > 0)}
+            >
+              🖨️ طباعة باركود البضاعة
+            </Button>
+            <Button
+              size="large"
+              onClick={() => setIsCreateOpen(false)}
+              style={{ height: 42 }}
+            >
+              إلغاء
+            </Button>
             <Button
               type="primary"
-              danger
-              loading={standaloneSubmitting}
-              onClick={handleSubmitStandaloneReturn}
+              size="large"
+              loading={submitting}
+              onClick={handleCreateInvoice}
+              style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', height: 42, padding: '0 28px', fontWeight: 'bold', fontSize: 15 }}
             >
-              اعتماد فاتورة المرتجع وخصم المخزون
+              اعتماد الفاتورة وتحديث الأسعار والمخزون [F4]
             </Button>
           </Space>
+        </div>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* 2. EXPANSIVE STANDALONE PURCHASE RETURN MODAL (Full Desk) */}
+      {/* ========================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '8px 12px', borderRadius: 10, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(220,38,38,0.15)' }}>
+                <RollbackOutlined />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18, fontWeight: 'bold', color: '#0f172a' }}>فاتورة مرتجع مشتريات مستقلة إلى المورد</span>
+                  <Tag color="error" style={{ fontSize: 12, fontWeight: 600 }}>إرجاع وخصم مخزني</Tag>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 'normal' }}>
+                  إرجاع بضائع مباشرة للمورد مع تسوية الحساب المالي (خصم مديونية أو استرداد نقدي)
+                </div>
+              </div>
+            </div>
+
+            {/* Keyboard shortcuts ribbon */}
+            <Space size={8} style={{ direction: 'ltr' }}>
+              <Tag color="blue" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleAddStandaloneItem}>
+                ⌨️ <strong style={{ color: '#1d4ed8' }}>F11</strong> إضافة صنف مرتجع
+              </Tag>
+              <Tag color="purple" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={() => handleOpenF1SearchModal('return')}>
+                🔍 <strong style={{ color: '#6d28d9' }}>F1</strong> بحث عن صنف
+              </Tag>
+              <Tag color="error" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleSubmitStandaloneReturn}>
+                ⚡ <strong style={{ color: '#b91c1c' }}>F4</strong> اعتماد المرتجع
+              </Tag>
+            </Space>
+          </div>
         }
+        open={isStandaloneReturnOpen}
+        onCancel={() => setIsStandaloneReturnOpen(false)}
+        footer={null}
+        width="96vw"
+        style={{ top: 10, maxWidth: 1480, paddingBottom: 0 }}
+        destroyOnHidden={false}
       >
         <Form layout="vertical">
-          <Alert
-            message="إرجاع بضاعة مستقل إلى المورد: يمكنك اختيار المورد ومستودع البضاعة ثم إضافة أي أصناف مباشرة بالبحث دون الحاجة لربطها بفاتورة شراء محددة."
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
+          <Card
+            size="small"
+            style={{
+              background: '#fff',
+              border: '1px solid #fee2e2',
+              borderRadius: 8,
+              marginBottom: 14
+            }}
+          >
+            <Row gutter={[16, 12]}>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={<strong>المورد المرتجع إليه (Supplier) *</strong>} required style={{ marginBottom: 0 }}>
+                  <Select
+                    showSearch
+                    size="large"
+                    placeholder="اختر المورد..."
+                    value={standaloneSupplier}
+                    onChange={setStandaloneSupplier}
+                    filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
+                    style={{ width: '100%' }}
+                  >
+                    {suppliersList.map(s => (
+                      <Option key={s.id} value={s.id}>{s.supplier_name} ({s.supplier_code})</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={<strong>المستودع المرتجع منه (Warehouse) *</strong>} required style={{ marginBottom: 0 }}>
+                  <Select
+                    size="large"
+                    value={standaloneBranch || defaultBranchId}
+                    disabled
+                    style={{ width: '100%', fontWeight: 700 }}
+                  >
+                    {(() => {
+                      const main = branchesList.find(b =>
+                        b.id === (standaloneBranch || defaultBranchId) ||
+                        b.branch_type === 'main_warehouse' ||
+                        b.branch_name.includes('الرئيسي') ||
+                        b.is_main === true
+                      ) || branchesList[0];
 
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item label="المورد المرتجع إليه" required>
-                <Select
-                  showSearch
-                  placeholder="اختر المورد..."
-                  value={standaloneSupplier}
-                  onChange={setStandaloneSupplier}
-                  filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
-                >
-                  {suppliersList.map(s => (
-                    <Option key={s.id} value={s.id}>{s.supplier_name} ({s.supplier_code})</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="المستودع المرتجع منه (Warehouse)" required>
-                <Select
-                  placeholder="اختر المستودع..."
-                  value={standaloneBranch}
-                  onChange={setStandaloneBranch}
-                >
-                  {branchesList.map(b => (
-                    <Option key={b.id} value={b.id}>
-                      {b.branch_name} {b.id === defaultBranchId ? '(الرئيسي الافتراضي)' : ''}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="تاريخ المرتجع">
-                <Input
-                  type="date"
-                  value={standaloneDate}
-                  onChange={(e) => setStandaloneDate(e.target.value)}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+                      return main ? (
+                        <Option key={main.id} value={main.id}>
+                          🏢 {main.branch_name} (المستودع الرئيسي المعتمد فقط)
+                        </Option>
+                      ) : (
+                        <Option value={defaultBranchId || 1}>
+                          🏢 الفرع الرئيسي (المستودع الرئيسي المعتمد فقط)
+                        </Option>
+                      );
+                    })()}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={<strong>تاريخ المرتجع</strong>} style={{ marginBottom: 0 }}>
+                  <Input
+                    size="large"
+                    type="date"
+                    value={standaloneDate}
+                    onChange={(e) => setStandaloneDate(e.target.value)}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
 
-          <Divider orientation="left" style={{ margin: '12px 0' }}>
+          {/* Quick Shortcuts Helper Bar */}
+          <div style={{
+            background: '#fef2f2',
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #fecaca',
+            marginBottom: 14,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10
+          }}>
+            <div style={{ fontSize: 13, color: '#991b1b' }}>
+              ⚡ <strong>طريقة العمل السريعة:</strong> اضغط <strong>[F11]</strong> لإضافة سطر مرتجع، <strong>[F1]</strong> للبحث السريع عن الصنف، ثم <strong>[F4]</strong> لاعتماد المرتجع وخصم المخزون!
+            </div>
+            <Space wrap>
+              <Button
+                type="dashed"
+                danger
+                icon={<PlusOutlined />}
+                onClick={handleAddStandaloneItem}
+                style={{ fontWeight: 600 }}
+              >
+                + إضافة سطر مرتجع [F11]
+              </Button>
+              <Button
+                icon={<SearchOutlined />}
+                onClick={() => handleOpenF1SearchModal('return')}
+                style={{ borderColor: '#dc2626', color: '#dc2626', background: '#fff', fontWeight: 600 }}
+              >
+                🔍 بحث سريع عن الأصناف [F1]
+              </Button>
+              <Tooltip title="تحديث ومزامنة الأصناف من قاعدة البيانات">
+                <Button
+                  icon={<ReloadOutlined spin={refreshingProducts} />}
+                  onClick={handleRefreshProductsList}
+                >
+                  تحديث
+                </Button>
+              </Tooltip>
+            </Space>
+          </div>
+
+          <Divider orientation="left" style={{ margin: '14px 0 12px 0' }}>
             الأصناف المراد إرجاعها (Return Items Grid)
           </Divider>
 
-          <Table
-            size="small"
-            dataSource={standaloneItems}
-            pagination={false}
-            columns={[
-              {
-                title: 'الصنف / المنتج',
-                dataIndex: 'product_id',
-                key: 'product_id',
-                width: 380,
-                render: (_, record) => (
-                  <Select
-                    showSearch
-                    placeholder="ابحث واختر الصنف المراد إرجاعه..."
-                    value={record.product_id}
-                    onChange={(val) => handleUpdateStandaloneItem(record.key, 'product_id', val)}
-                    style={{ width: '100%' }}
-                    filterOption={(input, opt) => (opt?.label || '').toLowerCase().includes(input.toLowerCase())}
-                    options={productsList
-                      .filter(p => p.status === 'active' && p.category_id)
-                      .map(p => ({
-                        value: p.id,
-                        label: `${p.category_name ? `[${p.category_name}] ` : ''}${p.product_name} (${p.product_code || p.barcode || 'لا يوجد كود'})`
-                      }))}
-                  />
-                )
-              },
-              {
-                title: 'الكمية المرتجعة',
-                dataIndex: 'quantity',
-                key: 'quantity',
-                width: 130,
-                render: (_, record) => (
-                  <InputNumber
-                    min={1}
-                    value={record.quantity}
-                    onChange={(val) => handleUpdateStandaloneItem(record.key, 'quantity', val || 1)}
-                    addonAfter="قطعة"
-                    style={{ width: '100%' }}
-                  />
-                )
-              },
-              {
-                title: 'سعر التكلفة المحسوب للمرتجع',
-                dataIndex: 'unit_cost',
-                key: 'unit_cost',
-                width: 170,
-                render: (_, record) => (
-                  <InputNumber
-                    min={0}
-                    precision={2}
-                    value={record.unit_cost}
-                    onChange={(val) => handleUpdateStandaloneItem(record.key, 'unit_cost', val || 0)}
-                    style={{ width: '100%' }}
-                    addonAfter="ج.م"
-                  />
-                )
-              },
-              {
-                title: 'إجمالي السطر',
-                dataIndex: 'line_total',
-                key: 'line_total',
-                width: 140,
-                render: (val) => <Text strong style={{ color: '#dc2626' }}>{(parseFloat(val) || 0).toLocaleString()} ج.م</Text>
-              },
-              {
-                title: '',
-                key: 'actions',
-                width: 50,
-                render: (_, record) => (
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveStandaloneItem(record.key)}
-                  />
-                )
-              }
-            ]}
-          />
+          {/* Return Items Tabular Grid */}
+          <div style={{ marginBottom: 16 }}>
+            {standaloneItems.length === 0 ? (
+              <Card
+                style={{
+                  textAlign: 'center',
+                  padding: '36px 20px',
+                  background: 'linear-gradient(180deg, #fff5f5 0%, #fef2f2 100%)',
+                  border: '2px dashed #fca5a5',
+                  borderRadius: 12,
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                }}
+              >
+                <div style={{
+                  width: 72,
+                  height: 72,
+                  margin: '0 auto 16px',
+                  borderRadius: '50%',
+                  background: '#fee2e2',
+                  color: '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 34,
+                  boxShadow: '0 4px 12px rgba(220, 38, 38, 0.15)'
+                }}>
+                  <RollbackOutlined />
+                </div>
+                <Title level={4} style={{ margin: '0 0 6px 0', color: '#1e293b' }}>
+                  قائمة أصناف المرتجع فارغة حالياً
+                </Title>
+                <Text type="secondary" style={{ fontSize: 14, display: 'block', maxWidth: 620, margin: '0 auto 20px' }}>
+                  ابدأ بإضافة سطر يدوي، أو استخدام اختصارات الكيبورد السريعة لتسريع إدخال مرتجع المشتريات:
+                </Text>
 
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={handleAddStandaloneItem}
-            style={{ width: '100%', marginTop: 8 }}
-          >
-            إضافة صنف آخر للمرتجع
-          </Button>
+                {/* Keyboard Shortcuts Visual Banner */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 16,
+                  background: '#ffffff',
+                  border: '1px solid #fecaca',
+                  padding: '10px 24px',
+                  borderRadius: 30,
+                  marginBottom: 24,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                  flexWrap: 'wrap'
+                }}>
+                  <Space size={6}>
+                    <Tag color="error" style={{ fontSize: 13, fontWeight: 'bold', padding: '2px 8px', borderRadius: 4 }}>F11</Tag>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>إضافة سطر إدخال يدوي</Text>
+                  </Space>
+                  <Divider type="vertical" style={{ height: 20 }} />
+                  <Space size={6}>
+                    <Tag color="purple" style={{ fontSize: 13, fontWeight: 'bold', padding: '2px 8px', borderRadius: 4 }}>F1</Tag>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>بحث واختيار من المجاميع والأصناف</Text>
+                  </Space>
+                  <Divider type="vertical" style={{ height: 20 }} />
+                  <Space size={6}>
+                    <Tag color="red" style={{ fontSize: 13, fontWeight: 'bold', padding: '2px 8px', borderRadius: 4 }}>F4</Tag>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>اعتماد المرتجع وخصم المخزون</Text>
+                  </Space>
+                </div>
+
+                {/* Action Buttons for Empty State */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <Button
+                    type="primary"
+                    danger
+                    size="large"
+                    icon={<PlusOutlined />}
+                    onClick={handleAddStandaloneItem}
+                    style={{
+                      height: 44,
+                      padding: '0 28px',
+                      fontWeight: 700,
+                      borderRadius: 8,
+                      boxShadow: '0 4px 10px rgba(220,38,38,0.25)'
+                    }}
+                  >
+                    + إضافة سطر صنف مرتجع جديد [F11]
+                  </Button>
+                  <Button
+                    size="large"
+                    icon={<SearchOutlined />}
+                    onClick={() => handleOpenF1SearchModal('return')}
+                    style={{
+                      height: 44,
+                      padding: '0 28px',
+                      color: '#7c3aed',
+                      borderColor: '#c4b5fd',
+                      background: '#f5f3ff',
+                      fontWeight: 700,
+                      borderRadius: 8
+                    }}
+                  >
+                    🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <div>
+                {/* Clean Top Action Header above table */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                  padding: '8px 14px',
+                  background: '#fef2f2',
+                  borderRadius: 8,
+                  border: '1px solid #fecaca',
+                  flexWrap: 'wrap',
+                  gap: 8
+                }}>
+                  <Space size="middle">
+                    <Button
+                      type="primary"
+                      danger
+                      icon={<PlusOutlined />}
+                      onClick={handleAddStandaloneItem}
+                      style={{ fontWeight: 700, borderRadius: 6 }}
+                    >
+                      + إضافة سطر صنف مرتجع جديد [F11]
+                    </Button>
+                    <Button
+                      icon={<SearchOutlined />}
+                      onClick={() => handleOpenF1SearchModal('return')}
+                      style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 700, borderRadius: 6 }}
+                    >
+                      🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                    </Button>
+                  </Space>
+                  <Space size={8}>
+                    <Tag color="error" style={{ fontWeight: 600 }}>[F11] سطر مرتجع</Tag>
+                    <Tag color="purple" style={{ fontWeight: 600 }}>[F1] بحث الأصناف</Tag>
+                    <Tag color="red" style={{ fontWeight: 600 }}>[F4] اعتماد المرتجع</Tag>
+                  </Space>
+                </div>
+
+                <div style={{ border: '1.5px solid #cbd5e1', borderRadius: 10, overflowX: 'auto', background: '#ffffff', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
+                    <thead style={{ background: '#fef2f2', borderBottom: '2.5px solid #fecaca' }}>
+                      <tr style={{ color: '#991b1b' }}>
+                        <th style={{ padding: '12px 10px', width: 44, textAlign: 'center', fontWeight: 700 }}>#</th>
+                        <th style={{ padding: '12px 10px', width: 140, fontWeight: 700 }}>كود / باركود</th>
+                        <th style={{ padding: '12px 10px', fontWeight: 700 }}>اسم الصنف والمواصفات</th>
+                        <th style={{ padding: '12px 10px', width: 110, textAlign: 'center', fontWeight: 700 }}>المجموعة</th>
+                        <th style={{ padding: '12px 10px', width: 140, textAlign: 'center', fontWeight: 700 }}>الكمية المرتجعة</th>
+                        <th style={{ padding: '12px 10px', width: 160, textAlign: 'center', fontWeight: 700 }}>سعر التكلفة المحسوب (ج.م)</th>
+                        <th style={{ padding: '12px 10px', width: 140, textAlign: 'center', fontWeight: 700 }}>إجمالي السطر</th>
+                        <th style={{ padding: '12px 6px', width: 70, textAlign: 'center', fontWeight: 700 }}>إجراء</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {standaloneItems.map((item, index) => {
+                        if (item.isManualRow || !item.product_id) {
+                          return (
+                            <tr
+                              key={item.key}
+                              style={{
+                                background: '#fffbeb',
+                                borderBottom: '3px solid #fde047',
+                                borderTop: index > 0 ? '1px dashed #fde047' : undefined,
+                                boxShadow: 'inset 0 1px 3px rgba(234, 179, 8, 0.06)'
+                              }}
+                            >
+                              <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#ca8a04', padding: '12px 10px' }}>
+                                <Badge count={index + 1} style={{ backgroundColor: '#eab308', color: '#ffffff', fontWeight: 'bold' }} />
+                              </td>
+                              <td colSpan={5} style={{ padding: '10px 12px' }}>
+                                <Input
+                                  ref={(el) => (manualReturnRowInputRefs.current[item.key] = el)}
+                                  size="middle"
+                                  placeholder="أدخل باركود أو كود الصنف واضغط Enter، أو اضغط [F1] لاختيار الصنف من القائمة..."
+                                  prefix={<BarcodeOutlined style={{ color: '#d97706', fontSize: 18 }} />}
+                                  onPressEnter={(e) => handleReturnManualRowBarcodeSubmit(item.key, e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    borderRadius: 6,
+                                    borderColor: '#facc15',
+                                    boxShadow: '0 1px 3px rgba(234, 179, 8, 0.1)',
+                                    fontSize: 13.5
+                                  }}
+                                  autoFocus
+                                />
+                              </td>
+                              <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                                <Button
+                                  size="middle"
+                                  icon={<SearchOutlined />}
+                                  onClick={() => handleOpenF1SearchModal('return', item.key)}
+                                  style={{
+                                    color: '#7c3aed',
+                                    borderColor: '#c4b5fd',
+                                    background: '#f5f3ff',
+                                    fontWeight: 700,
+                                    borderRadius: 6
+                                  }}
+                                >
+                                  بحث F1
+                                </Button>
+                              </td>
+                              <td style={{ textAlign: 'center', padding: '10px 6px' }}>
+                                <Button
+                                  type="text"
+                                  danger
+                                  icon={<DeleteOutlined style={{ fontSize: 16 }} />}
+                                  onClick={() => handleRemoveStandaloneItem(item.key)}
+                                  title="حذف هذا السطر"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr
+                            key={item.key}
+                            style={{
+                              borderBottom: '2.5px solid #e2e8f0',
+                              background: index % 2 === 0 ? '#ffffff' : '#fef2f2',
+                              transition: 'background 0.2s ease'
+                            }}
+                          >
+                            <td style={{ textAlign: 'center', color: '#475569', fontSize: 13, fontWeight: 700, padding: '12px 10px' }}>
+                              {index + 1}
+                            </td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <Text code style={{ fontSize: 12, fontWeight: 600 }}>{item.barcode || item.product_code || '—'}</Text>
+                            </td>
+                            <td style={{ padding: '12px 10px' }}>
+                              <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0f172a' }}>{item.product_name}</div>
+                              <Space size={4} style={{ marginTop: 3 }}>
+                                {item.color && <Tag color="geekblue" style={{ fontSize: 11 }}>اللون: {item.color}</Tag>}
+                                {item.size && <Tag color="purple" style={{ fontSize: 11 }}>المقاس: {item.size}</Tag>}
+                                {item.product_code && <Text type="secondary" style={{ fontSize: 11 }}>كود: {item.product_code}</Text>}
+                              </Space>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <Tag color="cyan" style={{ fontSize: 11, fontWeight: 600 }}>{item.category_name || 'عام'}</Tag>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <Space size={2}>
+                                <Button
+                                  size="small"
+                                  icon={<MinusOutlined style={{ fontSize: 10 }} />}
+                                  onClick={() => updateReturnItemQty(item.key, -1)}
+                                />
+                                <InputNumber
+                                  size="small"
+                                  min={1}
+                                  value={item.quantity}
+                                  onChange={(val) => handleUpdateStandaloneItem(item.key, 'quantity', val || 1)}
+                                  style={{ width: 60, textAlign: 'center', fontWeight: 'bold' }}
+                                />
+                                <Button
+                                  size="small"
+                                  icon={<PlusOutlined style={{ fontSize: 10 }} />}
+                                  onClick={() => updateReturnItemQty(item.key, 1)}
+                                />
+                              </Space>
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                precision={2}
+                                value={item.unit_cost}
+                                onChange={(val) => handleUpdateStandaloneItem(item.key, 'unit_cost', val || 0)}
+                                style={{ width: 105 }}
+                              />
+                            </td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', fontWeight: 800, fontSize: 13.5, color: '#dc2626' }}>
+                              {(parseFloat(item.line_total) || 0).toLocaleString()} ج.م
+                            </td>
+                            <td style={{ textAlign: 'center', padding: '12px 6px' }}>
+                              <Button
+                                type="text"
+                                danger
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                onClick={() => handleRemoveStandaloneItem(item.key)}
+                                title="حذف هذا السطر"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
 
           <Row gutter={16} style={{ marginTop: 16 }}>
             <Col span={10}>
@@ -2804,7 +3608,65 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             )}
           </Card>
         </Form>
-      </Drawer>
+
+        {/* Sticky / Prominent Bottom Action Bar */}
+        <div style={{
+          position: 'sticky',
+          bottom: -24,
+          margin: '24px -24px -24px -24px',
+          padding: '16px 24px',
+          background: '#ffffff',
+          borderTop: '2px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+          zIndex: 10,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
+        }}>
+          <Space size="large" wrap>
+            <div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>الأصناف المرتجعة</Text>
+              <Text strong style={{ fontSize: 16 }}>{standaloneItems.filter(i => i.product_id).length} صنف</Text>
+            </div>
+            <Divider type="vertical" style={{ height: 32 }} />
+            <div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>إجمالي القطع</Text>
+              <Text strong style={{ fontSize: 16, color: '#dc2626' }}>
+                {standaloneItems.reduce((sum, i) => sum + (parseInt(i.quantity, 10) || 0), 0)} قطعة
+              </Text>
+            </div>
+            <Divider type="vertical" style={{ height: 32 }} />
+            <div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>إجمالي قيمة المرتجع</Text>
+              <span style={{ fontSize: 20, fontWeight: 'bold', color: '#dc2626' }}>
+                {calculatedStandaloneTotal.toLocaleString()} ج.م
+              </span>
+            </div>
+          </Space>
+
+          <Space size="middle">
+            <Button
+              size="large"
+              onClick={() => setIsStandaloneReturnOpen(false)}
+              style={{ height: 42 }}
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="primary"
+              danger
+              size="large"
+              loading={standaloneSubmitting}
+              onClick={handleSubmitStandaloneReturn}
+              style={{ height: 42, padding: '0 28px', fontWeight: 'bold', fontSize: 15 }}
+            >
+              اعتماد فاتورة المرتجع وخصم المخزون [F4]
+            </Button>
+          </Space>
+        </div>
+      </Modal>
 
       {/* ========================================================= */}
       {/* 3. LINKED RETURN MODAL (FROM EXISTING INVOICE)           */}
@@ -2818,7 +3680,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         }
         open={linkedReturnOpen}
         onCancel={() => setLinkedReturnOpen(false)}
-        width={960}
+        width="95vw"
+        style={{ top: 12, maxWidth: 1380, paddingBottom: 0 }}
         footer={[
           <Button key="cancel" onClick={() => setLinkedReturnOpen(false)} disabled={linkedSubmitting}>
             إلغاء
@@ -4336,9 +5199,291 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               </Row>
             </div>
           )}
-
-
         </Form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* 🔍 POS-STYLE PRODUCT SEARCH & PICKER MODAL (F1)                           */}
+      {/* ========================================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ background: '#ede9fe', color: '#7c3aed', padding: '6px 10px', borderRadius: 8, fontSize: 18 }}>
+                <SearchOutlined />
+              </div>
+              <div>
+                <span style={{ fontSize: 17, fontWeight: 'bold' }}>
+                  نافذة البحث السريع عن الأصناف والمجاميع (F1)
+                </span>
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  {f1SearchTarget === 'invoice' ? 'اختيار صنف وتضمينه في فاتورة المشتريات' : 'اختيار صنف وتضمينه في فاتورة المرتجع'} | مسجل بالنظام: {productsList.length} صنف
+                </div>
+              </div>
+            </div>
+
+            <Space size="middle">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => handleOpenMasterCreate(f1TargetItemKey)}
+                style={{
+                  backgroundColor: '#059669',
+                  borderColor: '#059669',
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  boxShadow: '0 2px 8px rgba(5,150,105,0.25)'
+                }}
+              >
+                ✨ إضافة صنف جديد للمنظومة
+              </Button>
+              <Tag color="purple" style={{ fontSize: 12 }}>
+                اضغط <strong>[Enter]</strong> أو انقر نقراً مزدوجاً على الصنف لاختياره فوراً
+              </Tag>
+            </Space>
+          </div>
+        }
+        open={f1ModalOpen}
+        onCancel={() => setF1ModalOpen(false)}
+        footer={null}
+        width={1050}
+        style={{ top: 25 }}
+        destroyOnHidden
+      >
+        <div style={{ display: 'flex', gap: 14, height: 500, direction: 'rtl' }}>
+          {/* Right Sidebar: Categories / Groups (المجاميع والتصنيفات) */}
+          <div
+            style={{
+              width: 230,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              overflowY: 'auto'
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#334155', padding: '6px 8px', borderBottom: '1px solid #cbd5e1', marginBottom: 6 }}>
+              <AppstoreOutlined style={{ marginLeft: 6, color: '#2563eb' }} />
+              المجاميع والتصنيفات
+            </div>
+
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={() => handleOpenMasterCreate(f1TargetItemKey)}
+              style={{
+                borderColor: '#059669',
+                color: '#059669',
+                background: '#ecfdf5',
+                fontWeight: 700,
+                borderRadius: 6,
+                marginBottom: 8
+              }}
+            >
+              + إضافة صنف جديد
+            </Button>
+
+            <Button
+              type={f1CategoryFilter === 'all' ? 'primary' : 'text'}
+              style={{
+                textAlign: 'right',
+                justifyContent: 'flex-start',
+                marginBottom: 4,
+                borderRadius: 6,
+                fontWeight: f1CategoryFilter === 'all' ? 700 : 500,
+                backgroundColor: f1CategoryFilter === 'all' ? '#2563eb' : undefined
+              }}
+              onClick={() => handleF1CategoryChange('all')}
+            >
+              جميع الأصناف ({productsList.length})
+            </Button>
+
+            {categoriesList.map((cat) => {
+              const count = productsList.filter((p) => p.category_id === cat.id).length;
+              return (
+                <Button
+                  key={cat.id}
+                  type={f1CategoryFilter === cat.id ? 'primary' : 'text'}
+                  style={{
+                    textAlign: 'right',
+                    justifyContent: 'space-between',
+                    marginBottom: 3,
+                    borderRadius: 6,
+                    fontWeight: f1CategoryFilter === cat.id ? 700 : 500,
+                    backgroundColor: f1CategoryFilter === cat.id ? '#2563eb' : undefined,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onClick={() => handleF1CategoryChange(cat.id)}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.category_name}</span>
+                  <span style={{ fontSize: 11, opacity: 0.8 }}>({count})</span>
+                </Button>
+              );
+            })}
+          </div>
+
+          {/* Left / Main Section: Search Input & Product Results Table */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+              <Input
+                ref={f1SearchInputRef}
+                size="large"
+                placeholder="ابحث بالاسم، كود الصنف، الموديل، أو الباركود..."
+                prefix={<SearchOutlined style={{ color: '#2563eb' }} />}
+                value={f1SearchQuery}
+                onChange={(e) => handleF1SearchQueryChange(e.target.value)}
+                allowClear
+                autoFocus
+                style={{ borderRadius: 8, flex: 1 }}
+              />
+              <Button
+                type="primary"
+                size="large"
+                icon={<PlusOutlined />}
+                onClick={() => handleOpenMasterCreate(f1TargetItemKey)}
+                style={{
+                  backgroundColor: '#059669',
+                  borderColor: '#059669',
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(5,150,105,0.2)'
+                }}
+              >
+                ✨ صنف جديد للمنظومة
+              </Button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#ffffff' }}>
+              <Table
+                dataSource={f1SearchResults}
+                rowKey={(r) => `${r.product_id || r.id}-${r.variant_id || '0'}`}
+                loading={f1Loading}
+                pagination={false}
+                size="middle"
+                onRow={(record) => ({
+                  onDoubleClick: () => handleSelectProductFromF1Modal(record),
+                  style: { cursor: 'pointer' }
+                })}
+                columns={[
+                  {
+                    title: 'كود / باركود',
+                    dataIndex: 'barcode',
+                    key: 'barcode',
+                    width: 140,
+                    render: (b, r) => <Text code copyable={{ text: b || r.product_code || '' }}>{b || r.product_code || '—'}</Text>
+                  },
+                  {
+                    title: 'اسم الصنف والمواصفات',
+                    dataIndex: 'display_name',
+                    key: 'display_name',
+                    render: (name, r) => {
+                      const isAlreadyAdded = f1SearchTarget === 'invoice'
+                        ? items.some(it => (it.product_id === r.product_id || it.product_id === r.id) && (!r.variant_id || it.variant_id === r.variant_id))
+                        : standaloneItems.some(it => (it.product_id === r.product_id || it.product_id === r.id));
+
+                      return (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Text strong style={{ fontSize: 13, color: '#0f172a' }}>{name || r.product_name}</Text>
+                            {isAlreadyAdded && (
+                              <Tag color="success" style={{ fontSize: 10, margin: 0 }}>مضاف بالفاتورة</Tag>
+                            )}
+                          </div>
+                          <Space size={4} style={{ marginTop: 2 }}>
+                            {r.color && <Tag color="geekblue" style={{ fontSize: 10 }}>اللون: {r.color}</Tag>}
+                            {r.size && <Tag color="purple" style={{ fontSize: 10 }}>المقاس: {r.size}</Tag>}
+                            {r.category_name && <Tag color="cyan" style={{ fontSize: 10 }}>📁 {r.category_name}</Tag>}
+                          </Space>
+                        </div>
+                      );
+                    }
+                  },
+                  {
+                    title: 'سعر التكلفة',
+                    dataIndex: 'cost_price',
+                    key: 'cost_price',
+                    width: 110,
+                    align: 'center',
+                    render: (c) => <Text strong style={{ color: '#0f766e', fontSize: 13 }}>{(parseFloat(c) || 0).toLocaleString()} ج.م</Text>
+                  },
+                  {
+                    title: 'سعر البيع',
+                    dataIndex: 'unit_price',
+                    key: 'unit_price',
+                    width: 110,
+                    align: 'center',
+                    render: (p, r) => <Text strong style={{ color: '#16a34a', fontSize: 13 }}>{(parseFloat(p || r.selling_price) || 0).toLocaleString()} ج.م</Text>
+                  },
+                  {
+                    title: 'المخزون الحالي',
+                    dataIndex: 'available_qty',
+                    key: 'available_qty',
+                    width: 110,
+                    align: 'center',
+                    render: (qty) => (
+                      <Badge
+                        count={`${qty ?? 0} متاح`}
+                        style={{
+                          backgroundColor: (qty ?? 0) > 5 ? '#52c41a' : (qty ?? 0) > 0 ? '#fa8c16' : '#94a3b8',
+                          fontSize: 10
+                        }}
+                      />
+                    )
+                  },
+                  {
+                    title: 'إجراء',
+                    key: 'action',
+                    width: 170,
+                    align: 'center',
+                    render: (_, r) => (
+                      <Space size={4}>
+                        <Button
+                          size="small"
+                          type="primary"
+                          icon={<CheckOutlined />}
+                          style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', borderRadius: 6, fontWeight: 600 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectProductFromF1Modal(r);
+                          }}
+                        >
+                          اختيار
+                        </Button>
+                        <Button
+                          size="small"
+                          icon={<PlusOutlined />}
+                          style={{ color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', borderRadius: 6, fontSize: 11 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddAllVariantsOfProduct(r.product_id || r.id);
+                          }}
+                          title="إضافة كل المقاسات والألوان المتاحة لهذا الصنف دفعة واحدة"
+                        >
+                          كل المقاسات
+                        </Button>
+                      </Space>
+                    )
+                  }
+                ]}
+              />
+            </div>
+
+            {/* Footer inside F1 modal */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                💡 تلميح: انقر نقراً مزدوجاً (Double Click) على أي سطر لاختيار الصنف فوراً، أو اضغط زر [كل المقاسات] لإدراج كافة المتغيرات.
+              </Text>
+              <Button onClick={() => setF1ModalOpen(false)}>
+                إغلاق [Esc]
+              </Button>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );

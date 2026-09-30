@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
 const { requireAuth, requireRole } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+const { addToMainTreasury, deductFromMainTreasury } = require('../services/treasuryService');
 
 /**
  * GET /api/swm/purchases
@@ -22,7 +23,7 @@ router.get('/', requireAuth, async (req, res) => {
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const limitNum = Math.max(1, Math.min(10000, parseInt(limit, 10)));
     const offset = (pageNum - 1) * limitNum;
 
     const whereClauses = [];
@@ -137,7 +138,7 @@ router.get('/returns', requireAuth, async (req, res) => {
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const limitNum = Math.max(1, Math.min(10000, parseInt(limit, 10)));
     const offset = (pageNum - 1) * limitNum;
 
     const whereClauses = [];
@@ -461,8 +462,18 @@ router.post('/returns', requireAuth, requireRole(['super_admin', 'admin', 'inven
         );
       }
 
-      // 5. If money was refunded back from supplier (Cash, Transfer, E-Wallet), record refund receipt in supplier_payments
+      // 5. If money was refunded back from supplier (Cash, Transfer, E-Wallet), record refund receipt in supplier_payments and credit Main Treasury
       if (calculatedRefund > 0) {
+        await addToMainTreasury(client, {
+          amount: calculatedRefund,
+          paymentMethod: finalRefundMethod,
+          paymentBreakdown: payment_breakdown,
+          sourceAccount: 'supplier_refund',
+          reason: `مرتجع شغل من مورد للحساب - مرتجع مشتريات #${returnNumber}`,
+          refNumber: returnNumber,
+          userId: req.user.id
+        });
+
         const receiptRef = `SRCP-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 900 + 100)}`;
         await client.query(
           `INSERT INTO supplier_payments (
@@ -893,8 +904,18 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
         );
       }
 
-      // 7. If paid > 0, record in supplier_payments with multi-tender breakdown
+      // 7. If paid > 0, deduct from Main Treasury with strict solvency check, and record in supplier_payments
       if (paid > 0) {
+        await deductFromMainTreasury(client, {
+          amount: paid,
+          paymentMethod: finalPaymentMethod,
+          paymentBreakdown: payment_breakdown,
+          destinationAccount: 'supplier_payment',
+          reason: `سداد دفعة شراء بضاعة - فاتورة مشتريات #${finalInvNumber}`,
+          refNumber: finalInvNumber,
+          userId: req.user.id
+        });
+
         const paymentRef = `SPAY-INIT-${Date.now().toString().slice(-6)}`;
         await client.query(
           `INSERT INTO supplier_payments (
@@ -961,7 +982,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
     });
   } catch (err) {
     console.error('Create purchase invoice error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.message && err.message.includes('غير كافٍ') ? 400 : 500).json({ success: false, message: err.message });
   }
 });
 

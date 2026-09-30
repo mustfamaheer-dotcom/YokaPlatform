@@ -29,6 +29,55 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 /**
+ * Helper: auto-generate next unique branch code
+ */
+async function generateNextBranchCode(branchType = 'retail_branch') {
+  let prefix = 'BR';
+  if (branchType === 'main_warehouse') prefix = 'WH';
+  else if (branchType === 'ecom_warehouse') prefix = 'ECOM';
+
+  const rows = await query(`SELECT branch_code FROM branches`);
+  let maxNum = 0;
+  for (const r of rows) {
+    const code = String(r.branch_code || '').trim().toUpperCase();
+    const match = code.match(new RegExp(`^${prefix}-(\\d+)`));
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+
+  if (maxNum === 0) {
+    maxNum = rows.length;
+  }
+
+  let nextNum = maxNum + 1;
+  let candidate = `${prefix}-${String(nextNum).padStart(3, '0')}`;
+
+  const existingSet = new Set(rows.map(r => String(r.branch_code || '').trim().toUpperCase()));
+  while (existingSet.has(candidate)) {
+    nextNum++;
+    candidate = `${prefix}-${String(nextNum).padStart(3, '0')}`;
+  }
+
+  return candidate;
+}
+
+/**
+ * GET /api/swm/branches/next-code
+ * Return the next automatically generated branch code
+ */
+router.get('/next-code', requireAuth, async (req, res) => {
+  try {
+    const { branch_type = 'retail_branch' } = req.query;
+    const nextCode = await generateNextBranchCode(branch_type);
+    return res.json({ success: true, next_code: nextCode });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * GET /api/swm/branches/:id
  */
 router.get('/:id', requireAuth, async (req, res) => {
@@ -37,7 +86,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     const rows = await query(
       `SELECT id, branch_code, branch_name, branch_type, login_username, login_password_plain,
               address, phone, supervisor_id, status, working_hours, created_at, updated_at
-       FROM branches WHERE id = $1`,
+        FROM branches WHERE id = $1`,
       [id]
     );
     if (!rows.length) {
@@ -67,14 +116,17 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
       password
     } = req.body;
 
-    if (!branch_code || !branch_name) {
+    if (!branch_name || !branch_name.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'كود الفرع واسم الفرع حقول مطلوبة'
+        message: 'اسم الفرع حقل مطلوب'
       });
     }
 
-    const branchCodeClean = branch_code.trim().toUpperCase();
+    let branchCodeClean = (branch_code || '').trim().toUpperCase();
+    if (!branchCodeClean) {
+      branchCodeClean = await generateNextBranchCode(branch_type || 'retail_branch');
+    }
     const branchUserClean = (login_username || username || '').trim();
     const branchPasswordClean = (password || '').trim();
 

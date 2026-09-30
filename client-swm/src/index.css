@@ -866,3 +866,24 @@ body {
   right: 0;
   height: 4px;
 }
+
+/* ─── Modern Card Navigation Hub & Eye-Comfort Palette ───────────────── */
+.nav-hub-card {
+  will-change: transform, box-shadow, border-color;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-hub-card:focus-visible {
+  border-color: #0f766e !important;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.25) !important;
+}
+
+.nav-hub-card:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+.hub-back-btn:active {
+  transform: scale(0.97);
+}

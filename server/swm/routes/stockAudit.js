@@ -1,6 +1,7 @@
 const router = require('express').Router();
-const { query } = require('../../shared/db');
+const { query, transaction } = require('../../shared/db');
 const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { logActivity } = require('../../shared/activityLogger');
 
 /**
  * GET /api/swm/stock-audit
@@ -20,27 +21,39 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const isExport = limit === 'all' || parseInt(limit, 10) === 0;
-    const limitNum = isExport ? 5000 : Math.max(1, Math.min(250, parseInt(limit, 10) || 50));
+    const isExport = limit === 'all' || parseInt(limit, 10) === 0 || parseInt(limit, 10) >= 1000;
+    const limitNum = isExport ? 10000 : Math.max(1, Math.min(1000, parseInt(limit, 10) || 50));
     const offset = (pageNum - 1) * limitNum;
 
     const whereClauses = [`p.status = 'active'`];
     const params = [];
     let pIdx = 1;
 
-    // Branch scoping: branch accounts are locked to their own branch
-    const isBranchAccount = req.user.isBranchAccount ||
-      (!['super_admin', 'admin', 'inventory_manager'].includes(req.user.role));
-    const forcedBranchId = isBranchAccount ? req.user.branchId : null;
-    const effectiveBranchId = forcedBranchId || (branch_id && branch_id !== 'all' && branch_id !== '' ? branch_id : null);
+    // Branch scoping: Allow super_admin, admin, inventory_manager, and supervisor in SWM dashboard to audit any requested branch
+    const isRestrictedBranchUser = !['super_admin', 'admin', 'inventory_manager', 'supervisor'].includes(req.user.role);
+    const forcedBranchId = (isRestrictedBranchUser && req.user.branchId) ? req.user.branchId : null;
+    const effectiveBranchId = forcedBranchId || (branch_id && branch_id !== 'all' && branch_id !== '' && branch_id !== 'undefined' ? branch_id : null);
 
     // Branch filter
     let branchJoinSql = '';
+    let selectedBranchFallbackId = null;
+    let selectedBranchFallbackName = 'المستودع الرئيسي';
+
     if (effectiveBranchId) {
       const bId = parseInt(effectiveBranchId, 10);
+      selectedBranchFallbackId = bId;
       branchJoinSql = `AND ib.branch_id = $${pIdx}`;
       params.push(bId);
       pIdx++;
+
+      try {
+        const [brRow] = await query('SELECT id, branch_name FROM branches WHERE id = $1', [bId]);
+        if (brRow) {
+          selectedBranchFallbackName = brRow.branch_name;
+        }
+      } catch (e) {
+        // Fallback to default
+      }
     }
 
     // Category filter
@@ -88,8 +101,8 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
         COALESCE(ib.reserved_qty, 0) AS reserved_qty,
         COALESCE(ib.sold_qty, 0) AS sold_qty,
         COALESCE(ib.returned_qty, 0) AS returned_qty,
-        b.id AS branch_id,
-        b.branch_name,
+        COALESCE(b.id, ${selectedBranchFallbackId ? selectedBranchFallbackId : 'NULL'}) AS branch_id,
+        COALESCE(b.branch_name, '${selectedBranchFallbackName.replace(/'/g, "''")}') AS branch_name,
         b.branch_code,
         b.branch_type,
         ib.id AS balance_id,
@@ -260,25 +273,40 @@ router.post('/counts', requireAuth, requireRole(['super_admin', 'admin', 'invent
     const sessionCode = count_session || `STK-B${branchId}-${Date.now()}`;
     const dateVal = count_date || new Date().toISOString().slice(0, 10);
 
-    for (const item of items) {
-      await query(
-        `INSERT INTO inventory_counts (
-           count_session, branch_id, product_id, variant_id, system_qty,
-           actual_qty, notes, counted_by, count_date, status, created_at, updated_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'submitted', NOW(), NOW())`,
-        [
-          sessionCode,
-          branchId,
-          item.product_id,
-          item.variant_id || null,
-          parseInt(item.system_qty || 0, 10),
-          parseInt(item.actual_qty || 0, 10),
-          item.notes || notes || null,
-          req.user.id,
-          dateVal
-        ]
-      );
-    }
+    await transaction(async (client) => {
+      for (const item of items) {
+        if (!item.product_id) continue;
+        await client.query(
+          `INSERT INTO inventory_counts (
+             count_session, branch_id, product_id, variant_id, system_qty,
+             actual_qty, notes, counted_by, count_date, status, created_at, updated_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'submitted', NOW(), NOW())`,
+          [
+            sessionCode,
+            branchId,
+            item.product_id,
+            item.variant_id || null,
+            parseInt(item.system_qty || 0, 10),
+            parseInt(item.actual_qty || 0, 10),
+            item.notes || notes || null,
+            req.user.id,
+            dateVal
+          ]
+        );
+      }
+    });
+
+    logActivity({
+      userId: req.user.id,
+      branchId,
+      actionType: 'STOCK_COUNT_SUBMITTED',
+      entityType: 'inventory_counts',
+      entityId: null,
+      newValue: { count_session: sessionCode, items_count: items.length },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `تسجيل جلسة جرد مجمع (${sessionCode}) بعدد ${items.length} صنف`
+    });
 
     return res.status(201).json({
       success: true,
