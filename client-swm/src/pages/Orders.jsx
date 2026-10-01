@@ -19,7 +19,8 @@ import {
   Form,
   InputNumber,
   Switch,
-  Spin
+  Spin,
+  Tooltip
 } from 'antd';
 import {
   SearchOutlined,
@@ -637,13 +638,15 @@ export default function Orders({
       key: 'actions',
       render: (_, r) => (
         <Space size="small">
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleOpenEditPayment(r)}
-          >
-            تعديل
-          </Button>
+          <Tooltip title="تعديل طريقة الدفع">
+            <Button
+              size="middle"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEditPayment(r)}
+            >
+              تعديل
+            </Button>
+          </Tooltip>
 
           {r.method_key !== 'cod' && (
             <Popconfirm
@@ -654,9 +657,11 @@ export default function Orders({
               cancelText="إلغاء"
               okButtonProps={{ danger: true }}
             >
-              <Button size="small" danger icon={<DeleteOutlined />}>
-                حذف
-              </Button>
+              <Tooltip title="حذف طريقة الدفع">
+                <Button size="middle" danger icon={<DeleteOutlined />}>
+                  حذف
+                </Button>
+              </Tooltip>
             </Popconfirm>
           )}
         </Space>
@@ -789,38 +794,44 @@ export default function Orders({
       key: 'actions',
       render: (_, r) => (
         <Space size="small">
-          <Button
-            type="primary"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handleOpenDetail(r.id)}
-            style={{ backgroundColor: '#2563eb' }}
-          >
-            التفاصيل
-          </Button>
+          <Tooltip title="عرض التفاصيل">
+            <Button
+              type="primary"
+              ghost
+              size="middle"
+              icon={<EyeOutlined />}
+              onClick={() => handleOpenDetail(r.id)}
+            >
+              التفاصيل
+            </Button>
+          </Tooltip>
 
           {r.order_status === 'processing' && (
-            <Button
-              size="small"
-              type="primary"
-              icon={<CarOutlined />}
-              onClick={() => handleOpenShipModal(r)}
-              style={{ backgroundColor: '#0284c7' }}
-            >
-              شحن
-            </Button>
+            <Tooltip title="شحن الطلب وتحديد المندوب">
+              <Button
+                size="middle"
+                type="primary"
+                icon={<CarOutlined />}
+                onClick={() => handleOpenShipModal(r)}
+                style={{ backgroundColor: '#0284c7' }}
+              >
+                شحن
+              </Button>
+            </Tooltip>
           )}
 
           {r.order_status === 'shipped' && (
-            <Button
-              size="small"
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              onClick={() => handleUpdateStatus(r.id, 'delivered', 'paid')}
-              style={{ backgroundColor: '#16a34a' }}
-            >
-              تم التسليم
-            </Button>
+            <Tooltip title="تأكيد تسليم الطلب وتحصيل المبلغ">
+              <Button
+                size="middle"
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                onClick={() => handleUpdateStatus(r.id, 'delivered', 'paid')}
+                style={{ backgroundColor: '#16a34a' }}
+              >
+                تم التسليم
+              </Button>
+            </Tooltip>
           )}
         </Space>
       )
@@ -908,13 +919,15 @@ export default function Orders({
       key: 'actions',
       render: (_, r) => (
         <Space size="small">
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleOpenEditRate(r)}
-          >
-            تعديل السعر
-          </Button>
+          <Tooltip title="تعديل تكلفة الشحن">
+            <Button
+              size="middle"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEditRate(r)}
+            >
+              تعديل السعر
+            </Button>
+          </Tooltip>
 
           <Popconfirm
             title="حذف المدينة؟"
@@ -924,9 +937,11 @@ export default function Orders({
             cancelText="إلغاء"
             okButtonProps={{ danger: true }}
           >
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              حذف
-            </Button>
+            <Tooltip title="حذف المدينة">
+              <Button size="middle" danger ghost icon={<DeleteOutlined />}>
+                حذف
+              </Button>
+            </Tooltip>
           </Popconfirm>
         </Space>
       )
@@ -985,13 +1000,15 @@ export default function Orders({
       key: 'actions',
       render: (_, r) => (
         <Space size="small">
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleOpenEditCarrier(r)}
-          >
-            تعديل
-          </Button>
+          <Tooltip title="تعديل بيانات شركة الشحن">
+            <Button
+              size="middle"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEditCarrier(r)}
+            >
+              تعديل
+            </Button>
+          </Tooltip>
 
           <Popconfirm
             title="حذف شركة الشحن؟"
@@ -1001,9 +1018,11 @@ export default function Orders({
             cancelText="إلغاء"
             okButtonProps={{ danger: true }}
           >
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              حذف
-            </Button>
+            <Tooltip title="حذف شركة الشحن">
+              <Button size="middle" danger ghost icon={<DeleteOutlined />}>
+                حذف
+              </Button>
+            </Tooltip>
           </Popconfirm>
         </Space>
       )
@@ -1048,9 +1067,9 @@ export default function Orders({
             ),
             children: (
               <div>
-                <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f8fafc' }}>
-                  <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} md={10}>
+                <Card size="small" className="swm-toolbar" style={{ marginBottom: 16, backgroundColor: '#f8fafc' }}>
+                  <Row gutter={[16, 16]} style={{ width: '100%' }}>
+                    <Col xs={24} sm={12} md={10} className="swm-toolbar-search">
                       <Input
                         placeholder="البحث برقم الطلب، هاتف العميل، أو الاسم..."
                         prefix={<SearchOutlined />}
@@ -1060,7 +1079,7 @@ export default function Orders({
                         allowClear
                       />
                     </Col>
-                    <Col xs={24} sm={12} md={6}>
+                    <Col xs={24} sm={12} md={8}>
                       <Select
                         style={{ width: '100%' }}
                         value={statusFilter}
@@ -1073,7 +1092,7 @@ export default function Orders({
                         <Option value="cancelled">ملغي (Cancelled)</Option>
                       </Select>
                     </Col>
-                    <Col xs={24} sm={12} md={4}>
+                    <Col xs={24} sm={12} md={6} className="swm-toolbar-actions">
                       <Button icon={<ReloadOutlined />} onClick={fetchOrders}>
                         تحديث الطلبات
                       </Button>

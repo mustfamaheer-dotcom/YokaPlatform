@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, message, Card, Popconfirm, Divider, Tooltip, Alert } from 'antd';
 import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import api from '../api';
@@ -37,6 +39,7 @@ const BRANCH_TYPE_DESCRIPTIONS = {
 };
 
 export default function Branches({ autoOpenCreate, onResetAction, currentUser }) {
+  const navigate = useNavigate();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -262,24 +265,36 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>الفروع والمستودعات (Branches Master)</Title>
-          <Text type="secondary">
-            إدارة الفروع والمستودعات، وتعيين وعرض اسم المستخدم وكلمة المرور الخاصة بكل فرع لتسجيل الدخول في بوابة الفروع (POS)
-          </Text>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>الفروع والمستودعات (Branches Master)</h2>
+          <p>إدارة الفروع والمستودعات، وتعيين وعرض اسم المستخدم وكلمة المرور الخاصة بكل فرع لتسجيل الدخول في بوابة الفروع (POS)</p>
         </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={fetchBranches}>تحديث</Button>
+
+        <div className="swm-page-actions">
+          <Button icon={<ReloadOutlined />} onClick={fetchBranches} style={{ height: 44, borderRadius: 8 }}>
+            تحديث
+          </Button>
           <Button
             type="primary"
+            size="large"
             icon={<PlusOutlined />}
             onClick={handleOpenCreateModal}
-            style={{ backgroundColor: '#4f46e5' }}
+            style={{ backgroundColor: '#4f46e5', fontWeight: 700, height: 44, borderRadius: 8 }}
           >
             إضافة فرع / مخزن
           </Button>
-        </Space>
+        </div>
       </div>
 
       <Table

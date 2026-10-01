@@ -333,8 +333,9 @@ export default function ComprehensiveSalesCard({ branchId }) {
           {/* Main Sales & Net Revenue Trend Chart */}
           <Col xs={24} lg={16}>
             <div
+              className="swm-chart-card"
               style={{
-                background: '#f8fafc',
+                background: '#ffffff',
                 border: '1px solid #e2e8f0',
                 borderRadius: 12,
                 padding: '20px',
@@ -414,8 +415,9 @@ export default function ComprehensiveSalesCard({ branchId }) {
           {/* Payment Method Distribution Pie Chart */}
           <Col xs={24} lg={8}>
             <div
+              className="swm-chart-card"
               style={{
-                background: '#f8fafc',
+                background: '#ffffff',
                 border: '1px solid #e2e8f0',
                 borderRadius: 12,
                 padding: '20px',

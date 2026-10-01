@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Card, Row, Col, Table, Button, Modal, Tag, Space, Typography,
   message, Statistic, Badge, Tooltip, Popconfirm, Alert, Empty,
@@ -36,6 +38,7 @@ const REASON_CATEGORY_MAP = {
 };
 
 export default function TreasuryAdmin() {
+  const navigate = useNavigate();
   const [kpis, setKpis]                         = useState(null);
   const [transfers, setTransfers]               = useState([]);
   const [ownerData, setOwnerData]               = useState(null);
@@ -690,21 +693,30 @@ export default function TreasuryAdmin() {
   return (
     <div style={{ padding: '4px 0' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <Title level={4} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <BankOutlined style={{ color: '#4f46e5' }} />
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>
+            <BankOutlined style={{ color: '#4f46e5', marginLeft: 8 }} />
             الخزينة المركزية وإدارة السيولة النقدية والتحويلات
-          </Title>
-          <Text type="secondary">
-            متابعة أرصدة الخزينة الرئيسية (كاش / فيزا / تحويلات)، ورقابة الصرف والسيولة، وحساب صاحب المنشأة
-          </Text>
+          </h2>
+          <p>متابعة أرصدة الخزينة الرئيسية (كاش / فيزا / تحويلات)، ورقابة الصرف والسيولة، وحساب صاحب المنشأة</p>
         </div>
-        <Space wrap>
+
+        <div className="swm-page-actions">
           <Button
             type="primary"
             icon={<PlusCircleOutlined />}
-            style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+            style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', height: 44, borderRadius: 8, fontWeight: 700 }}
             onClick={() => openOwnerModal('deposit')}
           >
             إيداع رأس مال / تمويل
@@ -713,13 +725,14 @@ export default function TreasuryAdmin() {
             danger
             icon={<MinusCircleOutlined />}
             onClick={() => openOwnerModal('withdrawal')}
+            style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             مسحوبات صاحب الحساب
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading}>
+          <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading} style={{ height: 44, borderRadius: 8 }}>
             تحديث
           </Button>
-        </Space>
+        </div>
       </div>
 
       {loading && !kpis ? (
@@ -764,16 +777,17 @@ export default function TreasuryAdmin() {
             <Col xs={24} sm={12} lg={6}>
               <Card
                 size="small"
+                className="stat-metric-card"
                 style={{
                   borderRadius: 12,
                   borderLeft: '5px solid #16a34a',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
-                    <Text type="secondary" style={{ fontSize: 13 }}>💵 الخزينة النقدية (الكاش)</Text>
-                    <div style={{ fontSize: 22, fontWeight: 'bold', color: '#16a34a', marginTop: 4 }}>
+                    <Text type="secondary" className="stat-label">💵 الخزينة النقدية (الكاش)</Text>
+                    <div className="stat-value" style={{ color: '#16a34a', marginTop: 4 }}>
                       {(kpis?.main_safe?.cash_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 'normal' }}>ج.م</span>
                     </div>
@@ -792,16 +806,17 @@ export default function TreasuryAdmin() {
             <Col xs={24} sm={12} lg={6}>
               <Card
                 size="small"
+                className="stat-metric-card"
                 style={{
                   borderRadius: 12,
                   borderLeft: '5px solid #0284c7',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
-                    <Text type="secondary" style={{ fontSize: 13 }}>💳 الحساب البنكي (الفيزا / البطاقات)</Text>
-                    <div style={{ fontSize: 22, fontWeight: 'bold', color: '#0284c7', marginTop: 4 }}>
+                    <Text type="secondary" className="stat-label">💳 الحساب البنكي (الفيزا / البطاقات)</Text>
+                    <div className="stat-value" style={{ color: '#0284c7', marginTop: 4 }}>
                       {(kpis?.main_safe?.visa_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 'normal' }}>ج.م</span>
                     </div>
@@ -820,16 +835,17 @@ export default function TreasuryAdmin() {
             <Col xs={24} sm={12} lg={6}>
               <Card
                 size="small"
+                className="stat-metric-card"
                 style={{
                   borderRadius: 12,
                   borderLeft: '5px solid #8b5cf6',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
-                    <Text type="secondary" style={{ fontSize: 13 }}>📱 التحويلات والمحافظ (إنستاباي / كاش)</Text>
-                    <div style={{ fontSize: 22, fontWeight: 'bold', color: '#8b5cf6', marginTop: 4 }}>
+                    <Text type="secondary" className="stat-label">📱 التحويلات والمحافظ (إنستاباي / كاش)</Text>
+                    <div className="stat-value" style={{ color: '#8b5cf6', marginTop: 4 }}>
                       {(kpis?.main_safe?.transfer_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 'normal' }}>ج.م</span>
                     </div>

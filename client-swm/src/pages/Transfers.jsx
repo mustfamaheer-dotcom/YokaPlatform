@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Card,
   Row,
@@ -50,6 +52,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 export default function Transfers({ currentUser, autoOpenCreate, onResetAction }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [transfers, setTransfers] = useState([]);
   const [metrics, setMetrics] = useState(null);
@@ -754,10 +757,10 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
         <Space size="small">
           <Tooltip title="معاينة ومراجعة محتويات الإذن والأصناف">
             <Button
-              size="small"
+              size="middle"
               icon={<EyeOutlined />}
               onClick={() => handleOpenReviewModal(row.id)}
-              style={{ borderColor: '#6366f1', color: '#6366f1' }}
+              style={{ borderColor: '#6366f1', color: '#6366f1', minHeight: 36, borderRadius: 6 }}
             >
               معاينة
             </Button>
@@ -765,10 +768,10 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
           <Tooltip title="طباعة إذن الصرف الرسمي A4">
             <Button
               type="primary"
-              size="small"
+              size="middle"
               icon={<PrinterOutlined />}
               onClick={() => handleViewPrint(row.id)}
-              style={{ backgroundColor: '#1e293b' }}
+              style={{ backgroundColor: '#1e293b', minHeight: 36, borderRadius: 6 }}
             >
               طباعة
             </Button>
@@ -781,18 +784,27 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Top Header & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>
             <SwapOutlined style={{ marginLeft: 8, color: '#2563eb' }} />
             إذن الصرف (توزيع المنتجات بين المخازن والفروع)
-          </Title>
-          <Text type="secondary">
-            نقل البضائع والأصناف من المستودع الرئيسي إلى الفروع أو بين الفروع، مع جدول سطور فواتير متكامل واختصارات لوحة المفاتيح
-          </Text>
+          </h2>
+          <p>نقل البضائع والأصناف من المستودع الرئيسي إلى الفروع أو بين الفروع، مع جدول سطور فواتير متكامل واختصارات لوحة المفاتيح</p>
         </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => { fetchMetrics(); fetchTransfers(); }} loading={loading}>
+
+        <div className="swm-page-actions">
+          <Button icon={<ReloadOutlined />} onClick={() => { fetchMetrics(); fetchTransfers(); }} loading={loading} style={{ height: 44, borderRadius: 8 }}>
             تحديث
           </Button>
           <Button
@@ -800,11 +812,11 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
             size="large"
             icon={<PlusOutlined />}
             onClick={handleOpenCreateModal}
-            style={{ backgroundColor: '#2563eb', fontWeight: 'bold' }}
+            style={{ backgroundColor: '#2563eb', fontWeight: 'bold', height: 44, borderRadius: 8 }}
           >
             إنشاء إذن صرف جديد
           </Button>
-        </Space>
+        </div>
       </div>
 
       {/* KPI Cards */}

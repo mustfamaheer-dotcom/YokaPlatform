@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Table,
   Button,
@@ -67,6 +69,7 @@ const getAvatarColor = (name) => {
 };
 
 export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -573,35 +576,48 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>فريق العمل والمستخدمين (Staff Directory)</Title>
-          <Text type="secondary">
-            إدارة طاقم الفروع (مشرف فرع / كاشير)، تعيين الصلاحيات، ربطهم بالفروع، والتحكم في حالة الحسابات
-          </Text>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>فريق العمل والمستخدمين (Staff Directory)</h2>
+          <p>إدارة طاقم الفروع (مشرف فرع / كاشير)، تعيين الصلاحيات، ربطهم بالفروع، والتحكم في حالة الحسابات</p>
         </div>
-        <Space>
+
+        <div className="swm-page-actions">
           <Button
             icon={<FileExcelOutlined style={{ color: '#16a34a' }} />}
             onClick={handleExportExcel}
+            style={{ height: 44, borderRadius: 8 }}
           >
             تصدير كشف الموظفين (Excel)
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={fetchData}>تحديث</Button>
+          <Button icon={<ReloadOutlined />} onClick={fetchData} style={{ height: 44, borderRadius: 8 }}>
+            تحديث
+          </Button>
           {isAdmin && (
             <Button
               type="primary"
+              size="large"
               icon={<UserAddOutlined />}
               onClick={() => {
                 createForm.resetFields();
                 setIsCreateModalOpen(true);
               }}
-              style={{ backgroundColor: '#4f46e5' }}
+              style={{ backgroundColor: '#4f46e5', fontWeight: 700, height: 44, borderRadius: 8 }}
             >
               إضافة موظف جديد
             </Button>
           )}
-        </Space>
+        </div>
       </div>
 
       {/* Summary KPI Cards */}

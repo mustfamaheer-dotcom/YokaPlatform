@@ -77,8 +77,8 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
   }, [location.pathname]);
 
   const activeTab = useMemo(() => {
-    if (pathParts.length === 0) return 'hub';
-    if (pathParts[0] === 'hub') return 'hub';
+    if (pathParts.length === 0) return 'home';
+    if (pathParts[0] === 'hub') return 'home';
     return pathParts[0];
   }, [pathParts]);
 
@@ -93,15 +93,15 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
 
   // Helper to find category and metadata for current active page
   const currentPageMeta = useMemo(() => {
-    if (activeTab === 'hub') return null;
+    if (activeTab === 'home' || activeTab === 'hub') return null;
     const allPages = getAllPages();
     return allPages.find((p) => p.id === activeTab) || null;
   }, [activeTab]);
 
   const handleNavigate = (tab, extra = null) => {
     setTabExtra(extra);
-    if (!tab || tab === 'hub') {
-      navigate('/dashboard/hub');
+    if (!tab || tab === 'hub' || tab === 'home') {
+      navigate('/dashboard/home');
     } else {
       navigate(`/dashboard/${tab}`);
     }
@@ -136,14 +136,10 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
 
       {/* ─── FULL-WIDTH MODERN TOP NAVIGATION BAR ───────────────────── */}
       <Header
+        className="swm-top-header"
         style={{
-          padding: '0 24px',
           backgroundColor: '#FFFFFF',
           borderBottom: '1.5px solid #E2E8F0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          height: 68,
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -151,14 +147,15 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         }}
       >
         {/* Left Section: Branding & Hub Shortcut */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="swm-header-start" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Logo & Platform Name */}
           <div
-            onClick={() => handleNavigate('hub')}
+            className="swm-header-brand"
+            onClick={() => handleNavigate('home')}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
+              gap: 8,
               cursor: 'pointer',
               userSelect: 'none'
             }}
@@ -166,59 +163,64 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             <img
               src={yokaLogo}
               alt="Yoka Store"
-              style={{ height: 38, objectFit: 'contain' }}
+              className="swm-header-logo"
+              style={{ height: 34, objectFit: 'contain' }}
             />
             <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
               <span
+                className="swm-header-brand-title"
                 style={{
                   color: '#0F172A',
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: 800,
                   display: 'block'
                 }}
               >
                 يوكا ستور
               </span>
-              <span style={{ color: '#0F766E', fontSize: 11, fontWeight: 700 }}>
+              <span className="swm-hide-mobile" style={{ color: '#0F766E', fontSize: 11, fontWeight: 700 }}>
                 لوحة الإدارة المركزية
               </span>
             </div>
           </div>
 
           <div
+            className="swm-hide-mobile"
             style={{
-              height: 28,
+              height: 24,
               width: 1,
               backgroundColor: '#E2E8F0',
-              margin: '0 4px'
+              margin: '0 2px'
             }}
           />
 
           {/* Primary Navigation Hub Button */}
           <Button
-            type={activeTab === 'hub' ? 'primary' : 'default'}
-            icon={<Compass size={16} style={{ marginLeft: 6 }} />}
-            onClick={() => handleNavigate('hub')}
+            type={activeTab === 'home' || activeTab === 'hub' ? 'primary' : 'default'}
+            className="swm-header-hub-btn"
+            icon={<Compass size={16} style={{ marginLeft: 4 }} />}
+            onClick={() => handleNavigate('home')}
             style={{
-              borderRadius: 10,
+              borderRadius: 8,
               fontWeight: 700,
-              fontSize: 13,
-              height: 38,
+              fontSize: 12.5,
+              height: 36,
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: activeTab === 'hub' ? '#0F766E' : '#FFFFFF',
-              borderColor: activeTab === 'hub' ? '#0F766E' : '#CBD5E1',
-              color: activeTab === 'hub' ? '#FFFFFF' : '#0F172A'
+              backgroundColor: (activeTab === 'home' || activeTab === 'hub') ? '#0F766E' : '#FFFFFF',
+              borderColor: (activeTab === 'home' || activeTab === 'hub') ? '#0F766E' : '#CBD5E1',
+              color: (activeTab === 'home' || activeTab === 'hub') ? '#FFFFFF' : '#0F172A'
             }}
           >
-            القائمة الرئيسية (Navigation Hub)
+            <span>الرئيسية<span className="swm-hide-mobile"> (Navigation Hub)</span></span>
           </Button>
 
           {/* Branch Tag */}
           <Tag
+            className="swm-hide-mobile"
             style={{
               fontSize: 12,
-              padding: '4px 10px',
+              padding: '3px 8px',
               fontWeight: 700,
               borderRadius: 8,
               backgroundColor: '#F0FDFA',
@@ -233,30 +235,34 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         </div>
 
         {/* Left Section (in RTL: End/Left): User Profile Info & Logout */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="swm-header-end" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* User Profile Info */}
-          <Space size="small">
+          <div className="swm-header-user" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Avatar
+              className="swm-header-avatar"
               style={{
                 backgroundColor: '#0F766E',
-                border: '1px solid #0D5D56'
+                border: '1px solid #0D5D56',
+                flexShrink: 0
               }}
               icon={<ShieldCheck size={18} />}
             />
             <div style={{ lineHeight: 1.2, textAlign: 'right' }}>
-              <Text strong style={{ display: 'block', fontSize: 13, color: '#0F172A' }}>
+              <Text strong className="swm-header-username" style={{ display: 'block', fontSize: 13, color: '#0F172A' }}>
                 {currentUser?.fullName || currentUser?.username}
               </Text>
               <Tag
+                className="swm-hide-mobile"
                 color={roleInfo.color}
                 style={{ fontSize: 10, margin: 0, padding: '0 4px', borderRadius: 4 }}
               >
                 {roleInfo.label}
               </Tag>
             </div>
-          </Space>
+          </div>
 
           <div
+            className="swm-hide-mobile"
             style={{
               height: 28,
               width: 1,
@@ -269,6 +275,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
           <Button
             type="text"
             danger
+            className="swm-header-logout-btn"
             icon={<LogOut size={16} style={{ marginLeft: 4 }} />}
             onClick={onLogout}
             style={{
@@ -279,76 +286,46 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
               borderRadius: 8
             }}
           >
-            خروج
+            <span className="swm-header-logout-text">خروج</span>
           </Button>
         </div>
       </Header>
 
       {/* ─── MAIN FULL-WIDTH CONTENT AREA ─────────────────────────────── */}
       <Content
+        className="swm-main-content"
         style={{
-          padding: '24px 32px 48px',
-          minHeight: 'calc(100vh - 68px)',
           width: '100%',
           maxWidth: 1600,
           margin: '0 auto',
           boxSizing: 'border-box'
         }}
       >
-        {/* If viewing a child page, show quick breadcrumb bar to return to Hub/Sub-Hub */}
-        {activeTab !== 'hub' && currentPageMeta && (
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 14,
-              border: '1.5px solid #E2E8F0',
-              padding: '12px 20px',
-              marginBottom: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: '0 1px 3px rgba(15, 23, 42, 0.03)'
-            }}
-          >
-            {/* Breadcrumb Navigation */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        {/* If viewing a child page, show quick breadcrumb bar to return to Hub/Home */}
+        {activeTab !== 'home' && activeTab !== 'hub' && currentPageMeta && (
+          <div className="swm-breadcrumb-bar">
+            {/* Breadcrumb Navigation Trail */}
+            <div className="swm-breadcrumb-trail">
               <button
-                onClick={() => handleNavigate('hub')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  color: '#0F766E',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4
-                }}
+                onClick={() => handleNavigate('home')}
+                className="swm-breadcrumb-btn swm-breadcrumb-home"
               >
                 <Compass size={15} color="#0F766E" />
-                <span>القائمة الرئيسية</span>
+                <span>الرئيسية<span className="swm-hide-mobile"> (Navigation Hub)</span></span>
               </button>
 
-              <ChevronLeft size={14} color="#94A3B8" />
+              <ChevronLeft size={14} className="swm-breadcrumb-sep" />
 
               <button
                 onClick={() => handleSelectCategory(currentPageMeta.categoryId)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  color: '#475569',
-                  fontWeight: 600
-                }}
+                className="swm-breadcrumb-btn swm-breadcrumb-cat"
               >
                 {currentPageMeta.categoryTitle}
               </button>
 
-              <ChevronLeft size={14} color="#94A3B8" />
+              <ChevronLeft size={14} className="swm-breadcrumb-sep" />
 
-              <span style={{ color: '#0F172A', fontWeight: 800 }}>
+              <span className="swm-breadcrumb-current">
                 {currentPageMeta.title}
               </span>
             </div>
@@ -356,33 +333,21 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             {/* Quick Action Button: Back to Main Hub */}
             <Button
               size="small"
+              className="swm-hide-mobile swm-breadcrumb-back-btn"
               icon={<ArrowRight size={14} style={{ marginLeft: 4 }} />}
-              onClick={() => handleNavigate('hub')}
-              style={{
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12,
-                color: '#0F766E',
-                borderColor: '#0F766E'
-              }}
+              onClick={() => handleNavigate('home')}
             >
-              العودة للقائمة الرئيسية
+              العودة للرئيسية
             </Button>
           </div>
         )}
 
         {/* ─── ROUTING / TAB VIEWS ──────────────────────────────────── */}
-        {activeTab === 'hub' && (
-          <NavigationHub
-            currentUser={currentUser}
-            activeCategory={activeCategory}
-            onSelectCategory={handleSelectCategory}
-            onSelectPage={handleSelectPage}
-          />
+        {(activeTab === 'home' || activeTab === 'hub') && (
+          <Home currentUser={currentUser} onNavigate={handleNavigate} />
         )}
 
         {activeTab === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
-        {activeTab === 'home' && <Home currentUser={currentUser} onNavigate={handleNavigate} />}
         {activeTab === 'orders' && <Orders currentUser={currentUser} />}
         {activeTab === 'purchases' && (
           <Purchases

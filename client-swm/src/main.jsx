@@ -27,9 +27,46 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       locale={arEG}
       theme={{
         token: {
-          colorPrimary: '#4f46e5',
+          colorPrimary: '#4F46E5',
+          colorSuccess: '#16A34A',
+          colorError: '#DC2626',
+          colorWarning: '#F59E0B',
+          colorInfo: '#2563EB',
           fontFamily: 'Cairo, Inter, sans-serif',
-          borderRadius: 8
+          borderRadius: 10,
+          borderRadiusLG: 14,
+          borderRadiusSM: 6,
+          colorBgContainer: '#FFFFFF',
+          colorBgLayout: '#F8FAFC',
+          colorBorder: '#E2E8F0',
+          colorBorderSecondary: '#F1F5F9',
+          controlHeight: 40,
+          controlHeightLG: 48,
+          fontSize: 14,
+          fontSizeLG: 16,
+        },
+        components: {
+          Button: {
+            paddingInline: 18,
+            fontWeight: 600,
+          },
+          Table: {
+            headerBg: '#F8FAFC',
+            headerColor: '#334155',
+            rowHoverBg: '#F1F5F9',
+            borderColor: '#E2E8F0',
+          },
+          Card: {
+            paddingLG: 20,
+          },
+          Modal: {
+            borderRadiusLG: 16,
+          },
+          Tabs: {
+            inkBarColor: '#4F46E5',
+            itemActiveColor: '#4F46E5',
+            itemSelectedColor: '#4F46E5',
+          },
         }
       }}
     >

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { printHtmlContent } from '../utils/printUtils';
 import {
@@ -49,6 +51,7 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 export default function StockAdjustments({ currentUser, autoOpenCreate, onResetAction }) {
+  const navigate = useNavigate();
   const isRetailBranch = Boolean(
     currentUser &&
     (currentUser.branchType === 'retail_branch' || currentUser.isBranchAccount) &&
@@ -653,30 +656,39 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
   return (
     <div style={{ padding: '4px' }}>
       {/* 1. Header */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <Title level={3} style={{ margin: 0, color: '#1e293b' }}>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>
             <DiffOutlined style={{ marginLeft: 8, color: '#4f46e5' }} />
             سند التسوية (Stock Reconciliation & Adjustments)
-          </Title>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            مقارنة الرصيد المسجل في النظام مع الرصيد الفعلي، وإظهار الفروق (عجز / زيادة)، واعتماد التسويات المخزنية والمالية
-          </Text>
+          </h2>
+          <p>مقارنة الرصيد المسجل في النظام مع الرصيد الفعلي، وإظهار الفروق (عجز / زيادة)، واعتماد التسويات المخزنية والمالية</p>
         </div>
 
-        <Space wrap>
-          <Button icon={<ReloadOutlined />} loading={loading} onClick={() => fetchVouchers(pagination.current)}>
+        <div className="swm-page-actions">
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={() => fetchVouchers(pagination.current)} style={{ height: 44, borderRadius: 8 }}>
             تحديث
           </Button>
           <Button
             type="primary"
+            size="large"
             icon={<PlusOutlined />}
             onClick={handleOpenCreateDrawer}
-            style={{ backgroundColor: '#4f46e5' }}
+            style={{ backgroundColor: '#4f46e5', fontWeight: 'bold', height: 44, borderRadius: 8 }}
           >
             إنشاء سند تسوية جديد
           </Button>
-        </Space>
+        </div>
       </div>
 
       {/* 2. Filters Card */}

@@ -1,3 +1,102 @@
+:root {
+  /* === Admin Primary (Indigo) === */
+  --color-admin-primary:    #4F46E5;
+  --color-admin-primary-h:  #4338CA;   /* hover */
+  --color-admin-primary-s:  #EEF2FF;   /* soft surface */
+  --color-admin-primary-b:  #C7D2FE;   /* border */
+  --color-indigo-electric:  #6366F1;   /* pulse glow */
+
+  /* === POS Operational Streams === */
+  --color-pos-sale:         #059669;
+  --color-pos-sale-h:       #047857;
+  --color-pos-sale-s:       #F0FDF4;
+  --color-pos-sale-b:       #A7F3D0;
+
+  --color-pos-expense:      #EA580C;
+  --color-pos-expense-h:    #C2410C;
+  --color-pos-expense-s:    #FFF7ED;
+  --color-pos-expense-b:    #FED7AA;
+
+  --color-pos-shift:        #6366F1;
+  --color-pos-shift-s:      #EEF2FF;
+  --color-pos-shift-b:      #C7D2FE;
+
+  --color-pos-treasury:     #10B981;
+  --color-pos-treasury-s:   #ECFDF5;
+  --color-pos-treasury-b:   #6EE7B7;
+
+  --color-supervisor:       #2563EB;
+  --color-supervisor-s:     #EFF6FF;
+  --color-supervisor-b:     #BFDBFE;
+
+  /* === Semantic Feedback === */
+  --color-success:          #16A34A;
+  --color-danger:           #DC2626;
+  --color-warning:          #F59E0B;
+
+  /* === Neutrals === */
+  --navy:                   #0F172A;
+  --navy-soft:              #1E293B;
+  --slate-700:              #334155;
+  --slate-500:              #64748B;
+  --slate-400:              #94A3B8;
+  --slate-200:              #E2E8F0;
+  --slate-100:              #F1F5F9;
+  --slate-50:               #F8FAFC;
+  --card-bg:                #FFFFFF;
+
+  /* === Spacing Scale (dense dashboard - density 8/10) === */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+
+  /* === Border Radius === */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+
+  /* === Transitions === */
+  --transition-fast:   all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base:   all 0.2s  cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow:   all 0.3s  cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* === Sections Hub Navigation === */
+  --color-inventory:        #1D4ED8;   /* أقسام المخزون — Royal Blue */
+  --color-inventory-s:      #EFF6FF;
+  --color-inventory-b:      #BFDBFE;
+  --color-purchases:        #065F46;   /* أقسام المشتريات — Deep Emerald */
+  --color-purchases-s:      #F0FDF4;
+  --color-purchases-b:      #A7F3D0;
+  --color-finance:          #92400E;   /* أقسام المالية — Amber */
+  --color-finance-s:        #FFFBEB;
+  --color-finance-b:        #FDE68A;
+  --color-analytics:        #5B21B6;   /* أقسام التحليلات — Violet */
+  --color-analytics-s:      #F5F3FF;
+  --color-analytics-b:      #DDD6FE;
+  --color-system:           #0F766E;   /* أقسام إدارة النظام — Teal */
+  --color-system-s:         #F0FDFA;
+  --color-system-b:         #99F6E4;
+
+  /* === Fixed Card Dimensions (layout grid) === */
+  --card-nav-h:             290px;    /* unified navigation hub card height */
+  --card-stat-h:            88px;     /* KPI stat strip card height */
+  --card-quick-h:           164px;    /* quick action card height (existing) */
+  --card-pos-h:             300px;    /* POS hero nav card height (existing) */
+
+  /* === Z-index Scale === */
+  --z-toolbar:              10;
+  --z-back-btn:             20;
+  --z-modal:                1000;
+
+  /* === Back Button Fixed Position === */
+  --back-btn-top:           16px;
+  --back-btn-inset-end:     0px;      /* RTL: right edge = 0, relative to page wrapper */
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -887,3 +986,1573 @@ body {
 .hub-back-btn:active {
   transform: scale(0.97);
 }
+
+/* ================================================= */
+/* SWM UNIFIED BUTTON SYSTEM                         */
+/* ================================================= */
+
+/* Base reset for all SWM buttons */
+.swm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'Cairo', 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  white-space: nowrap;
+  min-height: 40px;
+  padding: 0 18px;
+  transition: var(--transition-base);
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.swm-btn:focus-visible {
+  outline: 2px solid var(--color-admin-primary);
+  outline-offset: 2px;
+}
+
+/* Size variants */
+.swm-btn-sm  { min-height: 32px; padding: 0 12px; font-size: 13px; border-radius: var(--radius-sm); }
+.swm-btn-lg  { min-height: 48px; padding: 0 24px; font-size: 15px; border-radius: var(--radius-md); }
+.swm-btn-xl  { min-height: 56px; padding: 0 32px; font-size: 16px; border-radius: var(--radius-md); font-weight: 700; }
+.swm-btn-icon { min-height: 40px; width: 40px; padding: 0; border-radius: var(--radius-sm); }
+.swm-btn-icon.swm-btn-sm { min-height: 32px; width: 32px; }
+.swm-btn-icon.swm-btn-lg { min-height: 44px; width: 44px; }
+
+/* Color variants */
+/* Admin Primary - Indigo */
+.swm-btn-primary {
+  background: var(--color-admin-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+}
+.swm-btn-primary:hover  { background: var(--color-admin-primary-h); box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35); transform: translateY(-1px); }
+.swm-btn-primary:active { transform: translateY(0) scale(0.98); box-shadow: 0 1px 4px rgba(79, 70, 229, 0.2); }
+
+/* POS Sale - Emerald */
+.swm-btn-sale {
+  background: var(--color-pos-sale);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+}
+.swm-btn-sale:hover  { background: var(--color-pos-sale-h); box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35); transform: translateY(-1px); }
+.swm-btn-sale:active { transform: translateY(0) scale(0.98); }
+
+/* POS Expense - Orange */
+.swm-btn-expense {
+  background: var(--color-pos-expense);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
+}
+.swm-btn-expense:hover  { background: var(--color-pos-expense-h); box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35); transform: translateY(-1px); }
+.swm-btn-expense:active { transform: translateY(0) scale(0.98); }
+
+/* Supervisor / Analytics - Royal Blue */
+.swm-btn-supervisor {
+  background: var(--color-supervisor);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+.swm-btn-supervisor:hover  { background: #1D4ED8; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); transform: translateY(-1px); }
+.swm-btn-supervisor:active { transform: translateY(0) scale(0.98); }
+
+/* Danger / Destructive */
+.swm-btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.2);
+}
+.swm-btn-danger:hover  { background: #B91C1C; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3); transform: translateY(-1px); }
+.swm-btn-danger:active { transform: translateY(0) scale(0.98); }
+
+/* Ghost / Outlined */
+.swm-btn-ghost {
+  background: transparent;
+  color: var(--slate-700);
+  border: 1px solid var(--slate-200);
+}
+.swm-btn-ghost:hover  { background: var(--slate-100); border-color: var(--slate-400); color: var(--navy); }
+.swm-btn-ghost:active { background: var(--slate-200); }
+
+/* Soft (tinted outline) - matches operational stream */
+.swm-btn-soft-sale     { background: var(--color-pos-sale-s);    color: var(--color-pos-sale);    border: 1px solid var(--color-pos-sale-b); }
+.swm-btn-soft-expense  { background: var(--color-pos-expense-s); color: var(--color-pos-expense); border: 1px solid var(--color-pos-expense-b); }
+.swm-btn-soft-shift    { background: var(--color-pos-shift-s);   color: var(--color-pos-shift);   border: 1px solid var(--color-pos-shift-b); }
+.swm-btn-soft-primary  { background: var(--color-admin-primary-s); color: var(--color-admin-primary); border: 1px solid var(--color-admin-primary-b); }
+.swm-btn-soft-sale:hover, .swm-btn-soft-expense:hover,
+.swm-btn-soft-shift:hover, .swm-btn-soft-primary:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+}
+
+/* Disabled state (global) */
+.swm-btn:disabled, .swm-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Ensures all Ant Design icon-only table action buttons hit 36x36px minimum */
+.ant-table .ant-btn-icon-only,
+.ant-table .ant-btn.ant-btn-sm {
+  min-width:  36px !important;
+  min-height: 36px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Space between adjacent row action buttons */
+.ant-table .ant-space-item { gap: 6px; }
+
+/* Quick Action card hover arrow animation */
+.quick-action-card:hover .card-arrow {
+  color: var(--color-admin-primary);
+  transform: translateX(-4px); /* RTL: slides right to left */
+}
+
+/* Executive pulse card hover border accent */
+.executive-pulse-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.07);
+  border-color: var(--color-admin-primary) !important;
+}
+
+/* ================================================= */
+/* SWM UNIVERSAL PAGE TOOLBAR                        */
+/* ================================================= */
+.swm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--card-bg);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.swm-toolbar-search {
+  flex: 1;
+  min-width: 220px;
+}
+
+.swm-toolbar-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .swm-toolbar { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
+  .swm-toolbar-search { min-width: 100%; order: -1; }
+  .swm-toolbar-actions { width: 100%; justify-content: flex-end; }
+}
+
+/* ================================================= */
+/* STAT METRIC CARD KPI TYPOGRAPHY                   */
+/* ================================================= */
+.stat-metric-card .stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--navy);
+  line-height: 1.2;
+}
+
+.stat-metric-card .stat-label {
+  font-size: 12px;
+  color: var(--slate-500);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.stat-metric-card .stat-delta {
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.stat-metric-card .stat-delta.up   { color: var(--color-success); }
+.stat-metric-card .stat-delta.down { color: var(--color-danger);  }
+
+/* ================================================= */
+/* MICRO-ANIMATIONS (respects prefers-reduced-motion) */
+/* ================================================= */
+
+/* Card stagger entrance (for quick-action cards) */
+@keyframes swm-card-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.quick-action-card {
+  animation: swm-card-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Stagger delay for grid children */
+.quick-cards-grid-5 > *:nth-child(1) { animation-delay: 0.05s; }
+.quick-cards-grid-5 > *:nth-child(2) { animation-delay: 0.10s; }
+.quick-cards-grid-5 > *:nth-child(3) { animation-delay: 0.15s; }
+.quick-cards-grid-5 > *:nth-child(4) { animation-delay: 0.20s; }
+.quick-cards-grid-5 > *:nth-child(5) { animation-delay: 0.25s; }
+
+/* POS Hero cards stagger */
+.pos-nav-hero-grid > *:nth-child(1) { animation: swm-card-in 0.4s 0.05s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.pos-nav-hero-grid > *:nth-child(2) { animation: swm-card-in 0.4s 0.12s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.pos-nav-hero-grid > *:nth-child(3) { animation: swm-card-in 0.4s 0.19s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* Pulse glow for Indigo Electric accent elements */
+@keyframes swm-indigo-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+}
+
+.swm-pulse-indigo { animation: swm-indigo-pulse 2.5s ease-in-out infinite; }
+
+/* Respect reduced-motion: disable all animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ================================================= */
+/* SECTION WIDGET HEADER ACCENTS                     */
+/* ================================================= */
+.section-widget-header {
+  border-right: 3px solid var(--color-admin-primary); /* RTL: right side */
+}
+
+/* Variant accents per operational stream */
+.section-widget-header.stream-sale     { border-right-color: var(--color-pos-sale); }
+.section-widget-header.stream-expense  { border-right-color: var(--color-pos-expense); }
+.section-widget-header.stream-shift    { border-right-color: var(--color-pos-shift); }
+.section-widget-header.stream-treasury { border-right-color: var(--color-pos-treasury); }
+.section-widget-header.stream-admin    { border-right-color: var(--color-admin-primary); }
+
+/* ================================================= */
+/* SIDEBAR & TOPBAR POLISH                           */
+/* ================================================= */
+.topbar-home-btn svg {
+  transition: transform 0.2s ease;
+}
+.topbar-home-btn:hover svg {
+  transform: scale(1.15);
+}
+.topbar-home-btn.active svg {
+  color: #1D4ED8;
+}
+
+/* Active sidebar menu item visual indicator */
+.ant-menu-dark .ant-menu-item-selected {
+  background: rgba(99, 102, 241, 0.18) !important;
+  border-right: 3px solid var(--color-indigo-electric) !important; /* RTL */
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
+}
+
+/* Hover state for non-active items */
+.ant-menu-dark .ant-menu-item:hover:not(.ant-menu-item-selected) {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ================================================= */
+/* SECTIONS HUB — القطاعات والوحدات الرئيسية       */
+/* ================================================= */
+
+/* Hub section title strip */
+.swm-hub-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--slate-200);
+}
+
+.swm-hub-section-title .hub-title-accent {
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.swm-hub-section-title h3,
+.swm-hub-title-heading {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0;
+}
+
+.swm-hub-title-desc {
+  font-size: 13px;
+  color: var(--slate-500);
+  margin-top: 2px;
+  display: block;
+}
+
+/* ================================================= */
+/* SWM BREADCRUMB BAR (DESKTOP & MOBILE RESPONSIVE)  */
+/* ================================================= */
+.swm-breadcrumb-bar {
+  background-color: #ffffff;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  gap: 12px;
+}
+
+.swm-breadcrumb-trail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  min-width: 0;
+  flex: 1;
+}
+
+.swm-breadcrumb-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.swm-breadcrumb-home {
+  color: #0f766e;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.swm-breadcrumb-home:hover {
+  text-decoration: underline;
+}
+
+.swm-breadcrumb-cat {
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.swm-breadcrumb-cat:hover {
+  color: #0f766e;
+  text-decoration: underline;
+}
+
+.swm-breadcrumb-sep {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.swm-breadcrumb-current {
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.swm-breadcrumb-back-btn {
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  color: #0f766e !important;
+  border-color: #0f766e !important;
+  flex-shrink: 0;
+}
+
+/* Domain group card container */
+.swm-domain-group {
+  background: var(--card-bg);
+  border: 1.5px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  transition: var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left accent stripe (RTL = border-right) */
+.swm-domain-group::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.swm-domain-group.domain-inventory::before  { background: var(--color-inventory); }
+.swm-domain-group.domain-purchases::before  { background: var(--color-purchases); }
+.swm-domain-group.domain-finance::before    { background: var(--color-finance); }
+.swm-domain-group.domain-analytics::before  { background: var(--color-analytics); }
+.swm-domain-group.domain-system::before     { background: var(--color-system); }
+
+/* Domain group header */
+.swm-domain-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.swm-domain-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.swm-domain-info h4 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0 0 2px;
+}
+
+.swm-domain-info p {
+  font-size: 12px;
+  color: var(--slate-500);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Entry point buttons grid — Ultra Spacious & Prominent */
+.swm-entries-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+/* Each entry button card — LARGE, CLEAR & HIGHLY CLICKABLE */
+.swm-entry-btn {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 22px 26px;
+  border-radius: 18px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  user-select: none;
+  outline: none;
+  min-height: 114px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.swm-entry-btn:hover {
+  border-color: #6366f1;
+  background: #ffffff;
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.09);
+}
+
+.swm-entry-btn:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+.swm-entry-btn:focus-visible {
+  outline: 3px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Domain-colored entry button variant */
+.swm-domain-group.domain-inventory .swm-entry-btn:hover  { border-color: #3b82f6; box-shadow: 0 16px 32px rgba(59, 130, 246, 0.12); }
+.swm-domain-group.domain-purchases .swm-entry-btn:hover  { border-color: #10b981; box-shadow: 0 16px 32px rgba(16, 185, 129, 0.12); }
+.swm-domain-group.domain-finance   .swm-entry-btn:hover  { border-color: #f59e0b; box-shadow: 0 16px 32px rgba(245, 158, 11, 0.12); }
+.swm-domain-group.domain-analytics .swm-entry-btn:hover  { border-color: #8b5cf6; box-shadow: 0 16px 32px rgba(139, 92, 246, 0.12); }
+.swm-domain-group.domain-system    .swm-entry-btn:hover  { border-color: #64748b; box-shadow: 0 16px 32px rgba(100, 116, 139, 0.12); }
+
+.swm-entry-icon-wrap {
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.swm-entry-btn:hover .swm-entry-icon-wrap {
+  transform: scale(1.08);
+}
+
+.swm-entry-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.swm-entry-text strong {
+  display: block;
+  font-size: 16.5px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+  margin-bottom: 5px;
+  letter-spacing: -0.2px;
+}
+
+.swm-entry-text span {
+  display: block;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.swm-entry-arrow {
+  color: #94a3b8;
+  transition: transform 0.25s ease, color 0.25s ease;
+  flex-shrink: 0;
+}
+
+.swm-entry-btn:hover .swm-entry-arrow {
+  transform: translateX(-6px); /* RTL: slides inward */
+  color: #4f46e5;
+}
+
+/* "فتح الصفحة" badge on entry button */
+.swm-entry-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--slate-100);
+  color: var(--slate-500);
+  border: 1px solid var(--slate-200);
+  white-space: nowrap;
+}
+
+/* Responsive grid collapse */
+@media (max-width: 900px) {
+  .swm-entries-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .swm-domain-group {
+    padding: 16px 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .swm-entries-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .swm-domain-group {
+    padding: 14px 12px;
+    margin-bottom: 12px;
+  }
+  .swm-domain-info h4 {
+    font-size: 14px;
+  }
+}
+
+/* ================================================= */
+/* FIXED BACK/HOME BUTTON LAYOUT SLOT                */
+/* ================================================= */
+
+/*
+  The back/home button must appear in a fixed slot
+  at the TOP-START of every inner page content area.
+  In RTL: this is the top-right corner of the page wrapper.
+  Use this class on the wrapper div that contains the button.
+*/
+.swm-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  min-height: 52px;                       /* Fixed height so all pages align */
+  padding: 0 4px;
+}
+
+/* Back/home button — consistent across every page */
+.swm-back-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--slate-200);
+  background: var(--card-bg);
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-base);
+  flex-shrink: 0;
+  user-select: none;
+  outline: none;
+}
+
+.swm-back-home-btn:hover {
+  background: var(--slate-100);
+  border-color: var(--color-admin-primary);
+  color: var(--color-admin-primary);
+}
+
+.swm-back-home-btn:focus-visible {
+  outline: 2px solid var(--color-admin-primary);
+  outline-offset: 2px;
+}
+
+.swm-back-home-btn:active {
+  transform: scale(0.97);
+}
+
+/* Page title area next to the back button */
+.swm-page-title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.swm-page-title-area h2 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0 0 2px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swm-page-title-area p {
+  font-size: 12px;
+  color: var(--slate-500);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Page-level actions slot (buttons, filters, etc.) */
+.swm-page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .swm-page-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    min-height: auto;
+    margin-bottom: 14px;
+  }
+  .swm-page-title-area h2 {
+    font-size: 15px;
+    white-space: normal;
+  }
+  .swm-page-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ================================================= */
+/* CHARTS — FORCE LIGHT MODE (ALL PAGES)             */
+/* ================================================= */
+
+/*
+  Recharts / ApexCharts — force white backgrounds and
+  dark text for all chart containers system-wide.
+  These rules are safe additive overrides.
+*/
+
+/* Recharts containers */
+.recharts-wrapper,
+.recharts-surface {
+  background: #ffffff !important;
+}
+
+.recharts-text,
+.recharts-cartesian-axis-tick-value {
+  fill: #334155 !important;          /* --slate-700 */
+  font-size: 12px !important;
+  font-family: 'Cairo', 'Inter', sans-serif !important;
+}
+
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08) !important;
+  color: #0f172a !important;
+}
+
+.recharts-legend-item-text {
+  color: #334155 !important;
+  font-size: 12px !important;
+}
+
+/* ApexCharts containers (if used) */
+.apexcharts-canvas {
+  background: #ffffff !important;
+}
+
+.apexcharts-tooltip {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  color: #0f172a !important;
+}
+
+.apexcharts-legend-text {
+  color: #334155 !important;
+  font-size: 12px !important;
+}
+
+.apexcharts-xaxis-label,
+.apexcharts-yaxis-label {
+  fill: #64748b !important;
+}
+
+/* Ant Design Charts / G2 */
+[class^="g2-tooltip"],
+[class^="g2-"] {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Wrapper card for any chart — forces white background */
+.swm-chart-card {
+  background: #ffffff !important;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 20px;
+}
+
+.swm-chart-card .chart-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 16px;
+}
+
+/* ================================================= */
+/* FIXED CARD SIZES & ALIGNMENT GRID                 */
+/* ================================================= */
+
+/* KPI Stat Strip — equal height */
+.stat-metric-card {
+  min-height: var(--card-stat-h);      /* 88px fixed height */
+  height: var(--card-stat-h) !important;
+  align-items: center !important;
+}
+
+/* Executive Pulse Cards — equal height */
+.executive-pulse-card {
+  min-height: 110px !important;
+  height: 110px !important;
+}
+
+/* Quick Action Cards — equal height (already set to min-height) */
+/* Enforce consistent max-height to prevent runaway content */
+.quick-action-card {
+  min-height: var(--card-quick-h) !important;   /* 164px */
+  max-height: 200px !important;
+}
+
+/* POS Hero Nav Cards — fixed height */
+.pos-nav-hero-card {
+  min-height: var(--card-pos-h) !important;    /* 300px */
+  height: var(--card-pos-h) !important;
+}
+
+/* Sections Hub Entry Buttons — spacious large comfort height */
+.swm-entry-btn {
+  min-height: 96px;
+  height: auto;
+}
+
+/* Domain Group Cards — no fixed height (content-driven is correct here) */
+
+/* ── Spacing Consistency ── */
+
+/* All Row + Col gutter in the system defaults to 16px — 
+   ensure the dashboard content wrapper has consistent padding */
+.swm-dashboard-content {
+  padding: 0 4px;                    /* Micro-align to grid */
+}
+
+/* Section separators — consistent margin between groups */
+.swm-section-gap {
+  margin-bottom: 28px !important;
+}
+
+.swm-section-gap-sm {
+  margin-bottom: 16px !important;
+}
+
+/* ── Alignment Principles ── */
+
+/* 1. All icon boxes must be exactly 44×44px */
+.quick-action-icon-box {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+/* 2. All card headers must be vertically centered */
+.quick-action-card .ant-card-head,
+.unified-nav-card .ant-card-head {
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* 3. Text overflow safety for card titles */
+.quick-action-card h5.ant-typography {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* 4. Grid alignment — use consistent gap */
+.quick-cards-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .quick-cards-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .quick-cards-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+/* ================================================= */
+/* GLOBAL MOBILE & TABLET RESPONSIVE ENGINE          */
+/* ================================================= */
+
+/* 1. Global Viewport Safety */
+html, body, #root {
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+}
+
+/* 2. Top Header & Content Layout */
+.swm-top-header {
+  padding: 0 24px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.swm-main-content {
+  padding: 24px 32px 48px;
+  min-height: calc(100vh - 68px);
+}
+
+/* 3. Ant Design Tables Universal Mobile Scroll */
+.ant-table-wrapper {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.ant-table-wrapper .ant-table {
+  min-width: 100% !important;
+}
+
+.ant-table-container {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* 4. Tablet & Small Laptop (max-width: 992px) */
+@media (max-width: 992px) {
+  .swm-main-content {
+    padding: 20px 20px 40px !important;
+  }
+  .swm-entries-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+  }
+}
+
+/* 5. Mobile Landscape & Tablets (max-width: 768px) */
+@media (max-width: 768px) {
+  /* ── Mobile Top Header Alignment ── */
+  .swm-top-header {
+    padding: 0 10px !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    background: #ffffff !important;
+  }
+
+  .swm-header-start {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-header-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    cursor: pointer !important;
+  }
+
+  .swm-header-logo {
+    height: 28px !important;
+    width: auto !important;
+    object-fit: contain !important;
+  }
+
+  .swm-header-brand-title {
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    line-height: 1.2 !important;
+  }
+
+  .swm-header-hub-btn {
+    height: 32px !important;
+    padding: 0 8px !important;
+    font-size: 11.5px !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-header-end {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-header-user {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+
+  .swm-header-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 28px !important;
+    font-size: 14px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-header-username {
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    max-width: 75px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+  }
+
+  .swm-header-logout-btn {
+    height: 32px !important;
+    padding: 0 6px !important;
+    font-size: 11.5px !important;
+    border-radius: 6px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-hide-mobile {
+    display: none !important;
+  }
+
+  .swm-main-content {
+    padding: 14px 12px 40px !important;
+    min-height: calc(100vh - 56px) !important;
+  }
+
+  /* Table styling for mobile touch */
+  .ant-table-thead > tr > th {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    background: #f8fafc !important;
+  }
+
+  .ant-table-tbody > tr > td {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+  }
+
+  .ant-table-pagination {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    margin: 12px 0 !important;
+  }
+
+  /* ── Page Header Mobile Layout: Perfectly Aligned ── */
+  .swm-page-header {
+    display: grid !important;
+    grid-template-columns: auto 1fr !important;
+    grid-template-areas:
+      "back title"
+      "actions actions" !important;
+    align-items: center !important;
+    gap: 8px 10px !important;
+    min-height: auto !important;
+    padding: 2px 0 !important;
+    margin-bottom: 14px !important;
+  }
+
+  .swm-page-header .swm-back-home-btn {
+    grid-area: back !important;
+    align-self: center !important;
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+    gap: 6px !important;
+  }
+
+  .swm-page-header .swm-page-title-area {
+    grid-area: title !important;
+    min-width: 0 !important;
+  }
+
+  .swm-page-header .swm-page-title-area h2 {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+    white-space: normal !important;
+  }
+
+  .swm-page-header .swm-page-title-area p {
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    color: #64748b !important;
+    margin: 2px 0 0 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 1 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  .swm-page-header .swm-page-actions {
+    grid-area: actions !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: stretch !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .swm-page-header .swm-page-actions > * {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-width: 110px !important;
+    height: 36px !important;
+    font-size: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Modals on Mobile */
+  .ant-modal {
+    max-width: 95vw !important;
+    margin: 10px auto !important;
+    top: 10px !important;
+  }
+
+  .ant-modal .ant-modal-content {
+    padding: 16px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .ant-modal .ant-modal-body {
+    max-height: calc(85vh - 120px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Printable Tables & Receipts */
+  .printable-invoice,
+  .print-table {
+    display: block !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Pickers, Dates & Selects */
+  .ant-picker-range {
+    width: 100% !important;
+  }
+
+  .ant-space-compact {
+    display: flex !important;
+    width: 100% !important;
+  }
+
+  .ant-space-compact > .ant-btn {
+    flex: 1 !important;
+    padding: 4px 6px !important;
+    font-size: 12px !important;
+  }
+
+  /* Sales Filter Bar Controls on Mobile */
+  .swm-sales-filter-controls {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .swm-sales-filter-controls > * {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .swm-sales-filter-controls .ant-select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .swm-sales-filter-controls .ant-picker {
+    width: 100% !important;
+  }
+
+  .swm-sales-filter-controls .ant-btn {
+    width: 100% !important;
+  }
+
+  /* Radio Groups on Mobile */
+  .ant-radio-group {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+  }
+
+  .ant-radio-group .ant-radio-button-wrapper {
+    flex: 1 1 auto !important;
+    text-align: center !important;
+    padding: 0 8px !important;
+    font-size: 12px !important;
+  }
+
+  /* Modal KPI & Payment Grids on Mobile */
+  .swm-modal-kpi-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .swm-modal-payment-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  /* Drawers on Mobile */
+  .ant-drawer-content-wrapper {
+    max-width: 100vw !important;
+  }
+
+  /* Charts on Mobile */
+  .swm-chart-card {
+    padding: 14px 10px !important;
+  }
+
+  .recharts-wrapper,
+  .recharts-surface {
+    max-width: 100% !important;
+  }
+
+  .recharts-legend-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+    padding-top: 8px !important;
+  }
+
+  /* Tabs horizontal scroll */
+  .ant-tabs-nav-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .ant-tabs-tab {
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+  }
+
+  /* Doc Headers for Printing/Modals on Mobile */
+  .doc-header {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+  }
+
+  .doc-brand {
+    flex-wrap: wrap !important;
+  }
+
+  /* SWM Breadcrumb Trail on Tablets & Mobile */
+  .swm-breadcrumb-bar {
+    padding: 10px 14px !important;
+    margin-bottom: 14px !important;
+    border-radius: 12px !important;
+    gap: 8px !important;
+  }
+
+  .swm-breadcrumb-trail {
+    gap: 6px !important;
+    font-size: 12px !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 2px 0 !important;
+  }
+
+  .swm-breadcrumb-trail::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .swm-breadcrumb-btn,
+  .swm-breadcrumb-home,
+  .swm-breadcrumb-cat,
+  .swm-breadcrumb-current {
+    font-size: 12px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Hub Section Title on Tablets & Mobile */
+  .swm-hub-section-title {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .swm-hub-title-heading {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+  }
+
+  .swm-hub-title-desc {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    margin-top: 3px !important;
+    display: block !important;
+  }
+
+  /* Domain Groups & Entries (including إدارة النظام والفروع and المستخدمين والصلاحيات) */
+  .swm-domain-header {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .swm-domain-icon {
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    min-height: 46px !important;
+    border-radius: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-domain-info {
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .swm-domain-info h4 {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+    margin: 0 0 2px !important;
+  }
+
+  .swm-domain-info p {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+  }
+
+  .swm-entry-btn {
+    text-align: right !important;
+    direction: rtl !important;
+  }
+
+  .swm-entry-text {
+    text-align: right !important;
+    direction: rtl !important;
+  }
+
+  .swm-entry-arrow {
+    align-self: center !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* 6. Mobile Phones (max-width: 480px) */
+@media (max-width: 480px) {
+  .swm-main-content {
+    padding: 10px 8px 36px !important;
+  }
+
+  /* Navigation Hub Domain Groups */
+  .swm-domain-group {
+    padding: 16px 12px !important;
+    margin-bottom: 12px !important;
+    border-radius: 14px !important;
+  }
+
+  .swm-domain-header {
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .swm-domain-icon {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    border-radius: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-domain-info {
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .swm-domain-info h4 {
+    font-size: 15.5px !important;
+    line-height: 1.3 !important;
+    margin: 0 0 2px !important;
+  }
+
+  .swm-domain-info p {
+    font-size: 11.5px !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+  }
+
+  /* 1 Column Cards on Phones — Generous, High-Visibility Touch Targets */
+  .swm-entries-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .swm-entry-btn {
+    min-height: 104px !important;
+    padding: 18px 20px !important;
+    gap: 16px !important;
+    border-radius: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: right !important;
+    direction: rtl !important;
+  }
+
+  .swm-entry-icon-wrap {
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+    border-radius: 14px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .swm-entry-text {
+    flex: 1 !important;
+    min-width: 0 !important;
+    text-align: right !important;
+    direction: rtl !important;
+  }
+
+  .swm-entry-text strong {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+    margin-bottom: 5px !important;
+    display: block !important;
+    text-align: right !important;
+  }
+
+  .swm-entry-text span {
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+    display: block !important;
+    text-align: right !important;
+  }
+
+  .swm-entry-arrow {
+    align-self: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Breadcrumb Bar on Phones (< 480px) */
+  .swm-breadcrumb-bar {
+    padding: 8px 10px !important;
+    margin-bottom: 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .swm-breadcrumb-trail {
+    gap: 5px !important;
+    font-size: 11.5px !important;
+    padding: 2px 0 !important;
+  }
+
+  .swm-breadcrumb-btn,
+  .swm-breadcrumb-home,
+  .swm-breadcrumb-cat,
+  .swm-breadcrumb-current {
+    font-size: 11.5px !important;
+  }
+
+  /* Ant Tags & Badges */
+  .ant-tag {
+    font-size: 11px !important;
+    margin: 2px !important;
+  }
+
+  /* Button touch comfort */
+  .ant-btn {
+    font-size: 13px !important;
+  }
+
+  /* Mobile Header (< 480px) */
+  .swm-top-header {
+    padding: 0 8px !important;
+    height: 52px !important;
+    min-height: 52px !important;
+  }
+
+  .swm-header-logo {
+    height: 26px !important;
+  }
+
+  .swm-header-brand-title {
+    font-size: 13px !important;
+  }
+
+  .swm-header-hub-btn {
+    height: 30px !important;
+    padding: 0 6px !important;
+    font-size: 11px !important;
+  }
+
+  .swm-header-avatar {
+    width: 26px !important;
+    height: 26px !important;
+    line-height: 26px !important;
+  }
+
+  .swm-header-username {
+    max-width: 60px !important;
+    font-size: 11px !important;
+  }
+
+  .swm-header-logout-btn {
+    height: 30px !important;
+    padding: 0 4px !important;
+    font-size: 11px !important;
+  }
+
+  /* Home Banner Header (< 480px) */
+  .swm-home-header-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .swm-home-header-meta {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .swm-home-header-badge {
+    flex: 1 !important;
+  }
+}
+
+

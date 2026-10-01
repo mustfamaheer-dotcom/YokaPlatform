@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Table,
   Button,
@@ -68,6 +70,7 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function Purchases({ autoOpenCreate, onResetAction }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('invoices');
 
   // Invoices List State
@@ -2074,14 +2077,14 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       render: (_, record) => (
         <Space size="small">
           <Button
-            size="small"
+            size="middle"
             icon={<EyeOutlined />}
             onClick={() => handleViewDetails(record)}
           >
             عرض الفاتورة
           </Button>
           <Button
-            size="small"
+            size="middle"
             danger
             icon={<RollbackOutlined />}
             onClick={() => handleOpenLinkedReturnModal(record)}
@@ -2172,7 +2175,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       key: 'actions',
       render: (_, record) => (
         <Button
-          size="small"
+          size="middle"
           icon={<EyeOutlined />}
           onClick={() => handleViewReturnDetails(record)}
         >
@@ -2184,13 +2187,24 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>المشتريات والتوريد والمرتجعات (Purchases & Returns)</Title>
-          <Text type="secondary">توريد بضائع المخازن، تحديث أسعار التكلفة والبيع، إدارة السداد المقسم، وإرجاع المشتريات للموردين</Text>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>المشتريات والتوريد والمرتجعات (Purchases & Returns)</h2>
+          <p>توريد بضائع المخازن، تحديث أسعار التكلفة والبيع، إدارة السداد المقسم، وإرجاع المشتريات للموردين</p>
         </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => { fetchInvoices(pagination.current); fetchReturns(returnsPagination.current); }}>
+
+        <div className="swm-page-actions">
+          <Button icon={<ReloadOutlined />} onClick={() => { fetchInvoices(pagination.current); fetchReturns(returnsPagination.current); }} style={{ height: 44, borderRadius: 8 }}>
             تحديث
           </Button>
           <Button
@@ -2198,6 +2212,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             danger
             icon={<RollbackOutlined />}
             onClick={handleOpenStandaloneReturnDrawer}
+            style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             فاتورة مرتجع مشتريات جديدة
           </Button>
@@ -2205,11 +2220,11 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleOpenCreateDrawer}
-            style={{ backgroundColor: '#2563eb' }}
+            style={{ backgroundColor: '#2563eb', height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             فاتورة مشتريات جديدة
           </Button>
-        </Space>
+        </div>
       </div>
 
       <Tabs
@@ -3043,7 +3058,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               size="large"
               loading={submitting}
               onClick={handleCreateInvoice}
-              style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', height: 42, padding: '0 28px', fontWeight: 'bold', fontSize: 15 }}
+              className="swm-btn-sale swm-btn-lg"
+              style={{ minHeight: 48, padding: '0 32px', fontWeight: 'bold', fontSize: 15 }}
             >
               اعتماد الفاتورة وتحديث الأسعار والمخزون [F4]
             </Button>
@@ -3660,7 +3676,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               size="large"
               loading={standaloneSubmitting}
               onClick={handleSubmitStandaloneReturn}
-              style={{ height: 42, padding: '0 28px', fontWeight: 'bold', fontSize: 15 }}
+              className="swm-btn-danger swm-btn-lg"
+              style={{ minHeight: 48, padding: '0 32px', fontWeight: 'bold', fontSize: 15 }}
             >
               اعتماد فاتورة المرتجع وخصم المخزون [F4]
             </Button>

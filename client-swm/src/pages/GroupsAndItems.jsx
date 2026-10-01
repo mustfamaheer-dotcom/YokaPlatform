@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Table,
   Button,
@@ -100,6 +102,7 @@ function buildVariantSku(productCode, colorName, sizeName, colorIndex = 0, sizeI
 }
 
 export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('groups'); // 'groups' | 'attributes' | 'items'
 
   // ==========================================
@@ -1171,28 +1174,37 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
   return (
     <div style={{ padding: '4px 0' }}>
       {/* Header & Title */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div>
-          <Title level={4} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-            المجموعات، المقاسات، والأصناف (Groups, Attributes & Items Master)
-          </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            إدارة التصنيفات الرئيسية وقوائم المقاسات والألوان وربط الأصناف بها لتوحيد استخدامها في فواتير المشتريات والتوريد والمرتجعات (Purchases & Returns)
-          </Text>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>المجموعات، المقاسات، والأصناف (Groups, Attributes & Items Master)</h2>
+          <p>إدارة التصنيفات الرئيسية وقوائم المقاسات والألوان وربط الأصناف بها لتوحيد استخدامها في فواتير المشتريات والتوريد والمرتجعات (Purchases & Returns)</p>
         </div>
-        <Space>
+
+        <div className="swm-page-actions">
           <Button
             icon={<ReloadOutlined />}
             onClick={() => { fetchCategories(); fetchAttributes(); fetchItems(itemsPagination.current); }}
+            style={{ height: 44, borderRadius: 8 }}
           >
             تحديث
           </Button>
           {activeTab === 'groups' && (
             <Button
               type="primary"
+              size="large"
               icon={<PlusOutlined />}
               onClick={handleOpenCreateGroup}
-              style={{ backgroundColor: '#4f46e5', borderColor: '#4f46e5' }}
+              style={{ backgroundColor: '#4f46e5', borderColor: '#4f46e5', fontWeight: 700, height: 44, borderRadius: 8 }}
             >
               إضافة مجموعة رئيسية جديدة
             </Button>
@@ -1201,17 +1213,19 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
             <Space>
               <Button
                 type="primary"
+                size="large"
                 icon={<PlusOutlined />}
                 onClick={() => handleOpenCreateAttr('size')}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', fontWeight: 700, height: 44, borderRadius: 8 }}
               >
                 إضافة مقاس جديد
               </Button>
               <Button
                 type="primary"
+                size="large"
                 icon={<PlusOutlined />}
                 onClick={() => handleOpenCreateAttr('color')}
-                style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed' }}
+                style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: 700, height: 44, borderRadius: 8 }}
               >
                 إضافة لون جديد
               </Button>
@@ -1220,14 +1234,15 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
           {activeTab === 'items' && (
             <Button
               type="primary"
+              size="large"
               icon={<PlusOutlined />}
               onClick={handleOpenCreateItem}
-              style={{ backgroundColor: '#059669', borderColor: '#059669' }}
+              style={{ backgroundColor: '#059669', borderColor: '#059669', fontWeight: 700, height: 44, borderRadius: 8 }}
             >
               إضافة صنف جديد وربطه بالمجموعة والصفات
             </Button>
           )}
-        </Space>
+        </div>
       </div>
 
       {/* Summary KPI Cards */}

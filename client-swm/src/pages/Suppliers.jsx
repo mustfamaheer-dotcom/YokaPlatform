@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Table,
   Button,
@@ -35,6 +37,7 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function Suppliers({ autoOpenCreate, onResetAction }) {
+  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -301,19 +304,36 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>إدارة الموردين والحسابات (Suppliers & Accounts)</Title>
-          <Text type="secondary">متابعة سجل الموردين، كشوف الحسابات الجارية، وسداد المستحقات بالدفع المقسم</Text>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>إدارة الموردين والحسابات (Suppliers & Accounts)</h2>
+          <p>متابعة سجل الموردين، كشوف الحسابات الجارية، وسداد المستحقات بالدفع المقسم</p>
         </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => fetchSuppliers(pagination.current)}>
+
+        <div className="swm-page-actions">
+          <Button icon={<ReloadOutlined />} onClick={() => fetchSuppliers(pagination.current)} style={{ height: 44, borderRadius: 8 }}>
             تحديث
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate} style={{ backgroundColor: '#2563eb' }}>
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={handleOpenCreate}
+            style={{ backgroundColor: '#2563eb', fontWeight: 700, height: 44, borderRadius: 8 }}
+          >
             إضافة مورد جديد
           </Button>
-        </Space>
+        </div>
       </div>
 
       <Card style={{ marginBottom: 20 }}>

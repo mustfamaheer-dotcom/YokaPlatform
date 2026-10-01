@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Table,
   Button,
@@ -51,6 +53,7 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function Products({ currentUser, autoOpenCreate, onResetAction }) {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -808,19 +811,33 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>كتالوج المنتجات والمخزون (Product Catalog & Inventory)</Title>
-          <Text type="secondary">توليد الأكواد آلياً، تخصيص صور المنتجات، وتحديد الأسعار والعرض بالمتجر (ECP)</Text>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleOpenCreate}
-          style={{ backgroundColor: '#2563eb', height: 40 }}
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
         >
-          إضافة منتج جديد
-        </Button>
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>كتالوج المنتجات والمخزون (Product Catalog & Inventory)</h2>
+          <p>توليد الأكواد آلياً، تخصيص صور المنتجات، وتحديد الأسعار والعرض بالمتجر (ECP)</p>
+        </div>
+
+        <div className="swm-page-actions">
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlusOutlined />}
+            onClick={handleOpenCreate}
+            style={{ backgroundColor: '#2563eb', height: 44, fontWeight: 700, borderRadius: 8 }}
+          >
+            إضافة منتج جديد
+          </Button>
+        </div>
       </div>
 
       <Card style={{ marginBottom: 16 }}>

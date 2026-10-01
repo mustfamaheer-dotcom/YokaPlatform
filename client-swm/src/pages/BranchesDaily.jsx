@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Card,
   Row,
@@ -54,6 +56,7 @@ const { Option } = Select;
 const { RangePicker } = DatePicker;
 
 export default function BranchesDaily() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [branchesList, setBranchesList] = useState([]);
@@ -460,19 +463,23 @@ export default function BranchesDaily() {
 
   return (
     <div style={{ padding: '4px' }}>
-      {/* 1. Header and Page Title */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <Title level={3} style={{ margin: 0, color: '#1e293b' }}>
-            <AuditOutlined style={{ marginLeft: 8, color: '#4f46e5' }} />
-            يومية الفروع (Branches Daily Overview)
-          </Title>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            مراقبة مالية وتشغيلية لحظية لمبيعات الفروع، فواتير نقاط البيع، والتدفقات النقدية وطرق التحصيل
-          </Text>
+      {/* 1. Standardized Page Header */}
+      <div className="swm-page-header">
+        <button
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>يومية الفروع (Branches Daily Overview)</h2>
+          <p>مراقبة مالية وتشغيلية لحظية لمبيعات الفروع، فواتير نقاط البيع، والتدفقات النقدية وطرق التحصيل</p>
         </div>
 
-        <Space wrap>
+        <div className="swm-page-actions">
           <Button
             icon={<ReloadOutlined />}
             loading={loading}
@@ -488,7 +495,7 @@ export default function BranchesDaily() {
           >
             طباعة تقرير اليومية الشامل
           </Button>
-        </Space>
+        </div>
       </div>
 
       {/* 2. Advanced Control and Filter Bar */}
@@ -926,19 +933,19 @@ export default function BranchesDaily() {
             {/* Metadata Card */}
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
               <Row gutter={[16, 8]}>
-                <Col span={6}>
+                <Col xs={12} sm={6}>
                   <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>الفرع:</div>
                   <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{selectedInvoice.branch_name || selectedInvoice.branch_code}</div>
                 </Col>
-                <Col span={6}>
+                <Col xs={12} sm={6}>
                   <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>الكاشير / البائع:</div>
                   <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{selectedInvoice.cashier_name || 'كاشير الفرع'}</div>
                 </Col>
-                <Col span={6}>
+                <Col xs={12} sm={6}>
                   <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>العميل:</div>
                   <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a', marginTop: 1 }}>{selectedInvoice.customer_name || 'عميل مباشر'}</div>
                 </Col>
-                <Col span={6}>
+                <Col xs={12} sm={6}>
                   <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>طريقة السداد:</div>
                   <div style={{ fontSize: 12.5, fontWeight: 800, color: '#16a34a', marginTop: 1 }}>
                     {selectedInvoice.payment_method === 'cash' ? 'نقداً (كاش)' : (selectedInvoice.payment_method === 'card' ? 'بطاقة بنكية' : (selectedInvoice.payment_method === 'split' ? 'دفع مقسم' : selectedInvoice.payment_method))}
@@ -948,63 +955,64 @@ export default function BranchesDaily() {
             </div>
 
             {/* Items Table */}
-            <table
-              className="print-table"
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                textAlign: 'right',
-                fontSize: '11px',
-                marginBottom: 12
-              }}
-            >
-              <thead>
-                <tr style={{ background: '#0f172a', color: '#ffffff' }}>
-                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '30px', textAlign: 'center' }}>م</th>
-                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '120px', textAlign: 'center' }}>كود الصنف</th>
-                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a' }}>اسم المنتج والمواصفات</th>
-                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'center' }}>اللون والمقاس</th>
-                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '60px', textAlign: 'center' }}>الكمية</th>
-                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '90px', textAlign: 'left' }}>سعر الوحدة</th>
-                  <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '100px', textAlign: 'left' }}>الإجمالي</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(selectedInvoice.items || []).map((item, idx) => (
-                  <tr
-                    key={item.id || idx}
-                    style={{
-                      background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
-                      borderBottom: '1px solid #cbd5e1'
-                    }}
-                  >
-                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>{idx + 1}</td>
-                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
-                      {item.product_code || '-'}
-                    </td>
-                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product_name}</div>
-                    </td>
-                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
-                      {[item.color, item.size].filter(Boolean).join(' • ') || '—'}
-                    </td>
-                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, fontFamily: 'monospace' }}>
-                      {item.quantity}
-                    </td>
-                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace' }}>
-                      {parseFloat(item.unit_price || 0).toLocaleString()} ج.م
-                    </td>
-                    <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 800, fontFamily: 'monospace' }}>
-                      {parseFloat(item.line_total || 0).toLocaleString()} ج.م
-                    </td>
+            <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 12 }}>
+              <table
+                className="print-table"
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  textAlign: 'right',
+                  fontSize: '11px'
+                }}
+              >
+                <thead>
+                  <tr style={{ background: '#0f172a', color: '#ffffff' }}>
+                    <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '30px', textAlign: 'center' }}>م</th>
+                    <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '120px', textAlign: 'center' }}>كود الصنف</th>
+                    <th style={{ padding: '6px 8px', border: '1px solid #0f172a' }}>اسم المنتج والمواصفات</th>
+                    <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '110px', textAlign: 'center' }}>اللون والمقاس</th>
+                    <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '60px', textAlign: 'center' }}>الكمية</th>
+                    <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '90px', textAlign: 'left' }}>سعر الوحدة</th>
+                    <th style={{ padding: '6px 8px', border: '1px solid #0f172a', width: '100px', textAlign: 'left' }}>الإجمالي</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(selectedInvoice.items || []).map((item, idx) => (
+                    <tr
+                      key={item.id || idx}
+                      style={{
+                        background: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+                        borderBottom: '1px solid #cbd5e1'
+                      }}
+                    >
+                      <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>{idx + 1}</td>
+                      <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {item.product_code || '-'}
+                      </td>
+                      <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product_name}</div>
+                      </td>
+                      <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+                        {[item.color, item.size].filter(Boolean).join(' • ') || '—'}
+                      </td>
+                      <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, fontFamily: 'monospace' }}>
+                        {item.quantity}
+                      </td>
+                      <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontFamily: 'monospace' }}>
+                        {parseFloat(item.unit_price || 0).toLocaleString()} ج.م
+                      </td>
+                      <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'left', fontWeight: 800, fontFamily: 'monospace' }}>
+                        {parseFloat(item.line_total || 0).toLocaleString()} ج.م
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Totals & Breakdown */}
-            <Row gutter={16}>
-              <Col span={14}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={14}>
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: '#334155', marginBottom: 4 }}>تفصيل سداد الفاتورة:</div>
                   {renderPaymentTags(selectedInvoice.payment_breakdown, selectedInvoice.final_amount)}
@@ -1013,7 +1021,7 @@ export default function BranchesDaily() {
                   </div>
                 </div>
               </Col>
-              <Col span={10}>
+              <Col xs={24} md={10}>
                 <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0', color: '#475569' }}>
                     <span>المجموع الفرعي:</span>
@@ -1063,7 +1071,7 @@ export default function BranchesDaily() {
       {/* ========================================================= */}
       <Modal
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '96%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '96%', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontWeight: 800, fontSize: 16 }}>معاينة وطباعة تقرير اليومية الشامل للفرع (A4)</span>
             <Button
               type="primary"
@@ -1133,7 +1141,7 @@ export default function BranchesDaily() {
           </div>
 
           {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
+          <div className="swm-modal-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
             <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
               <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي الوارد (مبيعات)</div>
               <div style={{ fontSize: 15, fontWeight: 900, color: '#16a34a', fontFamily: 'monospace', marginTop: 2 }}>
@@ -1169,7 +1177,7 @@ export default function BranchesDaily() {
           {/* Payment Breakdown Cards */}
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>تفصيل المتحصلات بحسب وسيلة الدفع:</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            <div className="swm-modal-payment-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               <div style={{ padding: '6px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6 }}>
                 <span style={{ fontSize: 10.5, color: '#64748b' }}>نقداً (كاش بالدرج):</span>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#16a34a', fontFamily: 'monospace' }}>

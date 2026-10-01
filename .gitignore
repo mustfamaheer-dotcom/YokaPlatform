@@ -14,3 +14,5 @@ dist-deploy/
 dist-server/
 server/swm/backups/
 scratch/
+__pycache__/
+*.py[cod]

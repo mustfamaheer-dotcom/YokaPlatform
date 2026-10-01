@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import {
   Card,
   Row,
@@ -63,6 +65,7 @@ const { Option } = Select;
 const { RangePicker } = DatePicker;
 
 export default function AdminJournals() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [branchesList, setBranchesList] = useState([]);
 
@@ -935,22 +938,30 @@ export default function AdminJournals() {
   return (
     <div style={{ padding: '4px' }}>
       {/* 1. Header Toolbar */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <Title level={3} style={{ margin: 0, color: '#0f172a' }}>
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>
             <AuditOutlined style={{ marginLeft: 8, color: '#4f46e5' }} />
             اليوميات الإدارية (Administrative Journals & Financials)
-          </Title>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            لوحة القيادة الإدارية والمالية الشاملة: رقابة المصروفات، سداد الموردين، التحويلات، وصافي الأرباح
-          </Text>
+          </h2>
+          <p>لوحة القيادة الإدارية والمالية الشاملة: رقابة المصروفات، سداد الموردين، التحويلات، وصافي الأرباح</p>
         </div>
 
-        <Space wrap>
-          <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchData}>
+        <div className="swm-page-actions">
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchData} style={{ height: 44, borderRadius: 8 }}>
             تحديث البيانات
           </Button>
-        </Space>
+        </div>
       </div>
 
       {/* 2. Global Filter Card (Time Presets & Branch Selector) */}
@@ -1564,7 +1575,7 @@ export default function AdminJournals() {
                         تصفية نوع المصروف:
                       </Text>
                       <Select
-                        style={{ width: 280 }}
+                        style={{ minWidth: 200, maxWidth: '100%', flex: 1 }}
                         value={expenseCategoryFilter}
                         onChange={(val) => setExpenseCategoryFilter(val)}
                         size="middle"
@@ -1618,6 +1629,7 @@ export default function AdminJournals() {
                         rowKey={(r) => `${r.branch_id}-${r.employee_name}`}
                         pagination={false}
                         size="small"
+                        scroll={{ x: 'max-content' }}
                       />
                     </Card>
                   )}
@@ -1645,6 +1657,7 @@ export default function AdminJournals() {
                       loading={loading}
                       pagination={false}
                       size="middle"
+                      scroll={{ x: 'max-content' }}
                     />
                   </Card>
                 </div>
@@ -1722,6 +1735,7 @@ export default function AdminJournals() {
                       rowKey="branch_id"
                       pagination={false}
                       size="small"
+                      scroll={{ x: 'max-content' }}
                     />
                   </Card>
                 </div>
@@ -1740,7 +1754,7 @@ export default function AdminJournals() {
                   {/* Operations Quick Summary KPI Cards */}
                   <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
                     <Col xs={12} sm={8} lg={4}>
-                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
                         <Statistic
                           title={<Text style={{ fontSize: 12, color: '#475569' }}>📋 إجمالي العمليات</Text>}
                           value={operations.summary?.totalAllOperationsCount || operations.allOperations?.length || 0}
@@ -1749,7 +1763,7 @@ export default function AdminJournals() {
                       </Card>
                     </Col>
                     <Col xs={12} sm={8} lg={4}>
-                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#faf5ff', border: '1px solid #e9d5ff' }}>
+                      <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#faf5ff', border: '1px solid #e9d5ff' }}>
                         <Statistic
                           title={<Text style={{ fontSize: 12, color: '#7e22ce' }}>⚖️ سندات التسوية</Text>}
                           value={operations.stockAdjustments?.length || 0}
@@ -1758,7 +1772,7 @@ export default function AdminJournals() {
                       </Card>
                     </Col>
                     <Col xs={12} sm={8} lg={4}>
-                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#fffbeb', border: '1px solid #fde68a' }}>
+                      <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#fffbeb', border: '1px solid #fde68a' }}>
                         <Statistic
                           title={<Text style={{ fontSize: 12, color: '#b45309' }}>💰 تحويلات الخزنة</Text>}
                           value={operations.cashTransfers?.length || 0}
@@ -1767,7 +1781,7 @@ export default function AdminJournals() {
                       </Card>
                     </Col>
                     <Col xs={12} sm={8} lg={4}>
-                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#ecfeff', border: '1px solid #a5f3fc' }}>
+                      <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#ecfeff', border: '1px solid #a5f3fc' }}>
                         <Statistic
                           title={<Text style={{ fontSize: 12, color: '#0e7490' }}>💳 سداد الموردين</Text>}
                           value={operations.supplierPayments?.length || 0}
@@ -1776,7 +1790,7 @@ export default function AdminJournals() {
                       </Card>
                     </Col>
                     <Col xs={12} sm={8} lg={4}>
-                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                      <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
                         <Statistic
                           title={<Text style={{ fontSize: 12, color: '#1d4ed8' }}>🚚 أذون الصرف والنقل</Text>}
                           value={operations.transfers?.length || 0}
@@ -1785,7 +1799,7 @@ export default function AdminJournals() {
                       </Card>
                     </Col>
                     <Col xs={12} sm={8} lg={4}>
-                      <Card size="small" style={{ borderRadius: 8, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                      <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                         <Statistic
                           title={<Text style={{ fontSize: 12, color: '#15803d' }}>📥 فواتير الشراء</Text>}
                           value={operations.purchaseInvoices?.length || 0}
@@ -1841,6 +1855,7 @@ export default function AdminJournals() {
                         loading={loading}
                         pagination={false}
                         size="middle"
+                        scroll={{ x: 'max-content' }}
                       />
                     )}
                     {activeOpSection === 'stock_adjustments' && (
@@ -1851,6 +1866,7 @@ export default function AdminJournals() {
                         loading={loading}
                         pagination={false}
                         size="middle"
+                        scroll={{ x: 'max-content' }}
                       />
                     )}
                     {activeOpSection === 'cash_transfers' && (
@@ -1861,6 +1877,7 @@ export default function AdminJournals() {
                         loading={loading}
                         pagination={false}
                         size="middle"
+                        scroll={{ x: 'max-content' }}
                       />
                     )}
                     {activeOpSection === 'transfers' && (
@@ -1871,6 +1888,7 @@ export default function AdminJournals() {
                         loading={loading}
                         pagination={false}
                         size="middle"
+                        scroll={{ x: 'max-content' }}
                       />
                     )}
                     {activeOpSection === 'supplier_payments' && (
@@ -1881,6 +1899,7 @@ export default function AdminJournals() {
                         loading={loading}
                         pagination={false}
                         size="middle"
+                        scroll={{ x: 'max-content' }}
                       />
                     )}
                     {activeOpSection === 'purchases' && (
@@ -1891,6 +1910,7 @@ export default function AdminJournals() {
                         loading={loading}
                         pagination={false}
                         size="middle"
+                        scroll={{ x: 'max-content' }}
                       />
                     )}
                   </Card>
@@ -2209,7 +2229,7 @@ export default function AdminJournals() {
           </div>
 
           {/* KPI Summary Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
+          <div className="swm-modal-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
             <div style={{ border: '1px solid #cbd5e1', padding: '10px 8px', borderRadius: 8, textAlign: 'center', background: '#f8fafc' }}>
               <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 700 }}>إجمالي الإيرادات</div>
               <div style={{ fontSize: 15, fontWeight: 900, color: '#1d4ed8', fontFamily: 'monospace', marginTop: 2 }}>{profitability.revenue?.toLocaleString()} ج.م</div>
@@ -2313,7 +2333,7 @@ export default function AdminJournals() {
         {inspectRecord && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Summary Highlights */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <Text type="secondary" style={{ fontSize: 12 }}>نوع الحركة / العملية:</Text>
                 <div style={{ fontWeight: 'bold', fontSize: 15, color: '#0f172a', marginTop: 2 }}>
@@ -2346,7 +2366,7 @@ export default function AdminJournals() {
             <Card size="small" style={{ borderRadius: 8 }}>
               <Row gutter={[16, 14]}>
                 {/* Reference No */}
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Text type="secondary" style={{ fontSize: 12 }}>رقم المرجع / الإذن:</Text>
                   <div style={{ fontWeight: 'bold', fontSize: 14, fontFamily: 'monospace', color: '#4f46e5', marginTop: 2 }}>
                     {inspectRecord.reference_no || inspectRecord.adjustment_number || inspectRecord.transfer_number || inspectRecord.payment_ref || inspectRecord.invoice_number || inspectRecord.id || '—'}
@@ -2354,7 +2374,7 @@ export default function AdminJournals() {
                 </Col>
 
                 {/* Date */}
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Text type="secondary" style={{ fontSize: 12 }}>التاريخ المسجل:</Text>
                   <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2 }}>
                     {dayjs(inspectRecord.date || inspectRecord.adjustment_date || inspectRecord.transfer_date || inspectRecord.payment_date || inspectRecord.invoice_date || inspectRecord.expense_date || inspectRecord.requested_at).format('YYYY-MM-DD HH:mm')}
@@ -2362,7 +2382,7 @@ export default function AdminJournals() {
                 </Col>
 
                 {/* Branch Info */}
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Text type="secondary" style={{ fontSize: 12 }}>الفرع أو المخزن المرتبط:</Text>
                   <div style={{ fontWeight: 600, marginTop: 2 }}>
                     <ShopOutlined style={{ marginLeft: 4, color: '#2563eb' }} />
@@ -2372,7 +2392,7 @@ export default function AdminJournals() {
 
                 {/* Destination if applicable */}
                 {inspectRecord.to_branch_name && (
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>الجهة المستلمة:</Text>
                     <div style={{ fontWeight: 600, color: '#16a34a', marginTop: 2 }}>
                       <BankOutlined style={{ marginLeft: 4 }} />
@@ -2383,7 +2403,7 @@ export default function AdminJournals() {
 
                 {/* Amount if applicable */}
                 {(inspectRecord.amount !== undefined || inspectRecord.total_variance_cost !== undefined || inspectRecord.final_amount !== undefined) && (
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>القيمة المالية:</Text>
                     <div style={{ fontWeight: 'bold', fontSize: 16, color: '#059669', marginTop: 2 }}>
                       {parseFloat(inspectRecord.amount || inspectRecord.total_variance_cost || inspectRecord.final_amount || 0).toLocaleString()} ج.م
@@ -2393,7 +2413,7 @@ export default function AdminJournals() {
 
                 {/* Quantity impact if applicable */}
                 {(inspectRecord.quantity_impact !== undefined || inspectRecord.total_units !== undefined || inspectRecord.net_qty_change !== undefined) && (
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>الأثر الكمي بالمخزن:</Text>
                     <div style={{ fontWeight: 'bold', fontSize: 15, marginTop: 2 }}>
                       <Tag color="cyan" style={{ fontSize: 13, padding: '2px 8px' }}>
@@ -2406,7 +2426,7 @@ export default function AdminJournals() {
                 {/* Surplus and deficit for stock adjustments */}
                 {inspectRecord.surplus_qty !== undefined && inspectRecord.deficit_qty !== undefined && (
                   <Col span={24}>
-                    <Space size="large">
+                    <Space size="large" wrap>
                       <span>فائض: <strong style={{ color: '#16a34a' }}>+{inspectRecord.surplus_qty || 0}</strong></span>
                       <span>عجز: <strong style={{ color: '#dc2626' }}>-{inspectRecord.deficit_qty || 0}</strong></span>
                     </Space>
@@ -2414,7 +2434,7 @@ export default function AdminJournals() {
                 )}
 
                 {/* User / Responsible */}
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Text type="secondary" style={{ fontSize: 12 }}>المسؤول / المعتمد:</Text>
                   <div style={{ fontWeight: 600, marginTop: 2 }}>
                     <UserOutlined style={{ marginLeft: 4, color: '#64748b' }} />
@@ -2424,7 +2444,7 @@ export default function AdminJournals() {
 
                 {/* Driver / Transport */}
                 {inspectRecord.driver_name && (
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Text type="secondary" style={{ fontSize: 12 }}>مندوب النقل / السائق:</Text>
                     <div style={{ fontWeight: 600, marginTop: 2 }}>
                       {inspectRecord.driver_name} {inspectRecord.vehicle_number ? `(${inspectRecord.vehicle_number})` : ''}

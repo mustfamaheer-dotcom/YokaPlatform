@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { printHtmlContent } from '../utils/printUtils';
 import {
@@ -49,6 +51,7 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
+  const navigate = useNavigate();
   const isRetailBranch = Boolean(
     currentUser &&
     (currentUser.branchType === 'retail_branch' || currentUser.isBranchAccount) &&
@@ -518,7 +521,7 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
         <Tooltip title="معاينة وتدقيق بطاقة الصنف">
           <Button
             type="text"
-            size="small"
+            size="middle"
             icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 16 }} />}
             onClick={() => handleViewItemReview(r)}
           />
@@ -529,29 +532,37 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
 
   return (
     <div style={{ padding: '4px' }}>
-      {/* 1. Header and Page Title */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <Title level={3} style={{ margin: 0, color: '#1e293b' }}>
+      {/* 1. Standardized Header and Page Title */}
+      <div className="swm-page-header">
+        <button
+          type="button"
+          className="swm-back-home-btn"
+          onClick={() => navigate('/dashboard/home')}
+          aria-label="العودة إلى الصفحة الرئيسية"
+        >
+          <HomeIcon size={15} />
+          <span>الرئيسية</span>
+        </button>
+
+        <div className="swm-page-title-area">
+          <h2>
             <FileSearchOutlined style={{ marginLeft: 8, color: '#4f46e5' }} />
             الجرد الفعلي وسندات التسوية (Stock Audit & Reconciliation)
-          </Title>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            استعراض الأرصدة، تسجيل الجرد الفعلي الميداني، ومطابقة الفروقات واعتماد سندات التسوية فورياً
-          </Text>
+          </h2>
+          <p>استعراض الأرصدة، تسجيل الجرد الفعلي الميداني، ومطابقة الفروقات واعتماد سندات التسوية فورياً</p>
         </div>
 
-        <Space wrap>
-          <Button icon={<ReloadOutlined />} loading={loading} onClick={() => fetchData(pagination.current)}>
+        <div className="swm-page-actions">
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={() => fetchData(pagination.current)} style={{ height: 44, borderRadius: 8 }}>
             تحديث الأرصدة
           </Button>
           <Button
             type="primary"
             icon={<PrinterOutlined />}
             onClick={handleOpenPrintModal}
-            style={{ backgroundColor: '#0f766e' }}
+            style={{ backgroundColor: '#0f766e', height: 44, borderRadius: 8, fontWeight: 700 }}
           >
-            طباعة كشف الجرد الميداني (A4 Sheet)
+            طباعة كشف الجرد الميداني (A4)
           </Button>
           <Button
             type="primary"
@@ -562,12 +573,14 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
               backgroundColor: '#16a34a',
               borderColor: '#16a34a',
               fontWeight: 700,
+              height: 44,
+              borderRadius: 8,
               boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)'
             }}
           >
             اعتماد جرد التسوية {Object.keys(modifiedRows).length > 0 && `(${Object.keys(modifiedRows).length})`}
           </Button>
-        </Space>
+        </div>
       </div>
 
       {/* 2. Control & Filter Card */}

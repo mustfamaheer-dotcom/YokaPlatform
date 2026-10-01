@@ -389,7 +389,7 @@ export default function SalesReportsPage({ currentUser }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="swm-sales-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {isAdmin && (
             <Select
               value={selectedBranch}
@@ -721,24 +721,25 @@ export default function SalesReportsPage({ currentUser }) {
 
                     {/* Visual Charts: Row 2 (Top-Selling Products & Top Categories) */}
                     <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-                      {/* Top Products BarChart & Leaderboard (Sleek Dark Card with White Labels) */}
+                      {/* Top Products BarChart & Leaderboard (Light Mode Card) */}
                       <Col xs={24} lg={15}>
                         <div
+                          className="swm-chart-card"
                           style={{
-                            background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
-                            border: '1px solid #334155',
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
                             borderRadius: 16,
                             padding: '22px',
                             minHeight: 400,
-                            boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.35)'
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
                             <div>
-                              <Text strong style={{ fontSize: 16, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Text strong style={{ fontSize: 16, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span>🏆</span> أعلى المنتجات مبيعاً بالفرع (Top Selling Products)
                               </Text>
-                              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+                              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
                                 مرتبة حسب إجمالي الإيرادات المحققة والكميات المباعة
                               </div>
                             </div>
@@ -751,7 +752,7 @@ export default function SalesReportsPage({ currentUser }) {
                                   { label: '📋 قائمة الصدارة', value: 'table' }
                                 ]}
                                 size="small"
-                                style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', fontWeight: 600 }}
+                                style={{ background: '#f1f5f9', color: '#0f172a', fontWeight: 600 }}
                               />
                               <Tag color="gold" style={{ fontWeight: 700, margin: 0 }}>أفضل {topProducts.length} أصناف</Tag>
                             </Space>
@@ -768,23 +769,23 @@ export default function SalesReportsPage({ currentUser }) {
                                   >
                                     <defs>
                                       <linearGradient id="topProductGrad" x1="0" y1="0" x2="1" y2="0">
-                                        <stop offset="0%" stopColor="#38bdf8" />
-                                        <stop offset="100%" stopColor="#6366f1" />
+                                        <stop offset="0%" stopColor="#4f46e5" />
+                                        <stop offset="100%" stopColor="#818cf8" />
                                       </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                     <XAxis
                                       type="number"
                                       tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                                      stroke="#64748b"
-                                      tick={{ fill: '#cbd5e1', fontSize: 11, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
+                                      stroke="#94a3b8"
+                                      tick={{ fill: '#475569', fontSize: 11, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
                                     />
                                     <YAxis
                                       dataKey="product_name"
                                       type="category"
                                       orientation="left"
                                       width={195}
-                                      stroke="#475569"
+                                      stroke="#94a3b8"
                                       tick={({ x, y, payload }) => {
                                         const full = payload?.value || '';
                                         const label = full.length > 24 ? `${full.substring(0, 23)}…` : full;
@@ -794,7 +795,7 @@ export default function SalesReportsPage({ currentUser }) {
                                               x={-10}
                                               y={4}
                                               textAnchor="end"
-                                              fill="#ffffff"
+                                              fill="#0f172a"
                                               fontSize={12.5}
                                               fontWeight={700}
                                               fontFamily="'Cairo', sans-serif"
@@ -807,17 +808,17 @@ export default function SalesReportsPage({ currentUser }) {
                                     />
                                     <ChartTooltip
                                       contentStyle={{
-                                        backgroundColor: '#1e293b',
-                                        border: '1px solid #475569',
+                                        backgroundColor: '#ffffff',
+                                        border: '1px solid #e2e8f0',
                                         borderRadius: 10,
-                                        color: '#ffffff',
-                                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                                        color: '#0f172a',
+                                        boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
                                         fontFamily: "'Cairo', sans-serif",
                                         direction: 'rtl',
                                         textAlign: 'right'
                                       }}
-                                      itemStyle={{ color: '#ffffff' }}
-                                      labelStyle={{ color: '#94a3b8' }}
+                                      itemStyle={{ color: '#0f172a' }}
+                                      labelStyle={{ color: '#64748b' }}
                                       formatter={(val, name, item) => [
                                         `${Number(val).toLocaleString()} ج.م (${item?.payload?.units_sold || 0} قطعة)`,
                                         'الإيراد المحقق'
@@ -834,7 +835,7 @@ export default function SalesReportsPage({ currentUser }) {
                                             <text
                                               x={(x || 0) + (width || 0) + 8}
                                               y={(y || 0) + (height || 0) / 2 + 4}
-                                              fill="#38bdf8"
+                                              fill="#4f46e5"
                                               fontSize={12}
                                               fontWeight={800}
                                               fontFamily="'Cairo', sans-serif"
@@ -866,35 +867,35 @@ export default function SalesReportsPage({ currentUser }) {
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'space-between',
-                                          background: 'rgba(255, 255, 255, 0.05)',
-                                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                                          background: '#f8fafc',
+                                          border: '1px solid #e2e8f0',
                                           borderRadius: 10,
                                           padding: '10px 14px',
                                           transition: 'all 0.2s ease'
                                         }}
                                       >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-                                          <span style={{ fontSize: idx < 3 ? 18 : 13, fontWeight: 800, width: 26, textAlign: 'center', color: '#94a3b8' }}>
+                                          <span style={{ fontSize: idx < 3 ? 18 : 13, fontWeight: 800, width: 26, textAlign: 'center', color: '#64748b' }}>
                                             {rankBadge}
                                           </span>
                                           <div style={{ minWidth: 0, flex: 1 }}>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                               {p.product_name}
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#64748b', marginTop: 2 }}>
                                               {p.product_code && <span>كود: {p.product_code}</span>}
-                                              {p.category_name && <Tag color="default" style={{ fontSize: 10, padding: '0 4px', margin: 0, background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', border: 'none' }}>{p.category_name}</Tag>}
+                                              {p.category_name && <Tag color="default" style={{ fontSize: 10, padding: '0 4px', margin: 0, background: '#f1f5f9', color: '#475569', border: 'none' }}>{p.category_name}</Tag>}
                                             </div>
                                           </div>
                                         </div>
 
                                         <div style={{ textAlign: 'left', minWidth: 140, paddingLeft: 8 }}>
-                                          <div style={{ fontWeight: 800, fontSize: 13.5, color: '#38bdf8' }}>
+                                          <div style={{ fontWeight: 800, fontSize: 13.5, color: '#4f46e5' }}>
                                             {rev.toLocaleString()} ج.م
                                           </div>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                            <span style={{ fontSize: 11, color: '#34d399', fontWeight: 600 }}>{p.units_sold} قطعة</span>
-                                            <Progress percent={pct} showInfo={false} size="small" strokeColor="#38bdf8" style={{ width: 45, margin: 0 }} />
+                                            <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>{p.units_sold} قطعة</span>
+                                            <Progress percent={pct} showInfo={false} size="small" strokeColor="#4f46e5" style={{ width: 45, margin: 0 }} />
                                           </div>
                                         </div>
                                       </div>
@@ -1033,6 +1034,7 @@ export default function SalesReportsPage({ currentUser }) {
                         dataSource={topSellers}
                         rowKey={(r) => r.salesperson_id || r.salesperson_name}
                         pagination={false}
+                        scroll={{ x: 'max-content' }}
                         columns={[
                           {
                             title: 'اسم البائع',
@@ -1122,6 +1124,7 @@ export default function SalesReportsPage({ currentUser }) {
                             dataSource={branchPerformance}
                             rowKey={(r) => r.branch_id || r.branch_name}
                             pagination={false}
+                            scroll={{ x: 'max-content' }}
                             columns={[
                               {
                                 title: 'الترتيب',
@@ -1256,6 +1259,7 @@ export default function SalesReportsPage({ currentUser }) {
                       columns={returnColumns}
                       rowKey={(r) => r.id}
                       pagination={{ pageSize: 10, showSizeChanger: true }}
+                      scroll={{ x: 'max-content' }}
                       locale={{
                         emptyText: (
                           <Empty
@@ -1333,6 +1337,7 @@ export default function SalesReportsPage({ currentUser }) {
                       columns={expenseColumns}
                       rowKey={(r) => r.id}
                       pagination={{ pageSize: 10, showSizeChanger: true }}
+                      scroll={{ x: 'max-content' }}
                       locale={{
                         emptyText: (
                           <Empty
