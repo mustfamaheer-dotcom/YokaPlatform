@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { Typography, Tag, Input, Breadcrumb } from 'antd';
 import NavCard from '../../components/NavCard';
-import SellerPayrollAndExpenseCategoriesCards from '../../components/SellerPayrollAndExpenseCategoriesCards';
 import {
   NAVIGATION_CATEGORIES,
   getCategoryById,
@@ -410,12 +409,6 @@ export default function NavigationHub({
               />
             ))}
           </div>
-
-          {currentCategoryObj.id === 'management' && (
-            <div style={{ marginTop: 28 }}>
-              <SellerPayrollAndExpenseCategoriesCards currentUser={currentUser} />
-            </div>
-          )}
         </div>
       ) : (
         /* ─── MAIN HUB VIEW (ROOT CATEGORY CARDS) ───────────────────── */

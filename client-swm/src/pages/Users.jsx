@@ -19,7 +19,9 @@ import {
   Statistic,
   Radio,
   Divider,
-  InputNumber
+  InputNumber,
+  Avatar,
+  Switch
 } from 'antd';
 import {
   UserAddOutlined,
@@ -37,7 +39,10 @@ import {
   CheckOutlined,
   LockOutlined,
   ShoppingCartOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  SwapOutlined,
+  FileExcelOutlined,
+  PhoneOutlined
 } from '@ant-design/icons';
 import api from '../api';
 
@@ -51,6 +56,16 @@ const ROLES = [
   { value: 'salesperson', label: 'بائع / كاشير (Salesperson)', color: 'blue', portal: 'branch' }
 ];
 
+const getAvatarColor = (name) => {
+  const colors = ['#4f46e5', '#0284c7', '#16a34a', '#d97706', '#9333ea', '#e11d48', '#0d9488'];
+  if (!name) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -58,6 +73,15 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+
+  // Quick Branch Transfer state
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferringUser, setTransferringUser] = useState(null);
+  const [targetBranchId, setTargetBranchId] = useState(null);
+  const [transferLoading, setTransferLoading] = useState(false);
+
+  // Quick Status Switch loading tracker
+  const [statusLoadingId, setStatusLoadingId] = useState(null);
 
   const [filterRole, setFilterRole] = useState(null);
   const [filterBranch, setFilterBranch] = useState(null);
@@ -155,6 +179,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
         phone: values.phone,
         role: values.role,
         branch_id: values.branch_id || null,
+        salary: values.salary !== undefined && values.salary !== null && values.salary !== '' ? parseFloat(values.salary) : null,
         status: values.status,
         ...(values.password ? { password: values.password } : {})
       };
@@ -165,7 +190,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
         setIsEditModalOpen(false);
         setEditingUser(null);
         editForm.resetFields();
-        fetchData();
+        await fetchData();
       }
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في تحديث بيانات الحساب');
@@ -174,15 +199,116 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
   const handleToggleStatus = async (user) => {
     const nextStatus = user.status === 'active' ? 'inactive' : 'active';
+    setStatusLoadingId(user.id);
     try {
       const res = await api.put(`/api/swm/users/${user.id}`, { status: nextStatus });
       if (res.data.success) {
-        message.success(`تم ${nextStatus === 'active' ? 'تفعيل' : 'تعطيل'} حساب (${user.username}) بنجاح`);
-        fetchData();
+        message.success(`تم ${nextStatus === 'active' ? 'تفعيل' : 'تعطيل'} حساب (${user.full_name || user.username}) بنجاح`);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === user.id ? { ...u, status: nextStatus } : u))
+        );
       }
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في تغيير حالة الحساب');
+    } finally {
+      setStatusLoadingId(null);
     }
+  };
+
+  // Quick Branch Transfer Handlers
+  const handleOpenTransfer = (user) => {
+    setTransferringUser(user);
+    setTargetBranchId(user.branch_id || null);
+    setIsTransferModalOpen(true);
+  };
+
+  const handleTransferSubmit = async () => {
+    if (!transferringUser) return;
+    if (!targetBranchId) {
+      message.warning('يرجى اختيار الفرع المستهدف للنقل');
+      return;
+    }
+    if (targetBranchId === transferringUser.branch_id) {
+      message.info('الموظف مسجل بالفعل في هذا الفرع');
+      return;
+    }
+
+    setTransferLoading(true);
+    try {
+      const res = await api.put(`/api/swm/users/${transferringUser.id}`, {
+        branch_id: targetBranchId
+      });
+      if (res.data.success) {
+        const destBranch = branches.find((b) => b.id === targetBranchId);
+        message.success(`تم نقل الموظف (${transferringUser.full_name || transferringUser.username}) إلى (${destBranch?.branch_name || 'الفرع المحدد'}) بنجاح`);
+        setIsTransferModalOpen(false);
+        setTransferringUser(null);
+        await fetchData();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في نقل الموظف إلى الفرع');
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  // Export Staff Directory to CSV with UTF-8 BOM
+  const handleExportExcel = () => {
+    if (!filteredUsers || filteredUsers.length === 0) {
+      message.warning('لا يوجد موظفين لتصديرهم بناءً على الفلتر الحالي');
+      return;
+    }
+
+    const headers = [
+      'معرف الموظف (ID)',
+      'الاسم الكامل',
+      'اسم المستخدم',
+      'رقم الهاتف',
+      'الدور الوظيفي',
+      'الفرع الحالي',
+      'بوابة تسجيل الدخول',
+      'المرتب الشهري',
+      'حالة الحساب',
+      'تاريخ الإنشاء'
+    ];
+
+    const getRoleLabel = (role) => {
+      const found = ROLES.find((r) => r.value === role);
+      return found ? found.label.replace(/\s*\(.*?\)\s*/g, '') : role;
+    };
+
+    const getPortalLabel = (record) => {
+      if (['super_admin', 'admin'].includes(record.role)) return 'بوابة الإدارة العامة';
+      if (record.branch_type === 'ecom_warehouse' || record.branch_code === 'BR-ECOM') return 'المتجر الإلكتروني';
+      return 'كاشير الفروع (POS)';
+    };
+
+    const rows = filteredUsers.map((u) => [
+      u.id,
+      `"${(u.full_name || '').replace(/"/g, '""')}"`,
+      `"${(u.username || '').replace(/"/g, '""')}"`,
+      `"${(u.phone || '').replace(/"/g, '""')}"`,
+      `"${getRoleLabel(u.role)}"`,
+      `"${(u.branch_name || (['super_admin', 'admin'].includes(u.role) ? 'الإدارة العامة' : 'غير محدد')).replace(/"/g, '""')}"`,
+      `"${getPortalLabel(u)}"`,
+      u.salary ? parseFloat(u.salary).toFixed(2) : '0.00',
+      u.status === 'active' ? 'نشط (مفعل)' : 'معطل',
+      u.created_at ? new Date(u.created_at).toLocaleDateString('ar-EG') : ''
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `كشف_الموظفين_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    message.success(`تم تصدير كشف بعدد ${filteredUsers.length} موظف بنجاح`);
   };
 
   // Compute staff counts per branch
@@ -249,43 +375,84 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
   const columns = [
     {
-      title: 'اسم المستخدم',
-      dataIndex: 'username',
-      key: 'username',
-      render: (u, record) => (
-        <Space>
-          <Text code strong>{u}</Text>
-          {record.id === newlyCreatedId && (
-            <Tag color="success" style={{ margin: 0, fontWeight: 'bold' }}>جديد ✨</Tag>
-          )}
-        </Space>
-      )
+      title: 'الموظف وبيانات الاتصال',
+      key: 'profile',
+      render: (_, record) => {
+        const initial = (record.full_name || record.username || 'م').trim().charAt(0).toUpperCase();
+        const avatarBg = getAvatarColor(record.full_name || record.username);
+        return (
+          <Space align="center" size={12}>
+            <Avatar
+              size={40}
+              style={{
+                backgroundColor: avatarBg,
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: 16,
+                boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+              }}
+            >
+              {initial}
+            </Avatar>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Space size={6} wrap>
+                <Text strong style={{ fontSize: 14, color: '#1e293b' }}>
+                  {record.full_name || record.username}
+                </Text>
+                {record.id === newlyCreatedId && (
+                  <Tag color="success" style={{ margin: 0, fontSize: 10, lineHeight: '18px', padding: '0 4px', fontWeight: 'bold' }}>
+                    جديد ✨
+                  </Tag>
+                )}
+              </Space>
+              <Space size={8} split={<Text type="secondary" style={{ fontSize: 10 }}>•</Text>} style={{ fontSize: 12 }}>
+                <Text code style={{ fontSize: 11, color: '#475569', margin: 0 }}>
+                  @{record.username}
+                </Text>
+                {record.phone ? (
+                  <Space size={3} style={{ color: '#64748b' }}>
+                    <PhoneOutlined style={{ fontSize: 11 }} />
+                    <span dir="ltr">{record.phone}</span>
+                  </Space>
+                ) : null}
+              </Space>
+            </div>
+          </Space>
+        );
+      }
     },
     {
-      title: 'الاسم الكامل',
-      dataIndex: 'full_name',
-      key: 'full_name',
-      render: (name) => <Text strong>{name}</Text>
-    },
-    {
-      title: 'كلمة المرور',
-      dataIndex: 'password_plain',
-      key: 'password_plain',
-      render: (pw) => {
-        return pw ? (
-          <Text
-            code
-            copyable={{ text: pw, tooltips: ['نسخ كلمة المرور', 'تم النسخ!'] }}
-            style={{ fontWeight: 600, color: '#0f766e', backgroundColor: '#f0fdfa', fontSize: 13 }}
-          >
-            {pw}
-          </Text>
-        ) : (
-          <Tooltip title="كلمة المرور مشفرة بالنظام. لتحديثها اضغط على تعديل في الإجراءات">
-            <Tag color="default" style={{ fontStyle: 'italic', fontSize: 11 }}>
-              مشفرة 🔒
-            </Tag>
-          </Tooltip>
+      title: 'الفرع والمنظومة',
+      key: 'branch_portal',
+      render: (_, record) => {
+        const isAdminRole = ['super_admin', 'admin'].includes(record.role);
+        const isEcom = record.branch_type === 'ecom_warehouse' || record.branch_code === 'BR-ECOM';
+        const branchName = record.branch_name || (isAdminRole ? 'المستودع الرئيسي (الإدارة العامة)' : 'غير محدد');
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <Space size={4}>
+              <ShopOutlined style={{ color: '#4f46e5' }} />
+              <Text strong style={{ fontSize: 13, color: '#334155' }}>
+                {branchName}
+              </Text>
+            </Space>
+            <div>
+              {isAdminRole ? (
+                <Tag icon={<CrownOutlined />} color="purple" style={{ margin: 0, fontSize: 11 }}>
+                  بوابة الإدارة (Admin)
+                </Tag>
+              ) : isEcom ? (
+                <Tag icon={<ShoppingCartOutlined />} color="magenta" style={{ margin: 0, fontSize: 11 }}>
+                  بوابة المتجر (E-Com)
+                </Tag>
+              ) : (
+                <Tag icon={<ShopOutlined />} color="cyan" style={{ margin: 0, fontSize: 11 }}>
+                  بوابة الكاشير (POS)
+                </Tag>
+              )}
+            </div>
+          </div>
         );
       }
     },
@@ -295,99 +462,86 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
       key: 'role',
       render: (role) => {
         const found = ROLES.find((r) => r.value === role);
-        return <Tag color={found?.color || 'default'}>{found?.label || role}</Tag>;
-      }
-    },
-    {
-      title: 'بوابة تسجيل الدخول',
-      key: 'portal_type',
-      render: (_, record) => {
-        const isAdminRole = ['super_admin', 'admin'].includes(record.role);
-        const isEcom = record.branch_type === 'ecom_warehouse' || record.branch_code === 'BR-ECOM';
-
-        if (isAdminRole) {
-          return (
-            <Tag icon={<CrownOutlined />} color="purple">
-              بوابة الإدارة (Admin)
-            </Tag>
-          );
-        }
-
-        if (isEcom) {
-          return (
-            <Tag icon={<ShoppingCartOutlined />} color="magenta">
-              بوابة المتجر (E-Com)
-            </Tag>
-          );
-        }
-
         return (
-          <Tag icon={<ShopOutlined />} color="cyan">
-            بوابة الكاشير (POS)
+          <Tag color={found?.color || 'default'} style={{ fontSize: 12, padding: '2px 8px' }}>
+            {found?.label || role}
           </Tag>
         );
       }
     },
     {
-      title: 'الفرع التابع له',
-      dataIndex: 'branch_name',
-      key: 'branch_name',
-      render: (b, record) => {
-        if (['super_admin', 'admin'].includes(record.role) && !b) {
-          return <Tag color="geekblue">المستودع الرئيسي (الإدارة العامة)</Tag>;
-        }
-        return b ? (
-          <Space size={4}>
-            <ShopOutlined style={{ color: '#4f46e5' }} />
-            <Text strong>{b}</Text>
-          </Space>
-        ) : (
-          <Text type="secondary">غير محدد</Text>
-        );
-      }
-    },
-    {
-      title: 'الهاتف',
-      dataIndex: 'phone',
-      key: 'phone',
-      render: (p) => p || '—'
-    },
-    {
-      title: 'المرتب الشهري',
-      dataIndex: 'salary',
-      key: 'salary',
-      render: (s) => s ? (
-        <Text strong style={{ color: '#15803d', fontSize: 13 }}>
-          {parseFloat(s).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
-        </Text>
-      ) : <Text type="secondary">—</Text>
+      title: 'المرتب وكلمة المرور',
+      key: 'salary_credentials',
+      render: (_, record) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div>
+            {record.salary ? (
+              <Text strong style={{ color: '#15803d', fontSize: 13 }}>
+                {parseFloat(record.salary).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+              </Text>
+            ) : (
+              <Text type="secondary" style={{ fontSize: 12 }}>المرتب: غير محدد</Text>
+            )}
+          </div>
+          <div>
+            {record.password_plain ? (
+              <Text
+                code
+                copyable={{ text: record.password_plain, tooltips: ['نسخ كلمة المرور', 'تم النسخ!'] }}
+                style={{ fontWeight: 600, color: '#0f766e', backgroundColor: '#f0fdfa', fontSize: 12 }}
+              >
+                {record.password_plain}
+              </Text>
+            ) : (
+              <Tooltip title="كلمة المرور مشفرة بالنظام. لتحديثها اضغط على تعديل في الإجراءات">
+                <Tag color="default" style={{ fontStyle: 'italic', fontSize: 10, margin: 0 }}>
+                  مشفرة 🔒
+                </Tag>
+              </Tooltip>
+            )}
+          </div>
+        </div>
+      )
     },
     {
       title: 'الحالة',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
-        <Tag color={status === 'active' ? 'green' : 'red'}>
-          {status === 'active' ? 'نشط (مفعل)' : 'معطل'}
-        </Tag>
-      )
-    },
-    {
-      title: 'تاريخ الإنشاء',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (date) => (
-        <Text type="secondary" style={{ fontSize: 13 }}>
-          {date ? new Date(date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
-        </Text>
-      )
+      align: 'center',
+      width: 100,
+      render: (status, record) => {
+        const isActive = status === 'active';
+        return (
+          <Tooltip title={isActive ? 'انقر لتعطيل الحساب' : 'انقر لتفعيل الحساب'}>
+            <Popconfirm
+              title={`هل أنت متأكد من ${isActive ? 'تعطيل' : 'تفعيل'} حساب (${record.full_name || record.username})؟`}
+              okText="نعم، تأكيد"
+              cancelText="إلغاء"
+              onConfirm={() => handleToggleStatus(record)}
+              okButtonProps={{ danger: isActive }}
+            >
+              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+                <Switch
+                  checked={isActive}
+                  loading={statusLoadingId === record.id}
+                  checkedChildren="نشط"
+                  unCheckedChildren="معطل"
+                  style={{ backgroundColor: isActive ? '#16a34a' : undefined }}
+                />
+              </div>
+            </Popconfirm>
+          </Tooltip>
+        );
+      }
     },
     {
       title: 'الإجراءات',
       key: 'actions',
+      align: 'center',
+      width: 170,
       render: (_, record) => {
-        const canEdit = isAdmin;
-        if (!canEdit) return null;
+        if (!isAdmin) return null;
+        const canTransfer = !['super_admin'].includes(record.role);
 
         return (
           <Space size="small">
@@ -399,21 +553,18 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
               تعديل
             </Button>
 
-            <Popconfirm
-              title={`هل أنت متأكد من ${record.status === 'active' ? 'تعطيل' : 'تفعيل'} هذا الحساب؟`}
-              okText="نعم"
-              cancelText="إلغاء"
-              onConfirm={() => handleToggleStatus(record)}
-            >
-              <Button
-                size="small"
-                danger={record.status === 'active'}
-                type={record.status === 'active' ? 'default' : 'primary'}
-                icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-              >
-                {record.status === 'active' ? 'تعطيل' : 'تفعيل'}
-              </Button>
-            </Popconfirm>
+            {canTransfer && (
+              <Tooltip title="نقل سريع لفرع آخر">
+                <Button
+                  size="small"
+                  icon={<SwapOutlined />}
+                  onClick={() => handleOpenTransfer(record)}
+                  style={{ color: '#4f46e5', borderColor: '#c7d2fe' }}
+                >
+                  نقل الفرع
+                </Button>
+              </Tooltip>
+            )}
           </Space>
         );
       }
@@ -430,6 +581,12 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
           </Text>
         </div>
         <Space>
+          <Button
+            icon={<FileExcelOutlined style={{ color: '#16a34a' }} />}
+            onClick={handleExportExcel}
+          >
+            تصدير كشف الموظفين (Excel)
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={fetchData}>تحديث</Button>
           {isAdmin && (
             <Button
@@ -853,6 +1010,75 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             </Space>
           </div>
         </Form>
+      </Modal>
+
+      {/* QUICK BRANCH TRANSFER MODAL */}
+      <Modal
+        title={
+          <Space>
+            <SwapOutlined style={{ color: '#4f46e5' }} />
+            <span>النقل السريع للموظف إلى فرع آخر</span>
+          </Space>
+        }
+        open={isTransferModalOpen}
+        onCancel={() => {
+          setIsTransferModalOpen(false);
+          setTransferringUser(null);
+        }}
+        onOk={handleTransferSubmit}
+        okText="تأكيد النقل الآن"
+        cancelText="إلغاء"
+        confirmLoading={transferLoading}
+        destroyOnClose
+        width={480}
+      >
+        <div style={{ padding: '8px 0' }}>
+          <div
+            style={{
+              background: '#f8fafc',
+              padding: '14px 16px',
+              borderRadius: 8,
+              marginBottom: 18,
+              border: '1px solid #e2e8f0'
+            }}
+          >
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary">الموظف المراد نقله:</Text>
+              <Text strong style={{ fontSize: 14 }}>
+                {transferringUser?.full_name || transferringUser?.username}
+              </Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary">الفرع الحالي:</Text>
+              <Tag color="blue" style={{ margin: 0 }}>
+                {transferringUser?.branch_name || 'غير محدد'}
+              </Tag>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <Text strong>اختر الفرع الجديد المنقول إليه:</Text>
+          </div>
+          <Select
+            style={{ width: '100%' }}
+            size="large"
+            placeholder="حدد الفرع المستهدف للنقل..."
+            value={targetBranchId}
+            onChange={(val) => setTargetBranchId(val)}
+          >
+            {branches.map((b) => (
+              <Option key={b.id} value={b.id} disabled={b.id === transferringUser?.branch_id}>
+                <ShopOutlined style={{ marginLeft: 6 }} />
+                {b.branch_name} ({b.branch_code})
+                {b.id === transferringUser?.branch_id ? ' (الفرع الحالي)' : ''}
+              </Option>
+            ))}
+          </Select>
+
+          <div style={{ marginTop: 12, padding: '8px 12px', background: '#eff6ff', borderRadius: 6, fontSize: 12, color: '#1e40af' }}>
+            💡 سيتم تحويل ارتباط الموظف فوراً بالفرع الجديد ليتمكن من تسجيل الدخول لكاشير وورديات الفرع الجديد مباشرة دون أي تعطيل.
+          </div>
+        </div>
       </Modal>
     </div>
   );

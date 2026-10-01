@@ -48,8 +48,11 @@ async function initTreasuryAuxTables() {
         paid_by INT,
         paid_at TIMESTAMPTZ DEFAULT NOW(),
         notes TEXT,
-        expense_id INT
+        expense_id INT,
+        deduct_source VARCHAR(50) DEFAULT 'main_treasury'
       );
+
+      ALTER TABLE payroll_payouts ADD COLUMN IF NOT EXISTS deduct_source VARCHAR(50) DEFAULT 'main_treasury';
     `);
 
     // Seed default withdrawal reasons if none exist
@@ -1216,7 +1219,7 @@ router.post('/quick-withdrawal', requireAuth, requireRole(['super_admin', 'admin
  * Returns employee info, base salary, advances taken this month from expenses,
  * and previous payouts for this month.
  */
-router.get('/employee-payroll-summary/:employeeId', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/employee-payroll-summary/:employeeId', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
   try {
     const { employeeId } = req.params;
     const { month } = req.query; // format: 'YYYY-MM'
@@ -1296,7 +1299,7 @@ router.get('/employee-payroll-summary/:employeeId', requireAuth, requireRole(['s
  *    so it appears immediately in Administrative Journal (اليومية الإدارية).
  * 3. Records voucher in payroll_payouts table.
  */
-router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
   try {
     const {
       employee_id,
@@ -1308,6 +1311,7 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin']), a
       bonus = 0,
       bonus_reason,
       channel = 'cash',
+      deduct_source = 'main_treasury',
       notes
     } = req.body;
 
@@ -1341,24 +1345,85 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin']), a
 
     const normChannel = ['cash', 'visa', 'transfer'].includes(channel) ? channel : 'cash';
     const month = payout_month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const isBranchSafe = deduct_source === 'branch_safe';
 
     const result = await transaction(async (client) => {
       const { mainBranch } = await getMainWarehouseSafe(client);
 
-      // 1. Deduct net salary from Main Treasury (verifies sufficient balance in channel)
-      await deductFromMainTreasury(client, {
-        amount: netSalary,
-        paymentMethod: normChannel,
-        paymentBreakdown: { [normChannel]: netSalary },
-        destinationAccount: 'payroll',
-        reason: `صرف راتب شهر ${month} للموظف: ${employee.full_name}`,
-        refNumber: `PAY-${employee.id}-${month.replace('-', '')}`,
-        userId: req.user.id
-      });
+      if (isBranchSafe) {
+        if (!employee.branch_id) {
+          throw new Error('الموظف غير مرتبط بفرع تجزئة لصرف راتبه من خزينة الفرع. يرجى اختيار الخزينة الرئيسية.');
+        }
+
+        let { rows: [branchSafe] } = await client.query(
+          `SELECT * FROM branch_safes WHERE branch_id = $1 FOR UPDATE`,
+          [employee.branch_id]
+        );
+        if (!branchSafe) {
+          const { rows: [newSafe] } = await client.query(
+            `INSERT INTO branch_safes (branch_id, safe_name, cash_balance, visa_balance, transfer_balance)
+             VALUES ($1, $2, 0, 0, 0) RETURNING *`,
+            [employee.branch_id, `خزينة ${employee.branch_name || 'الفرع'}`]
+          );
+          branchSafe = newSafe;
+        }
+
+        const chanCol = `${normChannel}_balance`;
+        const prevBal = parseFloat(branchSafe[chanCol] || 0);
+        if (netSalary > prevBal + 0.01) {
+          throw new Error(
+            `رصيد ${normChannel === 'cash' ? 'الكاش' : normChannel === 'visa' ? 'الفيزا' : 'التحويل'} بخزينة فرع (${employee.branch_name || 'الفرع'}) غير كافٍ. المتاح: ${prevBal.toLocaleString()} ج.م والمطلوب: ${netSalary.toLocaleString()} ج.م`
+          );
+        }
+
+        const newBal = Math.max(0, Math.round((prevBal - netSalary) * 100) / 100);
+        await client.query(
+          `UPDATE branch_safes SET ${chanCol} = $1, updated_at = NOW() WHERE id = $2`,
+          [newBal, branchSafe.id]
+        );
+
+        // Update register balance for branch
+        await client.query(
+          `UPDATE cash_registers SET current_balance = GREATEST(0, current_balance - $1), updated_at = NOW() WHERE branch_id = $2`,
+          [netSalary, employee.branch_id]
+        );
+
+        // Record audit entry in treasury_transactions
+        const entryNum = `OUTFLOW-BR-${Date.now().toString().slice(-8)}`;
+        await client.query(
+          `INSERT INTO treasury_transactions (
+             entry_number, branch_id, safe_id, source_account, destination_account,
+             payment_method, amount, previous_safe_balance, new_safe_balance, created_by, notes, created_at
+           ) VALUES ($1, $2, $3, 'branch_safe', 'payroll', $4, $5, $6, $7, $8, $9, NOW())`,
+          [
+            entryNum,
+            employee.branch_id,
+            branchSafe.id,
+            normChannel,
+            netSalary,
+            prevBal,
+            newBal,
+            req.user.id,
+            `صرف راتب شهر ${month} للموظف: ${employee.full_name} خصماً من خزينة فرع (${employee.branch_name})`
+          ]
+        );
+      } else {
+        // 1. Deduct net salary from Main Treasury (verifies sufficient balance in channel)
+        await deductFromMainTreasury(client, {
+          amount: netSalary,
+          paymentMethod: normChannel,
+          paymentBreakdown: { [normChannel]: netSalary },
+          destinationAccount: 'payroll',
+          reason: `صرف راتب شهر ${month} للموظف: ${employee.full_name}`,
+          refNumber: `PAY-${employee.id}-${month.replace('-', '')}`,
+          userId: req.user.id
+        });
+      }
 
       // 2. Insert into expenses for Administrative Journal (اليومية الإدارية)
       const expRef = `EXP-PAY-${Date.now().toString().slice(-6)}`;
-      const expDesc = `المستلم: ${employee.full_name} — صرف راتب شهر ${month} (أساسي: ${baseSal.toLocaleString()} ج.م - سلف: ${advDeducted.toLocaleString()} ج.م - خصم: ${ded.toLocaleString()} ج.م${bns > 0 ? ` + حوافز: ${bns.toLocaleString()} ج.م` : ''})${notes ? ` | ${notes}` : ''}`;
+      const sourceLabel = isBranchSafe ? `خزينة فرع (${employee.branch_name})` : 'الخزينة الرئيسية';
+      const expDesc = `المستلم: ${employee.full_name} — صرف راتب شهر ${month} من [${sourceLabel}] (أساسي: ${baseSal.toLocaleString()} ج.م - سلف: ${advDeducted.toLocaleString()} ج.م - خصم: ${ded.toLocaleString()} ج.م${bns > 0 ? ` + حوافز: ${bns.toLocaleString()} ج.م` : ''})${notes ? ` | ${notes}` : ''}`;
 
       const [expenseRecord] = (await client.query(
         `INSERT INTO expenses (
@@ -1381,9 +1446,9 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin']), a
         `INSERT INTO payroll_payouts (
           employee_id, employee_name, branch_id, payout_month,
           base_salary, advances_deducted, deductions, deduction_reason,
-          bonus, bonus_reason, net_salary, channel, paid_by, notes, expense_id, paid_at
+          bonus, bonus_reason, net_salary, channel, paid_by, notes, expense_id, deduct_source, paid_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
         RETURNING *`,
         [
           employee.id,
@@ -1400,7 +1465,8 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin']), a
           normChannel,
           req.user.id,
           notes || null,
-          expenseRecord.id
+          expenseRecord.id,
+          isBranchSafe ? 'branch_safe' : 'main_treasury'
         ]
       )).rows;
 
@@ -1440,7 +1506,7 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin']), a
  * GET /api/swm/treasury/payroll-history
  * Returns recent payroll payouts
  */
-router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
   try {
     const { month, limit = 50 } = req.query;
     let sql = `

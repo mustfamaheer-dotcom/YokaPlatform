@@ -15,7 +15,8 @@ import {
   Tooltip,
   Empty,
   Segmented,
-  Progress
+  Progress,
+  Select
 } from 'antd';
 import {
   BarChart3,
@@ -34,7 +35,9 @@ import {
   Layers,
   ArrowLeftRight,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Building,
+  Store
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -67,8 +70,13 @@ const PAYMENT_COLORS = {
 };
 
 export default function SalesReportsPage({ currentUser }) {
-  const branchId = currentUser?.branch_id || currentUser?.branchId || 1;
-  const branchName = currentUser?.branch_name || currentUser?.branchName || 'الفرع الرئيسي';
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role) || !currentUser?.branch_id;
+  const initialBranch = currentUser?.branch_id || currentUser?.branchId
+    ? String(currentUser.branch_id || currentUser.branchId)
+    : 'all';
+
+  const [selectedBranch, setSelectedBranch] = useState(initialBranch);
+  const [branchesList, setBranchesList] = useState([]);
 
   // Global Date Filter State
   const [period, setPeriod] = useState('month'); // 'today' | 'week' | 'month' | 'custom'
@@ -78,10 +86,21 @@ export default function SalesReportsPage({ currentUser }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [topProductView, setTopProductView] = useState('chart');
 
+  const fetchBranches = async () => {
+    try {
+      const res = await api.get('/api/swm/branches');
+      if (res.data.success) {
+        setBranchesList(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load branches:', err);
+    }
+  };
+
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const params = { branch_id: branchId, period };
+      const params = { branch_id: selectedBranch, period };
       if (dateRange && dateRange[0] && dateRange[1]) {
         params.startDate = dateRange[0].format('YYYY-MM-DD');
         params.endDate = dateRange[1].format('YYYY-MM-DD');
@@ -99,8 +118,12 @@ export default function SalesReportsPage({ currentUser }) {
   };
 
   useEffect(() => {
+    fetchBranches();
+  }, []);
+
+  useEffect(() => {
     fetchDashboardData();
-  }, [branchId, period, dateRange]);
+  }, [selectedBranch, period, dateRange]);
 
   const handlePresetChange = (presetKey) => {
     setPeriod(presetKey);
@@ -149,6 +172,7 @@ export default function SalesReportsPage({ currentUser }) {
   const topSellers = salesData?.graphical_analytics?.customer_analytics?.top_sellers || [];
   const returnsItems = returns.returns_items || [];
   const expensesList = profitLoss.expenses_list || [];
+  const branchPerformance = salesData?.graphical_analytics?.branch_performance || [];
 
   // Pie chart data for payment methods
   const paymentPieData = [
@@ -316,13 +340,8 @@ export default function SalesReportsPage({ currentUser }) {
     }
   ];
 
-  return (
-    <SupervisorPageLayout
-      currentUser={currentUser}
-      pageTitle="تقارير ومبيعات الفرع الشاملة والتحليلات"
-      pageIcon={<BarChart3 size={20} />}
-      pageSubtitle="لوحة التقارير المركزية: المؤشرات المالية، تدقيق المرتجعات، دفتر المصروفات والمرتدات، والرسوم البيانية التفاعلية"
-    >
+  const pageContent = (
+    <>
       {/* ─── GLOBAL DATE FILTER BAR (CRITICAL: DRIVES ALL TABS AND SECTIONS) ─── */}
       <div
         style={{
@@ -371,6 +390,22 @@ export default function SalesReportsPage({ currentUser }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {isAdmin && (
+            <Select
+              value={selectedBranch}
+              onChange={setSelectedBranch}
+              style={{ minWidth: 220, height: 38 }}
+            >
+              <Select.Option value="all">🏢 جميع الفروع (إجمالي المنظومة)</Select.Option>
+              <Select.Option value="retail">🏬 جميع فروع التجزئة (POS)</Select.Option>
+              {branchesList.map((b) => (
+                <Select.Option key={b.id} value={String(b.id)}>
+                  {b.branch_name}
+                </Select.Option>
+              ))}
+            </Select>
+          )}
+
           <Space.Compact>
             <Button
               type={period === 'today' ? 'primary' : 'default'}
@@ -1040,6 +1075,124 @@ export default function SalesReportsPage({ currentUser }) {
                   </div>
                 )
               },
+              ...(branchPerformance.length > 1 || selectedBranch === 'all'
+                ? [
+                    {
+                      key: 'branches_comparison',
+                      label: (
+                        <span style={{ fontWeight: 700, fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <Building size={17} color="#2563eb" />
+                          مقارنة أداء الفروع (Branches Comparison)
+                          {branchPerformance.length > 0 && (
+                            <Badge count={branchPerformance.length} style={{ backgroundColor: '#2563eb', marginRight: 4 }} />
+                          )}
+                        </span>
+                      ),
+                      children: (
+                        <div>
+                          <div
+                            style={{
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: 12,
+                              padding: '16px 20px',
+                              marginBottom: 18,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: 12
+                            }}
+                          >
+                            <div>
+                              <Title level={5} style={{ margin: 0, color: '#1e40af', fontWeight: 800 }}>
+                                جدول المقارنة الشاملة بين فروع المنظومة
+                              </Title>
+                              <Text style={{ fontSize: 12.5, color: '#2563eb' }}>
+                                تحليل المبيعات المحققة، عدد الفواتير، المرتجعات، وصافي الإيراد لكل فرع
+                              </Text>
+                            </div>
+                            <Tag color="blue" style={{ fontWeight: 700, fontSize: 13, padding: '4px 10px' }}>
+                              {branchPerformance.length} فروع نشطة
+                            </Tag>
+                          </div>
+
+                          <Table
+                            size="middle"
+                            dataSource={branchPerformance}
+                            rowKey={(r) => r.branch_id || r.branch_name}
+                            pagination={false}
+                            columns={[
+                              {
+                                title: 'الترتيب',
+                                key: 'rank',
+                                width: 80,
+                                align: 'center',
+                                render: (_, __, idx) => {
+                                  const medals = ['🥇', '🥈', '🥉'];
+                                  return idx < 3 ? <span style={{ fontSize: 18 }}>{medals[idx]}</span> : <Tag>#{idx + 1}</Tag>;
+                                }
+                              },
+                              {
+                                title: 'اسم الفرع',
+                                dataIndex: 'branch_name',
+                                key: 'branch_name',
+                                render: (name) => <strong style={{ color: '#0f172a', fontSize: 14 }}>{name}</strong>
+                              },
+                              {
+                                title: 'عدد الفواتير',
+                                dataIndex: 'sales_count',
+                                key: 'sales_count',
+                                align: 'center',
+                                render: (c) => <Tag color="cyan">{c || 0} فاتورة</Tag>
+                              },
+                              {
+                                title: 'إجمالي المبيعات',
+                                dataIndex: 'gross_sales',
+                                key: 'gross_sales',
+                                align: 'left',
+                                render: (v) => <span style={{ fontWeight: 700, color: '#0f172a' }}>{(v || 0).toLocaleString()} ج.م</span>
+                              },
+                              {
+                                title: 'المرتجعات',
+                                dataIndex: 'returns',
+                                key: 'returns',
+                                align: 'left',
+                                render: (v) => <span style={{ color: '#dc2626', fontWeight: 600 }}>-{(v || 0).toLocaleString()} ج.م</span>
+                              },
+                              {
+                                title: 'صافي الإيراد',
+                                dataIndex: 'net_revenue',
+                                key: 'net_revenue',
+                                align: 'left',
+                                render: (v) => (
+                                  <strong style={{ color: '#16a34a', fontSize: 14 }}>
+                                    {(v || 0).toLocaleString()} ج.م
+                                  </strong>
+                                )
+                              },
+                              {
+                                title: 'نسبة المساهمة',
+                                key: 'share',
+                                width: 200,
+                                render: (_, r) => {
+                                  const total = metrics.gross_sales || 1;
+                                  const pct = Math.min(100, Math.round(((r.gross_sales || 0) / total) * 100));
+                                  return (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <Progress percent={pct} size="small" strokeColor="#2563eb" style={{ flex: 1, margin: 0 }} />
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', minWidth: 35 }}>{pct}%</span>
+                                    </div>
+                                  );
+                                }
+                              }
+                            ]}
+                          />
+                        </div>
+                      )
+                    }
+                  ]
+                : []),
               {
                 key: 'returns',
                 label: (
@@ -1196,6 +1349,25 @@ export default function SalesReportsPage({ currentUser }) {
           />
         </div>
       </Spin>
+    </>
+  );
+
+  if (isAdmin) {
+    return (
+      <div style={{ padding: '8px 0', minHeight: '100%', direction: 'rtl' }}>
+        {pageContent}
+      </div>
+    );
+  }
+
+  return (
+    <SupervisorPageLayout
+      currentUser={currentUser}
+      pageTitle="تقارير ومبيعات الفرع الشاملة والتحليلات"
+      pageIcon={<BarChart3 size={20} />}
+      pageSubtitle="لوحة التقارير المركزية: المؤشرات المالية، تدقيق المرتجعات، دفتر المصروفات والمرتدات، والرسوم البيانية التفاعلية"
+    >
+      {pageContent}
     </SupervisorPageLayout>
   );
 }

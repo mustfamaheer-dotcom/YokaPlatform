@@ -7,7 +7,7 @@ const { requireAuth, requireRole } = require('../../shared/authMiddleware');
  * Strategic telemetry report on visitor behavior, geographic distribution (cities),
  * conversion funnel, and real-time live presence.
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'salesperson', 'cashier', 'branch_account']), async (req, res) => {
   try {
     const { days, startDate, endDate } = req.query;
 

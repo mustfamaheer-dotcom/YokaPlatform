@@ -1504,8 +1504,13 @@ router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) =
     const targetDate = date ? date : new Date().toISOString().split('T')[0];
 
     // Build filter for sales & return invoices
-    let invWhere = `si.branch_id = $1 AND DATE(si.invoice_date) = $2 AND si.status IN ('completed', 'returned')`;
-    const invParams = [branchId, targetDate];
+    let invWhere = `DATE(si.invoice_date) = $1 AND si.status IN ('completed', 'returned')`;
+    const invParams = [targetDate];
+
+    if (branchId && branchId !== 'all') {
+      invWhere += ` AND si.branch_id = $${invParams.length + 1}`;
+      invParams.push(parseInt(branchId, 10));
+    }
 
     if (salesperson_id) {
       invWhere += ` AND si.salesperson_id = $${invParams.length + 1}`;
@@ -1527,8 +1532,13 @@ router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) =
     const returnInvoices = allInvoices.filter(i => i.status === 'returned');
 
     // Build filter for expenses
-    let expWhere = `e.branch_id = $1 AND DATE(e.expense_date) = $2 AND e.status = 'approved'`;
-    const expParams = [branchId, targetDate];
+    let expWhere = `DATE(e.expense_date) = $1 AND e.status = 'approved'`;
+    const expParams = [targetDate];
+
+    if (branchId && branchId !== 'all') {
+      expWhere += ` AND e.branch_id = $${expParams.length + 1}`;
+      expParams.push(parseInt(branchId, 10));
+    }
 
     if (salesperson_id) {
       expWhere += ` AND e.recorded_by = $${expParams.length + 1}`;
@@ -1648,8 +1658,12 @@ router.get('/shift/summary', requireAuth, requireBranchScope, async (req, res) =
     const netTransfers = Math.round((transferSales - transferReturns - netTransferExpenses) * 100) / 100;
 
     // Get register opening & current balance
-    const register = await getOrCreateBranchRegister(branchId);
-    const openingBalance = Math.round(parseFloat(register.opening_balance || 0) * 100) / 100;
+    let register = { register_code: 'ALL', register_name: 'جميع الفروع', current_balance: 0 };
+    let openingBalance = 0;
+    if (branchId && branchId !== 'all') {
+      register = await getOrCreateBranchRegister(parseInt(branchId, 10));
+      openingBalance = Math.round(parseFloat(register.opening_balance || 0) * 100) / 100;
+    }
 
     // Physical Drawer Cash = Opening Cash Float + Net Cash generated during shift
     const expectedDrawerCash = Math.round((openingBalance + netCash) * 100) / 100;

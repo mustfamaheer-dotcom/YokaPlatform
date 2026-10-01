@@ -14,7 +14,6 @@ import {
   BarChart3,
   FileSpreadsheet,
   BookOpenCheck,
-  CalendarCheck,
   Store,
   Users
 } from 'lucide-react';
@@ -112,9 +111,9 @@ export const NAVIGATION_CATEGORIES = [
   {
     id: 'finance',
     title: 'المالية والخزائن',
-    subtitle: 'إدارة الخزينة المركزية، حركة النقدية والسيولة والتحويلات',
+    subtitle: 'إدارة الخزينة المركزية، حركة النقدية والسيولة، وتسوية الرواتب والمصروفات',
     icon: <Wallet />,
-    badge: 'الخزينة',
+    badge: 'قسمان',
     children: [
       {
         id: 'treasury_admin',
@@ -122,29 +121,29 @@ export const NAVIGATION_CATEGORIES = [
         subtitle: 'حركة السيولة المركزية، التحويلات البنكية، وتصفير الخزائن',
         icon: <Landmark />,
         badge: 'المركزية'
+      },
+      {
+        id: 'payroll_expenses',
+        title: 'مسير الرواتب وبنود المصروفات',
+        subtitle: 'تسوية مرتبات وعمولات البائعين، السلف والخصومات، وإدارة بنود مصروفات الفروع',
+        icon: <Wallet />,
+        badge: 'الرواتب'
       }
     ]
   },
   {
     id: 'analytics',
     title: 'التحليلات والتقارير الرقابية',
-    subtitle: 'تقارير المبيعات الشاملة، يومية الفروع، واليوميات الإدارية',
+    subtitle: 'تحليلات المبيعات المركزية، يومية الفروع، واليوميات الإدارية',
     icon: <BarChart3 />,
-    badge: '5 تقارير',
+    badge: '3 تقارير',
     children: [
       {
         id: 'sales_reports',
-        title: 'تقارير ومبيعات الفرع الشاملة',
-        subtitle: 'صافي الإيرادات، أداء البائعين، تدقيق المرتجعات، وتفاصيل الفواتير',
+        title: 'تحليلات المبيعات والإيرادات المركزية',
+        subtitle: 'الرسوم البيانية، مقارنة أداء الفروع، تقييم البائعين، وسجل المرتجعات',
         icon: <BarChart3 />,
         badge: 'المبيعات'
-      },
-      {
-        id: 'retail_analytics',
-        title: 'إحصائيات المبيعات والأداء',
-        subtitle: 'الرسوم البيانية التفاعلية، معدلات النمو، ومتوسط الفاتورة',
-        icon: <TrendingUp />,
-        badge: 'الرسوم'
       },
       {
         id: 'branches_daily',
@@ -156,16 +155,9 @@ export const NAVIGATION_CATEGORIES = [
       {
         id: 'admin_journals',
         title: 'اليوميات الإدارية والرقابة',
-        subtitle: 'سجلات التدقيق الإداري والمراجعة المحاسبية للعمليات',
+        subtitle: 'سجلات التدقيق الإداري، دفتر المصروفات، والعمليات المخزنية',
         icon: <BookOpenCheck />,
         badge: 'اليوميات'
-      },
-      {
-        id: 'daily_shift',
-        title: 'تقفيل الورديات والأرشيف',
-        subtitle: 'مراجعة إغلاقات الورديات اليومية للكاشير وأرصدة العجز والزيادة',
-        icon: <CalendarCheck />,
-        badge: 'الورديات'
       }
     ]
   },
@@ -174,7 +166,7 @@ export const NAVIGATION_CATEGORIES = [
     title: 'إدارة النظام والفروع',
     subtitle: 'هيكل الفروع والمستودعات، حسابات المستخدمين، وتعيين الصلاحيات',
     icon: <Store />,
-    badge: 'قسمين',
+    badge: 'قسمان',
     children: [
       {
         id: 'branches',

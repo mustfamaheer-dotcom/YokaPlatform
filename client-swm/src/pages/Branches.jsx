@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, message, Card, Popconfirm, Divider, Tooltip, Alert } from 'antd';
 import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import api from '../api';
-import SellerPayrollAndExpenseCategoriesCards from '../components/SellerPayrollAndExpenseCategoriesCards';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -281,11 +280,6 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
             إضافة فرع / مخزن
           </Button>
         </Space>
-      </div>
-
-      {/* ─── CARDS: SELLER PAYROLL & EXPENSE CATEGORIES ─────────────────────────── */}
-      <div style={{ marginBottom: 28 }}>
-        <SellerPayrollAndExpenseCategoriesCards currentUser={currentUser} />
       </div>
 
       <Table

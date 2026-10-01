@@ -40,6 +40,8 @@ import {
   UserOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
   PlusOutlined,
   RiseOutlined,
   FallOutlined,
@@ -81,8 +83,8 @@ export default function AdminJournals() {
     dayjs()
   ]);
 
-  // Active Main Tab: 'expenses' | 'operations' | 'profitability'
-  const [activeMainTab, setActiveMainTab] = useState('expenses');
+  // Active Hub Section: null (Hub showing 4 cards) | 'expenses' | 'branch_inflows' | 'admin_operations' | 'profitability'
+  const [activeSection, setActiveSection] = useState(null);
 
   // Expenses Tab: Category filter dropdown ('all' | 'payroll' | 'utility_bill' | 'other')
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('all');
@@ -948,21 +950,6 @@ export default function AdminJournals() {
           <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchData}>
             تحديث البيانات
           </Button>
-          <Button
-            icon={<PlusOutlined />}
-            onClick={() => setExpenseDrawerOpen(true)}
-            style={{ borderColor: '#ea580c', color: '#ea580c' }}
-          >
-            إضافة مصروف إداري
-          </Button>
-          <Button
-            type="primary"
-            icon={<PrinterOutlined />}
-            onClick={() => setPrintModalOpen(true)}
-            style={{ backgroundColor: '#0f766e' }}
-          >
-            طباعة تقرير اليومية الشامل (A4)
-          </Button>
         </Space>
       </div>
 
@@ -1027,114 +1014,538 @@ export default function AdminJournals() {
         </Row>
       </Card>
 
-      {/* 3. Top High-Level Executive Financial KPI Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        {/* Net Profit Card */}
-        <Col xs={24} sm={12} lg={6}>
-          <Card
-            variant="borderless"
+      {/* ======================================================== */}
+      {/* 3. Three Main Hub Navigation Cards (Default View)         */}
+      {/* ======================================================== */}
+      {activeSection === null ? (
+        <div style={{ marginBottom: 32 }}>
+          {/* Header Notice / Prompt */}
+          <div
             style={{
+              marginBottom: 18,
+              padding: '12px 18px',
+              backgroundColor: '#fff',
               borderRadius: 12,
-              backgroundColor: profitability.netProfit >= 0 ? '#ecfdf5' : '#fef2f2',
-              border: `1.5px solid ${profitability.netProfit >= 0 ? '#10b981' : '#ef4444'}`
+              border: '1px solid #fecaca',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.05)'
             }}
           >
-            <Statistic
-              title={
-                <Space>
-                  {profitability.netProfit >= 0 ? (
-                    <RiseOutlined style={{ color: '#059669', fontSize: 16 }} />
-                  ) : (
-                    <FallOutlined style={{ color: '#dc2626', fontSize: 16 }} />
-                  )}
-                  <Text strong style={{ color: profitability.netProfit >= 0 ? '#065f46' : '#991b1b', fontSize: 13 }}>
-                    صافي الربح (المكسب الفعلي)
-                  </Text>
-                </Space>
-              }
-              value={profitability.netProfit}
-              precision={2}
-              suffix="ج.م"
-              valueStyle={{
-                color: profitability.netProfit >= 0 ? '#047857' : '#b91c1c',
-                fontWeight: 800,
-                fontSize: 24
+            <Space size="middle">
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18
+                }}
+              >
+                <AuditOutlined />
+              </div>
+              <div>
+                <Text strong style={{ fontSize: 15, color: '#1e293b' }}>
+                  أقسام اليوميات الإدارية والرقابة العامة
+                </Text>
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  اختر أحد الأقسام التالية للاطلاع على التفاصيل الكاملة، الجداول، والعمليات الرقابية.
+                </div>
+              </div>
+            </Space>
+
+            <Tag color="error" style={{ borderRadius: 12, fontWeight: 700, padding: '3px 10px' }}>
+              4 أقسام رئيسية
+            </Tag>
+          </div>
+
+          <Row gutter={[16, 16]}>
+            {/* Card A: أ. المصروفات وقبض الموظفين */}
+            <Col xs={24} sm={12} lg={6}>
+              <div
+                onClick={() => setActiveSection('expenses')}
+                style={{
+                  cursor: 'pointer',
+                  borderRadius: 16,
+                  padding: '20px 18px 16px 18px',
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #ef4444',
+                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.12)',
+                  transition: 'all 0.25s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 280,
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(239, 68, 68, 0.22)';
+                  e.currentTarget.style.borderColor = '#dc2626';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(239, 68, 68, 0.12)';
+                  e.currentTarget.style.borderColor = '#ef4444';
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 12,
+                          backgroundColor: '#fee2e2',
+                          color: '#dc2626',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 20
+                        }}
+                      >
+                        <WalletOutlined />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>
+                          أ. المصروفات وقبض الموظفين
+                        </div>
+                        <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 1 }}>
+                          سندات الصرف وفواتير الخدمات
+                        </div>
+                      </div>
+                    </div>
+
+                    <Tag color="volcano" style={{ borderRadius: 12, fontWeight: 700, margin: 0 }}>
+                      {expenses.summary?.count || 0} سند
+                    </Tag>
+                  </div>
+
+                  <Paragraph style={{ color: '#475569', fontSize: 12, minHeight: 36, lineHeight: 1.5, marginBottom: 12 }}>
+                    سندات الصرف، كشف تفصيلي لقبض الموظفين ومسحوباتهم لكل فرع، مع إمكانية إضافة سند وطباعة الكشوفات.
+                  </Paragraph>
+
+                  {/* Simple KPI block */}
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      backgroundColor: '#fff7ed',
+                      border: '1px solid #fed7aa',
+                      marginBottom: 14
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                      <span style={{ fontSize: 11.5, color: '#9a3412', fontWeight: 600 }}>إجمالي المصروف:</span>
+                      <strong style={{ fontSize: 16, color: '#c2410c', fontWeight: 800 }}>
+                        {(expenses.summary?.totalExpenses || 0).toLocaleString()} ج.م
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#7c2d12', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>منها رواتب:</span>
+                      <strong>{(expenses.summary?.totalPayroll || 0).toLocaleString()} ج.م</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation CTA Bar */}
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    backgroundColor: '#fee2e2',
+                    color: '#991b1b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontWeight: 700,
+                    fontSize: 12.5
+                  }}
+                >
+                  <span>عرض تفاصيل المصروفات والرواتب</span>
+                  <ArrowLeftOutlined style={{ fontSize: 14 }} />
+                </div>
+              </div>
+            </Col>
+
+            {/* Card B: ب. صافي الوارد وتوريدات الفروع */}
+            <Col xs={24} sm={12} lg={6}>
+              <div
+                onClick={() => setActiveSection('branch_inflows')}
+                style={{
+                  cursor: 'pointer',
+                  borderRadius: 16,
+                  padding: '20px 18px 16px 18px',
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #ef4444',
+                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.12)',
+                  transition: 'all 0.25s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 280,
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(239, 68, 68, 0.22)';
+                  e.currentTarget.style.borderColor = '#dc2626';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(239, 68, 68, 0.12)';
+                  e.currentTarget.style.borderColor = '#ef4444';
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 12,
+                          backgroundColor: '#e0f2fe',
+                          color: '#0284c7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 20
+                        }}
+                      >
+                        <BankOutlined />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>
+                          ب. صافي الوارد وتوريدات الفروع
+                        </div>
+                        <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 1 }}>
+                          كاش، فيزا، ومحافظ الفروع
+                        </div>
+                      </div>
+                    </div>
+
+                    <Tag color="cyan" style={{ borderRadius: 12, fontWeight: 700, margin: 0 }}>
+                      توريدات الفروع
+                    </Tag>
+                  </div>
+
+                  <Paragraph style={{ color: '#475569', fontSize: 12, minHeight: 36, lineHeight: 1.5, marginBottom: 12 }}>
+                    كشف صافي المبالغ الموردة من كل فرع بعد خصم مصاريفه، مع تفصيل كامل للنقدية والفيزا والتسويات اليومية.
+                  </Paragraph>
+
+                  {/* Simple KPI block */}
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      backgroundColor: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      marginBottom: 14
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                      <span style={{ fontSize: 11.5, color: '#0369a1', fontWeight: 600 }}>صافي الوارد:</span>
+                      <strong style={{ fontSize: 16, color: '#0284c7', fontWeight: 800 }}>
+                        {(operations.summary?.netBranchInflow || 0).toLocaleString()} ج.م
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#075985', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>كاش: {(operations.summary?.netCash || 0).toLocaleString()}</span>
+                      <span>فيزا: {(operations.summary?.totalCardSales || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation CTA Bar */}
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    backgroundColor: '#fee2e2',
+                    color: '#991b1b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontWeight: 700,
+                    fontSize: 12.5
+                  }}
+                >
+                  <span>عرض كشف توريدات الفروع</span>
+                  <ArrowLeftOutlined style={{ fontSize: 14 }} />
+                </div>
+              </div>
+            </Col>
+
+            {/* Card C: ج. العمليات الإدارية والرقابة الشاملة */}
+            <Col xs={24} sm={12} lg={6}>
+              <div
+                onClick={() => setActiveSection('admin_operations')}
+                style={{
+                  cursor: 'pointer',
+                  borderRadius: 16,
+                  padding: '20px 18px 16px 18px',
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #ef4444',
+                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.12)',
+                  transition: 'all 0.25s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 280,
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(239, 68, 68, 0.22)';
+                  e.currentTarget.style.borderColor = '#dc2626';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(239, 68, 68, 0.12)';
+                  e.currentTarget.style.borderColor = '#ef4444';
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 12,
+                          backgroundColor: '#e0e7ff',
+                          color: '#4338ca',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 20
+                        }}
+                      >
+                        <SwapOutlined />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>
+                          ج. العمليات الإدارية والرقابة
+                        </div>
+                        <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 1 }}>
+                          تسويات، تحويلات، وسداد موردين
+                        </div>
+                      </div>
+                    </div>
+
+                    <Tag color="blue" style={{ borderRadius: 12, fontWeight: 700, margin: 0 }}>
+                      {operations.summary?.totalAllOperationsCount || operations.allOperations?.length || 0} عملية
+                    </Tag>
+                  </div>
+
+                  <Paragraph style={{ color: '#475569', fontSize: 12, minHeight: 36, lineHeight: 1.5, marginBottom: 12 }}>
+                    متابعة تسويات المخزون (عجز/فائض)، تحويلات الخزينة، أذون نقل البضائع، ومشتريات وسداد الموردين مع الفحص.
+                  </Paragraph>
+
+                  {/* Simple KPI block */}
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      backgroundColor: '#eef2ff',
+                      border: '1px solid #c7d2fe',
+                      marginBottom: 14
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                      <span style={{ fontSize: 11.5, color: '#3730a3', fontWeight: 600 }}>إجمالي العمليات:</span>
+                      <strong style={{ fontSize: 16, color: '#4338ca', fontWeight: 800 }}>
+                        {operations.summary?.totalAllOperationsCount || operations.allOperations?.length || 0} حركة
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#312e81', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>تسويات: {operations.stockAdjustments?.length || 0}</span>
+                      <span>تحويلات خزنة: {operations.cashTransfers?.length || 0}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation CTA Bar */}
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    backgroundColor: '#fee2e2',
+                    color: '#991b1b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontWeight: 700,
+                    fontSize: 12.5
+                  }}
+                >
+                  <span>عرض سجل العمليات والرقابة</span>
+                  <ArrowLeftOutlined style={{ fontSize: 14 }} />
+                </div>
+              </div>
+            </Col>
+
+            {/* Card D: د. تقرير الأرباح والمكسب الفعلي (P&L) */}
+            <Col xs={24} sm={12} lg={6}>
+              <div
+                onClick={() => setActiveSection('profitability')}
+                style={{
+                  cursor: 'pointer',
+                  borderRadius: 16,
+                  padding: '20px 18px 16px 18px',
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #ef4444',
+                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.12)',
+                  transition: 'all 0.25s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 280,
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(239, 68, 68, 0.22)';
+                  e.currentTarget.style.borderColor = '#dc2626';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(239, 68, 68, 0.12)';
+                  e.currentTarget.style.borderColor = '#ef4444';
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 12,
+                          backgroundColor: '#d1fae5',
+                          color: '#059669',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 20
+                        }}
+                      >
+                        <FundViewOutlined />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>
+                          د. تقرير الأرباح والمكسب الفعلي (P&L)
+                        </div>
+                        <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 1 }}>
+                          قائمة الدخل وتكلفة COGS
+                        </div>
+                      </div>
+                    </div>
+
+                    <Tag color="green" style={{ borderRadius: 12, fontWeight: 700, margin: 0 }}>
+                      هامش {profitability.netMarginPct}%
+                    </Tag>
+                  </div>
+
+                  <Paragraph style={{ color: '#475569', fontSize: 12, minHeight: 36, lineHeight: 1.5, marginBottom: 12 }}>
+                    قائمة الدخل الشاملة، تحليل إجمالي المبيعات، تكلفة البضاعة المباعة COGS، وحساب صافي الربح الفعلي بعد المصاريف.
+                  </Paragraph>
+
+                  {/* Simple KPI block */}
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      backgroundColor: profitability.netProfit >= 0 ? '#ecfdf5' : '#fef2f2',
+                      border: `1px solid ${profitability.netProfit >= 0 ? '#a7f3d0' : '#fecaca'}`,
+                      marginBottom: 14
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                      <span style={{ fontSize: 11.5, color: profitability.netProfit >= 0 ? '#065f46' : '#991b1b', fontWeight: 600 }}>
+                        صافي الربح:
+                      </span>
+                      <strong style={{ fontSize: 16, color: profitability.netProfit >= 0 ? '#047857' : '#b91c1c', fontWeight: 800 }}>
+                        {(profitability.netProfit || 0).toLocaleString()} ج.م
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#065f46', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>الإيراد: {(profitability.revenue || 0).toLocaleString()}</span>
+                      <span>مجمل: {(profitability.grossProfit || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation CTA Bar */}
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    backgroundColor: '#fee2e2',
+                    color: '#991b1b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontWeight: 700,
+                    fontSize: 12.5
+                  }}
+                >
+                  <span>عرض تقرير الأرباح وقائمة الدخل</span>
+                  <ArrowLeftOutlined style={{ fontSize: 14 }} />
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 24 }}>
+          {/* Header Back Bar */}
+          <div
+            style={{
+              marginBottom: 16,
+              padding: '10px 16px',
+              backgroundColor: '#ffffff',
+              borderRadius: 12,
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)'
+            }}
+          >
+            <Button
+              type="primary"
+              icon={<ArrowRightOutlined />}
+              onClick={() => setActiveSection(null)}
+              style={{
+                fontWeight: 700,
+                borderRadius: 8,
+                backgroundColor: '#0f172a',
+                borderColor: '#0f172a',
+                height: 38,
+                padding: '0 18px'
               }}
-            />
-            <div style={{ marginTop: 4, fontSize: 11, color: profitability.netProfit >= 0 ? '#047857' : '#b91c1c' }}>
-              هامش صافي الربح: <strong>{profitability.netMarginPct}%</strong> (بعد خصم كافة مصاريف التشغيل)
-            </div>
-          </Card>
-        </Col>
+            >
+              العودة للأقسام الرئيسية (اليوميات والرقابة)
+            </Button>
+          </div>
 
-        {/* Total Revenues */}
-        <Col xs={24} sm={12} lg={6}>
           <Card
-            variant="borderless"
-            style={{ borderRadius: 12, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}
+            style={{ borderRadius: 12 }}
+            styles={{ body: { padding: '16px 20px 20px 20px' } }}
           >
-            <Statistic
-              title={<Text strong style={{ color: '#1e40af' }}>💵 إجمالي الإيرادات (المبيعات)</Text>}
-              value={profitability.revenue}
-              precision={2}
-              suffix="ج.م"
-              valueStyle={{ color: '#1d4ed8', fontWeight: 800, fontSize: 24 }}
-            />
-            <div style={{ marginTop: 4, fontSize: 11, color: '#1e40af' }}>
-              تكلفة البضاعة المباعة (COGS): <strong>{profitability.cogs?.toLocaleString()} ج.م</strong>
-            </div>
-          </Card>
-        </Col>
-
-        {/* Total Operating Expenses */}
-        <Col xs={24} sm={12} lg={6}>
-          <Card
-            variant="borderless"
-            style={{ borderRadius: 12, backgroundColor: '#fff7ed', border: '1px solid #fed7aa' }}
-          >
-            <Statistic
-              title={<Text strong style={{ color: '#9a3412' }}>📉 إجمالي مصاريف التشغيل</Text>}
-              value={profitability.operatingExpenses}
-              precision={2}
-              suffix="ج.م"
-              valueStyle={{ color: '#c2410c', fontWeight: 800, fontSize: 24 }}
-            />
-            <div style={{ marginTop: 4, fontSize: 11, color: '#9a3412' }}>
-              منها قبض موظفين: <strong>{expenses.summary?.totalPayroll?.toLocaleString()} ج.م</strong>
-            </div>
-          </Card>
-        </Col>
-
-        {/* Net Branch Inflow */}
-        <Col xs={24} sm={12} lg={6}>
-          <Card
-            variant="borderless"
-            style={{ borderRadius: 12, backgroundColor: '#faf5ff', border: '1px solid #e9d5ff' }}
-          >
-            <Statistic
-              title={<Text strong style={{ color: '#6b21a8' }}>🏦 صافي الوارد من الفروع</Text>}
-              value={operations.summary?.netBranchInflow || 0}
-              precision={2}
-              suffix="ج.م"
-              valueStyle={{ color: '#7e22ce', fontWeight: 800, fontSize: 24 }}
-            />
-            <div style={{ marginTop: 4, fontSize: 11, color: '#6b21a8' }}>
-              كاش: {operations.summary?.netCash?.toLocaleString()} | فيزا: {operations.summary?.totalCardSales?.toLocaleString()}
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 4. Main Tabbed Sections */}
-      <Card
-        style={{ borderRadius: 12 }}
-        styles={{ body: { padding: '16px 20px 20px 20px' } }}
-      >
-        <Tabs
-          activeKey={activeMainTab}
-          onChange={(k) => setActiveMainTab(k)}
-          size="large"
-          items={[
+            <Tabs
+              activeKey={activeSection}
+              onChange={(k) => setActiveSection(k)}
+              renderTabBar={() => null}
+              size="large"
+              items={[
             {
               key: 'expenses',
               label: (
@@ -1169,6 +1580,22 @@ export default function AdminJournals() {
                       <Tag color="volcano" style={{ fontSize: 13, padding: '4px 10px' }}>
                         إجمالي المصروفات في النطاق: <strong>{expenses.summary?.totalExpenses?.toLocaleString()} ج.م</strong>
                       </Tag>
+                      <Button
+                        type="primary"
+                        danger
+                        icon={<PlusOutlined />}
+                        onClick={() => setExpenseDrawerOpen(true)}
+                        style={{ borderRadius: 8, fontWeight: 700 }}
+                      >
+                        + إضافة مصروف إداري
+                      </Button>
+                      <Button
+                        icon={<PrinterOutlined />}
+                        onClick={() => setPrintModalOpen(true)}
+                        style={{ borderRadius: 8, borderColor: '#0f766e', color: '#0f766e', fontWeight: 600 }}
+                      >
+                        طباعة تقرير اليومية (A4)
+                      </Button>
                     </Space>
                   </div>
 
@@ -1224,11 +1651,11 @@ export default function AdminJournals() {
               )
             },
             {
-              key: 'operations',
+              key: 'branch_inflows',
               label: (
                 <Space>
-                  <SwapOutlined style={{ color: '#0284c7', fontSize: 16 }} />
-                  <span style={{ fontWeight: 700 }}>ب. العمليات الإدارية وصافي الوارد من الفروع</span>
+                  <BankOutlined style={{ color: '#0284c7', fontSize: 16 }} />
+                  <span style={{ fontWeight: 700 }}>ب. صافي الوارد وتوريدات الفروع</span>
                 </Space>
               ),
               children: (
@@ -1297,7 +1724,19 @@ export default function AdminJournals() {
                       size="small"
                     />
                   </Card>
-
+                </div>
+              )
+            },
+            {
+              key: 'admin_operations',
+              label: (
+                <Space>
+                  <SwapOutlined style={{ color: '#4f46e5', fontSize: 16 }} />
+                  <span style={{ fontWeight: 700 }}>ج. العمليات الإدارية والرقابة الشاملة</span>
+                </Space>
+              ),
+              children: (
+                <div>
                   {/* Operations Quick Summary KPI Cards */}
                   <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
                     <Col xs={12} sm={8} lg={4}>
@@ -1463,7 +1902,7 @@ export default function AdminJournals() {
               label: (
                 <Space>
                   <FundViewOutlined style={{ color: '#16a34a', fontSize: 16 }} />
-                  <span style={{ fontWeight: 700 }}>ج. تقرير الأرباح والمكسب الفعلي (P&L)</span>
+                  <span style={{ fontWeight: 700 }}>د. تقرير الأرباح والمكسب الفعلي (P&L)</span>
                 </Space>
               ),
               children: (
@@ -1630,6 +2069,8 @@ export default function AdminJournals() {
           ]}
         />
       </Card>
+    </div>
+  )}
 
       {/* 5. Create Administrative Expense Drawer */}
       <Drawer

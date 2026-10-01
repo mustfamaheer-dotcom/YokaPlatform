@@ -42,13 +42,13 @@ import UsersPage from '../Users';
 import Suppliers from '../Suppliers';
 import Purchases from '../Purchases';
 import Orders from '../Orders';
-import RetailAnalytics from '../RetailAnalytics';
 import EcomAnalytics from '../EcomAnalytics';
 import DailyShift from '../DailyShift';
 import Transfers from '../Transfers';
 import TreasuryAdmin from '../TreasuryAdmin';
 import EcomInventory from '../EcomInventory';
 import SalesReportsPage from './supervisor/SalesReportsPage';
+import SellerPayrollAndExpenseCategoriesCards from '../../components/SellerPayrollAndExpenseCategoriesCards';
 import yokaLogo from '../../assets/yokaStoreTransparent.png';
 
 const { Header, Content } = Layout;
@@ -431,14 +431,16 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             onResetAction={() => setTabExtra(null)}
           />
         )}
+        {activeTab === 'payroll_expenses' && (
+          <div style={{ padding: '4px' }}>
+            <SellerPayrollAndExpenseCategoriesCards currentUser={currentUser} />
+          </div>
+        )}
         {activeTab === 'treasury_admin' && <TreasuryAdmin />}
         {activeTab === 'branches_daily' && <BranchesDaily />}
         {activeTab === 'admin_journals' && <AdminJournals />}
-        {activeTab === 'sales_reports' && (
+        {(activeTab === 'sales_reports' || activeTab === 'retail_analytics') && (
           <SalesReportsPage currentUser={currentUser} />
-        )}
-        {activeTab === 'retail_analytics' && (
-          <RetailAnalytics currentUser={currentUser} onNavigate={handleNavigate} />
         )}
         {activeTab === 'ecom_analytics' && (
           <EcomAnalytics currentUser={currentUser} onNavigate={handleNavigate} />

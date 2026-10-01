@@ -13,7 +13,8 @@ import {
   Segmented,
   Tooltip,
   Modal,
-  Input
+  Input,
+  DatePicker
 } from 'antd';
 import { antMessage as message } from '../utils/antAppBridge';
 import {
@@ -46,7 +47,14 @@ export default function DailyShift({ currentUser }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [staff, setStaff] = useState([]);
+  const [branchesList, setBranchesList] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState(
+    currentUser?.branch_id || currentUser?.branchId ? String(currentUser?.branch_id || currentUser?.branchId) : 'all'
+  );
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   const [selectedSalesperson, setSelectedSalesperson] = useState(null);
+
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || !currentUser?.branch_id;
 
   // Table Filter: 'all' | 'sale' | 'return' | 'expense'
   const [txFilterType, setTxFilterType] = useState('all');
@@ -60,34 +68,30 @@ export default function DailyShift({ currentUser }) {
   const [shiftPrintModalVisible, setShiftPrintModalVisible] = useState(false);
   const shiftPrintRef = useRef(null);
 
-  // Fetch branch staff for filter (strictly filtered to active branch)
+  // Fetch branches list for admin filter
+  const fetchBranches = async () => {
+    try {
+      const res = await api.get('/api/swm/branches');
+      if (res.data.success) {
+        setBranchesList(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Fetch branches error:', err);
+    }
+  };
+
+  // Fetch branch staff for filter
   const fetchStaff = async () => {
     try {
-      let bId = currentUser?.branch_id || currentUser?.branchId;
-      if (!bId) {
-        try {
-          const stored = localStorage.getItem('user');
-          if (stored) {
-            const u = JSON.parse(stored);
-            bId = u?.branch_id || u?.branchId;
-          }
-        } catch (e) {}
-      }
-      if (!bId) {
-        try {
-          const sRes = await api.get('/api/swm/pos/session/current');
-          bId = sRes.data?.data?.register?.branch_id;
-        } catch (e) {}
-      }
-
+      let bId = selectedBranch !== 'all' ? selectedBranch : (currentUser?.branch_id || currentUser?.branchId);
       const params = { status: 'active' };
-      if (bId) {
+      if (bId && bId !== 'all') {
         params.branch_id = bId;
       }
       const res = await api.get('/api/swm/users', { params });
       if (res.data.success) {
         const allUsers = res.data.data || [];
-        const branchStaff = bId
+        const branchStaff = (bId && bId !== 'all')
           ? allUsers.filter((u) => Number(u.branch_id) === Number(bId))
           : allUsers;
         setStaff(branchStaff);
@@ -97,13 +101,14 @@ export default function DailyShift({ currentUser }) {
     }
   };
 
-  // Fetch shift summary for today
+  // Fetch shift summary for selected date and branch
   const fetchSummary = async () => {
     setLoading(true);
     try {
-      const todayStr = dayjs().format('YYYY-MM-DD');
+      const dateStr = selectedDate ? selectedDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
       const params = {
-        date: todayStr,
+        date: dateStr,
+        branch_id: selectedBranch,
         salesperson_id: selectedSalesperson || undefined
       };
       const res = await api.get('/api/swm/pos/shift/summary', { params });
@@ -118,12 +123,16 @@ export default function DailyShift({ currentUser }) {
   };
 
   useEffect(() => {
-    fetchStaff();
+    fetchBranches();
   }, []);
 
   useEffect(() => {
+    fetchStaff();
+  }, [selectedBranch]);
+
+  useEffect(() => {
     fetchSummary();
-  }, [selectedSalesperson]);
+  }, [selectedBranch, selectedDate, selectedSalesperson]);
 
   // View & reprint POS invoice or return receipt
   const handleViewInvoice = async (invoiceId) => {
@@ -340,24 +349,32 @@ export default function DailyShift({ currentUser }) {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Tag
-            color="blue"
-            icon={<CalendarOutlined />}
-            style={{
-              padding: '6px 14px',
-              fontSize: 13,
-              fontWeight: 600,
-              borderRadius: 8,
-              margin: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              border: '1px solid #bfdbfe'
-            }}
-          >
-            <span>وردية اليوم:</span>
-            <strong style={{ color: '#1d4ed8' }}>{dayjs().format('YYYY-MM-DD')}</strong>
-          </Tag>
+          {isAdmin && (
+            <Select
+              placeholder="الفرع"
+              value={selectedBranch}
+              onChange={(val) => {
+                setSelectedBranch(val);
+                setSelectedSalesperson(null);
+              }}
+              style={{ width: 180 }}
+            >
+              <Option value="all">🏢 جميع الفروع (إجمالي)</Option>
+              {branchesList.map((b) => (
+                <Option key={b.id} value={String(b.id)}>
+                  {b.branch_name}
+                </Option>
+              ))}
+            </Select>
+          )}
+
+          <DatePicker
+            value={selectedDate}
+            onChange={(d) => setSelectedDate(d || dayjs())}
+            format="YYYY-MM-DD"
+            allowClear={false}
+            style={{ width: 140 }}
+          />
 
           <Select
             placeholder="جميع بائعي الفرع"

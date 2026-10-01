@@ -1069,6 +1069,7 @@ export default function TreasuryAdmin() {
                     style={{ width: '100%' }}
                     size="large"
                     value={selectedEmployeeId}
+                    optionLabelProp="label"
                     onChange={(val) => {
                       setSelectedEmployeeId(val);
                       setDeductionsAmount(0);
@@ -1079,16 +1080,22 @@ export default function TreasuryAdmin() {
                       else setEmployeeSummary(null);
                     }}
                     filterOption={(input, option) => {
-                      const label = option?.children?.props?.children || '';
-                      const searchText = typeof label === 'string' ? label : option?.filterText || '';
-                      return searchText.toLowerCase().includes(input.toLowerCase());
+                      const emp = employeesList.find(e => String(e.id) === String(option?.value));
+                      if (!emp) return false;
+                      const q = (input || '').trim().toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+                      if (!q) return true;
+                      const name = (emp.full_name || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+                      const branch = (emp.branch_name || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+                      const phone = (emp.phone || '').toLowerCase();
+                      const username = (emp.username || '').toLowerCase();
+                      return name.includes(q) || branch.includes(q) || phone.includes(q) || username.includes(q);
                     }}
                   >
                     {employeesList.map(emp => (
                       <Option
                         key={emp.id}
                         value={emp.id}
-                        filterText={`${emp.full_name} ${emp.phone || ''} ${emp.branch_name || ''} ${emp.username}`}
+                        label={`${emp.full_name} (${emp.branch_name || 'الفرع الرئيسي'})`}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Space size={6}>
