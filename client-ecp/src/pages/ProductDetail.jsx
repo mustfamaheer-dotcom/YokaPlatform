@@ -14,7 +14,8 @@ import {
   CheckOutlined,
   WhatsAppOutlined,
   ShareAltOutlined,
-  CopyOutlined
+  CopyOutlined,
+  ArrowRightOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
