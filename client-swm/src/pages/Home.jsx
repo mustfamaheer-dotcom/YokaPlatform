@@ -339,6 +339,20 @@ export default function Home({ currentUser, onNavigate }) {
     fetchSafeBalances();
     fetchExpenseCategories();
     fetchPendingOrdersCount();
+
+    const handleOrdersChange = () => {
+      fetchPendingOrdersCount();
+    };
+
+    window.addEventListener('ecp-orders-updated', handleOrdersChange);
+    window.addEventListener('focus', handleOrdersChange);
+    const interval = setInterval(fetchPendingOrdersCount, 20000);
+
+    return () => {
+      window.removeEventListener('ecp-orders-updated', handleOrdersChange);
+      window.removeEventListener('focus', handleOrdersChange);
+      clearInterval(interval);
+    };
   }, []);
 
 
@@ -638,13 +652,58 @@ export default function Home({ currentUser, onNavigate }) {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onNavigate('orders'); }}
               aria-label="فتح صفحة طلبات المتجر الإلكتروني"
             >
-              <Badge count={pendingOrdersCount} color="#f5222d" offset={[-4, 4]}>
-                <div className="swm-entry-icon-wrap" style={{ background: '#ECFDF5', color: '#059669' }}>
-                  <ShoppingBag size={28} />
-                </div>
-              </Badge>
+              <div className="swm-entry-icon-wrap" style={{ background: '#ECFDF5', color: '#059669', position: 'relative' }}>
+                <ShoppingBag size={28} />
+                {pendingOrdersCount > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: -5,
+                      right: -5,
+                      background: '#EF4444',
+                      color: '#FFFFFF',
+                      borderRadius: '12px',
+                      padding: '1px 6px',
+                      fontSize: '11.5px',
+                      fontWeight: 900,
+                      minWidth: '22px',
+                      height: '22px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 8px rgba(239, 68, 68, 0.45)',
+                      border: '2px solid #FFFFFF',
+                      fontVariantNumeric: 'tabular-nums',
+                      zIndex: 3
+                    }}
+                  >
+                    {pendingOrdersCount > 99 ? '+99' : pendingOrdersCount}
+                  </span>
+                )}
+              </div>
               <div className="swm-entry-text">
-                <strong>طلبات المتجر الإلكتروني</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <strong style={{ margin: 0 }}>طلبات المتجر الإلكتروني</strong>
+                  {pendingOrdersCount > 0 && (
+                    <span
+                      style={{
+                        background: '#FEF2F2',
+                        color: '#DC2626',
+                        border: '1px solid #FECACA',
+                        fontSize: '11.5px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5
+                      }}
+                    >
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', display: 'inline-block' }}></span>
+                      <span>{pendingOrdersCount} طلب جديد</span>
+                    </span>
+                  )}
+                </div>
                 <span>استعراض وتجهيز وشحن فواتير الطلبات الواردة من المتجر</span>
               </div>
               <ArrowRight size={20} className="swm-entry-arrow" style={{ transform: 'rotate(180deg)' }} />

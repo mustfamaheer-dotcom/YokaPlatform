@@ -255,6 +255,7 @@ export default function Orders({
         message.success('تم شحن الأوردر بنجاح وتسجيل بوليصة الشحن وعدد الطرود');
         setIsShipModalOpen(false);
         fetchOrders();
+        window.dispatchEvent(new CustomEvent('ecp-orders-updated'));
         if (selectedOrder && selectedOrder.id === shippingOrderId) {
           handleOpenDetail(shippingOrderId);
         }
@@ -277,6 +278,7 @@ export default function Orders({
       if (res.data.success) {
         message.success('تم تحديث حالة الطلب بنجاح');
         fetchOrders();
+        window.dispatchEvent(new CustomEvent('ecp-orders-updated'));
         if (selectedOrder && selectedOrder.id === orderId) {
           handleOpenDetail(orderId);
         }

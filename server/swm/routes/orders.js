@@ -9,8 +9,8 @@ const { logActivity } = require('../../shared/activityLogger');
  */
 router.get('/pending-count', requireAuth, async (req, res) => {
   try {
-    const [{ total }] = await query("SELECT COUNT(id) AS total FROM ecp_orders WHERE order_status = 'pending'");
-    return res.json({ success: true, data: parseInt(total || 0, 10) });
+    const [row] = await query("SELECT COUNT(id) AS total FROM ecp_orders WHERE LOWER(order_status) IN ('processing', 'pending')");
+    return res.json({ success: true, data: parseInt(row?.total || 0, 10) });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
