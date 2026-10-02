@@ -13,22 +13,26 @@ import api from '../api';
 
 const { useBreakpoint } = Grid;
 
-export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
+export default function Navbar({ cartCount, onOpenCart, cartBounce, settings }) {
   const [searchVal, setSearchVal] = useState('');
-  const [storeSettings, setStoreSettings] = useState(null);
+  const [storeSettings, setStoreSettings] = useState(settings || null);
   const navigate = useNavigate();
   const location = useLocation();
   const screens = useBreakpoint();
 
   useEffect(() => {
-    api.get('/api/ecp/catalog/store-settings')
-      .then((res) => {
-        if (res.data?.success && res.data?.data) {
-          setStoreSettings(res.data.data);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    if (settings) {
+      setStoreSettings(settings);
+    } else {
+      api.get('/api/ecp/catalog/store-settings')
+        .then((res) => {
+          if (res.data?.success && res.data?.data) {
+            setStoreSettings(res.data.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [settings]);
 
   const isMobile = screens.xs || (screens.sm === false && screens.md === false);
   const isTablet = screens.md && !screens.lg;
@@ -68,7 +72,7 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
         style={{
           maxWidth: 1360,
           margin: '0 auto',
-          height: isMobile ? 58 : 68,
+          height: isMobile ? 54 : 68,
           padding: isMobile ? '0 12px' : '0 24px',
           display: 'flex',
           alignItems: 'center',
@@ -84,7 +88,7 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
               src={yokaLogo}
               alt="Yoka Store Logo"
               style={{
-                height: isMobile ? 34 : 44,
+                height: isMobile ? 32 : 44,
                 width: 'auto',
                 objectFit: 'contain',
                 display: 'block'
@@ -258,13 +262,13 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce }) {
             onClick={onOpenCart}
             aria-label="سلة التسوق"
             style={{
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               padding: 0,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 20,
+              borderRadius: 22,
               backgroundColor: '#F8FAFC',
               border: '1px solid #E2E8F0'
             }}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home as HomeIcon } from 'lucide-react';
-import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, message, Card, Popconfirm, Divider, Tooltip, Alert } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, App, Card, Popconfirm, Divider, Tooltip, Alert } from 'antd';
 import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import api from '../api';
 
@@ -39,6 +39,7 @@ const BRANCH_TYPE_DESCRIPTIONS = {
 };
 
 export default function Branches({ autoOpenCreate, onResetAction, currentUser }) {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(false);

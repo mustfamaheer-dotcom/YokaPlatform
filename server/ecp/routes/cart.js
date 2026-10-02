@@ -124,8 +124,24 @@ router.get('/', async (req, res) => {
  */
 router.post('/items', async (req, res) => {
   try {
-    const { product_id, variant_id = null, quantity = 1 } = req.body;
+    let { product_id, variant_id = null, quantity = 1 } = req.body;
     const addQty = Math.max(1, parseInt(quantity, 10) || 1);
+
+    // If variant_id is not specified, check if product has variants and pick first available variant with stock
+    if (!variant_id) {
+      const stockVariants = await query(
+        `SELECT pv.id, COALESCE(ib.available_qty, 0) as stock
+         FROM product_variants pv
+         LEFT JOIN inventory_balances ib ON ib.variant_id = pv.id AND ib.branch_id = $2
+         WHERE pv.product_id = $1
+         ORDER BY (COALESCE(ib.available_qty, 0) > 0) DESC, pv.id ASC
+         LIMIT 1`,
+        [product_id, ONLINE_BRANCH_ID]
+      );
+      if (stockVariants && stockVariants.length > 0) {
+        variant_id = stockVariants[0].id;
+      }
+    }
 
     // Run cart retrieval and product+stock validation in parallel
     const [cart, prodRows] = await Promise.all([

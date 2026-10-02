@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Drawer, Button, Progress, Space, Typography, Popconfirm, Empty, message, Grid } from 'antd';
+import { Drawer, Button, Progress, Space, Typography, Popconfirm, Empty, App, Grid } from 'antd';
 import {
   ShoppingCartOutlined,
   DeleteOutlined,
@@ -17,6 +17,7 @@ const { Text, Title } = Typography;
 const { useBreakpoint } = Grid;
 
 export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const screens = useBreakpoint();
   const isMobile = screens.xs || (screens.sm === false && screens.md === false);
@@ -120,7 +121,7 @@ export default function CartDrawer({ visible, onClose, cart, onRefreshCart }) {
       title={
         <div>
           {isMobile && (
-            <div style={{ width: 36, height: 4, background: '#D4B76A', borderRadius: 2, margin: '-4px auto 10px', opacity: 0.7 }} />
+            <div className="bottom-sheet-handle" />
           )}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <Space>

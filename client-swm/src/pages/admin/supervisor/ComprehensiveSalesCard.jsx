@@ -45,6 +45,7 @@ import {
 } from 'recharts';
 import dayjs from 'dayjs';
 import api from '../../../api';
+import SafeChartContainer from '../../../components/common/SafeChartContainer';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -350,60 +351,64 @@ export default function ComprehensiveSalesCard({ branchId }) {
               </div>
 
               {trends.length > 0 ? (
-                <ResponsiveContainer width="100%" height={270}>
-                  <AreaChart data={trends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorGross" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(val) => val.slice(5)}
-                      stroke="#94a3b8"
-                      fontSize={11}
-                    />
-                    <YAxis
-                      stroke="#94a3b8"
-                      fontSize={11}
-                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                    />
-                    <ChartTooltip
-                      formatter={(val, name) => [
-                        `${Number(val).toLocaleString()} ج.م`,
-                        name === 'gross_sales' ? 'إجمالي المبيعات' : name === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
-                      ]}
-                      labelFormatter={(l) => `التاريخ: ${l}`}
-                    />
-                    <Legend
-                      formatter={(val) =>
-                        val === 'gross_sales' ? 'إجمالي المبيعات' : val === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
-                      }
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="gross_sales"
-                      stroke="#4f46e5"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorGross)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="net_sales"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorNet)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <SafeChartContainer height={270}>
+                  {({ width, height }) => (
+                    <ResponsiveContainer width={width} height={height} minWidth={0}>
+                      <AreaChart data={trends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorGross" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                          </linearGradient>
+                          <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={(val) => val.slice(5)}
+                          stroke="#94a3b8"
+                          fontSize={11}
+                        />
+                        <YAxis
+                          stroke="#94a3b8"
+                          fontSize={11}
+                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                        />
+                        <ChartTooltip
+                          formatter={(val, name) => [
+                            `${Number(val).toLocaleString()} ج.م`,
+                            name === 'gross_sales' ? 'إجمالي المبيعات' : name === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
+                          ]}
+                          labelFormatter={(l) => `التاريخ: ${l}`}
+                        />
+                        <Legend
+                          formatter={(val) =>
+                            val === 'gross_sales' ? 'إجمالي المبيعات' : val === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
+                          }
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="gross_sales"
+                          stroke="#4f46e5"
+                          strokeWidth={2}
+                          fillOpacity={1}
+                          fill="url(#colorGross)"
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="net_sales"
+                          stroke="#10b981"
+                          strokeWidth={2}
+                          fillOpacity={1}
+                          fill="url(#colorNet)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </SafeChartContainer>
               ) : (
                 <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
                   لا توجد حركات مبيعات في النطاق الزمني المحدد
@@ -432,24 +437,28 @@ export default function ComprehensiveSalesCard({ branchId }) {
 
               {paymentPieData.length > 0 ? (
                 <div style={{ flex: 1, position: 'relative' }}>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={paymentPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {paymentPieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip formatter={(v) => `${Number(v).toLocaleString()} ج.م`} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <SafeChartContainer height={220}>
+                    {({ width, height }) => (
+                      <ResponsiveContainer width={width} height={height} minWidth={0}>
+                        <PieChart>
+                          <Pie
+                            data={paymentPieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {paymentPieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <ChartTooltip formatter={(v) => `${Number(v).toLocaleString()} ج.م`} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </SafeChartContainer>
 
                   {/* Legend underneath */}
                   <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: 11, marginTop: 4 }}>

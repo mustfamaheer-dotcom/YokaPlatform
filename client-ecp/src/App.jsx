@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Layout, App as AntdApp } from 'antd';
 import Navbar from './components/Navbar';
+import AnnouncementBar from './components/AnnouncementBar';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
 import Home from './pages/Home';
@@ -21,6 +22,7 @@ const { Content } = Layout;
 export default function App() {
   const { message } = AntdApp.useApp();
   const location = useLocation();
+  const [storeSettings, setStoreSettings] = useState(null);
   const [cart, setCart] = useState({ items: [], items_count: 0, subtotal: 0 });
   const [cartDrawerVisible, setCartDrawerVisible] = useState(false);
   const [cartBounce, setCartBounce] = useState(false);
@@ -32,7 +34,19 @@ export default function App() {
 
   useEffect(() => {
     fetchCart();
+    fetchStoreSettings();
   }, []);
+
+  const fetchStoreSettings = async () => {
+    try {
+      const res = await api.get('/api/ecp/catalog/store-settings');
+      if (res.data?.success && res.data?.data) {
+        setStoreSettings(res.data.data);
+      }
+    } catch (err) {
+      console.error('Store settings fetch error:', err);
+    }
+  };
 
   const fetchCart = async () => {
     try {
@@ -140,21 +154,23 @@ export default function App() {
   return (
     <Layout style={{ minHeight: '100vh', background: 'var(--bg-color)' }}>
       <ScrollToTop />
+      <AnnouncementBar settings={storeSettings} />
       <Navbar
         cartCount={cart?.items_count || 0}
         onOpenCart={() => setCartDrawerVisible(true)}
         cartBounce={cartBounce}
+        settings={storeSettings}
       />
 
       <Content className="page-content" style={{ maxWidth: 1280, width: '100%', margin: '16px auto', flex: 1 }}>
         <Routes>
-          <Route path="/" element={<Home onAddToCart={handleAddToCart} />} />
+          <Route path="/" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
           <Route path="/catalog" element={<Catalog onAddToCart={handleAddToCart} />} />
           <Route path="/product/:slug" element={<ProductDetail onAddToCart={handleAddToCart} />} />
           <Route path="/checkout" element={<Checkout cart={cart} onRefreshCart={fetchCart} />} />
           <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="*" element={<Home onAddToCart={handleAddToCart} />} />
+          <Route path="*" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
         </Routes>
       </Content>
 
@@ -165,12 +181,14 @@ export default function App() {
         onRefreshCart={fetchCart}
       />
 
-      <Footer />
-      <MobileBottomNav
-        cartCount={cart?.items_count || 0}
-        onOpenCart={() => setCartDrawerVisible(true)}
-        cartBounce={cartBounce}
-      />
+      <Footer settings={storeSettings} />
+      {(!location.pathname.startsWith('/product/') && location.pathname !== '/checkout') && (
+        <MobileBottomNav
+          cartCount={cart?.items_count || 0}
+          onOpenCart={() => setCartDrawerVisible(true)}
+          cartBounce={cartBounce}
+        />
+      )}
 
       {/* Lightweight Floating Add Confirmation (removed after 1.1s) */}
       {feedbackPos && (

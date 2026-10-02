@@ -32,12 +32,19 @@
   --success: #16A34A;
   --danger: #DC2626;
   --info: #0284C7;
+
+  /* Mobile Safe Area Insets (iOS Notches & Home Indicator) */
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sat: env(safe-area-inset-top, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -47,6 +54,11 @@ body {
   direction: rtl;
   text-align: right;
   -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+
+button, a, input, select, textarea {
+  touch-action: manipulation;
 }
 
 a {
@@ -226,22 +238,254 @@ a {
 
 /* Hero Typography Fluid Scaling */
 .hero-title {
-  font-size: clamp(1.8rem, 4.5vw, 2.6rem) !important;
+  font-size: clamp(1.4rem, 4vw, 2.5rem) !important;
   line-height: 1.25 !important;
 }
 
 .hero-subtitle {
-  font-size: clamp(13px, 2vw, 16px) !important;
+  font-size: clamp(12.5px, 1.8vw, 15px) !important;
 }
 
-/* Modern 3D Floating Bag in Hero */
+/* Hero Modern Responsive Grid Layout */
+.hero-main-layout {
+  display: grid;
+  grid-template-columns: 1.25fr 0.85fr;
+  grid-template-areas:
+    "header bag"
+    "cta    bag"
+    "stats  bag";
+  align-items: center;
+  gap: 16px 40px;
+  position: relative;
+  z-index: 2;
+}
+
+.hero-header-area {
+  grid-area: header;
+  text-align: right;
+  position: relative;
+  z-index: 2;
+}
+
 .hero-3d-wrapper {
+  grid-area: bag;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   perspective: 1200px;
   transform-style: preserve-3d;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 320px;
+  max-height: 280px;
+}
+
+.hero-cta-group {
+  grid-area: cta;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.hero-cta-link {
+  flex: 1 1 0;
+  min-width: 0;
+  display: block;
+}
+
+.hero-btn-primary,
+.hero-btn-secondary {
+  width: 100% !important;
+  height: 48px !important;
+  border-radius: 24px !important;
+  font-weight: 800 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 16px !important;
+  transition: all 0.25s ease !important;
+}
+
+.hero-btn-primary {
+  background-color: #C8A45C !important;
+  color: #0F172A !important;
+  border: none !important;
+  box-shadow: 0 6px 20px rgba(200, 164, 92, 0.38) !important;
+}
+
+.hero-btn-primary:hover {
+  background-color: #DFCA95 !important;
+  box-shadow: 0 8px 24px rgba(200, 164, 92, 0.5) !important;
+  transform: translateY(-1px);
+}
+
+.hero-btn-secondary {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.hero-btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+}
+
+.hero-btn-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Floating Trust Statistics Bar */
+.hero-stats-bar {
+  grid-area: stats;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 8px;
+}
+
+.hero-stat-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
+.hero-stat-num {
+  color: #C8A45C;
+  font-weight: 900;
+  font-size: 14.5px;
+  direction: ltr;
+  display: inline-block;
+}
+
+.hero-stat-label {
+  color: #94A3B8;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hero-stat-rating {
+  color: #CBD5E1;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hero-stat-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+/* Mobile Responsiveness for Hero Card */
+@media (max-width: 768px) {
+  .hero-main-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "bag"
+      "cta"
+      "stats";
+    gap: 12px;
+    text-align: right;
+  }
+
+  .hero-title {
+    font-size: clamp(1.3rem, 5vw, 1.85rem) !important;
+    line-height: 1.3 !important;
+    margin-bottom: 8px !important;
+  }
+
+  .hero-subtitle {
+    font-size: 12.5px !important;
+    margin-bottom: 10px !important;
+    max-width: 100% !important;
+  }
+
+  .hero-3d-wrapper {
+    max-height: 200px !important;
+    max-width: 240px !important;
+    margin: 4px auto 8px auto !important;
+  }
+
+  .hero-3d-backlight {
+    width: 170px !important;
+    height: 170px !important;
+  }
+
+  .hero-pedestal-shadow {
+    width: 65% !important;
+    height: 18px !important;
+    bottom: 2px !important;
+  }
+
+  .hero-3d-bag {
+    max-height: 190px !important;
+  }
+
+  .hero-cta-group {
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .hero-btn-primary,
+  .hero-btn-secondary {
+    height: 42px !important;
+    font-size: 13px !important;
+    border-radius: 21px !important;
+    padding: 0 8px !important;
+  }
+
+  .hero-stats-bar {
+    margin-top: 8px;
+    padding-top: 10px;
+    gap: 4px;
+  }
+
+  .hero-stat-item {
+    gap: 4px;
+  }
+
+  .hero-stat-num {
+    font-size: 12.5px;
+  }
+
+  .hero-stat-label,
+  .hero-stat-rating {
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 360px) {
+  .hero-btn-primary,
+  .hero-btn-secondary {
+    font-size: 12px !important;
+    height: 40px !important;
+  }
+  .hero-stat-label,
+  .hero-stat-rating {
+    font-size: 9.5px;
+  }
+  .hero-stat-num {
+    font-size: 11.5px;
+  }
 }
 
 /* Luxury Backlight Halo behind 3D Product */
@@ -356,12 +600,12 @@ a {
 /* Sticky Product CTA bar for Mobile (<768px) */
 .sticky-cta-bar {
   position: fixed;
-  bottom: 64px; /* sits right above mobile bottom nav */
+  bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.98);
   border-top: 1px solid #E2E8F0;
-  padding: 10px 16px;
+  padding: 10px 16px calc(10px + var(--sab));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -389,9 +633,22 @@ a {
 
 /* Mobile-first responsive utilities */
 @media (max-width: 768px) {
-  body { padding-bottom: 64px; } /* space for bottom nav */
+  body { 
+    padding-bottom: calc(68px + var(--sab)) !important; 
+  }
   .desktop-only { display: none !important; }
-  .announcement-bar { display: none; }
+
+  /* Eliminate iOS Safari form auto-zoom on touch */
+  input, select, textarea,
+  .ant-input, .ant-input-affix-wrapper,
+  .ant-select-selector, .ant-select-selection-search-input {
+    font-size: 16px !important;
+  }
+
+  /* Tactile feedback for mobile touch */
+  .btn-touch:active {
+    transform: scale(0.97);
+  }
 }
 
 @media (min-width: 769px) {
@@ -411,17 +668,17 @@ a {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  height: calc(62px + var(--sab));
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid #E2E8F0;
-  box-shadow: 0 -2px 14px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 -3px 16px rgba(15, 23, 42, 0.07);
   display: flex;
   align-items: center;
   justify-content: space-around;
   z-index: 1001;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--sab);
 }
 
 .mobile-bottom-nav a,
@@ -432,20 +689,41 @@ a {
   justify-content: center;
   color: var(--slate-500);
   font-size: 11px;
-  gap: 4px;
+  font-weight: 600;
+  gap: 3px;
   flex: 1;
+  height: 100%;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 8px 0;
+  padding: 6px 0 0;
   text-decoration: none;
-  transition: color 0.2s;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mobile-bottom-nav a:active,
+.mobile-bottom-nav button.bottom-nav-btn:active {
+  transform: scale(0.94);
 }
 
 .mobile-bottom-nav a.active,
 .mobile-bottom-nav button.bottom-nav-btn:active {
-  color: var(--navy);
+  color: #C8A45C;
   font-weight: 800;
+}
+
+.mobile-bottom-nav a.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 22px;
+  height: 3px;
+  background: #C8A45C;
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 2px 6px rgba(200, 164, 92, 0.4);
 }
 
 .mobile-bottom-nav a svg,
@@ -503,6 +781,44 @@ a {
   .add-to-cart-feedback {
     animation: none !important;
   }
+}
+
+/* Bottom Sheet Drag Handle Indicator */
+.bottom-sheet-handle {
+  width: 44px;
+  height: 4.5px;
+  background: #CBD5E1;
+  border-radius: 4px;
+  margin: -4px auto 14px;
+  transition: background 0.2s;
+}
+
+/* Mobile Floating Filter Pill in Catalog */
+.mobile-floating-filter-pill {
+  position: fixed;
+  bottom: calc(72px + var(--sab));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  background: #0F172A;
+  color: #FFFFFF;
+  border: 1px solid #C8A45C;
+  border-radius: 28px;
+  padding: 8px 18px;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeIn 0.3s ease-out;
+  white-space: nowrap;
+}
+
+.mobile-floating-filter-pill:active {
+  transform: translateX(-50%) scale(0.96);
 }
 
 /* ========================================================= */

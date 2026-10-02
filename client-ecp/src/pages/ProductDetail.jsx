@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Row, Col, Typography, Button, Tag, Space, Breadcrumb, Spin, message, Segmented, Grid } from 'antd';
+import { Row, Col, Typography, Button, Tag, Space, Breadcrumb, Spin, App, Segmented, Grid } from 'antd';
 import {
   ShoppingCartOutlined,
   CheckCircleOutlined,
@@ -11,16 +11,22 @@ import {
   PlusOutlined,
   MinusOutlined,
   AppstoreOutlined,
-  CheckOutlined
+  CheckOutlined,
+  WhatsAppOutlined,
+  ShareAltOutlined,
+  CopyOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
+import ProductCard from '../components/ProductCard';
+import SEO from '../components/SEO';
 import { trackProductView } from '../services/tracker';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
 export default function ProductDetail({ onAddToCart }) {
+  const { message } = App.useApp();
   const { slug } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -43,10 +49,22 @@ export default function ProductDetail({ onAddToCart }) {
 
   // Multi-size selection state: { [variantId]: qty }
   const [multiQuantities, setMultiQuantities] = useState({});
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [contactWhatsApp, setContactWhatsApp] = useState('01000000000');
 
   useEffect(() => {
     fetchProductDetails();
   }, [slug]);
+
+  useEffect(() => {
+    api.get('/api/ecp/catalog/store-settings')
+      .then((res) => {
+        if (res.data?.success && res.data?.data?.contact_whatsapp) {
+          setContactWhatsApp(res.data.data.contact_whatsapp);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!ctaContainerRef.current) return;
@@ -75,6 +93,20 @@ export default function ProductDetail({ onAddToCart }) {
         const prod = res.data.data;
         setProduct(prod);
         trackProductView(prod);
+
+        // Fetch related products from same category
+        if (prod.category_id) {
+          api.get('/api/ecp/catalog', { params: { category_id: prod.category_id, limit: 5 } })
+            .then((r) => {
+              if (r.data?.success) {
+                const list = (r.data.data || [])
+                  .filter((p) => p.id !== prod.id && (parseInt(p.total_stock, 10) || 0) > 0)
+                  .slice(0, 4);
+                setRelatedProducts(list);
+              }
+            })
+            .catch(() => {});
+        }
 
         // Pre-select first variant if available
         if (prod.variants && prod.variants.length > 0) {
@@ -291,8 +323,113 @@ export default function ProductDetail({ onAddToCart }) {
 
   const hasMultipleVariants = product.variants && product.variants.length > 1;
 
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : `https://yokastore.runasp.net/product/${product.slug || product.id}`;
+  const prodImg = product.featured_image || 'https://yokastore.runasp.net/yokaStoreTransparent.png';
+  const fullImg = prodImg.startsWith('/') ? `https://yokastore.runasp.net${prodImg}` : prodImg;
+
+  const productSchema = {
+    '@context': 'https://schema.org/',
+    '@type': 'Product',
+    'name': product.product_name,
+    'image': [fullImg],
+    'description': product.description || `تسوق ${product.product_name} بجودة استثنائية وسعر مميز من يوكا ستور مصر مع شحن سريع ومعاينة قبل الاستلام.`,
+    'sku': product.product_code || String(product.id),
+    'brand': {
+      '@type': 'Brand',
+      'name': product.brand || 'Yoka Store'
+    },
+    'offers': {
+      '@type': 'Offer',
+      'url': currentUrl,
+      'priceCurrency': 'EGP',
+      'price': price,
+      'availability': availableStock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      'itemCondition': 'https://schema.org/NewCondition',
+      'seller': {
+        '@type': 'Organization',
+        'name': 'Yoka Store'
+      }
+    }
+  };
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    'itemListElement': [
+      {
+        '@type': 'ListItem',
+        'position': 1,
+        'name': 'الرئيسية',
+        'item': 'https://yokastore.runasp.net/'
+      },
+      {
+        '@type': 'ListItem',
+        'position': 2,
+        'name': 'الكتالوج',
+        'item': 'https://yokastore.runasp.net/catalog'
+      },
+      ...(product.category_name
+        ? [
+            {
+              '@type': 'ListItem',
+              'position': 3,
+              'name': product.category_name,
+              'item': `https://yokastore.runasp.net/catalog?category_id=${product.category_id}`
+            },
+            {
+              '@type': 'ListItem',
+              'position': 4,
+              'name': product.product_name,
+              'item': currentUrl
+            }
+          ]
+        : [
+            {
+              '@type': 'ListItem',
+              'position': 3,
+              'name': product.product_name,
+              'item': currentUrl
+            }
+          ])
+    ]
+  };
+
+  const combinedSchema = {
+    '@context': 'https://schema.org',
+    '@graph': [productSchema, breadcrumbSchema]
+  };
+
   return (
     <div className="fade-in" style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 60 }}>
+      <SEO
+        title={product.product_name}
+        description={product.description || `تسوق ${product.product_name} كود ${product.product_code} بسعر ${price} ج.م من يوكا ستور مصر مع شحن سريع ومعاينة قبل الاستلام.`}
+        image={product.featured_image}
+        type="product"
+        schemaData={combinedSchema}
+      />
+
+      {/* Mobile Back Link */}
+      {isMobile && (
+        <div style={{ marginBottom: 12 }}>
+          <Link
+            to="/catalog"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              color: '#64748B',
+              fontSize: 13,
+              fontWeight: 700,
+              padding: '2px 0'
+            }}
+          >
+            <ArrowRightOutlined style={{ fontSize: 12, color: '#C8A45C' }} />
+            <span>العودة للكتالوج</span>
+          </Link>
+        </div>
+      )}
+
       {/* Breadcrumb Navigation */}
       <Breadcrumb
         style={{ marginBottom: 20, fontSize: 13 }}
@@ -753,19 +890,87 @@ export default function ProductDetail({ onAddToCart }) {
                 <div><SyncOutlined style={{ color: '#C8A45C', marginLeft: 6 }} /> استبدال واسترجاع مجاني خلال 14 يوماً</div>
               </Space>
             </div>
+
+            {/* Quick Contact & Share Actions */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+              <Button
+                icon={<WhatsAppOutlined style={{ color: '#25D366', fontSize: 16 }} />}
+                onClick={() => {
+                  const msg = `مرحباً، أود الاستفسار والطلب بخصوص منتج: ${product.product_name} (كود: ${product.product_code}) ${window.location.href}`;
+                  window.open(`https://wa.me/${contactWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+                }}
+                style={{
+                  flex: 1,
+                  height: 42,
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  borderColor: '#25D366',
+                  color: '#0F172A',
+                  backgroundColor: '#F0FDF4'
+                }}
+              >
+                طلب أو استفسار عبر واتساب
+              </Button>
+
+              <Button
+                icon={<ShareAltOutlined />}
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  message.success('تم نسخ رابط المنتج بنجاح! شاركه مع أصدقائك');
+                }}
+                style={{
+                  height: 42,
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  borderColor: '#CBD5E1',
+                  color: '#475569'
+                }}
+              >
+                مشاركة الرابط
+              </Button>
+            </div>
           </div>
         </Col>
       </Row>
+
+      {/* Related Products Section */}
+      {relatedProducts.length > 0 && (
+        <section style={{ marginTop: 52, borderTop: '1px solid #E2E8F0', paddingTop: 36 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+            <div>
+              <Title level={3} style={{ margin: 0, fontWeight: 800, fontSize: 'clamp(18px, 2.5vw, 22px)', color: '#0F172A' }}>
+                منتجات مشابهة قد تعجبك
+              </Title>
+              <Text type="secondary" style={{ fontSize: 13 }}>تشكيلة مميزة من نفس القسم لنفس الإطلالة الفاخرة</Text>
+            </div>
+            {product.category_id && (
+              <Link to={`/catalog?category_id=${product.category_id}`} style={{ color: '#C8A45C', fontWeight: 700, fontSize: 13 }}>
+                عرض جميع منتجات القسم ←
+              </Link>
+            )}
+          </div>
+
+          <Row gutter={[{ xs: 12, sm: 16, md: 20 }, { xs: 14, sm: 18, md: 24 }]}>
+            {relatedProducts.map((rel) => (
+              <Col xs={12} sm={8} md={6} key={rel.id}>
+                <ProductCard product={rel} onAddToCart={onAddToCart} />
+              </Col>
+            ))}
+          </Row>
+        </section>
+      )}
 
       {/* Sticky Bottom Add-to-Cart Bar for Mobile */}
       {isMobile && showStickyBar && (
         <div className="sticky-cta-bar">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: 18, fontWeight: 900, color: '#C8A45C', fontVariantNumeric: 'tabular-nums' }}>
-              {price.toLocaleString()} <span style={{ fontSize: 12 }}>ج.م</span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+              {price.toLocaleString()} <span style={{ fontSize: 12, color: '#C8A45C', fontWeight: 800 }}>ج.م</span>
             </span>
             {selectedVariant?.size && (
-              <span style={{ fontSize: 11, color: '#0F172A', fontWeight: 700 }}>
+              <span style={{ fontSize: 11, color: '#64748B', fontWeight: 700 }}>
                 المقاس: {selectedVariant.size}
               </span>
             )}
@@ -776,17 +981,18 @@ export default function ProductDetail({ onAddToCart }) {
             disabled={availableStock <= 0}
             icon={<ShoppingCartOutlined style={{ fontSize: 18 }} />}
             onClick={orderMode === 'single' ? handleAdd : handleMultiAdd}
+            className="btn-touch"
             style={{
               flex: 1,
-              maxWidth: 220,
-              height: 44,
+              maxWidth: 230,
+              height: 48,
               backgroundColor: availableStock > 0 ? '#C8A45C' : '#F1F5F9',
               color: availableStock > 0 ? '#0F172A' : '#94A3B8',
-              borderRadius: 8,
+              borderRadius: 10,
               fontWeight: 800,
               border: 'none',
-              fontSize: 14,
-              boxShadow: availableStock > 0 ? '0 2px 10px rgba(200, 164, 92, 0.3)' : 'none'
+              fontSize: 14.5,
+              boxShadow: availableStock > 0 ? '0 4px 14px rgba(200, 164, 92, 0.38)' : 'none'
             }}
           >
             {availableStock > 0 ? 'أضف للسلة الآن' : 'غير متوفر'}

@@ -14,6 +14,7 @@ import {
 import { Link } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import api from '../api';
+import SEO from '../components/SEO';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -85,6 +86,12 @@ export default function Contact() {
 
   return (
     <div className="fade-in" style={{ padding: '0 8px 60px' }}>
+      <SEO
+        title="تواصل معنا وخدمة العملاء"
+        description="تواصل مباشرة مع خدمة عملاء متجر يوكا ستور عبر واتساب أو الاتصال الهاتفي لطلب المنتجات والمساعدة الفورية والاستفسار عن الشحن."
+        keywords="تواصل مع يوكا ستور, خدمة عملاء يوكا, رقم يوكا ستور, واتساب يوكا ستور مصر"
+      />
+
       {/* Breadcrumb Navigation */}
       <Breadcrumb
         style={{ marginBottom: 20, fontSize: 13 }}

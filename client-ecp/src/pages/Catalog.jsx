@@ -4,6 +4,7 @@ import { Row, Col, Card, Select, Slider, Input, Button, Pagination, Spin, Skelet
 import { FilterOutlined, SearchOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
+import SEO from '../components/SEO';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -18,6 +19,7 @@ export default function Catalog({ onAddToCart }) {
   const [meta, setMeta] = useState({ page: 1, total: 0, totalPages: 1 });
   const [filterDrawerVisible, setFilterDrawerVisible] = useState(false);
   const screens = useBreakpoint();
+  const isMobile = screens.xs || (screens.sm === false && screens.md === false);
 
   // Filters state
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -38,10 +40,17 @@ export default function Catalog({ onAddToCart }) {
     const b = searchParams.get('brand') || '';
     const c = searchParams.get('category_id') || '';
     const so = searchParams.get('sort') || 'newest';
+    const focus = searchParams.get('focus') || '';
+
     setSearch(s);
     setBrand(b);
     setCategoryId(c);
     setSort(so);
+
+    if (focus === 'search') {
+      setFilterDrawerVisible(true);
+    }
+
     fetchProducts(1, { search: s, brand: b, category_id: c, sort: so });
   }, [searchParams]);
 
@@ -213,8 +222,36 @@ export default function Catalog({ onAddToCart }) {
     hasPriceFilter ? { key: 'price', label: `السعر: ${priceRange[0]} - ${priceRange[1]} ج.م`, onClear: () => { setPriceRange([0, 5000]); } } : null,
   ].filter(Boolean);
 
+  const activeCategory = categories.find((c) => String(c.id) === String(categoryId));
+  let catalogTitle = 'الكتالوج وجميع المنتجات';
+  if (search) {
+    catalogTitle = `نتائج البحث عن "${search}" في الكتالوج`;
+  } else if (activeCategory) {
+    catalogTitle = `تشكيلة ${activeCategory.category_name} الفاخرة`;
+  } else if (sort === 'popular') {
+    catalogTitle = 'المنتجات الأكثر مبيعاً والأعلى طلباً';
+  }
+
+  const catalogDesc = activeCategory
+    ? `اكتشف أرقى موديلات ${activeCategory.category_name} متوفرة للطلب أونلاين بأسعار مميزة وخامات عالية الجودة مع شحن سريع ومعاينة قبل الاستلام من يوكا ستور مصر.`
+    : `تسوق أونلاين من كتالوج يوكا ستور مصر — أحدث صيحات الموضة والملابس بجودة استثنائية وشحن سريع لجميع المحافظات والدفع عند الاستلام.`;
+
+  const catalogSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    'name': `${catalogTitle} | يوكا ستور مصر`,
+    'description': catalogDesc,
+    'url': typeof window !== 'undefined' ? window.location.href : 'https://yokastore.runasp.net/catalog'
+  };
+
   return (
     <div className="fade-in">
+      <SEO
+        title={catalogTitle}
+        description={catalogDesc}
+        schemaData={catalogSchema}
+      />
+
       {/* Page Title & Sort Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
@@ -287,7 +324,7 @@ export default function Catalog({ onAddToCart }) {
           zIndex={1300}
           title={
             <div>
-              <div style={{ width: 36, height: 4, background: '#D4B76A', borderRadius: 2, margin: '-4px auto 10px', opacity: 0.7 }} />
+              <div className="bottom-sheet-handle" />
               <span style={{ fontWeight: 700 }}>فلاتر البحث والتصفية</span>
             </div>
           }
@@ -302,14 +339,54 @@ export default function Catalog({ onAddToCart }) {
 
         {/* Products Grid Area */}
         <Col xs={24} md={17} lg={18}>
+          {/* Quick Mobile Category Strip */}
+          {categories.length > 0 && (
+            <div
+              className="horizontal-scroll-strip mobile-only"
+              style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                paddingBottom: 8,
+                marginBottom: 16
+              }}
+            >
+              <button
+                type="button"
+                className={`category-filter-pill ${!categoryId ? 'active' : ''}`}
+                onClick={() => {
+                  setCategoryId('');
+                  fetchProducts(1, { category_id: '' });
+                }}
+              >
+                الكل
+              </button>
+              {categories.map((c) => (
+                <button
+                  type="button"
+                  key={c.id}
+                  className={`category-filter-pill ${String(categoryId) === String(c.id) ? 'active' : ''}`}
+                  onClick={() => {
+                    setCategoryId(String(c.id));
+                    fetchProducts(1, { category_id: String(c.id) });
+                  }}
+                >
+                  <span>{c.category_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <Row gutter={[{ xs: 10, sm: 12, md: 16 }, { xs: 12, sm: 16, md: 20 }]}>
-              {[...Array(6)].map((_, i) => (
+              {[...Array(8)].map((_, i) => (
                 <Col xs={12} sm={12} md={8} lg={6} key={i}>
-                  <Card style={{ borderRadius: 12, overflow: 'hidden' }} styles={{ body: { padding: 12 } }}>
-                    <div style={{ width: '100%', paddingTop: '100%', background: '#F5F5F3', borderRadius: 8, marginBottom: 12 }} />
-                    <Skeleton active paragraph={{ rows: 2 }} title={{ width: '60%' }} />
-                  </Card>
+                  <div style={{ background: '#FFFFFF', borderRadius: 20, border: '1px solid rgba(226, 232, 240, 0.85)', padding: 8, overflow: 'hidden', boxShadow: '0 4px 18px rgba(15, 23, 42, 0.04)' }}>
+                    <div style={{ width: '100%', aspectRatio: '3 / 4', background: '#F1F5F9', borderRadius: 14, marginBottom: 12 }} />
+                    <div style={{ padding: '0 6px 6px' }}>
+                      <Skeleton active paragraph={{ rows: 2 }} title={{ width: '75%' }} />
+                    </div>
+                  </div>
                 </Col>
               ))}
             </Row>
@@ -353,6 +430,19 @@ export default function Catalog({ onAddToCart }) {
           )}
         </Col>
       </Row>
+
+      {/* Floating Mobile Filter Pill */}
+      {isMobile && !filterDrawerVisible && (
+        <button
+          type="button"
+          className="mobile-floating-filter-pill"
+          onClick={() => setFilterDrawerVisible(true)}
+          aria-label="تصفية المنتجات"
+        >
+          <FilterOutlined style={{ color: '#C8A45C' }} />
+          <span>تصفية وفلاتر {activeFilters.length > 0 ? `(${activeFilters.length})` : ''}</span>
+        </button>
+      )}
     </div>
   );
 }

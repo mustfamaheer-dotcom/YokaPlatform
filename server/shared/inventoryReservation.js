@@ -140,7 +140,17 @@ async function reserveCartStock(cartId, branchId, items, ttlSeconds = RESERVATIO
            WHERE branch_id = $1 AND product_id = $2 AND variant_id IS NULL`,
           [branchId, item.product_id]
         );
-        physicalStock = baseRow ? parseInt(baseRow.available_qty, 10) : 0;
+        if (baseRow && parseInt(baseRow.available_qty, 10) > 0) {
+          physicalStock = parseInt(baseRow.available_qty, 10);
+        } else {
+          // Fallback to sum of variants if no un-varianted stock row exists
+          const [sumRow] = await query(
+            `SELECT COALESCE(SUM(available_qty), 0) as total_qty FROM inventory_balances
+             WHERE branch_id = $1 AND product_id = $2`,
+            [branchId, item.product_id]
+          );
+          physicalStock = sumRow ? parseInt(sumRow.total_qty, 10) : 0;
+        }
       }
 
       // Query existing reservations

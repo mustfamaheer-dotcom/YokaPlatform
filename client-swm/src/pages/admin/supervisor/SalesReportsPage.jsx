@@ -56,8 +56,9 @@ import {
   LabelList
 } from 'recharts';
 import dayjs from 'dayjs';
-import SupervisorPageLayout from './SupervisorPageLayout';
 import api from '../../../api';
+import SafeChartContainer from '../../../components/common/SafeChartContainer';
+import SupervisorPageLayout from './SupervisorPageLayout';
 
 const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -85,6 +86,18 @@ export default function SalesReportsPage({ currentUser }) {
   const [salesData, setSalesData] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [topProductView, setTopProductView] = useState('chart');
+
+  // Responsive Viewport Detection for Dynamic Chart Sizing
+  const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isSmallMobile = windowWidth < 480;
 
   const fetchBranches = async () => {
     try {
@@ -348,53 +361,54 @@ export default function SalesReportsPage({ currentUser }) {
           background: '#ffffff',
           borderRadius: 16,
           border: '1.5px solid #e2e8f0',
-          padding: '16px 22px',
+          padding: isMobile ? '14px 12px' : '16px 22px',
           boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.05)',
-          marginBottom: 24,
+          marginBottom: 20,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: 16
+          gap: 14
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 12, width: isMobile ? '100%' : 'auto' }}>
           <div
             style={{
-              width: 44,
-              height: 44,
+              width: isMobile ? 38 : 44,
+              height: isMobile ? 38 : 44,
               borderRadius: 12,
               background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)'
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+              flexShrink: 0
             }}
           >
-            <Calendar size={22} />
+            <Calendar size={isMobile ? 18 : 22} />
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 900, color: '#0f172a' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: isMobile ? 14.5 : 16, fontWeight: 900, color: '#0f172a' }}>
                 النطاق الزمني الشامل للتقارير
               </span>
-              <Tag color="indigo" style={{ fontWeight: 700, borderRadius: 6, margin: 0 }}>
+              <Tag color="indigo" style={{ fontWeight: 700, borderRadius: 6, margin: 0, fontSize: isMobile ? 10.5 : 12 }}>
                 فلتر موحد لكافة الجداول والرسوم
               </Tag>
             </div>
-            <span style={{ fontSize: 12, color: '#64748b' }}>
+            <span style={{ fontSize: isMobile ? 11 : 12, color: '#64748b' }}>
               يتم تطبيق هذا الفلتر لحظياً على كافة الرسوم البيانية وسجل المرتجعات ودفتر المصروفات
             </span>
           </div>
         </div>
 
-        <div className="swm-sales-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="swm-sales-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
           {isAdmin && (
             <Select
               value={selectedBranch}
               onChange={setSelectedBranch}
-              style={{ minWidth: 220, height: 38 }}
+              style={{ width: isMobile ? '100%' : 220, minWidth: isMobile ? '100%' : 220, height: 38 }}
             >
               <Select.Option value="all">🏢 جميع الفروع (إجمالي المنظومة)</Select.Option>
               <Select.Option value="retail">🏬 جميع فروع التجزئة (POS)</Select.Option>
@@ -406,25 +420,25 @@ export default function SalesReportsPage({ currentUser }) {
             </Select>
           )}
 
-          <Space.Compact>
+          <Space.Compact style={{ width: isMobile ? '100%' : 'auto', display: isMobile ? 'flex' : 'inline-flex' }}>
             <Button
               type={period === 'today' ? 'primary' : 'default'}
               onClick={() => handlePresetChange('today')}
-              style={{ fontWeight: 700 }}
+              style={{ fontWeight: 700, flex: isMobile ? 1 : 'none', padding: isMobile ? '4px 6px' : undefined, fontSize: isMobile ? 12 : 13 }}
             >
               اليوم
             </Button>
             <Button
               type={period === 'week' ? 'primary' : 'default'}
               onClick={() => handlePresetChange('week')}
-              style={{ fontWeight: 700 }}
+              style={{ fontWeight: 700, flex: isMobile ? 1 : 'none', padding: isMobile ? '4px 6px' : undefined, fontSize: isMobile ? 12 : 13 }}
             >
               آخر 7 أيام
             </Button>
             <Button
               type={period === 'month' ? 'primary' : 'default'}
               onClick={() => handlePresetChange('month')}
-              style={{ fontWeight: 700 }}
+              style={{ fontWeight: 700, flex: isMobile ? 1 : 'none', padding: isMobile ? '4px 6px' : undefined, fontSize: isMobile ? 12 : 13 }}
             >
               هذا الشهر
             </Button>
@@ -434,7 +448,7 @@ export default function SalesReportsPage({ currentUser }) {
             value={dateRange}
             onChange={handleCustomRangeChange}
             format="YYYY-MM-DD"
-            style={{ borderRadius: 8, height: 38, borderColor: period === 'custom' ? '#4f46e5' : '#cbd5e1' }}
+            style={{ width: isMobile ? '100%' : 'auto', borderRadius: 8, height: 38, borderColor: period === 'custom' ? '#4f46e5' : '#cbd5e1' }}
           />
 
           <Button
@@ -443,6 +457,7 @@ export default function SalesReportsPage({ currentUser }) {
             onClick={fetchDashboardData}
             loading={loading}
             style={{
+              width: isMobile ? '100%' : 'auto',
               backgroundColor: '#4f46e5',
               borderColor: '#4f46e5',
               borderRadius: 8,
@@ -457,7 +472,7 @@ export default function SalesReportsPage({ currentUser }) {
 
       <Spin spinning={loading}>
         {/* ─── 4 CORE EXECUTIVE FINANCIAL CARDS ─── */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
           {/* Card 1: Gross Sales */}
           <Col xs={24} sm={12} lg={6}>
             <div
@@ -465,20 +480,20 @@ export default function SalesReportsPage({ currentUser }) {
                 background: '#ffffff',
                 border: '1px solid #e2e8f0',
                 borderRadius: 14,
-                padding: '18px 20px',
+                padding: isMobile ? '14px 14px' : '18px 20px',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 13, color: '#64748b', fontWeight: 700 }}>إجمالي مبيعات الفرع</span>
-                <Tag color="blue" style={{ fontWeight: 700, borderRadius: 6, margin: 0 }}>
+                <span style={{ fontSize: isMobile ? 12 : 13, color: '#64748b', fontWeight: 700 }}>إجمالي مبيعات الفرع</span>
+                <Tag color="blue" style={{ fontWeight: 700, borderRadius: 6, margin: 0, fontSize: isMobile ? 10.5 : 12 }}>
                   {metrics.sales_count || 0} فاتورة
                 </Tag>
               </div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: '#0f172a', margin: '8px 0 4px' }}>
+              <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 900, color: '#0f172a', margin: '6px 0 4px' }}>
                 {(metrics.gross_sales || 0).toLocaleString()} <span style={{ fontSize: 13 }}>ج.م</span>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ fontSize: isMobile ? 11 : 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <TrendingUp size={14} color="#16a34a" />
                 متوسط الفاتورة: <strong>{(metrics.aov || 0).toLocaleString()} ج.م</strong>
               </div>
@@ -492,18 +507,18 @@ export default function SalesReportsPage({ currentUser }) {
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                 border: '1.5px solid #bbf7d0',
                 borderRadius: 14,
-                padding: '18px 20px',
+                padding: isMobile ? '14px 14px' : '18px 20px',
                 boxShadow: '0 2px 8px rgba(22, 101, 52, 0.06)'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 13, color: '#166534', fontWeight: 700 }}>صافي الإيرادات المحققة</span>
+                <span style={{ fontSize: isMobile ? 12 : 13, color: '#166534', fontWeight: 700 }}>صافي الإيرادات المحققة</span>
                 <Tag color="green" style={{ fontWeight: 700, borderRadius: 6, margin: 0, fontSize: 10 }}>صافي بعد الخصم</Tag>
               </div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: '#14532d', margin: '8px 0 4px' }}>
+              <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 900, color: '#14532d', margin: '6px 0 4px' }}>
                 {(financials.net_revenue || metrics.net_sales || 0).toLocaleString()} <span style={{ fontSize: 13 }}>ج.م</span>
               </div>
-              <div style={{ fontSize: 12, color: '#15803d' }}>
+              <div style={{ fontSize: isMobile ? 11 : 12, color: '#15803d' }}>
                 معدل التحويل: <strong>{metrics.conversion_rate || 100}%</strong>
               </div>
             </div>
@@ -516,20 +531,20 @@ export default function SalesReportsPage({ currentUser }) {
                 background: '#fef2f2',
                 border: '1.5px solid #fecaca',
                 borderRadius: 14,
-                padding: '18px 20px',
+                padding: isMobile ? '14px 14px' : '18px 20px',
                 boxShadow: '0 2px 8px rgba(185, 28, 28, 0.06)'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 13, color: '#991b1b', fontWeight: 700 }}>إجمالي المرتجعات</span>
-                <Tag color="error" style={{ fontWeight: 700, borderRadius: 6, margin: 0 }}>
+                <span style={{ fontSize: isMobile ? 12 : 13, color: '#991b1b', fontWeight: 700 }}>إجمالي المرتجعات</span>
+                <Tag color="error" style={{ fontWeight: 700, borderRadius: 6, margin: 0, fontSize: isMobile ? 10.5 : 12 }}>
                   {returns.returns_count || 0} عملية
                 </Tag>
               </div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: '#b91c1c', margin: '8px 0 4px' }}>
+              <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 900, color: '#b91c1c', margin: '6px 0 4px' }}>
                 {(returns.gross_returns || 0).toLocaleString()} <span style={{ fontSize: 13 }}>ج.م</span>
               </div>
-              <div style={{ fontSize: 12, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ fontSize: isMobile ? 11 : 12, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <RotateCcw size={14} />
                 نسبة المرتجع: <strong>{returns.returns_percentage || 0}%</strong> من المبيعات
               </div>
@@ -543,20 +558,20 @@ export default function SalesReportsPage({ currentUser }) {
                 background: '#fffbeb',
                 border: '1.5px solid #fde68a',
                 borderRadius: 14,
-                padding: '18px 20px',
+                padding: isMobile ? '14px 14px' : '18px 20px',
                 boxShadow: '0 2px 8px rgba(180, 83, 9, 0.06)'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 13, color: '#92400e', fontWeight: 700 }}>المصروفات التشغيلية المعتمدة</span>
+                <span style={{ fontSize: isMobile ? 12 : 13, color: '#92400e', fontWeight: 700 }}>المصروفات التشغيلية المعتمدة</span>
                 <Tag color="gold" style={{ fontWeight: 700, borderRadius: 6, margin: 0, fontSize: 10 }}>
                   صافي المصروف
                 </Tag>
               </div>
-              <div style={{ fontSize: 26, fontWeight: 900, color: '#b45309', margin: '8px 0 4px' }}>
+              <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 900, color: '#b45309', margin: '6px 0 4px' }}>
                 {(profitLoss.total_expenses || 0).toLocaleString()} <span style={{ fontSize: 13 }}>ج.م</span>
               </div>
-              <div style={{ fontSize: 12, color: '#92400e' }}>
+              <div style={{ fontSize: isMobile ? 11 : 12, color: '#92400e' }}>
                 صافي الربح التقديري: <strong>{(profitLoss.net_profit || 0).toLocaleString()} ج.م</strong> ({profitLoss.net_profit_margin || 0}%)
               </div>
             </div>
@@ -569,14 +584,17 @@ export default function SalesReportsPage({ currentUser }) {
             background: '#ffffff',
             borderRadius: 16,
             border: '1px solid #e2e8f0',
-            padding: '20px 24px',
+            padding: isMobile ? '12px 10px' : '20px 24px',
             boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-            marginBottom: 24
+            marginBottom: 24,
+            overflow: 'hidden'
           }}
         >
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
+            destroyOnHidden={true}
+            size={isMobile ? 'small' : 'middle'}
             items={[
               {
                 key: 'overview',
@@ -592,67 +610,87 @@ export default function SalesReportsPage({ currentUser }) {
                     <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
                       <Col xs={24} lg={15}>
                         <div
+                          className="swm-chart-card"
                           style={{
-                            background: '#f8fafc',
+                            background: '#ffffff',
                             border: '1px solid #e2e8f0',
-                            borderRadius: 14,
-                            padding: '20px',
-                            height: 360
+                            borderRadius: 16,
+                            padding: isMobile ? '16px 10px' : '20px',
+                            minHeight: isMobile ? 340 : 360,
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                            minWidth: 0,
+                            overflow: 'hidden'
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
                             <div>
-                              <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
+                              <Text strong style={{ fontSize: isMobile ? 14 : 15, color: '#0f172a' }}>
                                 📈 منحنى الإيرادات والمبيعات اليومية
                               </Text>
-                              <div style={{ fontSize: 11.5, color: '#64748b' }}>
+                              <div style={{ fontSize: isMobile ? 11 : 11.5, color: '#64748b' }}>
                                 تتبع دقيق لإجمالي المبيعات، وصافي الإيرادات بعد خصم المرتجعات
                               </div>
                             </div>
-                            <Tag color="indigo" style={{ fontWeight: 700, borderRadius: 6 }}>محدث لحظياً</Tag>
+                            <Tag color="indigo" style={{ fontWeight: 700, borderRadius: 6, fontSize: isMobile ? 10.5 : 12 }}>محدث لحظياً</Tag>
                           </div>
 
                           {trends.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={280}>
-                              <AreaChart data={trends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                <defs>
-                                  <linearGradient id="colorGross" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
-                                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                                  </linearGradient>
-                                  <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                  </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="date" tickFormatter={(v) => v.slice(5)} stroke="#94a3b8" tick={{ fill: '#475569', fontSize: 11.5, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }} />
-                                <YAxis stroke="#94a3b8" tick={{ fill: '#475569', fontSize: 11.5, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                                <ChartTooltip
-                                  contentStyle={{
-                                    borderRadius: 10,
-                                    border: '1px solid #e2e8f0',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                                    fontFamily: "'Cairo', sans-serif"
-                                  }}
-                                  formatter={(val, name) => [
-                                    `${Number(val).toLocaleString()} ج.م`,
-                                    name === 'gross_sales' ? 'إجمالي المبيعات' : name === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
-                                  ]}
-                                  labelFormatter={(l) => `التاريخ: ${l}`}
-                                />
-                                <Legend
-                                  wrapperStyle={{ fontFamily: "'Cairo', sans-serif", fontWeight: 600, paddingTop: 6 }}
-                                  formatter={(val) =>
-                                    val === 'gross_sales' ? 'إجمالي المبيعات' : val === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
-                                  }
-                                />
-                                <Area type="monotone" dataKey="gross_sales" stroke="#4f46e5" strokeWidth={2} fillOpacity={1} fill="url(#colorGross)" />
-                                <Area type="monotone" dataKey="net_sales" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorNet)" />
-                              </AreaChart>
-                            </ResponsiveContainer>
+                            <SafeChartContainer height={isMobile ? 240 : 280}>
+                              {({ width, height }) => (
+                                <ResponsiveContainer key={`sales-trend-${isMobile ? 'm' : 'd'}`} width={width} height={height} minWidth={0}>
+                                  <AreaChart data={trends} margin={isMobile ? { top: 10, right: 8, left: -10, bottom: 0 } : { top: 10, right: 16, left: 0, bottom: 0 }}>
+                                    <defs>
+                                      <linearGradient id="colorGross" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                                      </linearGradient>
+                                      <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                      </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <XAxis
+                                      dataKey="date"
+                                      tickFormatter={(v) => v.slice(5)}
+                                      stroke="#94a3b8"
+                                      interval={isMobile ? 'preserveStartEnd' : 0}
+                                      minTickGap={isMobile ? 20 : 12}
+                                      tick={{ fill: '#475569', fontSize: isMobile ? 10 : 11.5, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
+                                    />
+                                    <YAxis
+                                      stroke="#94a3b8"
+                                      width={isMobile ? 40 : 55}
+                                      tick={{ fill: '#475569', fontSize: isMobile ? 10 : 11.5, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
+                                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                                    />
+                                    <ChartTooltip
+                                      contentStyle={{
+                                        borderRadius: 10,
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                                        fontFamily: "'Cairo', sans-serif"
+                                      }}
+                                      formatter={(val, name) => [
+                                        `${Number(val).toLocaleString()} ج.م`,
+                                        name === 'gross_sales' ? 'إجمالي المبيعات' : name === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
+                                      ]}
+                                      labelFormatter={(l) => `التاريخ: ${l}`}
+                                    />
+                                    <Legend
+                                      wrapperStyle={{ fontFamily: "'Cairo', sans-serif", fontWeight: 600, fontSize: isMobile ? 11 : 12, paddingTop: 4 }}
+                                      formatter={(val) =>
+                                        val === 'gross_sales' ? 'إجمالي المبيعات' : val === 'net_sales' ? 'صافي المبيعات' : 'المرتجعات'
+                                      }
+                                    />
+                                    <Area type="monotone" dataKey="gross_sales" stroke="#4f46e5" strokeWidth={2} fillOpacity={1} fill="url(#colorGross)" />
+                                    <Area type="monotone" dataKey="net_sales" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorNet)" />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              )}
+                            </SafeChartContainer>
                           ) : (
-                            <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                            <div style={{ height: isMobile ? 200 : 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
                               لا توجد حركات مبيعات في النطاق الزمني المحدد
                             </div>
                           )}
@@ -662,50 +700,81 @@ export default function SalesReportsPage({ currentUser }) {
                       {/* Payment Methods Distribution */}
                       <Col xs={24} lg={9}>
                         <div
+                          className="swm-chart-card"
                           style={{
-                            background: '#f8fafc',
+                            background: '#ffffff',
                             border: '1px solid #e2e8f0',
-                            borderRadius: 14,
-                            padding: '20px',
-                            height: 360,
+                            borderRadius: 16,
+                            padding: isMobile ? '16px 10px' : '20px',
+                            minHeight: isMobile ? 340 : 360,
                             display: 'flex',
-                            flexDirection: 'column'
+                            flexDirection: 'column',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                            minWidth: 0,
+                            overflow: 'hidden'
                           }}
                         >
-                          <Text strong style={{ fontSize: 15, color: '#0f172a', marginBottom: 6 }}>
+                          <Text strong style={{ fontSize: isMobile ? 14 : 15, color: '#0f172a', marginBottom: 4 }}>
                             💳 توزيع المحصلات المالية (Payment Methods)
                           </Text>
-                          <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>
+                          <div style={{ fontSize: isMobile ? 11 : 11.5, color: '#64748b', marginBottom: 10 }}>
                             النقدية والفيزا والتحويلات البنكية المحققة
                           </div>
 
                           {paymentPieData.length > 0 ? (
-                            <div style={{ flex: 1, position: 'relative' }}>
-                              <ResponsiveContainer width="100%" height={210}>
-                                <PieChart>
-                                  <Pie
-                                    data={paymentPieData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={45}
-                                    outerRadius={75}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                  >
-                                    {paymentPieData.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                  </Pie>
-                                  <ChartTooltip formatter={(v) => `${Number(v).toLocaleString()} ج.م`} />
-                                </PieChart>
-                              </ResponsiveContainer>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%', minWidth: 0 }}>
+                              <SafeChartContainer height={isMobile ? 180 : 210}>
+                                {({ width, height }) => (
+                                  <ResponsiveContainer key={`payment-pie-${isMobile ? 'm' : 'd'}`} width={width} height={height} minWidth={0}>
+                                    <PieChart>
+                                      <Pie
+                                        data={paymentPieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={isMobile ? 36 : 45}
+                                        outerRadius={isMobile ? 62 : 75}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                      >
+                                        {paymentPieData.map((entry, index) => (
+                                          <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                      </Pie>
+                                      <ChartTooltip formatter={(v) => `${Number(v).toLocaleString()} ج.م`} />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                )}
+                              </SafeChartContainer>
 
-                              <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: 11.5, marginTop: 4 }}>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(3, 1fr)',
+                                  gap: 6,
+                                  marginTop: 8,
+                                  width: '100%'
+                                }}
+                              >
                                 {paymentPieData.map((p, idx) => (
-                                  <div key={idx} style={{ textAlign: 'center' }}>
-                                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.color, marginRight: 4 }} />
-                                    <span style={{ fontWeight: 700, color: '#334155' }}>{p.name.split(' ')[0]}</span>
-                                    <div style={{ fontWeight: 800, color: '#0f172a' }}>{p.value.toLocaleString()} ج.م</div>
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      textAlign: 'center',
+                                      background: '#f8fafc',
+                                      borderRadius: 8,
+                                      padding: isMobile ? '6px 2px' : '8px 4px',
+                                      border: '1px solid #e2e8f0'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 2 }}>
+                                      <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: p.color }} />
+                                      <span style={{ fontWeight: 700, color: '#334155', fontSize: isMobile ? 10.5 : 11.5 }}>
+                                        {p.name.split(' ')[0]}
+                                      </span>
+                                    </div>
+                                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: isMobile ? 11 : 12.5 }}>
+                                      {Number(p.value).toLocaleString()} ج.م
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -729,21 +798,23 @@ export default function SalesReportsPage({ currentUser }) {
                             background: '#ffffff',
                             border: '1px solid #e2e8f0',
                             borderRadius: 16,
-                            padding: '22px',
-                            minHeight: 400,
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                            padding: isMobile ? '16px 10px' : '22px',
+                            minHeight: isMobile ? 'auto' : 400,
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                            minWidth: 0,
+                            overflow: 'hidden'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
                             <div>
-                              <Text strong style={{ fontSize: 16, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Text strong style={{ fontSize: isMobile ? 14.5 : 16, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span>🏆</span> أعلى المنتجات مبيعاً بالفرع (Top Selling Products)
                               </Text>
-                              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                              <div style={{ fontSize: isMobile ? 11 : 12, color: '#64748b', marginTop: 2 }}>
                                 مرتبة حسب إجمالي الإيرادات المحققة والكميات المباعة
                               </div>
                             </div>
-                            <Space size={8}>
+                            <Space size={8} style={{ width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
                               <Segmented
                                 value={topProductView}
                                 onChange={setTopProductView}
@@ -754,101 +825,108 @@ export default function SalesReportsPage({ currentUser }) {
                                 size="small"
                                 style={{ background: '#f1f5f9', color: '#0f172a', fontWeight: 600 }}
                               />
-                              <Tag color="gold" style={{ fontWeight: 700, margin: 0 }}>أفضل {topProducts.length} أصناف</Tag>
+                              <Tag color="gold" style={{ fontWeight: 700, margin: 0, fontSize: isMobile ? 10.5 : 12 }}>أفضل {topProducts.length} أصناف</Tag>
                             </Space>
                           </div>
 
                           {topProducts.length > 0 ? (
                             topProductView === 'chart' ? (
-                              <div dir="ltr" style={{ width: '100%', height: 320, direction: 'ltr' }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart
-                                    data={topProducts}
-                                    layout="vertical"
-                                    margin={{ top: 10, right: 125, left: 10, bottom: 5 }}
-                                  >
-                                    <defs>
-                                      <linearGradient id="topProductGrad" x1="0" y1="0" x2="1" y2="0">
-                                        <stop offset="0%" stopColor="#4f46e5" />
-                                        <stop offset="100%" stopColor="#818cf8" />
-                                      </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                                    <XAxis
-                                      type="number"
-                                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                                      stroke="#94a3b8"
-                                      tick={{ fill: '#475569', fontSize: 11, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
-                                    />
-                                    <YAxis
-                                      dataKey="product_name"
-                                      type="category"
-                                      orientation="left"
-                                      width={195}
-                                      stroke="#94a3b8"
-                                      tick={({ x, y, payload }) => {
-                                        const full = payload?.value || '';
-                                        const label = full.length > 24 ? `${full.substring(0, 23)}…` : full;
-                                        return (
-                                          <g transform={`translate(${x},${y})`}>
-                                            <text
-                                              x={-10}
-                                              y={4}
-                                              textAnchor="end"
-                                              fill="#0f172a"
-                                              fontSize={12.5}
-                                              fontWeight={700}
-                                              fontFamily="'Cairo', sans-serif"
-                                            >
-                                              {label}
-                                            </text>
-                                          </g>
-                                        );
-                                      }}
-                                    />
-                                    <ChartTooltip
-                                      contentStyle={{
-                                        backgroundColor: '#ffffff',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: 10,
-                                        color: '#0f172a',
-                                        boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
-                                        fontFamily: "'Cairo', sans-serif",
-                                        direction: 'rtl',
-                                        textAlign: 'right'
-                                      }}
-                                      itemStyle={{ color: '#0f172a' }}
-                                      labelStyle={{ color: '#64748b' }}
-                                      formatter={(val, name, item) => [
-                                        `${Number(val).toLocaleString()} ج.م (${item?.payload?.units_sold || 0} قطعة)`,
-                                        'الإيراد المحقق'
-                                      ]}
-                                    />
-                                    <Bar dataKey="total_revenue" fill="url(#topProductGrad)" radius={[0, 6, 6, 0]}>
-                                      <LabelList
-                                        dataKey="total_revenue"
-                                        position="right"
-                                        content={({ x, y, width, height, value }) => {
-                                          if (value === undefined || value === null) return null;
-                                          const text = `${Number(value).toLocaleString()} ج.م`;
-                                          return (
-                                            <text
-                                              x={(x || 0) + (width || 0) + 8}
-                                              y={(y || 0) + (height || 0) / 2 + 4}
-                                              fill="#4f46e5"
-                                              fontSize={12}
-                                              fontWeight={800}
-                                              fontFamily="'Cairo', sans-serif"
-                                              textAnchor="start"
-                                            >
-                                              {text}
-                                            </text>
-                                          );
-                                        }}
-                                      />
-                                    </Bar>
-                                  </BarChart>
-                                </ResponsiveContainer>
+                              <div dir="ltr" style={{ width: '100%', minWidth: 0, direction: 'ltr' }}>
+                                <SafeChartContainer height={isMobile ? Math.max(260, topProducts.length * 48) : 320}>
+                                  {({ width, height }) => (
+                                    <ResponsiveContainer key={`top-bar-${isMobile ? 'm' : 'd'}`} width={width} height={height} minWidth={0}>
+                                      <BarChart
+                                        data={topProducts}
+                                        layout="vertical"
+                                        margin={isMobile ? { top: 10, right: 55, left: -10, bottom: 5 } : { top: 10, right: 120, left: 10, bottom: 5 }}
+                                      >
+                                        <defs>
+                                          <linearGradient id="topProductGrad" x1="0" y1="0" x2="1" y2="0">
+                                            <stop offset="0%" stopColor="#4f46e5" />
+                                            <stop offset="100%" stopColor="#818cf8" />
+                                          </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                                        <XAxis
+                                          type="number"
+                                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                                          stroke="#94a3b8"
+                                          tick={{ fill: '#475569', fontSize: isMobile ? 10 : 11, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
+                                        />
+                                        <YAxis
+                                          dataKey="product_name"
+                                          type="category"
+                                          orientation="left"
+                                          width={isMobile ? 85 : 195}
+                                          stroke="#94a3b8"
+                                          tick={({ x, y, payload }) => {
+                                            const full = payload?.value || '';
+                                            const maxChars = isMobile ? 9 : 24;
+                                            const label = full.length > maxChars ? `${full.substring(0, maxChars - 1)}…` : full;
+                                            return (
+                                              <g transform={`translate(${x},${y})`}>
+                                                <text
+                                                  x={-6}
+                                                  y={4}
+                                                  textAnchor="end"
+                                                  fill="#0f172a"
+                                                  fontSize={isMobile ? 10.5 : 12.5}
+                                                  fontWeight={700}
+                                                  fontFamily="'Cairo', sans-serif"
+                                                >
+                                                  {label}
+                                                </text>
+                                              </g>
+                                            );
+                                          }}
+                                        />
+                                        <ChartTooltip
+                                          contentStyle={{
+                                            backgroundColor: '#ffffff',
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: 10,
+                                            color: '#0f172a',
+                                            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                                            fontFamily: "'Cairo', sans-serif",
+                                            direction: 'rtl',
+                                            textAlign: 'right'
+                                          }}
+                                          itemStyle={{ color: '#0f172a' }}
+                                          labelStyle={{ color: '#64748b' }}
+                                          formatter={(val, name, item) => [
+                                            `${Number(val).toLocaleString()} ج.م (${item?.payload?.units_sold || 0} قطعة)`,
+                                            'الإيراد المحقق'
+                                          ]}
+                                        />
+                                        <Bar dataKey="total_revenue" fill="url(#topProductGrad)" radius={[0, 6, 6, 0]} barSize={isMobile ? 16 : 24}>
+                                          <LabelList
+                                            dataKey="total_revenue"
+                                            position="right"
+                                            content={({ x, y, width, height, value }) => {
+                                              if (value === undefined || value === null) return null;
+                                              const text = isMobile
+                                                ? `${(Number(value) / 1000).toFixed(1)}k ج.م`
+                                                : `${Number(value).toLocaleString()} ج.م`;
+                                              return (
+                                                <text
+                                                  x={(x || 0) + (width || 0) + 6}
+                                                  y={(y || 0) + (height || 0) / 2 + 4}
+                                                  fill="#4f46e5"
+                                                  fontSize={isMobile ? 10 : 12}
+                                                  fontWeight={800}
+                                                  fontFamily="'Cairo', sans-serif"
+                                                  textAnchor="start"
+                                                >
+                                                  {text}
+                                                </text>
+                                              );
+                                            }}
+                                          />
+                                        </Bar>
+                                      </BarChart>
+                                    </ResponsiveContainer>
+                                  )}
+                                </SafeChartContainer>
                               </div>
                             ) : (
                               <div style={{ height: 310, overflowY: 'auto', paddingRight: 4 }}>
@@ -870,32 +948,32 @@ export default function SalesReportsPage({ currentUser }) {
                                           background: '#f8fafc',
                                           border: '1px solid #e2e8f0',
                                           borderRadius: 10,
-                                          padding: '10px 14px',
+                                          padding: isMobile ? '8px 10px' : '10px 14px',
                                           transition: 'all 0.2s ease'
                                         }}
                                       >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-                                          <span style={{ fontSize: idx < 3 ? 18 : 13, fontWeight: 800, width: 26, textAlign: 'center', color: '#64748b' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, minWidth: 0, flex: 1 }}>
+                                          <span style={{ fontSize: idx < 3 ? (isMobile ? 15 : 18) : (isMobile ? 11 : 13), fontWeight: 800, width: isMobile ? 20 : 26, textAlign: 'center', color: '#64748b' }}>
                                             {rankBadge}
                                           </span>
                                           <div style={{ minWidth: 0, flex: 1 }}>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <div style={{ fontWeight: 700, fontSize: isMobile ? 12 : 13, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                               {p.product_name}
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: isMobile ? 10 : 11, color: '#64748b', marginTop: 2 }}>
                                               {p.product_code && <span>كود: {p.product_code}</span>}
-                                              {p.category_name && <Tag color="default" style={{ fontSize: 10, padding: '0 4px', margin: 0, background: '#f1f5f9', color: '#475569', border: 'none' }}>{p.category_name}</Tag>}
+                                              {p.category_name && <Tag color="default" style={{ fontSize: 9.5, padding: '0 4px', margin: 0, background: '#f1f5f9', color: '#475569', border: 'none' }}>{p.category_name}</Tag>}
                                             </div>
                                           </div>
                                         </div>
 
-                                        <div style={{ textAlign: 'left', minWidth: 140, paddingLeft: 8 }}>
-                                          <div style={{ fontWeight: 800, fontSize: 13.5, color: '#4f46e5' }}>
+                                        <div style={{ textAlign: 'left', minWidth: isMobile ? 95 : 140, paddingLeft: 6 }}>
+                                          <div style={{ fontWeight: 800, fontSize: isMobile ? 12 : 13.5, color: '#4f46e5' }}>
                                             {rev.toLocaleString()} ج.م
                                           </div>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                            <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>{p.units_sold} قطعة</span>
-                                            <Progress percent={pct} showInfo={false} size="small" strokeColor="#4f46e5" style={{ width: 45, margin: 0 }} />
+                                            <span style={{ fontSize: isMobile ? 10 : 11, color: '#16a34a', fontWeight: 600 }}>{p.units_sold} قطعة</span>
+                                            {!isMobile && <Progress percent={pct} showInfo={false} size="small" strokeColor="#4f46e5" style={{ width: 45, margin: 0 }} />}
                                           </div>
                                         </div>
                                       </div>
@@ -915,60 +993,67 @@ export default function SalesReportsPage({ currentUser }) {
                       {/* Top Categories Donut Chart & Breakdown */}
                       <Col xs={24} lg={9}>
                         <div
+                          className="swm-chart-card"
                           style={{
                             background: '#ffffff',
                             border: '1px solid #e2e8f0',
                             borderRadius: 16,
-                            padding: '22px',
-                            minHeight: 400,
+                            padding: isMobile ? '16px 10px' : '22px',
+                            minHeight: isMobile ? 'auto' : 400,
                             display: 'flex',
                             flexDirection: 'column',
-                            boxShadow: '0 4px 14px -2px rgba(0, 0, 0, 0.04)'
+                            boxShadow: '0 4px 14px -2px rgba(0, 0, 0, 0.04)',
+                            minWidth: 0,
+                            overflow: 'hidden'
                           }}
                         >
                           <div style={{ marginBottom: 12 }}>
-                            <Text strong style={{ fontSize: 15.5, color: '#0f172a', display: 'block', marginBottom: 2 }}>
+                            <Text strong style={{ fontSize: isMobile ? 14.5 : 15.5, color: '#0f172a', display: 'block', marginBottom: 2 }}>
                               🏷️ تصنيفات المنتجات الأكثر طلباً (Categories)
                             </Text>
-                            <div style={{ fontSize: 11.5, color: '#64748b' }}>
+                            <div style={{ fontSize: isMobile ? 11 : 11.5, color: '#64748b' }}>
                               حصة كل قسم وتصنيف من إجمالي مبيعات الفرع
                             </div>
                           </div>
 
                           {topCategories.length > 0 ? (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                              <ResponsiveContainer width="100%" height={210}>
-                                <PieChart>
-                                  <Pie
-                                    data={topCategories}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={50}
-                                    outerRadius={80}
-                                    paddingAngle={topCategories.length > 1 ? 4 : 0}
-                                    dataKey="total_revenue"
-                                    nameKey="category_name"
-                                  >
-                                    {topCategories.map((entry, index) => (
-                                      <Cell key={`cat-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
-                                    ))}
-                                  </Pie>
-                                  <ChartTooltip
-                                    contentStyle={{
-                                      borderRadius: 10,
-                                      border: '1px solid #e2e8f0',
-                                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                                      fontFamily: "'Cairo', sans-serif"
-                                    }}
-                                    formatter={(v, n, item) => [
-                                      `${Number(v).toLocaleString()} ج.م (${item?.payload?.units_sold || 0} قطعة)`,
-                                      'الإيراد'
-                                    ]}
-                                  />
-                                </PieChart>
-                              </ResponsiveContainer>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0, width: '100%' }}>
+                              <SafeChartContainer height={isMobile ? 180 : 210}>
+                                {({ width, height }) => (
+                                  <ResponsiveContainer key={`cat-pie-${isMobile ? 'm' : 'd'}`} width={width} height={height} minWidth={0}>
+                                    <PieChart>
+                                      <Pie
+                                        data={topCategories}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={isMobile ? 38 : 50}
+                                        outerRadius={isMobile ? 62 : 80}
+                                        paddingAngle={topCategories.length > 1 ? 4 : 0}
+                                        dataKey="total_revenue"
+                                        nameKey="category_name"
+                                      >
+                                        {topCategories.map((entry, index) => (
+                                          <Cell key={`cat-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                                        ))}
+                                      </Pie>
+                                      <ChartTooltip
+                                        contentStyle={{
+                                          borderRadius: 10,
+                                          border: '1px solid #e2e8f0',
+                                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                                          fontFamily: "'Cairo', sans-serif"
+                                        }}
+                                        formatter={(v, n, item) => [
+                                          `${Number(v).toLocaleString()} ج.م (${item?.payload?.units_sold || 0} قطعة)`,
+                                          'الإيراد'
+                                        ]}
+                                      />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                )}
+                              </SafeChartContainer>
 
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxHeight: 120, overflowY: 'auto', paddingRight: 4 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxHeight: isMobile ? 140 : 120, overflowY: 'auto', paddingRight: 4 }}>
                                 {topCategories.map((c, idx) => {
                                   const color = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
                                   const pct = totalCatRevenue > 0 ? Math.round((c.total_revenue / totalCatRevenue) * 100) : 0;
@@ -979,20 +1064,20 @@ export default function SalesReportsPage({ currentUser }) {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
-                                        padding: '4px 8px',
+                                        padding: '5px 8px',
                                         background: '#f8fafc',
                                         borderRadius: 8,
-                                        fontSize: 12
+                                        fontSize: isMobile ? 11 : 12
                                       }}
                                     >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
-                                        <span style={{ fontWeight: 700, color: '#1e293b' }}>{c.category_name}</span>
-                                        <span style={{ fontSize: 11, color: '#64748b' }}>({pct}%)</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                                        <span style={{ fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.category_name}</span>
+                                        <span style={{ fontSize: isMobile ? 10 : 11, color: '#64748b' }}>({pct}%)</span>
                                       </div>
-                                      <div style={{ textAlign: 'left' }}>
+                                      <div style={{ textAlign: 'left', flexShrink: 0, paddingLeft: 4 }}>
                                         <span style={{ fontWeight: 800, color: '#0f172a' }}>{c.total_revenue.toLocaleString()} ج.م</span>
-                                        <span style={{ fontSize: 10.5, color: '#64748b', marginRight: 4 }}>({c.units_sold} قطعة)</span>
+                                        <span style={{ fontSize: 10, color: '#64748b', marginRight: 4 }}>({c.units_sold} ق)</span>
                                       </div>
                                     </div>
                                   );

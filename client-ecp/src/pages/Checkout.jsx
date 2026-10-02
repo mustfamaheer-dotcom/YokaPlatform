@@ -34,7 +34,10 @@ import {
   QrcodeOutlined,
   WalletOutlined,
   CreditCardOutlined,
-  EyeOutlined
+  EyeOutlined,
+  DownOutlined,
+  UpOutlined,
+  ShoppingCartOutlined
 } from '@ant-design/icons';
 import { Sparkles, Truck } from 'lucide-react';
 import api from '../api';
@@ -62,6 +65,7 @@ export default function Checkout({ cart, onRefreshCart }) {
   const [copiedKey, setCopiedKey] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
   const [reservationTimeLeft, setReservationTimeLeft] = useState(900); // 15 mins in seconds
 
   useEffect(() => {
@@ -284,8 +288,60 @@ export default function Checkout({ cart, onRefreshCart }) {
         }
         type="warning"
         showIcon={false}
-        style={{ marginBottom: 24, borderRadius: 8, backgroundColor: '#0F172A', border: '1px solid rgba(200, 164, 92, 0.35)', color: '#E2C889' }}
+        style={{ marginBottom: 20, borderRadius: 8, backgroundColor: '#0F172A', border: '1px solid rgba(200, 164, 92, 0.35)', color: '#E2C889' }}
       />
+
+      {/* Mobile Collapsible Order Summary Header */}
+      {screens.xs && (
+        <div
+          onClick={() => setMobileSummaryOpen(!mobileSummaryOpen)}
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderRadius: 12,
+            padding: '12px 16px',
+            marginBottom: 20,
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(15,23,42,0.03)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0F172A', fontWeight: 700, fontSize: 13.5 }}>
+              <ShoppingCartOutlined style={{ color: '#C8A45C', fontSize: 16 }} />
+              <span>ملخص الطلب ({cart.items_count} قطعة)</span>
+              {mobileSummaryOpen ? <UpOutlined style={{ fontSize: 10, color: '#94A3B8' }} /> : <DownOutlined style={{ fontSize: 10, color: '#94A3B8' }} />}
+            </div>
+            <div style={{ fontWeight: 900, color: '#C8A45C', fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>
+              {totalAmount.toLocaleString()} ج.م
+            </div>
+          </div>
+
+          {mobileSummaryOpen && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #F1F5F9' }}>
+              {cart.items.map((item) => (
+                <div key={item.item_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 13 }}>
+                  <div style={{ flex: 1, paddingLeft: 8 }}>
+                    <Text strong ellipsis style={{ color: '#0F172A', display: 'block' }}>{item.product_name}</Text>
+                    <Text type="secondary" style={{ fontSize: 11, color: '#64748B' }}>
+                      الكمية: {item.quantity} × {parseFloat(item.unit_price).toLocaleString()} ج.م
+                    </Text>
+                  </div>
+                  <Text strong style={{ color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                    {(item.quantity * parseFloat(item.unit_price)).toLocaleString()} ج.م
+                  </Text>
+                </div>
+              ))}
+              <Divider style={{ margin: '8px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <Text type="secondary">تكلفة الشحن ({selectedGov}):</Text>
+                <Text strong style={{ color: isFreeShipping ? '#16A34A' : '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                  {isFreeShipping ? 'مجاناً' : `${finalShippingCost} ج.م`}
+                </Text>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: screens.xs ? 'column' : 'row', justifyContent: 'space-between', alignItems: screens.xs ? 'flex-start' : 'center', gap: 10, marginBottom: 20 }}>
         <div>
@@ -797,6 +853,40 @@ export default function Checkout({ cart, onRefreshCart }) {
           />
         </div>
       </Modal>
+
+      {/* Sticky Bottom Place Order CTA for Mobile */}
+      {screens.xs && (
+        <div className="sticky-cta-bar" style={{ zIndex: 1200 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>المجموع الكلي</span>
+            <span style={{ fontSize: 18, fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+              {totalAmount.toLocaleString()} <span style={{ fontSize: 12, color: '#C8A45C', fontWeight: 800 }}>ج.م</span>
+            </span>
+          </div>
+          <Button
+            type="primary"
+            size="large"
+            loading={submitting}
+            icon={<LockOutlined />}
+            onClick={() => form.submit()}
+            className="btn-touch"
+            style={{
+              flex: 1,
+              maxWidth: 220,
+              height: 48,
+              backgroundColor: '#C8A45C',
+              color: '#0F172A',
+              borderRadius: 10,
+              fontWeight: 800,
+              border: 'none',
+              fontSize: 14.5,
+              boxShadow: '0 4px 14px rgba(200, 164, 92, 0.4)'
+            }}
+          >
+            تأكيد الطلب الآن
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

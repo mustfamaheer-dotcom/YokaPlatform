@@ -208,7 +208,7 @@ export default function SupervisorPageLayout({
       </header>
 
       {/* ─── Main Content ─── */}
-      <main style={{ flex: 1, padding: '24px 28px 48px', maxWidth: 1440, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <main className="swm-main-content" style={{ flex: 1, padding: '24px 28px 48px', maxWidth: 1440, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
         {children}
       </main>
     </div>

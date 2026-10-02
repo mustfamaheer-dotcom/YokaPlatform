@@ -21,7 +21,7 @@ router.get('/', requireAuth, async (req, res) => {
  * PUT /api/swm/store-settings/:key
  * Update a specific setting
  */
-router.put('/:key', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'general_manager']), async (req, res) => {
+router.put('/:key', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'general_manager', 'salesperson', 'warehouse_admin', 'inventory_manager', 'branch_account', 'cashier']), async (req, res) => {
   try {
     const { key } = req.params;
     const { value } = req.body;
@@ -59,7 +59,7 @@ router.put('/:key', requireAuth, requireRole(['super_admin', 'admin', 'superviso
  * POST /api/swm/store-settings/bulk
  * Update multiple settings in one call
  */
-router.post('/bulk', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'general_manager']), async (req, res) => {
+router.post('/bulk', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'general_manager', 'salesperson', 'warehouse_admin', 'inventory_manager', 'branch_account', 'cashier']), async (req, res) => {
   try {
     const { settings } = req.body; // e.g. { hero_offer_enabled: 'true', hero_offer_text: '...', hero_offer_link: '...' }
     if (!settings || typeof settings !== 'object') {

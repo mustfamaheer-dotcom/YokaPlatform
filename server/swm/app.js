@@ -156,11 +156,13 @@ const ecpCatalogRoutes = require('../ecp/routes/catalog');
 const ecpCartRoutes = require('../ecp/routes/cart');
 const ecpCheckoutRoutes = require('../ecp/routes/checkout');
 const ecpTrackingRoutes = require('../ecp/routes/tracking');
+const ecpSitemapRoutes = require('../ecp/routes/sitemap');
 
 app.use('/api/ecp/catalog', ecpCatalogRoutes);
 app.use('/api/ecp/cart', ecpCartRoutes);
 app.use('/api/ecp/checkout', ecpCheckoutRoutes);
 app.use('/api/ecp/track', ecpTrackingRoutes);
+app.use('/', ecpSitemapRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -267,8 +269,96 @@ if (swmStaticDir && fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
 // Serve ECP (Public Customer Store) on Root '/'
 if (ecpStaticDir && fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
   app.use('/', express.static(ecpStaticDir, staticOptions));
+
+  // Dynamic Server-Side Meta Injection for Products (WhatsApp, Facebook, Googlebot Rich Previews)
+  app.get('/product/:slug', async (req, res, next) => {
+    try {
+      const slug = req.params.slug;
+      const { query } = require('../shared/db');
+      const prodRes = await query(
+        `SELECT product_name, description, selling_price, sale_price, featured_image, brand, product_code, total_stock
+         FROM products
+         WHERE slug = $1 OR id::text = $1
+         LIMIT 1`,
+        [slug]
+      );
+      const prod = prodRes.rows?.[0] || prodRes?.[0];
+
+      if (prod) {
+        const rawSelling = parseFloat(prod.selling_price) || 0;
+        const rawSale = parseFloat(prod.sale_price) || 0;
+        const hasDiscount = rawSale > 0 && rawSale < rawSelling;
+        const price = hasDiscount ? rawSale : rawSelling;
+
+        const baseUrl = process.env.PUBLIC_STORE_URL || 'https://yokastore.runasp.net';
+        const pageTitle = `${prod.product_name} | يوكا ستور مصر`;
+        const pageDesc = prod.description
+          ? `${prod.description.substring(0, 150)}... - متوفر بسعر ${price.toLocaleString()} ج.م في يوكا ستور مع شحن سريع ومعاينة قبل الاستلام.`
+          : `تسوق ${prod.product_name} بجودة استثنائية وسعر ${price.toLocaleString()} ج.م من يوكا ستور. شحن سريع لكافة محافظات مصر ومعاينة قبل الاستلام.`;
+
+        let imageUrl = prod.featured_image || '/yokaStoreTransparent.png';
+        if (imageUrl.startsWith('/')) {
+          imageUrl = `${baseUrl}${imageUrl}`;
+        }
+        const pageUrl = `${baseUrl}/product/${slug}`;
+
+        let html = fs.readFileSync(path.join(ecpStaticDir, 'index.html'), 'utf8');
+
+        // Replace Title & Description
+        html = html.replace(/<title>.*?<\/title>/i, `<title>${pageTitle}</title>`);
+        html = html.replace(/<meta name="title" content=".*?" \/>/i, `<meta name="title" content="${pageTitle}" />`);
+        html = html.replace(/<meta name="description" content=".*?" \/>/i, `<meta name="description" content="${pageDesc}" />`);
+
+        // Replace Open Graph Tags
+        html = html.replace(/<meta property="og:title" content=".*?" \/>/i, `<meta property="og:title" content="${pageTitle}" />`);
+        html = html.replace(/<meta property="og:description" content=".*?" \/>/i, `<meta property="og:description" content="${pageDesc}" />`);
+        html = html.replace(/<meta property="og:url" content=".*?" \/>/i, `<meta property="og:url" content="${pageUrl}" />`);
+        html = html.replace(/<meta property="og:image" content=".*?" \/>/i, `<meta property="og:image" content="${imageUrl}" />`);
+
+        // Replace Twitter Tags
+        html = html.replace(/<meta property="twitter:title" content=".*?" \/>/i, `<meta property="twitter:title" content="${pageTitle}" />`);
+        html = html.replace(/<meta property="twitter:description" content=".*?" \/>/i, `<meta property="twitter:description" content="${pageDesc}" />`);
+        html = html.replace(/<meta property="twitter:image" content=".*?" \/>/i, `<meta property="twitter:image" content="${imageUrl}" />`);
+
+        // Inject Product Schema.org JSON-LD
+        const jsonLd = {
+          "@context": "https://schema.org/",
+          "@type": "Product",
+          "name": prod.product_name,
+          "image": [imageUrl],
+          "description": pageDesc,
+          "sku": prod.product_code || slug,
+          "brand": {
+            "@type": "Brand",
+            "name": prod.brand || "Yoka Store"
+          },
+          "offers": {
+            "@type": "Offer",
+            "url": pageUrl,
+            "priceCurrency": "EGP",
+            "price": price,
+            "availability": parseInt(prod.total_stock, 10) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            "seller": {
+              "@type": "Organization",
+              "name": "Yoka Store"
+            }
+          }
+        };
+
+        const jsonLdScript = `\n    <script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n    </script>\n  </head>`;
+        html = html.replace('</head>', jsonLdScript);
+
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        return res.send(html);
+      }
+    } catch (ssrErr) {
+      console.warn('Product SSR Meta Injection warning:', ssrErr.message);
+    }
+    sendNoCacheFile(res, path.join(ecpStaticDir, 'index.html'));
+  });
+
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path === '/health' || req.path.startsWith('/swm-admin')) return next();
+    if (req.path.startsWith('/api/') || req.path === '/health' || req.path.startsWith('/swm-admin') || req.path === '/sitemap.xml' || req.path === '/robots.txt') return next();
     sendNoCacheFile(res, path.join(ecpStaticDir, 'index.html'));
   });
 } else {

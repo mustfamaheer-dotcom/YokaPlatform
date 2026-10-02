@@ -14,6 +14,8 @@ import {
 } from '@ant-design/icons';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
+import SEO from '../components/SEO';
+import { Sparkles, Star, ShieldCheck, Users } from 'lucide-react';
 import heroBagImg from '../assets/hero-bag.png';
 
 const { Title, Text } = Typography;
@@ -80,34 +82,86 @@ export default function Home({ onAddToCart }) {
     return inStock.filter(p => String(p.category_id) === String(selectedCategoryFilter));
   }, [featuredProducts, selectedCategoryFilter]);
 
+  const homeSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': 'https://yokastore.runasp.net/#organization',
+        'name': 'يوكا ستور | Yoka Store',
+        'url': 'https://yokastore.runasp.net/',
+        'logo': 'https://yokastore.runasp.net/yokaStoreTransparent.png',
+        'description': storeSettings?.seo_description || 'أرقى أزياء وموضة وملابس في مصر مع شحن سريع ودفع عند الاستلام',
+        'contactPoint': {
+          '@type': 'ContactPoint',
+          'telephone': storeSettings?.contact_phone || '+201000000000',
+          'contactType': 'customer service',
+          'areaServed': 'EG',
+          'availableLanguage': ['Arabic']
+        }
+      },
+      {
+        '@type': 'WebSite',
+        '@id': 'https://yokastore.runasp.net/#website',
+        'url': 'https://yokastore.runasp.net/',
+        'name': 'يوكا ستور Yoka Store',
+        'potentialAction': {
+          '@type': 'SearchAction',
+          'target': 'https://yokastore.runasp.net/catalog?search={search_term_string}',
+          'query-input': 'required name=search_term_string'
+        }
+      }
+    ]
+  }), [storeSettings]);
+
   return (
     <div className="fade-in">
+      <SEO
+        title={storeSettings?.seo_title ? storeSettings.seo_title.replace(' | يوكا ستور', '') : 'الرئيسية — تسوق أحدث صيحات الموضة والأزياء في مصر'}
+        description={storeSettings?.seo_description}
+        keywords={storeSettings?.seo_keywords}
+        schemaData={homeSchema}
+      />
+
       {/* 1. Hero Banner Section */}
       <section
         className="hero-gradient"
         style={{
           borderRadius: 20,
-          padding: 'clamp(28px, 4.5vw, 44px) clamp(20px, 4vw, 44px)',
-          marginBottom: 32,
+          padding: 'clamp(20px, 3.8vw, 44px) clamp(16px, 3.5vw, 44px)',
+          marginBottom: 28,
           position: 'relative',
           overflow: 'hidden'
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'clamp(24px, 4vw, 56px)',
-            flexWrap: 'wrap',
-            position: 'relative',
-            zIndex: 2
-          }}
-        >
-          {/* Right Side: Headline and Single Catalog CTA */}
-          <div style={{ flex: '1 1 380px', maxWidth: 640, position: 'relative', zIndex: 2 }}>
-            <Title level={1} className="hero-title" style={{ color: '#FFFFFF', fontWeight: 900, marginBottom: 28, textWrap: 'balance' }}>
+        <div className="hero-main-layout">
+          {/* Header Block: Badges, Headline, and Editorial Subtitle */}
+          <div className="hero-header-area">
+            {/* Category / Collection Badge */}
+            {storeSettings.hero_badge_text && (
+              <div style={{ marginBottom: 12 }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: 'rgba(200, 164, 92, 0.18)',
+                    border: '1px solid rgba(200, 164, 92, 0.45)',
+                    color: '#DFCA95',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    padding: '4px 12px',
+                    borderRadius: 20,
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <Sparkles size={13} color="#C8A45C" />
+                  <span>{storeSettings.hero_badge_text}</span>
+                </span>
+              </div>
+            )}
+
+            <Title level={1} className="hero-title" style={{ color: '#FFFFFF', fontWeight: 900, marginBottom: storeSettings.hero_subtitle ? 10 : 18, textWrap: 'balance' }}>
               {storeSettings.hero_title ? (
                 storeSettings.hero_title.includes('يوكا ستور') ? (
                   <>
@@ -123,46 +177,24 @@ export default function Home({ onAddToCart }) {
               )}
             </Title>
 
-            <div>
-              <Link to={storeSettings.hero_button_link || '/catalog'}>
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<ArrowLeftOutlined />}
-                  style={{
-                    height: 52,
-                    padding: '0 36px',
-                    backgroundColor: '#C8A45C',
-                    color: '#0F172A',
-                    fontWeight: 800,
-                    borderRadius: 26,
-                    fontSize: 16,
-                    border: 'none',
-                    boxShadow: '0 6px 22px rgba(200,164,92,0.4)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8
-                  }}
-                >
-                  {storeSettings.hero_button_text || 'تسوق الكتالوج الآن'}
-                </Button>
-              </Link>
-            </div>
+            {/* Editorial Subtitle */}
+            {storeSettings.hero_subtitle && (
+              <p
+                className="hero-subtitle"
+                style={{
+                  color: '#CBD5E1',
+                  lineHeight: 1.6,
+                  marginBottom: 16,
+                  maxWidth: 540
+                }}
+              >
+                {storeSettings.hero_subtitle}
+              </p>
+            )}
           </div>
 
-          {/* Left Side: 3D Luxury Product Bag */}
-          <div
-            className="hero-3d-wrapper"
-            style={{
-              flex: '1 1 260px',
-              maxWidth: 380,
-              minWidth: 220,
-              margin: '0 auto',
-              display: 'flex',
-              justifyContent: 'center',
-              position: 'relative'
-            }}
-          >
+          {/* 3D Luxury Product Bag Showcase */}
+          <div className="hero-3d-wrapper">
             {/* Luxury Backlight Halo */}
             <div className="hero-3d-backlight" />
 
@@ -174,14 +206,54 @@ export default function Home({ onAddToCart }) {
               src={heroBagImg}
               alt="حقيبة جلدية فاخرة يوكا ستور"
               className="hero-3d-bag"
-              style={{
-                width: '100%',
-                maxHeight: 330,
-                objectFit: 'contain',
-                display: 'block'
-              }}
             />
           </div>
+
+          {/* Call-To-Action (CTA) Buttons Group */}
+          <div className="hero-cta-group">
+            <Link to={storeSettings.hero_button_link || '/catalog'} className="hero-cta-link">
+              <Button
+                type="primary"
+                size="large"
+                icon={<ArrowLeftOutlined />}
+                className="hero-btn-primary"
+              >
+                <span className="hero-btn-text">{storeSettings.hero_button_text || 'تسوق الكتالوج الآن'}</span>
+              </Button>
+            </Link>
+
+            {storeSettings.hero_secondary_button_text && (
+              <Link to={storeSettings.hero_secondary_button_link || '/catalog?sort=popular'} className="hero-cta-link">
+                <Button
+                  size="large"
+                  className="hero-btn-secondary"
+                >
+                  <span className="hero-btn-text">{storeSettings.hero_secondary_button_text}</span>
+                </Button>
+              </Link>
+            )}
+          </div>
+
+          {/* Floating Trust & Credibility Statistics */}
+          {storeSettings.hero_stats_enabled !== 'false' && (
+            <div className="hero-stats-bar">
+              <div className="hero-stat-item">
+                <Users size={14} color="#C8A45C" style={{ flexShrink: 0 }} />
+                <span className="hero-stat-num">+2,500</span>
+                <span className="hero-stat-label">عميل</span>
+              </div>
+              <div className="hero-stat-divider" />
+              <div className="hero-stat-item">
+                <Star size={13} color="#EAB308" fill="#EAB308" style={{ flexShrink: 0 }} />
+                <span className="hero-stat-rating">4.9 تقييم</span>
+              </div>
+              <div className="hero-stat-divider" />
+              <div className="hero-stat-item">
+                <ShieldCheck size={14} color="#C8A45C" style={{ flexShrink: 0 }} />
+                <span className="hero-stat-label">فحص عند الاستلام</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Ambient Corner Glow */}
@@ -199,133 +271,7 @@ export default function Home({ onAddToCart }) {
         />
       </section>
 
-      {/* 2. Modern Category Section (Responsive Grid + Mobile Touch Track) */}
-      {categories.length > 0 && (
-        <section style={{ marginBottom: 44 }}>
-          {/* Section Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 18 }}>
-            <div>
-              <Title level={3} style={{ margin: 0, fontWeight: 900, fontSize: 'clamp(18px, 3vw, 24px)', color: '#0F172A' }}>
-                <AppstoreOutlined style={{ color: '#C8A45C', marginLeft: 8 }} />
-                التصنيفات المميزة
-              </Title>
-              <Text type="secondary" style={{ fontSize: 13 }}>تصفح تشكيلاتنا الحصرية المتجددة بعناية</Text>
-            </div>
-            <Link to="/catalog" style={{ color: '#C8A45C', fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <span>عرض الكل</span>
-              <ArrowLeftOutlined style={{ fontSize: 11 }} />
-            </Link>
-          </div>
-
-          {/* Desktop & Tablet Grid View */}
-          <div className="desktop-only">
-            <Row gutter={[16, 16]}>
-              {categories.map((cat) => (
-                <Col xs={12} sm={8} md={6} lg={Math.max(4, Math.floor(24 / Math.min(categories.length, 6)))} key={cat.id}>
-                  <Link to={`/catalog?category_id=${cat.id}`} style={{ display: 'block', height: '100%' }}>
-                    <div className="category-card" style={{ padding: '22px 14px' }}>
-                      <div
-                        className="category-icon-wrapper"
-                        style={{
-                          width: 56,
-                          height: 56,
-                          margin: '0 auto 12px',
-                          background: 'rgba(200, 164, 92, 0.12)',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#C8A45C',
-                          fontSize: 24,
-                          boxShadow: '0 4px 12px rgba(200, 164, 92, 0.15)'
-                        }}
-                      >
-                        {getCategoryIcon(cat.slug, cat.category_name)}
-                      </div>
-                      <Text strong style={{ fontSize: 15, display: 'block', color: '#0F172A', marginBottom: 4 }}>
-                        {cat.category_name}
-                      </Text>
-                      <span 
-                        style={{ 
-                          fontSize: 11, 
-                          color: '#64748B', 
-                          background: '#F1F5F9', 
-                          padding: '2px 8px', 
-                          borderRadius: 12,
-                          display: 'inline-block'
-                        }}
-                      >
-                        {cat.products_count} منتج متوفر
-                      </span>
-                    </div>
-                  </Link>
-                </Col>
-              ))}
-            </Row>
-          </div>
-
-          {/* Mobile Horizontal Swipeable Category Track */}
-          <div className="mobile-only">
-            <div 
-              className="horizontal-scroll-strip"
-              style={{
-                display: 'flex',
-                gap: 12,
-                overflowX: 'auto',
-                paddingBottom: 8,
-                scrollSnapType: 'x mandatory'
-              }}
-            >
-              {categories.map((cat) => (
-                <Link 
-                  to={`/catalog?category_id=${cat.id}`} 
-                  key={cat.id}
-                  style={{
-                    flex: '0 0 135px',
-                    scrollSnapAlign: 'start'
-                  }}
-                >
-                  <div 
-                    className="category-card"
-                    style={{
-                      padding: '16px 10px',
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <div
-                      className="category-icon-wrapper"
-                      style={{
-                        width: 46,
-                        height: 46,
-                        borderRadius: '50%',
-                        background: 'rgba(200, 164, 92, 0.12)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#C8A45C',
-                        fontSize: 20,
-                        marginBottom: 8
-                      }}
-                    >
-                      {getCategoryIcon(cat.slug, cat.category_name)}
-                    </div>
-                    <Text strong style={{ fontSize: 13, color: '#0F172A', textAlign: 'center', display: 'block' }}>
-                      {cat.category_name}
-                    </Text>
-                    <span style={{ fontSize: 10, color: '#64748B', marginTop: 2 }}>
-                      {cat.products_count} منتج
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Products Section (Immediately after Hero) */}
 
       {/* 4. Featured & New Arrivals Products Section */}
       <section style={{ marginBottom: 48 }}>
@@ -383,11 +329,13 @@ export default function Home({ onAddToCart }) {
         {/* Products Grid / Skeleton / Empty State */}
         {loading ? (
           <Row gutter={[{ xs: 12, sm: 16, md: 20 }, { xs: 14, sm: 18, md: 24 }]}>
-            {[...Array(4)].map((_, i) => (
+            {[...Array(8)].map((_, i) => (
               <Col xs={12} sm={8} lg={6} key={i}>
-                <div style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 12, overflow: 'hidden' }}>
-                  <div style={{ width: '100%', paddingTop: '100%', background: '#F8FAFC', borderRadius: 12, marginBottom: 12 }} />
-                  <Skeleton active paragraph={{ rows: 2 }} title={{ width: '70%' }} />
+                <div style={{ background: '#FFFFFF', borderRadius: 20, border: '1px solid rgba(226, 232, 240, 0.85)', padding: 8, overflow: 'hidden', boxShadow: '0 4px 18px rgba(15, 23, 42, 0.04)' }}>
+                  <div style={{ width: '100%', aspectRatio: '3 / 4', background: '#F1F5F9', borderRadius: 14, marginBottom: 12 }} />
+                  <div style={{ padding: '0 6px 6px' }}>
+                    <Skeleton active paragraph={{ rows: 2 }} title={{ width: '75%' }} />
+                  </div>
                 </div>
               </Col>
             ))}

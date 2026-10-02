@@ -1702,7 +1702,7 @@ body {
 /* Recharts containers */
 .recharts-wrapper,
 .recharts-surface {
-  background: #ffffff !important;
+  background: transparent !important;
 }
 
 .recharts-text,
@@ -2176,12 +2176,30 @@ html, body, #root {
     min-width: 0 !important;
   }
 
-  .swm-sales-filter-controls .ant-picker {
+  .swm-sales-filter-controls .ant-space-compact {
+    display: flex !important;
     width: 100% !important;
   }
 
-  .swm-sales-filter-controls .ant-btn {
+  .swm-sales-filter-controls .ant-space-compact .ant-btn {
+    flex: 1 1 0% !important;
+    width: auto !important;
+    text-align: center !important;
+    padding: 0 4px !important;
+  }
+
+  .swm-sales-filter-controls .ant-picker {
     width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .swm-sales-filter-controls .ant-picker .ant-picker-input > input {
+    font-size: 12px !important;
+  }
+
+  .swm-sales-filter-controls > .ant-btn {
+    width: 100% !important;
+    height: 40px !important;
   }
 
   /* Radio Groups on Mobile */
@@ -2220,21 +2238,21 @@ html, body, #root {
   /* Charts on Mobile */
   .swm-chart-card {
     padding: 14px 10px !important;
+    overflow: hidden !important;
   }
 
-  .recharts-wrapper,
-  .recharts-surface {
+  .recharts-responsive-container {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .recharts-wrapper {
     max-width: 100% !important;
   }
 
   .recharts-legend-wrapper {
-    position: relative !important;
-    width: 100% !important;
-    display: flex !important;
-    justify-content: center !important;
-    flex-wrap: wrap !important;
-    gap: 4px !important;
-    padding-top: 8px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   /* Tabs horizontal scroll */

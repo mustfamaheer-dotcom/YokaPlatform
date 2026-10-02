@@ -318,6 +318,20 @@ router.post('/order', async (req, res) => {
             [ONLINE_BRANCH_ID, it.product_id]
           );
           balanceRow = res.rows[0];
+          // If no un-varianted balance row has enough stock, find any variant row with available_qty >= qty
+          if (!balanceRow || parseInt(balanceRow.available_qty, 10) < qty) {
+            const varFallback = await client.query(
+              `SELECT * FROM inventory_balances
+               WHERE branch_id = $1 AND product_id = $2 AND available_qty >= $3
+               ORDER BY available_qty DESC
+               LIMIT 1
+               FOR UPDATE`,
+              [ONLINE_BRANCH_ID, it.product_id, qty]
+            );
+            if (varFallback.rows.length > 0) {
+              balanceRow = varFallback.rows[0];
+            }
+          }
         }
 
         const availStock = balanceRow ? parseInt(balanceRow.available_qty, 10) : 0;
