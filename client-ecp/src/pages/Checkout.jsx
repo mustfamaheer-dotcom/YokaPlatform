@@ -227,6 +227,7 @@ export default function Checkout({ cart, onRefreshCart }) {
         cart_id: cart.cart_id,
         customer_name: values.customer_name,
         customer_phone: values.customer_phone,
+        customer_secondary_phone: values.customer_secondary_phone || undefined,
         customer_email: values.customer_email || undefined,
         governorate: selectedGov,
         city: values.city,
@@ -383,11 +384,19 @@ export default function Checkout({ cart, onRefreshCart }) {
                     label="رقم الهاتف (للتواصل والتوصيل)"
                     name="customer_phone"
                     rules={[
-                      { required: true, message: 'يرجى إدخال رقم الهاتف' },
-                      { pattern: /^01[0125][0-9]{8}$/, message: 'يرجى إدخال رقم هاتف مصري صحيح (11 رقم)' }
+                      { required: true, message: 'يرجى إدخال رقم الهاتف' }
                     ]}
                   >
-                    <Input size="large" type="tel" autoComplete="tel" placeholder="010XXXXXXXX" />
+                    <Input size="large" type="tel" autoComplete="tel" placeholder="رقم الموبايل" />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="رقم هاتف بديل (اختياري)"
+                    name="customer_secondary_phone"
+                  >
+                    <Input size="large" type="tel" autoComplete="tel" placeholder="رقم موبايل آخر للتواصل" />
                   </Form.Item>
                 </Col>
               </Row>

@@ -726,6 +726,11 @@ export default function Orders({
             <div style={{ fontSize: 12, color: '#059669', direction: 'ltr', textAlign: 'right' }}>
               {addr.phone || '-'}
             </div>
+            {addr.secondary_phone && (
+              <div style={{ fontSize: 11, color: '#64748B', direction: 'ltr', textAlign: 'right', marginTop: 2 }}>
+                بديل: {addr.secondary_phone}
+              </div>
+            )}
           </div>
         );
       }
@@ -1292,7 +1297,14 @@ export default function Orders({
           <div>
             <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 20 }}>
               <Descriptions.Item label="اسم المستلم">{selectedAddr.recipient_name || '-'}</Descriptions.Item>
-              <Descriptions.Item label="رقم الهاتف">{selectedAddr.phone || '-'}</Descriptions.Item>
+              <Descriptions.Item label="رقم الهاتف">
+                {selectedAddr.phone || '-'}
+                {selectedAddr.secondary_phone && (
+                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                    بديل: {selectedAddr.secondary_phone}
+                  </div>
+                )}
+              </Descriptions.Item>
               <Descriptions.Item label="عنوان الشحن" span={2}>
                 {selectedAddr.governorate} — {selectedAddr.city} — {selectedAddr.street_address} {selectedAddr.building_apartment}
               </Descriptions.Item>

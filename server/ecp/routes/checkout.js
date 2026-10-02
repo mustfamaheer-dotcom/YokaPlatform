@@ -136,6 +136,7 @@ router.post('/order', async (req, res) => {
       customer_name,
       customer_email,
       customer_phone,
+      customer_secondary_phone,
       governorate,
       city,
       street_address,
@@ -244,6 +245,8 @@ router.post('/order', async (req, res) => {
     const shippingAddress = {
       recipient_name: customer_name,
       phone: customer_phone,
+      secondary_phone: customer_secondary_phone || '',
+      alternative_phone: customer_secondary_phone || '',
       governorate: governorateName,
       city: city || '',
       street_address,

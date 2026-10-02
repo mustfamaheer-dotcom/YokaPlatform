@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, Menu, Button, Space, Typography, Tag, Avatar, Card, Badge, Tooltip, Row, Col } from 'antd';
 import {
@@ -15,6 +15,7 @@ import {
   TrendingUp,
   ArrowRight
 } from 'lucide-react';
+import api from '../../api';
 import yokaLogo from '../../assets/yokaStoreTransparent.png';
 import Orders from '../Orders';
 import EcomInventory from '../EcomInventory';
@@ -41,6 +42,37 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
     }
   };
 
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+
+  const fetchPendingOrdersCount = async () => {
+    try {
+      const res = await api.get('/api/swm/orders/pending-count');
+      if (res.data?.success) {
+        setPendingOrdersCount(res.data.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch pending orders count:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingOrdersCount();
+
+    const handleOrdersChange = () => {
+      fetchPendingOrdersCount();
+    };
+
+    window.addEventListener('ecp-orders-updated', handleOrdersChange);
+    window.addEventListener('focus', handleOrdersChange);
+    const interval = setInterval(fetchPendingOrdersCount, 20000);
+
+    return () => {
+      window.removeEventListener('ecp-orders-updated', handleOrdersChange);
+      window.removeEventListener('focus', handleOrdersChange);
+      clearInterval(interval);
+    };
+  }, []);
+
   const navigationCards = [
     {
       key: 'orders',
@@ -51,8 +83,8 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
       activeBg: 'linear-gradient(135deg, rgba(37, 99, 235, 0.22) 0%, #1e293b 100%)',
       iconActiveBg: 'rgba(37, 99, 235, 0.35)',
       glowColor: 'rgba(37, 99, 235, 0.25)',
-      badge: 'الطلبات',
-      badgeColor: 'blue'
+      badge: pendingOrdersCount > 0 ? `${pendingOrdersCount} طلب جديد` : 'الطلبات',
+      badgeColor: pendingOrdersCount > 0 ? 'red' : 'blue'
     },
     {
       key: 'rates',

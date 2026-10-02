@@ -277,6 +277,11 @@ export default function OrderSuccess() {
             </Descriptions.Item>
             <Descriptions.Item label="رقم الهاتف">
               {order.shipping_address?.phone || '-'}
+              {order.shipping_address?.secondary_phone && (
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  بديل: {order.shipping_address.secondary_phone}
+                </div>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="عنوان التوصيل" span={{ xs: 1, sm: 2 }}>
               {order.shipping_address?.governorate} — {order.shipping_address?.city} — {order.shipping_address?.street_address} {order.shipping_address?.building_apartment}
