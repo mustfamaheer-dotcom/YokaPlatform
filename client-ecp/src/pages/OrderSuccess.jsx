@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Result, Button, Card, Descriptions, Table, Typography, Space, Spin } from 'antd';
-import { CheckCircleFilled, ShoppingOutlined, PrinterOutlined, HomeOutlined, MessageOutlined } from '@ant-design/icons';
+import { Result, Button, Card, Descriptions, Table, Typography, Space, Spin, App as AntdApp } from 'antd';
+import {
+  CheckCircleFilled,
+  ShoppingOutlined,
+  PrinterOutlined,
+  HomeOutlined,
+  MessageOutlined,
+  CameraOutlined
+} from '@ant-design/icons';
+import html2canvas from 'html2canvas';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { trackPurchase } from '../services/tracker';
@@ -9,9 +17,11 @@ import { trackPurchase } from '../services/tracker';
 const { Title, Text } = Typography;
 
 export default function OrderSuccess() {
+  const { message } = AntdApp.useApp();
   const { orderNumber } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [savingImage, setSavingImage] = useState(false);
   const [storeSettings, setStoreSettings] = useState(null);
 
   useEffect(() => {
@@ -92,6 +102,39 @@ export default function OrderSuccess() {
   }
   const contactPhone = storeSettings?.contact_phone || '01000000000';
 
+  const handleSaveAsImage = async () => {
+    const invoiceEl = document.querySelector('.customer-invoice-print');
+    if (!invoiceEl) {
+      window.print();
+      return;
+    }
+    setSavingImage(true);
+    message.loading({ content: 'جاري إنشاء وحفظ صورة الفاتورة...', key: 'save-invoice-msg' });
+    try {
+      const canvas = await html2canvas(invoiceEl, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#FFFFFF',
+        ignoreElements: (el) => el.classList.contains('no-print')
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = dataUrl;
+      downloadLink.download = `فاتورة-طلب-${orderNumber || 'yoka'}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      message.success({ content: 'تم حفظ الفاتورة كصورة بنجاح في جهازك!', key: 'save-invoice-msg' });
+    } catch (err) {
+      console.error('Failed to capture invoice image:', err);
+      message.info({ content: 'سيتم فتح نافذة الطباعة/الحفظ الآن', key: 'save-invoice-msg' });
+      window.print();
+    } finally {
+      setSavingImage(false);
+    }
+  };
+
   return (
     <div className="fade-in" style={{ maxWidth: 840, margin: '0 auto', paddingBottom: 60 }}>
       <Result
@@ -106,12 +149,13 @@ export default function OrderSuccess() {
         extra={
           <Space wrap size="middle" style={{ justifyContent: 'center' }}>
             <Button
-              key="print"
-              icon={<PrinterOutlined />}
-              onClick={() => window.print()}
+              key="save-image"
+              icon={<CameraOutlined />}
+              onClick={handleSaveAsImage}
+              loading={savingImage}
               className="print-invoice-highlight-btn"
             >
-              طباعة الفاتورة
+              حفظ الفاتورة ك صورة
             </Button>
             <Link to="/" key="home">
               <Button type="primary" size="large" icon={<HomeOutlined />} style={{ backgroundColor: '#0F172A', color: '#FFFFFF', borderRadius: 8, fontWeight: 700, border: 'none', height: 44 }}>
@@ -132,7 +176,7 @@ export default function OrderSuccess() {
         }
       />
 
-      {/* Customer Notice to Print/Save Invoice */}
+      {/* Customer Notice to Save Invoice as Image */}
       <div className="invoice-action-notice no-print">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 260 }}>
           <div
@@ -150,32 +194,33 @@ export default function OrderSuccess() {
               boxShadow: '0 2px 8px rgba(217, 119, 6, 0.28)'
             }}
           >
-            <PrinterOutlined />
+            <CameraOutlined />
           </div>
           <div>
             <div style={{ fontSize: 15.5, fontWeight: 800, color: '#92400E', marginBottom: 2 }}>
-              تنبيه هام: يرجى طباعة الفاتورة أو حفظها كمرجع لطلبك
+              تنبيه هام: يرجى حفظ الفاتورة ك صورة كمرجع لطلبك
             </div>
             <div style={{ fontSize: 13, color: '#78350F', lineHeight: 1.5 }}>
-              يرجى الاحتفاظ بنسخة مطبوعة أو PDF من الفاتورة لمطابقة الأصناف مع مندوب التوصيل وتسهيل خدمات الضمان والاستبدال.
+              يرجى الاحتفاظ بنسخة من صورة الفاتورة على هاتفك لمطابقة الأصناف مع مندوب التوصيل وتسهيل خدمات الضمان والاستبدال.
             </div>
           </div>
         </div>
         <Button
           type="primary"
-          icon={<PrinterOutlined />}
-          onClick={() => window.print()}
+          icon={<CameraOutlined />}
+          onClick={handleSaveAsImage}
+          loading={savingImage}
           className="print-invoice-highlight-btn"
         >
-          طباعة الفاتورة الآن
+          حفظ الفاتورة ك صورة
         </Button>
       </div>
 
       {order && (
         <Card className="customer-invoice-print" style={{ borderRadius: 12, marginTop: 16, border: '1px solid #E2E8F0', background: '#FFFFFF' }}>
-          {/* Print-Only Branded Header */}
-          <div className="print-only" style={{ borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Branded Header */}
+          <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 120, objectFit: 'contain' }} />
                 <div>
@@ -200,17 +245,27 @@ export default function OrderSuccess() {
 
           <Descriptions 
             title={
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ fontWeight: 700, color: '#0F172A' }}>بيانات الشحن والفاتورة</span>
-                <Button
-                  className="no-print"
-                  size="small"
-                  icon={<PrinterOutlined />}
-                  onClick={() => window.print()}
-                  style={{ borderColor: '#C8A45C', color: '#0F172A', fontWeight: 700, borderRadius: 6 }}
-                >
-                  طباعة
-                </Button>
+                <Space className="no-print">
+                  <Button
+                    size="small"
+                    icon={<CameraOutlined />}
+                    onClick={handleSaveAsImage}
+                    loading={savingImage}
+                    style={{ borderColor: '#C8A45C', color: '#0F172A', fontWeight: 700, borderRadius: 6 }}
+                  >
+                    حفظ الفاتورة ك صورة
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<PrinterOutlined />}
+                    onClick={() => window.print()}
+                    style={{ borderRadius: 6 }}
+                  >
+                    طباعة
+                  </Button>
+                </Space>
               </div>
             }
             bordered 
@@ -269,8 +324,8 @@ export default function OrderSuccess() {
             </Space>
           </div>
 
-          {/* Print-Only Footer Notice */}
-          <div className="print-only" style={{ marginTop: 20, paddingTop: 10, borderTop: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '10.5px', color: '#64748b' }}>
+          {/* Footer Notice */}
+          <div style={{ marginTop: 20, paddingTop: 10, borderTop: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '10.5px', color: '#64748b' }}>
             <div>شكراً لتسوقكم من متجر YOKA STORE • الاستبدال والاسترجاع متاح خلال 14 يوماً وفقاً للشروط والأحكام.</div>
             <div style={{ marginTop: 4, color: '#94a3b8' }}>تم استخراج هذه الفاتورة إلكترونياً من متجر Yoka Store</div>
           </div>
