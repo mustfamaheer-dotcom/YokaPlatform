@@ -32,7 +32,7 @@ import {
   MailOutlined,
   SearchOutlined
 } from '@ant-design/icons';
-import { PhoneCall, MessageCircle, ArrowLeft, ExternalLink, Sparkles, Truck, RotateCcw, Award, Star, ShieldCheck, Users, Flame } from 'lucide-react';
+import { PhoneCall, MessageCircle, ArrowLeft, Sparkles, Truck, RotateCcw, Award, Star, ShieldCheck, Users, Flame } from 'lucide-react';
 import api from '../api';
 
 const { Title, Text } = Typography;
@@ -549,56 +549,6 @@ export default function StoreSettings({ currentUser }) {
             >
               <Input placeholder="يوكا ستور, ملابس, أزياء, كاجوال, شحن محافظات" style={{ borderRadius: 8 }} />
             </Form.Item>
-          </Card>
-
-          {/* Section 2: Verification & Pixels */}
-          <Card
-            size="small"
-            style={{ borderRadius: 10, borderColor: '#E2E8F0' }}
-            title={<span style={{ fontWeight: 700 }}>أدوات مشرفي المواقع والتتبع الإعلاني (Webmaster & Analytics)</span>}
-          >
-            <Form.Item
-              name="google_site_verification"
-              label={<span style={{ fontWeight: 600 }}>رمز إثبات الملكية في Google Search Console</span>}
-              extra="الكود التعريفي لإثبات ملكية المتجر وتفعيل الفهرسة الفورية في جوجل"
-            >
-              <Input placeholder="مثال: abc123XYZ_sample_token" style={{ borderRadius: 8, direction: 'ltr' }} />
-            </Form.Item>
-
-            <Row gutter={16}>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name="google_analytics_id"
-                  label={<span style={{ fontWeight: 600 }}>معرّف Google Analytics (GA4)</span>}
-                  extra="معرف القياس لتتبع الزوار ومصادر الحركة"
-                >
-                  <Input placeholder="G-XXXXXXXXXX" style={{ borderRadius: 8, direction: 'ltr' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name="facebook_pixel_id"
-                  label={<span style={{ fontWeight: 600 }}>معرّف Facebook Pixel ID</span>}
-                  extra="لتتبع الحملات الإعلانية ومعدل الشراء"
-                >
-                  <Input placeholder="مثال: 123456789012345" style={{ borderRadius: 8, direction: 'ltr' }} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Divider style={{ margin: '14px 0' }} />
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-              <div>
-                <span style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', display: 'block' }}>خريطة الموقع الآلية (Dynamic XML Sitemap)</span>
-                <span style={{ fontSize: 12, color: '#64748B' }}>مفهرسة تلقائياً وتحدث مع كل منتج وتصنيف جديد</span>
-              </div>
-              <a href="https://yokastore.runasp.net/sitemap.xml" target="_blank" rel="noopener noreferrer">
-                <Button size="small" icon={<ExternalLink size={12} />} style={{ fontWeight: 700, color: '#C8A45C', borderColor: '#C8A45C' }}>
-                  معاينة sitemap.xml ↗
-                </Button>
-              </a>
-            </div>
           </Card>
         </Space>
       )

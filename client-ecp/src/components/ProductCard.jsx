@@ -268,7 +268,7 @@ export default function ProductCard({ product, onAddToCart }) {
             <span className={styles['product-category-tag']}>{product.category_name}</span>
           )}
 
-          <Link to={`/product/${product.slug || product.id}`}>
+          <Link to={`/product/${product.slug || product.id}`} className={styles['product-title-link']}>
             <h3 className={styles['product-title']} title={product.product_name}>
               {product.product_name}
             </h3>
@@ -307,36 +307,54 @@ export default function ProductCard({ product, onAddToCart }) {
             </div>
           )}
 
-          {/* Price row */}
-          <div className={styles['product-price-row']}>
-            <span className={styles['product-price']}>
-              {price.toLocaleString()}
-              <span className={styles['product-currency']}>ج.م</span>
-            </span>
-            {hasDiscount && (
-              <span className={styles['product-original-price']}>
-                {originalPrice.toLocaleString()} ج.م
+          {/* Rating & Price row */}
+          <div className={styles['product-meta-row']}>
+            <div className={styles['rating-stars-wrap']} title="تقييم 5 نجوم">
+              <span className={styles['rating-star']}>★</span>
+              <span className={styles['rating-star']}>★</span>
+              <span className={styles['rating-star']}>★</span>
+              <span className={styles['rating-star']}>★</span>
+              <span className={styles['rating-star']}>★</span>
+            </div>
+            <span className={styles['meta-dot-divider']}>•</span>
+            <div className={styles['product-price-row']}>
+              <span className={styles['product-price']}>
+                {price.toLocaleString()}
+                <span className={styles['product-currency']}>ج.م</span>
               </span>
-            )}
+              {hasDiscount && (
+                <span className={styles['product-original-price']}>
+                  {originalPrice.toLocaleString()} ج.م
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Add to cart action */}
-          <Button
-            type="primary"
+          {/* Add to cart action (Pill CTA with Button-in-Button Capsule) */}
+          <button
+            type="button"
             className={`${styles['add-to-cart-btn']} ${addedFlash ? styles['add-to-cart-btn-added'] : ''}`}
-            icon={addedFlash ? <CheckOutlined /> : <ShoppingCartOutlined />}
             onClick={handleCardAdd}
             disabled={!isAvailable}
             aria-label={`إضافة ${product.product_name} إلى السلة`}
           >
-            {addedFlash
-              ? 'تمت الإضافة بنجاح'
-              : !isAvailable
-              ? 'نفد المخزون'
-              : (product.sizes?.length > 1 || product.colors?.length > 1)
-              ? 'اختيار المقاس واللون'
-              : 'أضف إلى السلة'}
-          </Button>
+            <span className={styles['add-to-cart-text']}>
+              {addedFlash
+                ? 'تمت الإضافة بنجاح'
+                : !isAvailable
+                ? 'نفد المخزون'
+                : (product.sizes?.length > 1 || product.colors?.length > 1)
+                ? 'اختيار المقاس واللون'
+                : 'إضافة إلى السلة'}
+            </span>
+            <span className={styles['add-to-cart-capsule']}>
+              {addedFlash ? (
+                <CheckOutlined style={{ fontSize: 15 }} />
+              ) : (
+                <ShoppingCartOutlined style={{ fontSize: 16 }} />
+              )}
+            </span>
+          </button>
         </div>
       </div>
 

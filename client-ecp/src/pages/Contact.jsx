@@ -9,10 +9,12 @@ import {
   CustomerServiceOutlined,
   HomeOutlined,
   AppstoreOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  EnvironmentOutlined,
+  ShopOutlined
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { Zap } from 'lucide-react';
+import { Zap, Navigation, MapPin } from 'lucide-react';
 import api from '../api';
 import SEO from '../components/SEO';
 
@@ -24,11 +26,24 @@ export default function Contact() {
     contact_phone: '01000000000',
     contact_whatsapp: '01000000000'
   });
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchSettings();
+    fetchBranches();
   }, []);
+
+  const fetchBranches = async () => {
+    try {
+      const res = await api.get('/api/ecp/catalog/branches');
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setBranches(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load branches in Contact:', err);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -421,6 +436,162 @@ export default function Contact() {
           </Card>
         </Col>
       </Row>
+
+      {/* Store Branches & Showrooms Section */}
+      {branches.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 12,
+              marginBottom: 18
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: '#C8A45C',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  marginBottom: 4
+                }}
+              >
+                <ShopOutlined />
+                <span>زيارة معارضنا</span>
+              </div>
+              <Title level={2} style={{ margin: 0, fontSize: 'clamp(18px, 3vw, 22px)', fontWeight: 800, color: '#0F172A' }}>
+                فروع ومعارض يوكا ستور
+              </Title>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                تفضلوا بزيارة فروعنا لتجربة أرقى الموديلات ومعاينتها على أرض الواقع
+              </Text>
+            </div>
+
+            <Link to="/branches">
+              <Button
+                type="default"
+                icon={<Navigation size={14} style={{ color: '#C8A45C' }} />}
+                style={{
+                  borderRadius: 10,
+                  fontWeight: 700,
+                  borderColor: '#C8A45C',
+                  color: '#0F172A',
+                  height: 40
+                }}
+              >
+                عرض تفاصيل وخرائط الفروع ↗
+              </Button>
+            </Link>
+          </div>
+
+          <Row gutter={[16, 16]}>
+            {branches.slice(0, 3).map((b) => (
+              <Col xs={24} sm={12} lg={8} key={b.id}>
+                <Card
+                  hoverable
+                  style={{
+                    borderRadius: 16,
+                    border: '1px solid #E2E8F0',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+                  }}
+                  bodyStyle={{ padding: 20, display: 'flex', flexDirection: 'column', height: '100%' }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <Title level={4} style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
+                        {b.name}
+                      </Title>
+                      {b.city && (
+                        <Tag color="gold" style={{ borderRadius: 6, fontWeight: 700, margin: 0 }}>
+                          {b.city}
+                        </Tag>
+                      )}
+                    </div>
+
+                    {b.address && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10, color: '#475569', fontSize: 13 }}>
+                        <MapPin size={16} style={{ color: '#C8A45C', flexShrink: 0, marginTop: 2 }} />
+                        <span style={{ lineHeight: 1.5 }}>{b.address}</span>
+                      </div>
+                    )}
+
+                    {b.working_hours && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: '#64748B', fontSize: 12.5 }}>
+                        <ClockCircleOutlined style={{ color: '#C8A45C', flexShrink: 0 }} />
+                        <span>{b.working_hours}</span>
+                      </div>
+                    )}
+
+                    {b.phone && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13 }}>
+                        <PhoneOutlined style={{ color: '#C8A45C', flexShrink: 0 }} />
+                        <a
+                          href={`tel:${b.phone}`}
+                          style={{
+                            color: '#0F172A',
+                            fontWeight: 700,
+                            direction: 'ltr',
+                            fontVariantNumeric: 'tabular-nums'
+                          }}
+                        >
+                          {b.phone}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {b.google_maps_url ? (
+                    <Button
+                      type="primary"
+                      href={b.google_maps_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      icon={<Navigation size={15} />}
+                      block
+                      style={{
+                        borderRadius: 10,
+                        backgroundColor: '#0F172A',
+                        borderColor: '#0F172A',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        height: 42,
+                        marginTop: 12
+                      }}
+                    >
+                      فتح اللوكيشن في خرائط جوجل ↗
+                    </Button>
+                  ) : (
+                    <Link to="/branches">
+                      <Button
+                        block
+                        style={{
+                          borderRadius: 10,
+                          fontWeight: 700,
+                          height: 42,
+                          marginTop: 12
+                        }}
+                      >
+                        تفاصيل الفرع
+                      </Button>
+                    </Link>
+                  )}
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </div>
+      )}
 
       {/* Helpful Support Info & Fast Navigation */}
       <Card

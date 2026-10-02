@@ -11,6 +11,7 @@ import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
 import Contact from './pages/Contact';
+import Branches from './pages/Branches';
 import MobileBottomNav from './components/MobileBottomNav';
 import api from './api';
 import { trackPageView, trackAddToCart } from './services/tracker';
@@ -170,6 +171,7 @@ export default function App() {
           <Route path="/checkout" element={<Checkout cart={cart} onRefreshCart={fetchCart} />} />
           <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/branches" element={<Branches />} />
           <Route path="*" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
         </Routes>
       </Content>

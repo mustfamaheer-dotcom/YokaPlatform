@@ -13,14 +13,15 @@ router.get('/', requireAuth, async (req, res) => {
     const branches = await query(
       `SELECT b.id, b.branch_code, b.branch_name, b.branch_type,
               b.login_username, b.login_password_plain,
-              b.address, b.phone, b.supervisor_id, b.status, b.created_at, b.updated_at,
+              b.address, b.city, b.phone, b.google_maps_url, b.show_in_store, b.display_order,
+              b.working_hours, b.supervisor_id, b.status, b.created_at, b.updated_at,
               u.full_name AS supervisor_name,
               COUNT(DISTINCT u2.id) AS staff_count
        FROM branches b
        LEFT JOIN users u ON u.id = b.supervisor_id
        LEFT JOIN users u2 ON u2.branch_id = b.id
        GROUP BY b.id, u.full_name
-       ORDER BY b.id ASC`
+       ORDER BY b.display_order ASC, b.id ASC`
     );
     return res.json({ success: true, data: branches });
   } catch (err) {
@@ -85,7 +86,8 @@ router.get('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const rows = await query(
       `SELECT id, branch_code, branch_name, branch_type, login_username, login_password_plain,
-              address, phone, supervisor_id, status, working_hours, created_at, updated_at
+              address, city, phone, google_maps_url, show_in_store, display_order,
+              supervisor_id, status, working_hours, created_at, updated_at
         FROM branches WHERE id = $1`,
       [id]
     );
@@ -109,7 +111,11 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
       branch_name,
       branch_type,
       address,
+      city,
       phone,
+      google_maps_url,
+      show_in_store,
+      display_order,
       working_hours,
       login_username,
       username,
@@ -151,18 +157,23 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
 
     const rows = await query(
       `INSERT INTO branches (
-        branch_code, branch_name, branch_type, address, phone, working_hours,
+        branch_code, branch_name, branch_type, address, city, phone, google_maps_url,
+        show_in_store, display_order, working_hours,
         login_username, login_password_hash, login_password_plain, status, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active', NOW(), NOW())
       RETURNING id, branch_code, branch_name, login_username, login_password_plain`,
       [
         branchCodeClean,
         branch_name.trim(),
         branch_type || 'retail_branch',
         address || null,
+        city || null,
         phone || null,
-        working_hours ? JSON.stringify(working_hours) : null,
+        google_maps_url || null,
+        show_in_store !== undefined ? Boolean(show_in_store) : (branch_type === 'retail_branch'),
+        parseInt(display_order, 10) || 0,
+        working_hours ? (typeof working_hours === 'object' ? JSON.stringify(working_hours) : String(working_hours)) : null,
         branchUserClean || null,
         passwordHash,
         branchPasswordClean || null
@@ -231,7 +242,12 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (re
       branch_name,
       branch_type,
       address,
+      city,
       phone,
+      google_maps_url,
+      show_in_store,
+      display_order,
+      working_hours,
       supervisor_id,
       status,
       login_username,
@@ -263,20 +279,30 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (re
       `UPDATE branches
        SET branch_name = COALESCE($1, branch_name),
            branch_type = COALESCE($2, branch_type),
-           address = COALESCE($3, address),
-           phone = COALESCE($4, phone),
-           supervisor_id = $5,
-           status = COALESCE($6, status),
-           login_username = $7,
-           login_password_hash = $8,
-           login_password_plain = $9,
+           address = $3,
+           city = $4,
+           phone = $5,
+           google_maps_url = $6,
+           show_in_store = CASE WHEN $7::boolean IS NOT NULL THEN $7::boolean ELSE show_in_store END,
+           display_order = CASE WHEN $8::integer IS NOT NULL THEN $8::integer ELSE display_order END,
+           working_hours = CASE WHEN $9::text IS NOT NULL THEN $9::text ELSE working_hours END,
+           supervisor_id = $10,
+           status = COALESCE($11, status),
+           login_username = $12,
+           login_password_hash = $13,
+           login_password_plain = $14,
            updated_at = NOW()
-       WHERE id = $10`,
+       WHERE id = $15`,
       [
         branch_name || null,
         branch_type || null,
-        address || null,
-        phone || null,
+        address !== undefined ? (address || null) : old.address,
+        city !== undefined ? (city || null) : old.city,
+        phone !== undefined ? (phone || null) : old.phone,
+        google_maps_url !== undefined ? (google_maps_url || null) : old.google_maps_url,
+        show_in_store !== undefined ? Boolean(show_in_store) : null,
+        display_order !== undefined ? parseInt(display_order, 10) : null,
+        working_hours !== undefined ? (typeof working_hours === 'object' ? JSON.stringify(working_hours) : String(working_hours || '')) : null,
         supervisor_id !== undefined ? (supervisor_id ? parseInt(supervisor_id, 10) : null) : old.supervisor_id,
         status || null,
         newUsername ? newUsername.trim() : null,
@@ -300,6 +326,24 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (re
     });
 
     return res.json({ success: true, message: 'تم تحديث بيانات الفرع وبيانات تسجيل الدخول بنجاح' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * PATCH /api/swm/branches/:id/toggle-store
+ * Quick toggle for storefront visibility
+ */
+router.patch('/:id/toggle-store', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { show_in_store } = req.body;
+    await query(
+      `UPDATE branches SET show_in_store = $1, updated_at = NOW() WHERE id = $2`,
+      [Boolean(show_in_store), id]
+    );
+    return res.json({ success: true, message: 'تم تحديث حالة عرض الفرع في المتجر' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

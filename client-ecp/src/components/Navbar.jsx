@@ -55,6 +55,7 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce, settings }) 
   const isCatalog = location.pathname === '/catalog' && !location.search.includes('sort=popular');
   const isPopular = location.pathname === '/catalog' && location.search.includes('sort=popular');
   const isContact = location.pathname === '/contact';
+  const isBranches = location.pathname === '/branches';
 
   return (
     <header
@@ -149,6 +150,22 @@ export default function Navbar({ cartCount, onOpenCart, cartBounce, settings }) 
               >
                 <FireOutlined style={{ color: '#C8A45C', fontSize: 13 }} />
                 <span>الأكثر مبيعاً</span>
+              </Link>
+
+              <Link
+                to="/branches"
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 20,
+                  fontSize: 13.5,
+                  fontWeight: isBranches ? 800 : 600,
+                  color: isBranches ? '#0F172A' : '#475569',
+                  backgroundColor: isBranches ? 'rgba(200, 164, 92, 0.16)' : 'transparent',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                فروعنا
               </Link>
 
               <Link

@@ -166,6 +166,9 @@ export default function Footer({ settings }) {
                 <span>الأكثر مبيعاً</span>
                 <Flame size={13} color="#C8A45C" />
               </Link>
+              <Link to="/branches" style={{ color: '#94A3B8', transition: 'color 0.2s' }} className="footer-link">
+                فروعنا ومعارضنا
+              </Link>
               <Link to="/contact" style={{ color: '#94A3B8', transition: 'color 0.2s' }} className="footer-link">
                 تواصل معنا
               </Link>

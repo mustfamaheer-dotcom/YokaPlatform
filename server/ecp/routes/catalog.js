@@ -259,6 +259,26 @@ router.get('/store-settings', async (req, res) => {
 });
 
 /**
+ * GET /api/ecp/catalog/branches
+ * Public store branches / locations for customers
+ */
+router.get('/branches', async (req, res) => {
+  try {
+    const branches = await query(
+      `SELECT id, branch_code, branch_name, branch_type, address, city, phone,
+              google_maps_url, working_hours, display_order
+       FROM branches
+       WHERE status = 'active' AND (show_in_store = true OR show_in_store IS NULL)
+       ORDER BY display_order ASC, id ASC`
+    );
+    return res.json({ success: true, data: branches.rows || branches });
+  } catch (err) {
+    console.error('ECP branches fetch error:', err);
+    return res.status(500).json({ success: false, message: 'تعذر جلب فروع المتجر' });
+  }
+});
+
+/**
  * GET /api/ecp/catalog/:slug
  * Detailed product view with full variants matrix and stock
  */

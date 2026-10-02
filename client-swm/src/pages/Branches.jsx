@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home as HomeIcon } from 'lucide-react';
-import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, App, Card, Popconfirm, Divider, Tooltip, Alert } from 'antd';
-import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, App, Card, Popconfirm, Divider, Tooltip, Alert, Switch, InputNumber, Row, Col } from 'antd';
+import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined, EnvironmentOutlined, CompassOutlined, GlobalOutlined } from '@ant-design/icons';
 import api from '../api';
 
 const { Title, Text } = Typography;
@@ -71,7 +71,13 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
 
   const handleOpenCreateModal = () => {
     createForm.resetFields();
-    createForm.setFieldsValue({ branch_type: 'retail_branch' });
+    createForm.setFieldsValue({
+      branch_type: 'retail_branch',
+      city: 'القاهرة',
+      show_in_store: true,
+      display_order: 0,
+      working_hours: 'يومياً من 10:00 صباحاً إلى 11:00 مساءً'
+    });
     setIsCreateModalOpen(true);
     fetchNextBranchCode('retail_branch');
   };
@@ -112,7 +118,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
     try {
       const res = await api.post('/api/swm/branches', values);
       if (res.data.success) {
-        message.success('تم إنشاء الفرع وبيانات تسجيل دخوله بنجاح');
+        message.success('تم إنشاء الفرع وبيانات تسجيل دخوله وموقعه بنجاح');
         setIsCreateModalOpen(false);
         createForm.resetFields();
         fetchBranches();
@@ -129,12 +135,29 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
       branch_type: branch.branch_type,
       login_username: branch.login_username || '',
       password: branch.login_password_plain || '',
-      address: branch.address,
-      phone: branch.phone,
+      city: branch.city || '',
+      address: branch.address || '',
+      phone: branch.phone || '',
+      google_maps_url: branch.google_maps_url || '',
+      working_hours: branch.working_hours || 'يومياً من 10:00 صباحاً إلى 11:00 مساءً',
+      show_in_store: branch.show_in_store !== false,
+      display_order: branch.display_order || 0,
       supervisor_id: branch.supervisor_id || undefined,
       status: branch.status
     });
     setIsEditModalOpen(true);
+  };
+
+  const handleToggleStore = async (branchId, checked) => {
+    try {
+      const res = await api.patch(`/api/swm/branches/${branchId}/toggle-store`, { show_in_store: checked });
+      if (res.data.success) {
+        message.success(checked ? 'تم تفعيل عرض الفرع في المتجر الإلكتروني' : 'تم إخفاء الفرع من المتجر الإلكتروني');
+        setBranches((prev) => prev.map((b) => b.id === branchId ? { ...b, show_in_store: checked } : b));
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'تعذر تحديث حالة العرض');
+    }
   };
 
   const handleUpdate = async (values) => {
@@ -142,7 +165,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
     try {
       const res = await api.put(`/api/swm/branches/${editingBranch.id}`, values);
       if (res.data.success) {
-        message.success('تم تحديث بيانات الفرع وبيانات الدخول بنجاح');
+        message.success('تم تحديث بيانات الفرع والموقع بنجاح');
         setIsEditModalOpen(false);
         setEditingBranch(null);
         editForm.resetFields();
@@ -238,6 +261,47 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
       dataIndex: 'phone',
       key: 'phone',
       render: (ph) => ph || '—'
+    },
+    {
+      title: 'الموقع واللوكيشن',
+      key: 'location',
+      render: (_, record) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {record.city && (
+            <Tag color="gold" style={{ width: 'fit-content', fontWeight: 700, margin: 0 }}>
+              {record.city}
+            </Tag>
+          )}
+          <Text ellipsis={{ tooltip: record.address }} style={{ maxWidth: 170, fontSize: 12 }}>
+            {record.address || 'لم يحدد العنوان'}
+          </Text>
+          {record.google_maps_url ? (
+            <a href={record.google_maps_url} target="_blank" rel="noopener noreferrer">
+              <Button size="small" type="link" icon={<EnvironmentOutlined />} style={{ padding: 0, height: 'auto', fontSize: 11, color: '#C8A45C', fontWeight: 700 }}>
+                خرائط جوجل ↗
+              </Button>
+            </a>
+          ) : (
+            <span style={{ fontSize: 11, color: '#94A3B8' }}>لا يوجد رابط خريطة</span>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'المتجر أونلاين',
+      key: 'show_in_store',
+      align: 'center',
+      render: (_, record) => (
+        <Tooltip title={record.show_in_store ? 'معروض للعملاء في موقع المتجر' : 'مخفي عن موقع المتجر'}>
+          <Switch
+            checked={record.show_in_store !== false}
+            onChange={(checked) => handleToggleStore(record.id, checked)}
+            checkedChildren="معروض"
+            unCheckedChildren="مخفي"
+            style={{ backgroundColor: record.show_in_store !== false ? '#10B981' : undefined }}
+          />
+        </Tooltip>
+      )
     },
     {
       title: 'الحالة',
@@ -398,15 +462,61 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
             <Input.Password prefix={<LockOutlined style={{ color: '#6366f1' }} />} placeholder="••••••••" />
           </Form.Item>
 
-          <Divider style={{ margin: '12px 0' }}>بيانات الاتصال والموقع</Divider>
+          <Divider style={{ margin: '14px 0' }}>الموقع الجغرافي وخريطة جوجل (Location & Maps)</Divider>
 
-          <Form.Item label="العنوان" name="address">
-            <Input.TextArea rows={2} placeholder="شارع عباس العقاد، مدينة نصر، القاهرة" />
+          <Row gutter={12}>
+            <Col xs={24} sm={12}>
+              <Form.Item label="المدينة / المحافظة" name="city">
+                <Select placeholder="اختر المدينة أو اكتبها" allowClear showSearch>
+                  <Option value="القاهرة">القاهرة</Option>
+                  <Option value="الجيزة">الجيزة</Option>
+                  <Option value="الإسكندرية">الإسكندرية</Option>
+                  <Option value="الإسماعيلية">الإسماعيلية</Option>
+                  <Option value="بورسعيد">بورسعيد</Option>
+                  <Option value="السويس">السويس</Option>
+                  <Option value="طنطا">طنطا / الغربية</Option>
+                  <Option value="المنصورة">المنصورة / الدقهلية</Option>
+                  <Option value="الشرقية">الشرقية / الزقازيق</Option>
+                  <Option value="أسيوط">أسيوط</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item label="رقم هاتف الفرع" name="phone">
+                <Input placeholder="+201000000000" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item label="العنوان التفصيلي للفرع" name="address">
+            <Input.TextArea rows={2} placeholder="شارع عباس العقاد، مدينة نصر، بجوار..." />
           </Form.Item>
 
-          <Form.Item label="رقم الهاتف" name="phone">
-            <Input placeholder="+201000000000" />
+          <Form.Item
+            label="رابط موقع الفرع على خرائط جوجل (Google Maps URL)"
+            name="google_maps_url"
+            extra="مثال: https://maps.app.goo.gl/... أو https://goo.gl/maps/... ليتمكن العميل من فتح موقع الفرع والملاحة إليه بنقرة واحدة."
+          >
+            <Input prefix={<EnvironmentOutlined style={{ color: '#ea4335' }} />} placeholder="https://maps.app.goo.gl/..." style={{ direction: 'ltr' }} />
           </Form.Item>
+
+          <Row gutter={12}>
+            <Col xs={24} sm={14}>
+              <Form.Item label="مواعيد العمل (Working Hours)" name="working_hours">
+                <Input placeholder="يومياً من 10:00 صباحاً إلى 11:00 مساءً" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={5}>
+              <Form.Item label="ترتيب العرض" name="display_order">
+                <InputNumber min={0} max={99} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={5}>
+              <Form.Item label="عرض بالمتجر" name="show_in_store" valuePropName="checked">
+                <Switch checkedChildren="معروض" unCheckedChildren="مخفي" />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <div style={{ textAlign: 'left', marginTop: 16 }}>
             <Space>
@@ -486,7 +596,63 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
             <Input.Password prefix={<LockOutlined style={{ color: '#6366f1' }} />} placeholder="••••••••" />
           </Form.Item>
 
-          <Divider style={{ margin: '12px 0' }}>الإشراف والموقع</Divider>
+          <Divider style={{ margin: '14px 0' }}>الموقع الجغرافي وخريطة جوجل (Location & Maps)</Divider>
+
+          <Row gutter={12}>
+            <Col xs={24} sm={12}>
+              <Form.Item label="المدينة / المحافظة" name="city">
+                <Select placeholder="اختر المدينة أو اكتبها" allowClear showSearch>
+                  <Option value="القاهرة">القاهرة</Option>
+                  <Option value="الجيزة">الجيزة</Option>
+                  <Option value="الإسكندرية">الإسكندرية</Option>
+                  <Option value="الإسماعيلية">الإسماعيلية</Option>
+                  <Option value="بورسعيد">بورسعيد</Option>
+                  <Option value="السويس">السويس</Option>
+                  <Option value="طنطا">طنطا / الغربية</Option>
+                  <Option value="المنصورة">المنصورة / الدقهلية</Option>
+                  <Option value="الشرقية">الشرقية / الزقازيق</Option>
+                  <Option value="أسيوط">أسيوط</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item label="رقم هاتف الفرع" name="phone">
+                <Input placeholder="+201000000000" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item label="العنوان التفصيلي للفرع" name="address">
+            <Input.TextArea rows={2} placeholder="شارع عباس العقاد، مدينة نصر، بجوار..." />
+          </Form.Item>
+
+          <Form.Item
+            label="رابط موقع الفرع على خرائط جوجل (Google Maps URL)"
+            name="google_maps_url"
+            extra="مثال: https://maps.app.goo.gl/... أو https://goo.gl/maps/... ليتمكن العميل من فتح موقع الفرع والملاحة إليه بنقرة واحدة."
+          >
+            <Input prefix={<EnvironmentOutlined style={{ color: '#ea4335' }} />} placeholder="https://maps.app.goo.gl/..." style={{ direction: 'ltr' }} />
+          </Form.Item>
+
+          <Row gutter={12}>
+            <Col xs={24} sm={14}>
+              <Form.Item label="مواعيد العمل (Working Hours)" name="working_hours">
+                <Input placeholder="يومياً من 10:00 صباحاً إلى 11:00 مساءً" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={5}>
+              <Form.Item label="ترتيب العرض" name="display_order">
+                <InputNumber min={0} max={99} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={5}>
+              <Form.Item label="عرض بالمتجر" name="show_in_store" valuePropName="checked">
+                <Switch checkedChildren="معروض" unCheckedChildren="مخفي" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider style={{ margin: '14px 0' }}>الإشراف وحالة التشغيل</Divider>
 
           <Form.Item label="مشرف الفرع" name="supervisor_id">
             <Select placeholder="اختر مشرف الفرع" allowClear>
@@ -494,14 +660,6 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
                 <Option key={s.id} value={s.id}>{s.full_name} ({s.username})</Option>
               ))}
             </Select>
-          </Form.Item>
-
-          <Form.Item label="العنوان" name="address">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-
-          <Form.Item label="رقم الهاتف" name="phone">
-            <Input />
           </Form.Item>
 
           <Form.Item label="حالة الفرع" name="status" rules={[{ required: true }]}>
