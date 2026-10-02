@@ -4,6 +4,19 @@ const { requireAuth } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 
 /**
+ * GET /api/swm/orders/pending-count
+ * Returns the count of pending e-commerce orders
+ */
+router.get('/pending-count', requireAuth, async (req, res) => {
+  try {
+    const [{ total }] = await query("SELECT COUNT(id) AS total FROM ecp_orders WHERE order_status = 'pending'");
+    return res.json({ success: true, data: parseInt(total || 0, 10) });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * GET /api/swm/orders
  * Returns list of e-commerce customer orders with filter & pagination
  */

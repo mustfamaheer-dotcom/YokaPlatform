@@ -129,6 +129,8 @@ export default function Home({ currentUser, onNavigate }) {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [addingCategory, setAddingCategory] = useState(false);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+
 
   const fetchEmployeesList = async () => {
     try {
@@ -320,12 +322,25 @@ export default function Home({ currentUser, onNavigate }) {
     }
   };
 
+  const fetchPendingOrdersCount = async () => {
+    try {
+      const res = await api.get('/api/swm/orders/pending-count');
+      if (res.data?.success) {
+        setPendingOrdersCount(res.data.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch pending orders count:', e);
+    }
+  };
+
   useEffect(() => {
     fetchHomeData();
     fetchEmployeesList();
     fetchSafeBalances();
     fetchExpenseCategories();
+    fetchPendingOrdersCount();
   }, []);
+
 
   // Quick helper to generate unique product code & valid EAN-13 barcode
   const generateCodes = () => {
@@ -623,9 +638,11 @@ export default function Home({ currentUser, onNavigate }) {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onNavigate('orders'); }}
               aria-label="فتح صفحة طلبات المتجر الإلكتروني"
             >
-              <div className="swm-entry-icon-wrap" style={{ background: '#ECFDF5', color: '#059669' }}>
-                <ShoppingBag size={28} />
-              </div>
+              <Badge count={pendingOrdersCount} color="#f5222d" offset={[-4, 4]}>
+                <div className="swm-entry-icon-wrap" style={{ background: '#ECFDF5', color: '#059669' }}>
+                  <ShoppingBag size={28} />
+                </div>
+              </Badge>
               <div className="swm-entry-text">
                 <strong>طلبات المتجر الإلكتروني</strong>
                 <span>استعراض وتجهيز وشحن فواتير الطلبات الواردة من المتجر</span>
