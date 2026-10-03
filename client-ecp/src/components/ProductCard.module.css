@@ -207,52 +207,6 @@
   animation: pulseDot 1.6s infinite ease-in-out;
 }
 
-/* Quick View Overlay (Desktop Hover Trigger) */
-.quick-view-overlay {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%) translateY(16px);
-  opacity: 0;
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 4;
-  pointer-events: none;
-  width: auto;
-}
-
-.product-card:hover .quick-view-overlay {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-  pointer-events: auto;
-}
-
-.quick-view-btn {
-  height: 36px !important;
-  padding: 0 16px !important;
-  border-radius: 20px !important;
-  background: rgba(255, 255, 255, 0.94) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  color: #0F172A !important;
-  border: 1px solid rgba(255, 255, 255, 0.9) !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16) !important;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  cursor: pointer;
-}
-
-.quick-view-btn:hover {
-  background: #0F172A !important;
-  color: #FFFFFF !important;
-  border-color: #0F172A !important;
-  transform: scale(1.04);
-}
-
 /* Product Content: Centered Information Hierarchy */
 .product-content {
   flex: 1;
@@ -541,10 +495,6 @@
   .add-to-cart-capsule {
     width: 32px;
     height: 32px;
-  }
-
-  .quick-view-overlay {
-    display: none;
   }
 
   .wishlist-btn {

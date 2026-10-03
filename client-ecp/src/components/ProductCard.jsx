@@ -1,21 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Button, Typography, Modal, Space, Tag, App } from 'antd';
+import { App } from 'antd';
 import {
   ShoppingCartOutlined,
   HeartOutlined,
   HeartFilled,
-  EyeOutlined,
-  CheckOutlined,
-  FireOutlined,
-  ArrowLeftOutlined,
-  PlusOutlined,
-  MinusOutlined
+  CheckOutlined
 } from '@ant-design/icons';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import styles from './ProductCard.module.css';
-
-const { Text, Title } = Typography;
 
 // Helper to resolve simple color names to hex codes for swatch dots
 const resolveColorHex = (name) => {
@@ -40,16 +33,10 @@ export default function ProductCard({ product, onAddToCart }) {
   const { message } = App.useApp();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [addedFlash, setAddedFlash] = useState(false);
-  const [quickViewOpen, setQuickViewOpen] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // Card-level active color state
   const [activeCardColor, setActiveCardColor] = useState(null);
-
-  // Quick View local selection state
-  const [qvSelectedColor, setQvSelectedColor] = useState(null);
-  const [qvSelectedSize, setQvSelectedSize] = useState(null);
-  const [qvQty, setQvQty] = useState(1);
 
   const totalStock = parseInt(product.total_stock || 0, 10);
   const isAvailable = totalStock > 0;
@@ -61,6 +48,11 @@ export default function ProductCard({ product, onAddToCart }) {
   const price = hasDiscount ? rawSale : originalPrice;
   const discountPercent = hasDiscount ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
 
+  const hasOptions =
+    (product.variants && product.variants.length > 1) ||
+    (product.sizes && product.sizes.length > 0) ||
+    (product.colors && product.colors.length > 0);
+
   // Helper to find image for a specific color variant
   const getColorImage = (colorName) => {
     if (!colorName || !product.variants || !Array.isArray(product.variants)) return null;
@@ -70,13 +62,6 @@ export default function ProductCard({ product, onAddToCart }) {
 
   // Main card image based on active color selection or default featured image
   const cardMainImage =
-    (activeCardColor && getColorImage(activeCardColor)) ||
-    product.featured_image ||
-    yokaLogo;
-
-  // Quick View modal active preview image
-  const qvActiveImage =
-    (qvSelectedColor && getColorImage(qvSelectedColor)) ||
     (activeCardColor && getColorImage(activeCardColor)) ||
     product.featured_image ||
     yokaLogo;
@@ -117,18 +102,14 @@ export default function ProductCard({ product, onAddToCart }) {
     e.preventDefault();
     e.stopPropagation();
 
-    // If item has variants, open Quick View modal so customer can pick size/color easily
-    if ((product.variants && product.variants.length > 1) || (product.sizes && product.sizes.length > 1) || (product.colors && product.colors.length > 1)) {
-      const initialColor = activeCardColor || (product.colors?.length > 0 ? product.colors[0] : null);
-      setQvSelectedColor(initialColor);
-      if (product.sizes?.length > 0) setQvSelectedSize(product.sizes[0]);
-      setQvQty(1);
-      setQuickViewOpen(true);
+    if (!isAvailable) {
+      message.warning('عذراً، هذا المنتج غير متوفر حالياً');
       return;
     }
 
-    if (!isAvailable) {
-      message.warning('عذراً، هذا المنتج غير متوفر حالياً');
+    // If item has variants or options, navigate to product page to choose color and size
+    if (hasOptions) {
+      navigate(`/product/${product.slug || product.id}`);
       return;
     }
 
@@ -141,54 +122,11 @@ export default function ProductCard({ product, onAddToCart }) {
     setTimeout(() => setAddedFlash(false), 1800);
   };
 
-  const handleOpenQuickView = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const initialColor = activeCardColor || (product.colors?.length > 0 ? product.colors[0] : null);
-    setQvSelectedColor(initialColor);
-    if (product.sizes?.length > 0) setQvSelectedSize(product.sizes[0]);
-    setQvQty(1);
-    setQuickViewOpen(true);
-  };
-
-  const handleQuickViewAdd = () => {
-    if (!isAvailable) {
-      message.warning('المنتج غير متوفر في المخزون');
-      return;
-    }
-
-    let matchedVariant = null;
-    if (product.variants?.length > 0) {
-      matchedVariant = product.variants.find(
-        (v) => (!qvSelectedColor || v.color === qvSelectedColor) && (!qvSelectedSize || v.size === qvSelectedSize)
-      );
-      if (!matchedVariant && qvSelectedColor) {
-        matchedVariant = product.variants.find((v) => v.color === qvSelectedColor);
-      }
-      if (!matchedVariant) {
-        matchedVariant = product.variants[0];
-      }
-    }
-
-    onAddToCart?.({
-      ...product,
-      variant_id: matchedVariant?.id || product.variant_id || null,
-      color: qvSelectedColor || matchedVariant?.color,
-      size: qvSelectedSize || matchedVariant?.size,
-      quantity: qvQty
-    });
-
-    setQuickViewOpen(false);
-    setAddedFlash(true);
-    setTimeout(() => setAddedFlash(false), 1800);
-  };
-
   // Extract unique colors for swatches
   const colorList = product.colors || (product.variants ? [...new Set(product.variants.map((v) => v.color).filter(Boolean))] : []);
 
   return (
-    <>
-      <div className={styles['product-card']}>
+    <div className={styles['product-card']}>
         {/* Wishlist Button */}
         <button
           type="button"
@@ -239,19 +177,6 @@ export default function ProductCard({ product, onAddToCart }) {
               <span className={styles['out-of-stock-pill']}>غير متوفر حالياً</span>
             </div>
           )}
-
-          {/* Quick View Button (Desktop Hover) */}
-          <div className={styles['quick-view-overlay']}>
-            <button
-              type="button"
-              className={styles['quick-view-btn']}
-              onClick={handleOpenQuickView}
-              aria-label="معاينة سريعة"
-            >
-              <EyeOutlined style={{ fontSize: 14 }} />
-              <span>معاينة سريعة</span>
-            </button>
-          </div>
         </Link>
 
         {/* Content Details */}
@@ -335,11 +260,11 @@ export default function ProductCard({ product, onAddToCart }) {
                 ? 'تمت الإضافة بنجاح'
                 : !isAvailable
                 ? 'نفد المخزون'
-                : (product.sizes?.length > 1 || product.colors?.length > 1)
+                : hasOptions
                 ? 'اختيار المقاس واللون'
                 : 'إضافة إلى السلة'}
             </span>
-            <span className={styles['add-to-cart-capsule']}>
+            <span className={styles['add-to-capsule'] || styles['add-to-cart-capsule']}>
               {addedFlash ? (
                 <CheckOutlined style={{ fontSize: 15 }} />
               ) : (
@@ -349,305 +274,5 @@ export default function ProductCard({ product, onAddToCart }) {
           </button>
         </div>
       </div>
-
-      {/* Quick View Modal (Boutique Pop-up - Mounted on demand only) */}
-      {quickViewOpen && (
-        <Modal
-          open={quickViewOpen}
-          destroyOnClose={true}
-          onCancel={() => setQuickViewOpen(false)}
-        footer={null}
-        centered
-        width={560}
-        styles={{
-          mask: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(15, 23, 42, 0.5)' },
-          content: { borderRadius: 20, padding: 0, overflow: 'hidden' },
-          body: { padding: '24px' }
-        }}
-      >
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', direction: 'rtl' }}>
-          {/* Product Thumbnail with Dynamic Color Preview */}
-          <div
-            style={{
-              width: 190,
-              height: 240,
-              background: '#F8FAFC',
-              borderRadius: 16,
-              border: '1px solid #E2E8F0',
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto',
-              flexShrink: 0,
-              position: 'relative',
-              boxShadow: 'inset 0 0 0 1px rgba(15, 23, 42, 0.04)'
-            }}
-          >
-            <img
-              key={qvActiveImage}
-              src={qvActiveImage}
-              alt={`${product.product_name} - ${qvSelectedColor || ''}`}
-              style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-                transition: 'opacity 0.25s ease-in-out',
-                display: 'block'
-              }}
-              onError={(e) => {
-                e.target.src = product.featured_image || yokaLogo;
-              }}
-            />
-
-            {/* Selected Color Badge on Thumbnail */}
-            {qvSelectedColor && (
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: 10,
-                  left: 10,
-                  backgroundColor: 'rgba(15, 23, 42, 0.85)',
-                  color: '#FFFFFF',
-                  padding: '3px 9px',
-                  borderRadius: 12,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  backdropFilter: 'blur(6px)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                }}
-              >
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    backgroundColor: resolveColorHex(qvSelectedColor),
-                    border: '1px solid rgba(255,255,255,0.6)'
-                  }}
-                />
-                <span>{qvSelectedColor}</span>
-              </span>
-            )}
-          </div>
-
-          {/* Quick Details & Options */}
-          <div style={{ flex: '1 1 250px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              {product.category_name && (
-                <span style={{ fontSize: 11, color: '#8A7A5D', fontWeight: 700, display: 'block', marginBottom: 4 }}>
-                  {product.category_name}
-                </span>
-              )}
-              <h3 style={{ margin: 0, fontWeight: 800, color: '#0F172A', fontSize: 16, lineHeight: 1.4 }}>
-                {product.product_name}
-              </h3>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
-                {price.toLocaleString()} <span style={{ fontSize: 13, color: '#8A7A5D', fontWeight: 800 }}>ج.م</span>
-              </span>
-              {hasDiscount && (
-                <span style={{ fontSize: 14, color: '#94A3B8', textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>
-                  {originalPrice.toLocaleString()} ج.م
-                </span>
-              )}
-            </div>
-
-            {/* Colors */}
-            {product.colors?.length > 0 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text strong style={{ fontSize: 12 }}>
-                    اللون: <span style={{ color: '#0F172A', fontWeight: 800 }}>{qvSelectedColor || '—'}</span>
-                  </Text>
-                  {getColorImage(qvSelectedColor) && (
-                    <span style={{ fontSize: 11, color: '#16A34A', fontWeight: 700 }}>
-                      ✓ تم تحديث الصورة
-                    </span>
-                  )}
-                </div>
-                <Space wrap size={[6, 6]}>
-                  {product.colors.map((c) => {
-                    const isSelected = qvSelectedColor === c;
-                    return (
-                      <Button
-                        key={c}
-                        size="small"
-                        type={isSelected ? 'primary' : 'default'}
-                        onClick={() => {
-                          setQvSelectedColor(c);
-                          setActiveCardColor(c);
-                        }}
-                        style={{
-                          borderRadius: 8,
-                          fontWeight: 700,
-                          backgroundColor: isSelected ? '#0F172A' : '#FFFFFF',
-                          color: isSelected ? '#FFFFFF' : '#0F172A',
-                          borderColor: isSelected ? '#0F172A' : '#E2E8F0',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '4px 10px',
-                          boxShadow: isSelected ? '0 2px 8px rgba(15,23,42,0.18)' : 'none',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            backgroundColor: resolveColorHex(c),
-                            display: 'inline-block',
-                            border: '1px solid rgba(0,0,0,0.15)',
-                            flexShrink: 0
-                          }}
-                        />
-                        <span>{c}</span>
-                      </Button>
-                    );
-                  })}
-                </Space>
-              </div>
-            )}
-
-            {/* Sizes */}
-            {product.sizes?.length > 0 && (
-              <div>
-                <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>المقاس:</Text>
-                <Space wrap size={[6, 6]}>
-                  {product.sizes.map((s) => (
-                    <Button
-                      key={s}
-                      size="small"
-                      type={qvSelectedSize === s ? 'primary' : 'default'}
-                      onClick={() => setQvSelectedSize(s)}
-                      style={{
-                        borderRadius: 8,
-                        fontWeight: 700,
-                        backgroundColor: qvSelectedSize === s ? '#0F172A' : '#FFFFFF',
-                        color: qvSelectedSize === s ? '#FFFFFF' : '#0F172A',
-                        borderColor: qvSelectedSize === s ? '#0F172A' : '#E2E8F0'
-                      }}
-                    >
-                      {s}
-                    </Button>
-                  ))}
-                </Space>
-              </div>
-            )}
-
-            {/* Quantity Stepper */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
-              <Text strong style={{ fontSize: 12 }}>الكمية:</Text>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                  background: '#FFFFFF'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setQvQty((prev) => Math.max(1, prev - 1))}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    border: 'none',
-                    background: '#F8FAFC',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#64748B'
-                  }}
-                  aria-label="تقليل الكمية"
-                >
-                  <MinusOutlined style={{ fontSize: 11 }} />
-                </button>
-                <span
-                  style={{
-                    width: 36,
-                    textAlign: 'center',
-                    fontSize: 13,
-                    fontWeight: 800,
-                    color: '#0F172A'
-                  }}
-                >
-                  {qvQty}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQvQty((prev) => prev + 1)}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    border: 'none',
-                    background: '#F8FAFC',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#64748B'
-                  }}
-                  aria-label="زيادة الكمية"
-                >
-                  <PlusOutlined style={{ fontSize: 11 }} />
-                </button>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={{ marginTop: 'auto', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Button
-                type="primary"
-                block
-                size="large"
-                icon={<ShoppingCartOutlined />}
-                onClick={handleQuickViewAdd}
-                style={{
-                  height: 44,
-                  backgroundColor: '#C8A45C',
-                  color: '#0F172A',
-                  fontWeight: 800,
-                  borderRadius: 12,
-                  border: 'none',
-                  boxShadow: '0 4px 14px rgba(200, 164, 92, 0.35)'
-                }}
-              >
-                أضف إلى السلة الآن
-              </Button>
-
-              <Link
-                to={`/product/${product.slug || product.id}`}
-                onClick={() => setQuickViewOpen(false)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  color: '#64748B',
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  textDecoration: 'none'
-                }}
-              >
-                <span>مشاهدة كافة التفاصيل والصور الإضافية</span>
-                <ArrowLeftOutlined style={{ fontSize: 11 }} />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </Modal>
-      )}
-    </>
   );
 }
