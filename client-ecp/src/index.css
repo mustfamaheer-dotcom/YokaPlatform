@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
-
 :root {
   /* Brand Gold Palette — 10% Core Accent */
   --gold: #C8A45C;
@@ -226,7 +224,7 @@ a {
 
 @media (max-width: 480px) {
   .page-content {
-    padding: 0 12px !important;
+    padding: 0 10px !important;
   }
 }
 
@@ -633,9 +631,6 @@ a {
 
 /* Mobile-first responsive utilities */
 @media (max-width: 768px) {
-  body { 
-    padding-bottom: calc(68px + var(--sab)) !important; 
-  }
   .desktop-only { display: none !important; }
 
   /* Eliminate iOS Safari form auto-zoom on touch */

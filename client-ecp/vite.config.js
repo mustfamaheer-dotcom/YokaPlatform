@@ -78,12 +78,13 @@ export default defineConfig({
     host: true
   },
   build: {
-    chunkSizeWarningLimit: 900,
+    chunkSizeWarningLimit: 950,
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          antd: ['antd', '@ant-design/icons']
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'antd-vendor': ['antd', '@ant-design/icons']
         }
       }
     }

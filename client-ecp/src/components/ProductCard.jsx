@@ -358,10 +358,12 @@ export default function ProductCard({ product, onAddToCart }) {
         </div>
       </div>
 
-      {/* Quick View Modal (Boutique Pop-up) */}
-      <Modal
-        open={quickViewOpen}
-        onCancel={() => setQuickViewOpen(false)}
+      {/* Quick View Modal (Boutique Pop-up - Mounted on demand only) */}
+      {quickViewOpen && (
+        <Modal
+          open={quickViewOpen}
+          destroyOnClose={true}
+          onCancel={() => setQuickViewOpen(false)}
         footer={null}
         centered
         width={560}
@@ -653,6 +655,7 @@ export default function ProductCard({ product, onAddToCart }) {
           </div>
         </div>
       </Modal>
+      )}
     </>
   );
 }

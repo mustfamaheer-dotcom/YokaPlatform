@@ -222,16 +222,22 @@ const ecpPublicDir = resolveFirstExisting([
   path.join(process.cwd(), 'client-ecp/public')
 ]);
 
-// Serve public static images & assets
+// Serve public static images & assets with performance caching headers
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-app.use('/uploads', express.static(uploadsDir));
+const uploadStaticOptions = {
+  maxAge: '7d',
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+  }
+};
+app.use('/uploads', express.static(uploadsDir, uploadStaticOptions));
 
-if (imgDir) app.use(express.static(imgDir));
-if (swmPublicDir) app.use(express.static(swmPublicDir));
-if (ecpPublicDir) app.use(express.static(ecpPublicDir));
+if (imgDir) app.use(express.static(imgDir, uploadStaticOptions));
+if (swmPublicDir) app.use(express.static(swmPublicDir, uploadStaticOptions));
+if (ecpPublicDir) app.use(express.static(ecpPublicDir, uploadStaticOptions));
 
 // Helper for serving index.html without caching to ensure fresh deployments
 const sendNoCacheFile = (res, filePath) => {
@@ -247,6 +253,9 @@ const staticOptions = {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+    } else if (filePath && (filePath.includes('/assets/') || filePath.includes('\\assets\\'))) {
+      // Hashed Vite production chunks: immutable 1 year cache
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     }
   }
 };
@@ -269,6 +278,19 @@ if (swmStaticDir && fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
 // Serve ECP (Public Customer Store) on Root '/'
 if (ecpStaticDir && fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
   app.use('/', express.static(ecpStaticDir, staticOptions));
+
+  // In-memory cache for ECP index.html template to prevent blocking disk I/O on every product visit
+  let cachedEcpIndexHtml = null;
+  const getEcpIndexHtml = () => {
+    if (!cachedEcpIndexHtml) {
+      try {
+        cachedEcpIndexHtml = fs.readFileSync(path.join(ecpStaticDir, 'index.html'), 'utf8');
+      } catch (e) {
+        return '';
+      }
+    }
+    return cachedEcpIndexHtml;
+  };
 
   // Dynamic Server-Side Meta Injection for Products (WhatsApp, Facebook, Googlebot Rich Previews)
   app.get('/product/:slug', async (req, res, next) => {
@@ -302,7 +324,7 @@ if (ecpStaticDir && fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
         }
         const pageUrl = `${baseUrl}/product/${slug}`;
 
-        let html = fs.readFileSync(path.join(ecpStaticDir, 'index.html'), 'utf8');
+        let html = getEcpIndexHtml();
 
         // Replace Title & Description
         html = html.replace(/<title>.*?<\/title>/i, `<title>${pageTitle}</title>`);

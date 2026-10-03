@@ -55,14 +55,20 @@ async function getReservedQuantity(branchId, productId, variantId = null) {
   const prefix = `ecp:reserve:${branchId}:${productId}:${variantId || 'null'}:`;
   let total = 0;
 
-  // 1. From Redis if available
+  // 1. From Redis if available (using non-blocking SCAN + MGET batching)
   if (redis.raw && redis.raw.status === 'ready') {
     try {
-      const keys = await redis.raw.keys(`${prefix}*`);
-      for (const k of keys) {
-        const val = await redis.raw.get(k);
-        if (val) total += parseInt(val, 10) || 0;
-      }
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await redis.raw.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100);
+        cursor = nextCursor;
+        if (keys && keys.length > 0) {
+          const values = await redis.raw.mget(keys);
+          for (const val of values) {
+            if (val) total += parseInt(val, 10) || 0;
+          }
+        }
+      } while (cursor !== '0');
       return total;
     } catch (e) {
       // fallback

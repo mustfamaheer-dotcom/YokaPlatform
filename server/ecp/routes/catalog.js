@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const crypto = require('crypto');
 const { query } = require('../../shared/db');
 const redis = require('../../shared/redis');
 
@@ -67,9 +68,9 @@ router.get('/', async (req, res) => {
     const limitNum = Math.max(1, Math.min(60, parseInt(limit, 10)));
     const offset = (pageNum - 1) * limitNum;
 
-    // Cache key for common queries
+    // Cache key for common queries (using deterministic MD5 hash to prevent key collisions)
     const queryHash = JSON.stringify({ pageNum, limitNum, category, category_id, brand, min_price, max_price, color, size, search, sort });
-    const cacheKey = `ecp:cache:catalog:${Buffer.from(queryHash).toString('base64').slice(0, 32)}`;
+    const cacheKey = `ecp:cache:catalog:${crypto.createHash('md5').update(queryHash).digest('hex')}`;
     const cached = await redis.get(cacheKey);
     if (cached) {
       try {
@@ -173,12 +174,11 @@ router.get('/', async (req, res) => {
              c.id AS category_id,
              c.category_name,
              c.slug AS category_slug,
-             COALESCE(SUM(ib.available_qty), 0) AS total_stock,
+             COALESCE((SELECT SUM(ib2.available_qty) FROM inventory_balances ib2 WHERE ib2.product_id = p.id AND ib2.branch_id = $1), 0) AS total_stock,
              COUNT(DISTINCT v.id) AS variants_count
       FROM products p
       LEFT JOIN product_categories c ON c.id = p.category_id
       LEFT JOIN product_variants v ON v.product_id = p.id AND v.status = 'active'
-      LEFT JOIN inventory_balances ib ON ib.product_id = p.id AND ib.branch_id = $1
       ${whereSql}
       GROUP BY p.id, c.id, c.category_name, c.slug
       ORDER BY ${orderSql}
@@ -237,11 +237,21 @@ router.get('/', async (req, res) => {
  */
 router.get('/store-settings', async (req, res) => {
   try {
+    const cacheKey = 'ecp:cache:store-settings';
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      try {
+        return res.json({ success: true, data: JSON.parse(cached), fromCache: true });
+      } catch (e) {}
+    }
+
     const result = await query('SELECT key, value, label FROM store_settings');
     const settingsMap = {};
     (result.rows || result).forEach(row => {
       settingsMap[row.key] = row.value;
     });
+
+    await redis.setex(cacheKey, 600, JSON.stringify(settingsMap));
     return res.json({ success: true, data: settingsMap });
   } catch (err) {
     console.error('ECP store-settings fetch error:', err);
@@ -264,6 +274,14 @@ router.get('/store-settings', async (req, res) => {
  */
 router.get('/branches', async (req, res) => {
   try {
+    const cacheKey = 'ecp:cache:branches';
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      try {
+        return res.json({ success: true, data: JSON.parse(cached), fromCache: true });
+      } catch (e) {}
+    }
+
     const branches = await query(
       `SELECT id, branch_code, branch_name, branch_type, address, city, phone,
               google_maps_url, working_hours, display_order
@@ -271,7 +289,9 @@ router.get('/branches', async (req, res) => {
        WHERE status = 'active' AND (show_in_store = true OR show_in_store IS NULL)
        ORDER BY display_order ASC, id ASC`
     );
-    return res.json({ success: true, data: branches.rows || branches });
+    const data = branches.rows || branches;
+    await redis.setex(cacheKey, 600, JSON.stringify(data));
+    return res.json({ success: true, data });
   } catch (err) {
     console.error('ECP branches fetch error:', err);
     return res.status(500).json({ success: false, message: 'تعذر جلب فروع المتجر' });

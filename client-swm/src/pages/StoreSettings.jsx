@@ -13,7 +13,12 @@ import {
   Space,
   Tabs,
   Switch,
-  Select
+  Select,
+  Table,
+  Modal,
+  Tag,
+  InputNumber,
+  Tooltip
 } from 'antd';
 import {
   ShopOutlined,
@@ -30,9 +35,14 @@ import {
   SafetyCertificateOutlined,
   GlobalOutlined,
   MailOutlined,
-  SearchOutlined
+  SearchOutlined,
+  EnvironmentOutlined,
+  EditOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  PlusOutlined
 } from '@ant-design/icons';
-import { PhoneCall, MessageCircle, ArrowLeft, Sparkles, Truck, RotateCcw, Award, Star, ShieldCheck, Users, Flame } from 'lucide-react';
+import { PhoneCall, MessageCircle, ArrowLeft, Sparkles, Truck, RotateCcw, Award, Star, ShieldCheck, Users, Flame, MapPin, Navigation, ExternalLink } from 'lucide-react';
 import api from '../api';
 
 const { Title, Text } = Typography;
@@ -44,6 +54,14 @@ export default function StoreSettings({ currentUser }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Branches Master State for Storefront Control
+  const [branchesList, setBranchesList] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [editingBranch, setEditingBranch] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [savingBranch, setSavingBranch] = useState(false);
+  const [branchForm] = Form.useForm();
 
   // Live preview states
   const [previewValues, setPreviewValues] = useState({
@@ -83,9 +101,72 @@ export default function StoreSettings({ currentUser }) {
     facebook_pixel_id: ''
   });
 
+  const fetchBranches = async () => {
+    setLoadingBranches(true);
+    try {
+      const res = await api.get('/api/swm/branches');
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setBranchesList(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load branches in StoreSettings:', err);
+    } finally {
+      setLoadingBranches(false);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
+    fetchBranches();
   }, []);
+
+  const handleToggleStore = async (branchId, checked) => {
+    try {
+      const res = await api.patch(`/api/swm/branches/${branchId}/toggle-store`, { show_in_store: checked });
+      if (res.data?.success) {
+        message.success(checked ? 'تم تفعيل ظهور الفرع في المتجر الإلكتروني' : 'تم إخفاء الفرع من المتجر الإلكتروني');
+        setBranchesList((prev) => prev.map((b) => b.id === branchId ? { ...b, show_in_store: checked } : b));
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'تعذر تحديث حالة العرض');
+    }
+  };
+
+  const handleOpenEditBranch = (branch) => {
+    setEditingBranch(branch);
+    branchForm.setFieldsValue({
+      branch_name: branch.branch_name,
+      city: branch.city || '',
+      address: branch.address || '',
+      phone: branch.phone || '',
+      google_maps_url: branch.google_maps_url || '',
+      working_hours: branch.working_hours || 'يومياً من 10:00 صباحاً إلى 11:00 مساءً',
+      show_in_store: branch.show_in_store !== false,
+      display_order: branch.display_order || 0
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveBranch = async (values) => {
+    if (!editingBranch) return;
+    setSavingBranch(true);
+    try {
+      const res = await api.put(`/api/swm/branches/${editingBranch.id}`, values);
+      if (res.data?.success) {
+        message.success(`تم تحديث بيانات وموقع فرع "${values.branch_name}" بنجاح`);
+        setIsEditModalOpen(false);
+        setEditingBranch(null);
+        branchForm.resetFields();
+        fetchBranches();
+      } else {
+        message.error(res.data?.message || 'فشل في تحديث بيانات الفرع');
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في تحديث بيانات الفرع');
+    } finally {
+      setSavingBranch(false);
+    }
+  };
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -552,6 +633,132 @@ export default function StoreSettings({ currentUser }) {
           </Card>
         </Space>
       )
+    },
+    {
+      key: 'branches_control',
+      label: (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+          <ShopOutlined style={{ color: '#C8A45C' }} />
+          <span>فروع ومعارض المتجر (Store Branches)</span>
+        </span>
+      ),
+      children: (
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="التحكم في فروع ومعارض المتجر الظاهرة في المتجر الإلكتروني والصفحة الرئيسية"
+            description="يمكنك تفعيل أو إخفاء أي فرع من العرض على المتجر، وتعديل اسم الفرع، العنوان التفصيلي، مواعيد العمل، أرقام التواصل، ورابط الموقع على خرائط Google Maps."
+            style={{ borderRadius: 10 }}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text strong style={{ fontSize: 14 }}>
+              قائمة الفروع المسجلة ({branchesList.length} فرع):
+            </Text>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={fetchBranches}
+              loading={loadingBranches}
+              size="small"
+            >
+              تحديث الفروع
+            </Button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {branchesList.map((branch) => {
+              const isVisibleInStore = branch.show_in_store !== false;
+              return (
+                <Card
+                  key={branch.id}
+                  size="small"
+                  style={{
+                    borderRadius: 12,
+                    borderColor: isVisibleInStore ? '#CBD5E1' : '#E2E8F0',
+                    backgroundColor: isVisibleInStore ? '#FFFFFF' : '#F8FAFC'
+                  }}
+                  bodyStyle={{ padding: 14 }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <ShopOutlined style={{ color: isVisibleInStore ? '#C8A45C' : '#94A3B8', fontSize: 16 }} />
+                        <Text strong style={{ fontSize: 15, color: '#0F172A' }}>{branch.branch_name}</Text>
+                        <Tag color={branch.branch_type === 'retail_branch' ? 'blue' : 'purple'}>
+                          {branch.branch_type === 'retail_branch' ? 'فرع تجزئة' : 'مستودع'}
+                        </Tag>
+                        {branch.city && <Tag color="gold">{branch.city}</Tag>}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                        كود الفرع: <Text code>{branch.branch_code}</Text>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ textAlign: 'left' }}>
+                        <span style={{ fontSize: 11, color: '#64748B', display: 'block' }}>الظهور بالمتجر:</span>
+                        <Switch
+                          checked={isVisibleInStore}
+                          onChange={(checked) => handleToggleStore(branch.id, checked)}
+                          checkedChildren="معروض"
+                          unCheckedChildren="مخفي"
+                        />
+                      </div>
+                      <Button
+                        type="primary"
+                        icon={<EditOutlined />}
+                        onClick={() => handleOpenEditBranch(branch)}
+                        style={{
+                          backgroundColor: '#0F172A',
+                          borderColor: '#0F172A',
+                          borderRadius: 8,
+                          fontSize: 12.5,
+                          height: 36
+                        }}
+                      >
+                        تعديل البيانات
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Divider style={{ margin: '10px 0' }} />
+
+                  <Row gutter={[12, 8]} style={{ fontSize: 12.5 }}>
+                    <Col xs={24} md={12}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>العنوان: </span>
+                      <Text style={{ color: '#1E293B' }}>{branch.address || 'لم يُحدد'}</Text>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>الهاتف: </span>
+                      <Text style={{ color: '#1E293B', direction: 'ltr' }}>{branch.phone || 'لم يُحدد'}</Text>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>مواعيد العمل: </span>
+                      <Text style={{ color: '#1E293B' }}>{branch.working_hours || 'يومياً'}</Text>
+                    </Col>
+                  </Row>
+
+                  {branch.google_maps_url && (
+                    <div style={{ marginTop: 8, fontSize: 12 }}>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>رابط خرائط جوجل: </span>
+                      <a
+                        href={branch.google_maps_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#0284C7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <EnvironmentOutlined />
+                        <span>معاينة الرابط على الخريطة ↗</span>
+                      </a>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </Space>
+      )
     }
   ];
 
@@ -865,6 +1072,138 @@ export default function StoreSettings({ currentUser }) {
           </Col>
         </Row>
       </Form>
+
+      {/* Edit Branch Modal for Storefront Options */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShopOutlined style={{ color: '#C8A45C', fontSize: 18 }} />
+            <span>تعديل بيانات وموقع الفرع في المتجر الإلكتروني</span>
+          </div>
+        }
+        open={isEditModalOpen}
+        onCancel={() => {
+          setIsEditModalOpen(false);
+          setEditingBranch(null);
+          branchForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+        width={650}
+      >
+        <Form
+          form={branchForm}
+          layout="vertical"
+          onFinish={handleSaveBranch}
+          style={{ marginTop: 16 }}
+        >
+          <Row gutter={16}>
+            <Col xs={24} sm={16}>
+              <Form.Item
+                name="branch_name"
+                label={<span style={{ fontWeight: 600 }}>اسم الفرع</span>}
+                rules={[{ required: true, message: 'اسم الفرع مطلوب' }]}
+              >
+                <Input placeholder="مثال: فرع مدينة نصر" style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+              <Form.Item
+                name="city"
+                label={<span style={{ fontWeight: 600 }}>المدينة / المحافظة</span>}
+              >
+                <Input placeholder="مثال: القاهرة" style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="address"
+            label={<span style={{ fontWeight: 600 }}>العنوان بالتفصيل</span>}
+          >
+            <Input placeholder="مثال: شارع عباس العقاد، بجوار كذا..." style={{ borderRadius: 8 }} />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="phone"
+                label={<span style={{ fontWeight: 600 }}>رقم الهاتف / واتساب الفرع</span>}
+              >
+                <Input placeholder="010xxxxxxxx" style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="working_hours"
+                label={<span style={{ fontWeight: 600 }}>مواعيد العمل</span>}
+              >
+                <Input placeholder="يومياً من 10:00 ص حتى 11:00 م" style={{ borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="google_maps_url"
+            label={<span style={{ fontWeight: 600 }}>رابط الموقع على خرائط جوجل (Google Maps URL)</span>}
+            extra="انسخ رابط المشاركة من تطبيق خرائط جوجل ليتمكن العملاء من فتح اتجاهات السير مباشرة"
+          >
+            <Input
+              prefix={<EnvironmentOutlined style={{ color: '#EA4335' }} />}
+              placeholder="https://maps.google.com/?q=..."
+              style={{ borderRadius: 8 }}
+            />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="show_in_store"
+                valuePropName="checked"
+                label={<span style={{ fontWeight: 600 }}>عرض الفرع في المتجر الإلكتروني</span>}
+              >
+                <Switch checkedChildren="نعم، معروض" unCheckedChildren="مخفي" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="display_order"
+                label={<span style={{ fontWeight: 600 }}>ترتيب الظهور</span>}
+              >
+                <InputNumber min={0} max={999} style={{ width: '100%', borderRadius: 8 }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+            <Button
+              onClick={() => {
+                setIsEditModalOpen(false);
+                setEditingBranch(null);
+                branchForm.resetFields();
+              }}
+              style={{ borderRadius: 8 }}
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={savingBranch}
+              icon={<SaveOutlined />}
+              style={{
+                backgroundColor: '#0F172A',
+                borderColor: '#0F172A',
+                color: '#FFFFFF',
+                borderRadius: 8,
+                fontWeight: 700
+              }}
+            >
+              حفظ التعديلات
+            </Button>
+          </div>
+        </Form>
+      </Modal>
     </div>
   );
 }

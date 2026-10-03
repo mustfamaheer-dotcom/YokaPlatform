@@ -237,10 +237,12 @@ router.post('/order', async (req, res) => {
 
     const totalAmount = subtotal + shippingCost;
 
-    // Generate Order Number: ORD-YYMM-XXXXX
-    const yymm = new Date().toISOString().slice(2, 7).replace('-', '');
-    const [{ count }] = await query(`SELECT COUNT(id) AS count FROM ecp_orders`);
-    const orderNumber = `ORD-${yymm}-${String(parseInt(count, 10) + 1).padStart(5, '0')}`;
+    // Generate unique, collision-free Order Number: ORD-YYMM-XXXXXX (instant, no full table scan or race condition)
+    const now = new Date();
+    const yymm = now.toISOString().slice(2, 7).replace('-', '');
+    const timeSeq = String(Date.now()).slice(-4);
+    const randSuffix = Math.floor(10 + Math.random() * 90);
+    const orderNumber = `ORD-${yymm}-${timeSeq}${randSuffix}`;
 
     const shippingAddress = {
       recipient_name: customer_name,

@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { Layout, App as AntdApp } from 'antd';
+import { Layout, App as AntdApp, Spin } from 'antd';
 import Navbar from './components/Navbar';
 import AnnouncementBar from './components/AnnouncementBar';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
-import Home from './pages/Home';
-import Catalog from './pages/Catalog';
-import ProductDetail from './pages/ProductDetail';
-import Checkout from './pages/Checkout';
-import OrderSuccess from './pages/OrderSuccess';
-import Contact from './pages/Contact';
-import Branches from './pages/Branches';
 import MobileBottomNav from './components/MobileBottomNav';
 import api from './api';
 import { trackPageView, trackAddToCart } from './services/tracker';
 import { Check } from 'lucide-react';
 import ScrollToTop from './components/ScrollToTop';
+
+const Home = lazy(() => import('./pages/Home'));
+const Catalog = lazy(() => import('./pages/Catalog'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Branches = lazy(() => import('./pages/Branches'));
 
 const { Content } = Layout;
 
@@ -164,16 +165,24 @@ export default function App() {
       />
 
       <Content className="page-content" style={{ maxWidth: 1280, width: '100%', margin: '16px auto', flex: 1 }}>
-        <Routes>
-          <Route path="/" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
-          <Route path="/catalog" element={<Catalog onAddToCart={handleAddToCart} />} />
-          <Route path="/product/:slug" element={<ProductDetail onAddToCart={handleAddToCart} />} />
-          <Route path="/checkout" element={<Checkout cart={cart} onRefreshCart={fetchCart} />} />
-          <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/branches" element={<Branches />} />
-          <Route path="*" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
-        </Routes>
+        <Suspense
+          fallback={
+            <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Spin size="large" />
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
+            <Route path="/catalog" element={<Catalog onAddToCart={handleAddToCart} />} />
+            <Route path="/product/:slug" element={<ProductDetail onAddToCart={handleAddToCart} />} />
+            <Route path="/checkout" element={<Checkout cart={cart} onRefreshCart={fetchCart} />} />
+            <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/branches" element={<Branches />} />
+            <Route path="*" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
+          </Routes>
+        </Suspense>
       </Content>
 
       <CartDrawer

@@ -43,6 +43,26 @@ import { Sparkles, Truck } from 'lucide-react';
 import api from '../api';
 import { trackBeginCheckout } from '../services/tracker';
 
+const ReservationCountdown = React.memo(function ReservationCountdown({ initialSeconds = 900 }) {
+  const [timeLeft, setTimeLeft] = useState(initialSeconds);
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timeLeft]);
+
+  const mins = Math.floor(timeLeft / 60);
+  const rem = timeLeft % 60;
+  return (
+    <span style={{ fontWeight: 800, color: '#C8A45C', fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>
+      الوقت المتبقي: {mins}:{rem < 10 ? '0' : ''}{rem}
+    </span>
+  );
+});
+
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
@@ -66,7 +86,6 @@ export default function Checkout({ cart, onRefreshCart }) {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
-  const [reservationTimeLeft, setReservationTimeLeft] = useState(900); // 15 mins in seconds
 
   useEffect(() => {
     fetchShippingRates();
@@ -91,15 +110,6 @@ export default function Checkout({ cart, onRefreshCart }) {
     }
   };
 
-  // 15-minute countdown timer
-  useEffect(() => {
-    if (reservationTimeLeft <= 0) return;
-    const interval = setInterval(() => {
-      setReservationTimeLeft((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [reservationTimeLeft]);
-
   // Acquire 15-minute temporary reservation upon entering checkout
   useEffect(() => {
     if (cart?.cart_id && cart?.items?.length > 0) {
@@ -110,7 +120,6 @@ export default function Checkout({ cart, onRefreshCart }) {
   const reserveStock = async () => {
     try {
       await api.post('/api/ecp/checkout/reserve', { cart_id: cart.cart_id });
-      setReservationTimeLeft(900);
     } catch (err) {
       console.warn('Temporary stock reservation info:', err.response?.data?.message);
     }
@@ -252,12 +261,6 @@ export default function Checkout({ cart, onRefreshCart }) {
     }
   };
 
-  const formatTime = (secs) => {
-    const mins = Math.floor(secs / 60);
-    const rem = secs % 60;
-    return `${mins}:${rem < 10 ? '0' : ''}${rem}`;
-  };
-
   if (!cart?.items || cart.items.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '80px 0', background: '#FFFFFF', borderRadius: 12 }}>
@@ -282,9 +285,7 @@ export default function Checkout({ cart, onRefreshCart }) {
               <ClockCircleOutlined style={{ marginLeft: 6, color: '#C8A45C' }} />
               <strong>تم حجز محتويات سلتك مؤقتاً</strong> لمدة 15 دقيقة لضمان عدم نفاد المخزون أثناء إتمام الدفع.
             </span>
-            <span style={{ fontWeight: 800, color: '#C8A45C', fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>
-              الوقت المتبقي: {formatTime(reservationTimeLeft)}
-            </span>
+            <ReservationCountdown />
           </div>
         }
         type="warning"

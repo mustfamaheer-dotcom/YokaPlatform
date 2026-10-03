@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Row, Col, Button, Skeleton, Typography, Empty } from 'antd';
+import { Row, Col, Button, Skeleton, Typography, Empty, Tag, Space } from 'antd';
 import {
   ArrowLeftOutlined,
   FireOutlined,
@@ -10,7 +10,14 @@ import {
   SmileOutlined,
   SketchOutlined,
   ShoppingOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  EnvironmentOutlined,
+  PhoneOutlined,
+  ClockCircleOutlined,
+  WhatsAppOutlined,
+  CompassOutlined,
+  LeftOutlined,
+  RightOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
@@ -35,6 +42,11 @@ const getCategoryIcon = (slug, name) => {
 export default function Home({ onAddToCart }) {
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [activeBranchIndex, setActiveBranchIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [mouseStartX, setMouseStartX] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
   const [storeSettings, setStoreSettings] = useState({
@@ -53,20 +65,24 @@ export default function Home({ onAddToCart }) {
   const fetchHomeData = async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, settingsRes] = await Promise.all([
+      const [prodRes, catRes, settingsRes, branchRes] = await Promise.all([
         api.get('/api/ecp/catalog', { params: { limit: 12, sort: 'newest' } }),
         api.get('/api/ecp/catalog/categories'),
-        api.get('/api/ecp/catalog/store-settings').catch(() => null)
+        api.get('/api/ecp/catalog/store-settings').catch(() => null),
+        api.get('/api/ecp/catalog/branches').catch(() => null)
       ]);
 
-      if (prodRes.data.success) {
+      if (prodRes?.data?.success) {
         setFeaturedProducts((prodRes.data.data || []).filter(p => (parseInt(p.total_stock, 10) || 0) > 0));
       }
-      if (catRes.data.success) {
+      if (catRes?.data?.success) {
         setCategories(catRes.data.data);
       }
       if (settingsRes?.data?.success && settingsRes.data.data) {
         setStoreSettings(prev => ({ ...prev, ...settingsRes.data.data }));
+      }
+      if (branchRes?.data?.success && Array.isArray(branchRes.data.data)) {
+        setBranches(branchRes.data.data);
       }
     } catch (err) {
       console.error('Home data fetch error:', err);
@@ -113,6 +129,51 @@ export default function Home({ onAddToCart }) {
       }
     ]
   }), [storeSettings]);
+
+  const handleNextBranch = () => {
+    if (branches.length === 0) return;
+    setActiveBranchIndex((prev) => (prev + 1) % branches.length);
+  };
+
+  const handlePrevBranch = () => {
+    if (branches.length === 0) return;
+    setActiveBranchIndex((prev) => (prev - 1 + branches.length) % branches.length);
+  };
+
+  const handleTouchStart = (e) => {
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const deltaX = touchStartX - touchEndX;
+
+    // In RTL layout, swiping left (positive deltaX) advances to next branch
+    if (deltaX > 40) {
+      handleNextBranch();
+    } else if (deltaX < -40) {
+      handlePrevBranch();
+    }
+    setTouchStartX(null);
+  };
+
+  const handleMouseDown = (e) => {
+    setIsMouseDown(true);
+    setMouseStartX(e.clientX);
+  };
+
+  const handleMouseUp = (e) => {
+    if (!isMouseDown || mouseStartX === null) return;
+    const deltaX = mouseStartX - e.clientX;
+    if (deltaX > 45) {
+      handleNextBranch();
+    } else if (deltaX < -45) {
+      handlePrevBranch();
+    }
+    setIsMouseDown(false);
+    setMouseStartX(null);
+  };
 
   return (
     <div className="fade-in">
@@ -201,11 +262,16 @@ export default function Home({ onAddToCart }) {
             {/* Dynamic Breathing Pedestal Shadow */}
             <div className="hero-pedestal-shadow" />
 
-            {/* 3D Floating Bag */}
+            {/* 3D Floating Bag (Optimized LCP) */}
             <img
               src={heroBagImg}
               alt="حقيبة جلدية فاخرة يوكا ستور"
               className="hero-3d-bag"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              width={380}
+              height={380}
             />
           </div>
 
@@ -392,6 +458,443 @@ export default function Home({ onAddToCart }) {
           </>
         )}
       </section>
+
+      {/* 3. Interactive Branches Spotlight Card (Swipe / Swap in place) */}
+      {branches.length > 0 && (
+        <section
+          style={{
+            marginTop: 48,
+            marginBottom: 24
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+              flexWrap: 'wrap',
+              gap: 12,
+              marginBottom: 18
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: 'rgba(200, 164, 92, 0.15)',
+                    color: '#C8A45C',
+                    padding: '3px 10px',
+                    borderRadius: 14,
+                    fontSize: 11.5,
+                    fontWeight: 800
+                  }}
+                >
+                  <CompassOutlined />
+                  <span>معارضنا على الطبيعة</span>
+                </span>
+              </div>
+              <Title
+                level={2}
+                style={{
+                  margin: 0,
+                  fontWeight: 900,
+                  fontSize: 'clamp(20px, 3.5vw, 26px)',
+                  color: '#0F172A'
+                }}
+              >
+                فروعنا ومعارضنا
+              </Title>
+              <Text type="secondary" style={{ fontSize: 13, color: '#64748B' }}>
+                تفضل بزيارتنا في فروع يوكا ستور للاستمتاع بتجربة تسوق فريدة ومعاينة الأزياء
+              </Text>
+            </div>
+
+            {/* Controls: Counter + Arrow Navigation + View All */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Counter Badge */}
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#64748B',
+                  background: '#FFFFFF',
+                  padding: '5px 12px',
+                  borderRadius: 16,
+                  border: '1px solid #E2E8F0',
+                  direction: 'ltr'
+                }}
+              >
+                {activeBranchIndex + 1} / {branches.length}
+              </span>
+
+              {/* Prev Button (In RTL, Right arrow goes previous) */}
+              <Button
+                shape="circle"
+                icon={<RightOutlined style={{ fontSize: 12 }} />}
+                onClick={handlePrevBranch}
+                aria-label="الفرع السابق"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderColor: '#E2E8F0',
+                  color: '#0F172A',
+                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)'
+                }}
+              />
+
+              {/* Next Button (In RTL, Left arrow goes next) */}
+              <Button
+                shape="circle"
+                icon={<LeftOutlined style={{ fontSize: 12 }} />}
+                onClick={handleNextBranch}
+                aria-label="الفرع التالي"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderColor: '#E2E8F0',
+                  color: '#0F172A',
+                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)'
+                }}
+              />
+
+              {/* Link to Full Branches Page */}
+              <Link to="/branches">
+                <Button
+                  type="text"
+                  style={{
+                    color: '#C8A45C',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    padding: '4px 10px'
+                  }}
+                >
+                  <span>عرض الكل</span>
+                  <ArrowLeftOutlined style={{ fontSize: 11 }} />
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Swipeable Card View Container */}
+          {(() => {
+            const currentBranch = branches[activeBranchIndex] || branches[0];
+            const hasMap = Boolean(currentBranch?.google_maps_url);
+            const workingHours = currentBranch?.working_hours || 'يومياً من 10:00 صباحاً إلى 11:00 مساءً';
+
+            return (
+              <div
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                onMouseDown={handleMouseDown}
+                onMouseUp={handleMouseUp}
+                style={{
+                  userSelect: 'none',
+                  cursor: 'grab',
+                  position: 'relative'
+                }}
+              >
+                <div
+                  key={currentBranch.id}
+                  className="fade-in"
+                  style={{
+                    background: '#FFFFFF',
+                    borderRadius: 22,
+                    border: '1.5px solid #E2E8F0',
+                    boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {/* Decorative Top Accent Gradient */}
+                  <div
+                    style={{
+                      height: 5,
+                      background: 'linear-gradient(90deg, #0F172A 0%, #C8A45C 50%, #0F172A 100%)'
+                    }}
+                  />
+
+                  <div style={{ padding: 'clamp(18px, 3vw, 28px)' }}>
+                    {/* Header Row: Icon + Name + Code + City Tag */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        marginBottom: 18,
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 14,
+                            background: 'linear-gradient(135deg, rgba(200, 164, 92, 0.18) 0%, rgba(15, 23, 42, 0.08) 100%)',
+                            border: '1px solid rgba(200, 164, 92, 0.35)',
+                            color: '#C8A45C',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 22,
+                            flexShrink: 0
+                          }}
+                        >
+                          <ShopOutlined />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Title
+                              level={3}
+                              style={{
+                                margin: 0,
+                                fontWeight: 800,
+                                color: '#0F172A',
+                                fontSize: 'clamp(17px, 2.5vw, 21px)'
+                              }}
+                            >
+                              {currentBranch.branch_name}
+                            </Title>
+                          </div>
+                          <Text type="secondary" style={{ fontSize: 12, color: '#64748B' }}>
+                            كود الفرع: {currentBranch.branch_code}
+                          </Text>
+                        </div>
+                      </div>
+
+                      {currentBranch.city && (
+                        <Tag
+                          style={{
+                            backgroundColor: '#FFFBEB',
+                            color: '#B45309',
+                            borderColor: '#FDE68A',
+                            borderRadius: 16,
+                            fontWeight: 800,
+                            padding: '4px 14px',
+                            fontSize: 12,
+                            margin: 0
+                          }}
+                        >
+                          {currentBranch.city}
+                        </Tag>
+                      )}
+                    </div>
+
+                    {/* Details Info Grid */}
+                    <Row gutter={[16, 14]} style={{ marginBottom: 22 }}>
+                      <Col xs={24} md={12}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 10,
+                            background: '#F8FAFC',
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            border: '1px solid #F1F5F9',
+                            height: '100%'
+                          }}
+                        >
+                          <EnvironmentOutlined style={{ color: '#EA4335', fontSize: 18, marginTop: 2, flexShrink: 0 }} />
+                          <div>
+                            <span style={{ fontSize: 11, color: '#94A3B8', display: 'block', fontWeight: 700 }}>عنوان الفرع:</span>
+                            <Text style={{ fontSize: 13, color: '#1E293B', fontWeight: 600, lineHeight: 1.5 }}>
+                              {currentBranch.address || 'العنوان متاح عبر خدمة العملاء'}
+                            </Text>
+                          </div>
+                        </div>
+                      </Col>
+
+                      <Col xs={24} sm={12} md={6}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 10,
+                            background: '#F8FAFC',
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            border: '1px solid #F1F5F9',
+                            height: '100%'
+                          }}
+                        >
+                          <ClockCircleOutlined style={{ color: '#C8A45C', fontSize: 17, marginTop: 2, flexShrink: 0 }} />
+                          <div>
+                            <span style={{ fontSize: 11, color: '#94A3B8', display: 'block', fontWeight: 700 }}>مواعيد العمل:</span>
+                            <Text style={{ fontSize: 12.5, color: '#334155', fontWeight: 600 }}>
+                              {workingHours}
+                            </Text>
+                          </div>
+                        </div>
+                      </Col>
+
+                      <Col xs={24} sm={12} md={6}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 10,
+                            background: '#F8FAFC',
+                            padding: '12px 14px',
+                            borderRadius: 12,
+                            border: '1px solid #F1F5F9',
+                            height: '100%'
+                          }}
+                        >
+                          <PhoneOutlined style={{ color: '#16A34A', fontSize: 17, marginTop: 2, flexShrink: 0 }} />
+                          <div>
+                            <span style={{ fontSize: 11, color: '#94A3B8', display: 'block', fontWeight: 700 }}>رقم هاتف الفرع:</span>
+                            {currentBranch.phone ? (
+                              <a
+                                href={`tel:${currentBranch.phone}`}
+                                style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', direction: 'ltr', textDecoration: 'none' }}
+                              >
+                                {currentBranch.phone}
+                              </a>
+                            ) : (
+                              <Text type="secondary" style={{ fontSize: 12 }}>غير متوفر</Text>
+                            )}
+                          </div>
+                        </div>
+                      </Col>
+                    </Row>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {hasMap ? (
+                        <a
+                          href={currentBranch.google_maps_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ textDecoration: 'none', flex: 1, minWidth: 200 }}
+                        >
+                          <Button
+                            type="primary"
+                            block
+                            icon={<EnvironmentOutlined style={{ fontSize: 15 }} />}
+                            style={{
+                              height: 44,
+                              borderRadius: 12,
+                              backgroundColor: '#0F172A',
+                              borderColor: '#0F172A',
+                              fontWeight: 800,
+                              fontSize: 13.5,
+                              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.12)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6
+                            }}
+                          >
+                            <span>عرض الموقع على خرائط جوجل</span>
+                            <span style={{ fontSize: 12 }}>↗</span>
+                          </Button>
+                        </a>
+                      ) : (
+                        <Button
+                          disabled
+                          style={{ height: 44, borderRadius: 12, flex: 1, minWidth: 200 }}
+                        >
+                          الخريطة ستتوفر قريباً
+                        </Button>
+                      )}
+
+                      {currentBranch.phone && (
+                        <a
+                          href={`https://wa.me/${currentBranch.phone.replace(/[^0-9]/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ textDecoration: 'none', minWidth: 160 }}
+                        >
+                          <Button
+                            block
+                            icon={<WhatsAppOutlined style={{ color: '#25D366', fontSize: 16 }} />}
+                            style={{
+                              height: 44,
+                              borderRadius: 12,
+                              fontWeight: 700,
+                              color: '#0F172A',
+                              borderColor: '#E2E8F0',
+                              fontSize: 13,
+                              backgroundColor: '#FFFFFF',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6
+                            }}
+                          >
+                            <span>واتساب الفرع</span>
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Swipe Help Caption on Mobile */}
+                  <div
+                    style={{
+                      background: '#F8FAFC',
+                      borderTop: '1px solid #F1F5F9',
+                      padding: '8px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: 11.5,
+                      color: '#94A3B8'
+                    }}
+                  >
+                    <span>💡 يمكنك السحب يميناً أو يساراً للتنقل بين الفروع</span>
+                    <span style={{ fontWeight: 700, color: '#C8A45C' }}>
+                      اسحب للتالي ←
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dot Indicators */}
+                {branches.length > 1 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginTop: 14
+                    }}
+                  >
+                    {branches.map((b, idx) => {
+                      const isActive = idx === activeBranchIndex;
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => setActiveBranchIndex(idx)}
+                          aria-label={`الانتقال إلى ${b.branch_name}`}
+                          style={{
+                            border: 'none',
+                            cursor: 'pointer',
+                            height: 8,
+                            width: isActive ? 28 : 8,
+                            borderRadius: 4,
+                            backgroundColor: isActive ? '#C8A45C' : '#CBD5E1',
+                            transition: 'all 0.3s ease',
+                            padding: 0
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </section>
+      )}
     </div>
   );
 }

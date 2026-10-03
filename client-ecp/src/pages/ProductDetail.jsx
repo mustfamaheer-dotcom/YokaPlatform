@@ -433,7 +433,7 @@ export default function ProductDetail({ onAddToCart }) {
 
       {/* Breadcrumb Navigation */}
       <Breadcrumb
-        style={{ marginBottom: 20, fontSize: 13 }}
+        style={{ marginBottom: isMobile ? 12 : 20, fontSize: isMobile ? 12 : 13 }}
         items={
           isMobile
             ? [
@@ -451,7 +451,7 @@ export default function ProductDetail({ onAddToCart }) {
         }
       />
 
-      <Row gutter={[{ xs: 16, sm: 24, md: 36 }, { xs: 20, sm: 24, md: 36 }]}>
+      <Row gutter={[{ xs: 0, sm: 24, md: 36 }, { xs: 16, sm: 24, md: 36 }]}>
         {/* Product Image Area */}
         <Col xs={24} md={12}>
           <div
@@ -460,11 +460,12 @@ export default function ProductDetail({ onAddToCart }) {
               borderRadius: 16,
               border: '1px solid #E2E8F0',
               overflow: 'hidden',
-              padding: isMobile ? 12 : 20,
+              padding: isMobile ? 8 : 20,
               boxShadow: '0 4px 16px rgba(15,23,42,0.04)',
               position: 'relative',
               width: '100%',
-              height: isMobile ? 340 : 460,
+              aspectRatio: isMobile ? '4 / 4.5' : undefined,
+              height: isMobile ? 'auto' : 460,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -508,8 +509,8 @@ export default function ProductDetail({ onAddToCart }) {
                     key={idx}
                     onClick={() => handleSelectThumbnail(item)}
                     style={{
-                      width: isMobile ? 64 : 76,
-                      height: isMobile ? 64 : 76,
+                      width: isMobile ? 56 : 76,
+                      height: isMobile ? 56 : 76,
                       flexShrink: 0,
                       borderRadius: 10,
                       overflow: 'hidden',
@@ -577,7 +578,7 @@ export default function ProductDetail({ onAddToCart }) {
               </Text>
             )}
 
-            <Title level={2} style={{ margin: 0, fontWeight: 800, color: '#0F172A', textWrap: 'balance' }}>
+            <Title level={isMobile ? 3 : 2} style={{ margin: 0, fontWeight: 800, color: '#0F172A', textWrap: 'balance', fontSize: isMobile ? 20 : undefined }}>
               {product.product_name}
             </Title>
 
@@ -593,9 +594,9 @@ export default function ProductDetail({ onAddToCart }) {
             </Space>
 
             {/* Price Box */}
-            <div style={{ background: '#FFFFFF', padding: '16px 20px', borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(15,23,42,0.03)' }}>
+            <div style={{ background: '#FFFFFF', padding: isMobile ? '12px 14px' : '16px 20px', borderRadius: 12, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(15,23,42,0.03)' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                <span style={{ fontSize: 28, fontWeight: 900, color: '#C8A45C', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: isMobile ? 24 : 28, fontWeight: 900, color: '#C8A45C', fontVariantNumeric: 'tabular-nums' }}>
                   {price.toLocaleString()} <span style={{ fontSize: 16, fontWeight: 700 }}>ج.م</span>
                 </span>
                 {hasDiscount && (
@@ -723,24 +724,24 @@ export default function ProductDetail({ onAddToCart }) {
                 )}
 
                 {/* Quantity Stepper & Add to Cart */}
-                <div ref={ctaContainerRef} style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '4px 8px' }}>
+                <div ref={ctaContainerRef} style={{ display: 'flex', gap: isMobile ? 10 : 16, alignItems: 'center', marginTop: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: isMobile ? '2px 4px' : '4px 8px' }}>
                     <Button
                       type="text"
                       icon={<MinusOutlined />}
                       disabled={quantity <= 1}
                       aria-label="تقليل الكمية"
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      style={{ minWidth: 44, minHeight: 44 }}
+                      style={{ minWidth: isMobile ? 38 : 44, minHeight: isMobile ? 38 : 44 }}
                     />
-                    <span style={{ fontSize: 16, fontWeight: 700, padding: '0 8px', fontVariantNumeric: 'tabular-nums', width: 32, textAlign: 'center', color: '#0F172A' }}>{quantity}</span>
+                    <span style={{ fontSize: isMobile ? 15 : 16, fontWeight: 700, padding: isMobile ? '0 4px' : '0 8px', fontVariantNumeric: 'tabular-nums', width: isMobile ? 26 : 32, textAlign: 'center', color: '#0F172A' }}>{quantity}</span>
                     <Button
                       type="text"
                       icon={<PlusOutlined />}
                       disabled={quantity >= availableStock}
                       aria-label="زيادة الكمية"
                       onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
-                      style={{ minWidth: 44, minHeight: 44 }}
+                      style={{ minWidth: isMobile ? 38 : 44, minHeight: isMobile ? 38 : 44 }}
                     />
                   </div>
 
@@ -748,15 +749,15 @@ export default function ProductDetail({ onAddToCart }) {
                     type="primary"
                     size="large"
                     disabled={availableStock <= 0}
-                    icon={<ShoppingCartOutlined style={{ fontSize: 20 }} />}
+                    icon={<ShoppingCartOutlined style={{ fontSize: isMobile ? 18 : 20 }} />}
                     onClick={handleAdd}
                     style={{
                       flex: 1,
-                      height: 52,
+                      height: isMobile ? 48 : 52,
                       backgroundColor: availableStock > 0 ? '#C8A45C' : '#F1F5F9',
                       color: availableStock > 0 ? '#0F172A' : '#94A3B8',
                       borderRadius: 8,
-                      fontSize: 16,
+                      fontSize: isMobile ? 14.5 : 16,
                       fontWeight: 800,
                       border: 'none',
                       boxShadow: availableStock > 0 ? '0 4px 14px rgba(200,164,92,0.35)' : 'none'
@@ -768,7 +769,7 @@ export default function ProductDetail({ onAddToCart }) {
               </>
             ) : (
               /* MODE 2: MULTI-SIZE SELECTION (Pick size for each piece) */
-              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16 }}>
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: isMobile ? 12 : 16 }}>
                 <Text strong style={{ display: 'block', marginBottom: 12, fontSize: 14 }}>
                   حدد عدد القطع المطلوبة من كل مقاس ولون:
                 </Text>
@@ -788,7 +789,7 @@ export default function ProductDetail({ onAddToCart }) {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '10px 14px',
+                          padding: isMobile ? '8px 10px' : '10px 14px',
                           background: '#FFFFFF',
                           borderRadius: 8,
                           border: chosenQty > 0 ? '1px solid #C8A45C' : '1px solid #E2E8F0'
@@ -884,8 +885,8 @@ export default function ProductDetail({ onAddToCart }) {
             )}
 
             {/* Delivery Guarantees */}
-            <div style={{ marginTop: 16, borderTop: '1px solid #E2E8F0', paddingTop: 16 }}>
-              <Space direction="vertical" size="small" style={{ width: '100%', fontSize: 13, color: '#64748B' }}>
+            <div style={{ marginTop: isMobile ? 12 : 16, borderTop: '1px solid #E2E8F0', paddingTop: isMobile ? 12 : 16 }}>
+              <Space direction="vertical" size="small" style={{ width: '100%', fontSize: isMobile ? 12 : 13, color: '#64748B' }}>
                 <div><CarOutlined style={{ color: '#C8A45C', marginLeft: 6 }} /> شحن سريع يصلك خلال 2-4 أيام عمل</div>
                 <div><SafetyCertificateOutlined style={{ color: '#C8A45C', marginLeft: 6 }} /> الدفع عند الاستلام مع إمكانية فتح الشحنة والفحص</div>
                 <div><SyncOutlined style={{ color: '#C8A45C', marginLeft: 6 }} /> استبدال واسترجاع مجاني خلال 14 يوماً</div>
@@ -893,7 +894,7 @@ export default function ProductDetail({ onAddToCart }) {
             </div>
 
             {/* Quick Contact & Share Actions */}
-            <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, marginTop: isMobile ? 12 : 16, flexDirection: isMobile ? 'column' : 'row' }}>
               <Button
                 icon={<WhatsAppOutlined style={{ color: '#25D366', fontSize: 16 }} />}
                 onClick={() => {
@@ -901,11 +902,12 @@ export default function ProductDetail({ onAddToCart }) {
                   window.open(`https://wa.me/${contactWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
                 }}
                 style={{
-                  flex: 1,
-                  height: 42,
+                  flex: isMobile ? undefined : 1,
+                  width: isMobile ? '100%' : undefined,
+                  height: isMobile ? 40 : 42,
                   borderRadius: 8,
                   fontWeight: 700,
-                  fontSize: 13,
+                  fontSize: isMobile ? 12.5 : 13,
                   borderColor: '#25D366',
                   color: '#0F172A',
                   backgroundColor: '#F0FDF4'
@@ -921,10 +923,11 @@ export default function ProductDetail({ onAddToCart }) {
                   message.success('تم نسخ رابط المنتج بنجاح! شاركه مع أصدقائك');
                 }}
                 style={{
-                  height: 42,
+                  width: isMobile ? '100%' : undefined,
+                  height: isMobile ? 40 : 42,
                   borderRadius: 8,
                   fontWeight: 600,
-                  fontSize: 13,
+                  fontSize: isMobile ? 12.5 : 13,
                   borderColor: '#CBD5E1',
                   color: '#475569'
                 }}

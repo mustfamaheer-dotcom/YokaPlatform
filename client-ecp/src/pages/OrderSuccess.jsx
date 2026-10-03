@@ -9,7 +9,6 @@ import {
   MessageOutlined,
   CameraOutlined
 } from '@ant-design/icons';
-import html2canvas from 'html2canvas';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { trackPurchase } from '../services/tracker';
@@ -111,6 +110,7 @@ export default function OrderSuccess() {
     setSavingImage(true);
     message.loading({ content: 'جاري إنشاء وحفظ صورة الفاتورة...', key: 'save-invoice-msg' });
     try {
+      const { default: html2canvas } = await import('html2canvas');
       const canvas = await html2canvas(invoiceEl, {
         scale: 2,
         useCORS: true,
