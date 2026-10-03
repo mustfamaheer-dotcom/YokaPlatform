@@ -6,26 +6,27 @@ const crypto = require('crypto');
  * Resolves and ensures the uploads/products destination folder exists.
  */
 function getUploadsProductsDir() {
-  if (process.env.UPLOADS_DIR) {
-    const customDir = path.resolve(process.env.UPLOADS_DIR, 'products');
-    if (!fs.existsSync(customDir)) {
-      fs.mkdirSync(customDir, { recursive: true });
+  const candidateDirs = [
+    process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR, 'products') : null,
+    path.resolve(process.cwd(), 'uploads', 'products'),
+    path.resolve(__dirname, 'uploads', 'products'),
+    path.resolve(__dirname, '../../uploads', 'products')
+  ];
+
+  for (const dir of candidateDirs) {
+    if (!dir) continue;
+    try {
+      if (fs.existsSync(dir)) return dir;
+    } catch (e) {}
+  }
+
+  const fallback = path.resolve(process.cwd(), 'uploads', 'products');
+  try {
+    if (!fs.existsSync(fallback)) {
+      fs.mkdirSync(fallback, { recursive: true });
     }
-    return customDir;
-  }
-
-  const repoProductsDir = path.resolve(__dirname, '../../uploads', 'products');
-  const cwdProductsDir = path.resolve(process.cwd(), 'uploads', 'products');
-
-  const targetDir = fs.existsSync(repoProductsDir)
-    ? repoProductsDir
-    : (fs.existsSync(cwdProductsDir) ? cwdProductsDir : repoProductsDir);
-
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
-
-  return targetDir;
+  } catch (e) {}
+  return fallback;
 }
 
 const MIME_EXTENSION_MAP = {

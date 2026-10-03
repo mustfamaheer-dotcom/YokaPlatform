@@ -75,5 +75,5 @@ jobs:
       - name: Deploy Full-Stack to IIS via Web Deploy (MSDeploy)
         shell: cmd
         run: |
-          "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" -verb:sync -source:contentPath="%GITHUB_WORKSPACE%\dist-deploy" -dest:contentPath="site93498",computerName="https://site93498.siteasp.net:8172/msdeploy.axd?site=site93498",userName="site93498",password="2Wp@-q8SeE=7",authType="Basic" -enableRule:AppOffline -skip:objectName=filePath,absolutePath=".*\\logs\\.*" -skip:objectName=dirPath,absolutePath=".*\\logs.*" -allowUntrusted
+          "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" -verb:sync -source:contentPath="%GITHUB_WORKSPACE%\dist-deploy" -dest:contentPath="site93498",computerName="https://site93498.siteasp.net:8172/msdeploy.axd?site=site93498",userName="site93498",password="2Wp@-q8SeE=7",authType="Basic" -enableRule:AppOffline -enableRule:DoNotDeleteRule -skip:objectName=filePath,absolutePath=".*\\logs\\.*" -skip:objectName=dirPath,absolutePath=".*\\logs.*" -allowUntrusted
 

@@ -183,7 +183,12 @@ const fs = require('fs');
 // Helper to resolve first existing directory across development and production
 function resolveFirstExisting(candidatePaths) {
   for (const candidate of candidatePaths) {
-    if (candidate && fs.existsSync(candidate)) return candidate;
+    if (!candidate) continue;
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch (e) {
+      // Ignore permission or traversal errors on locked directories
+    }
   }
   return null;
 }
@@ -226,12 +231,14 @@ const ecpPublicDir = resolveFirstExisting([
 const uploadsDir = resolveFirstExisting([
   process.env.UPLOADS_DIR,
   path.join(process.cwd(), 'uploads'),
-  path.join(__dirname, '../../uploads'),
-  path.join(__dirname, '../uploads')
+  path.join(__dirname, 'uploads'),
+  path.join(__dirname, '../../uploads')
 ]) || path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (e) {}
 const uploadStaticOptions = {
   maxAge: '7d',
   setHeaders: (res) => {

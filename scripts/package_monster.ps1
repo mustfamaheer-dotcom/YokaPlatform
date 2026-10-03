@@ -33,6 +33,11 @@ if (Test-Path "img") {
     Copy-Item -Recurse -Force "img\*" "$deployDir\img"
 }
 
+if (Test-Path "uploads") {
+    New-Item -ItemType Directory -Path "$deployDir\uploads" -Force | Out-Null
+    Copy-Item -Recurse -Force "uploads\*" "$deployDir\uploads"
+}
+
 # Bundle server into single standalone server.js
 Write-Host ">>> [4/5] Bundling backend server.js with esbuild..."
 npx -y esbuild server/swm/app.js --bundle --platform=node --target=node20 --outfile="$deployDir\server.js"
