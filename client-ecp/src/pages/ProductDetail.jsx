@@ -475,6 +475,8 @@ export default function ProductDetail({ onAddToCart }) {
               key={displayImage}
               src={displayImage || product.featured_image || yokaLogo}
               alt={product.product_name || 'صورة المنتج'}
+              fetchpriority="high"
+              decoding="async"
               style={{
                 maxWidth: '100%',
                 maxHeight: '100%',
@@ -530,6 +532,8 @@ export default function ProductDetail({ onAddToCart }) {
                     <img
                       src={item.url}
                       alt={item.label}
+                      loading="lazy"
+                      decoding="async"
                       style={{
                         width: '100%',
                         height: '100%',
@@ -676,6 +680,8 @@ export default function ProductDetail({ onAddToCart }) {
                               <img
                                 src={cImg}
                                 alt={c}
+                                loading="lazy"
+                                decoding="async"
                                 style={{
                                   width: 24,
                                   height: 24,
@@ -804,6 +810,8 @@ export default function ProductDetail({ onAddToCart }) {
                             <img
                               src={vImg}
                               alt={v.color || 'صورة المقاس'}
+                              loading="lazy"
+                              decoding="async"
                               style={{
                                 width: 38,
                                 height: 38,

@@ -223,7 +223,12 @@ const ecpPublicDir = resolveFirstExisting([
 ]);
 
 // Serve public static images & assets with performance caching headers
-const uploadsDir = path.join(process.cwd(), 'uploads');
+const uploadsDir = resolveFirstExisting([
+  process.env.UPLOADS_DIR,
+  path.join(process.cwd(), 'uploads'),
+  path.join(__dirname, '../../uploads'),
+  path.join(__dirname, '../uploads')
+]) || path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -234,6 +239,9 @@ const uploadStaticOptions = {
   }
 };
 app.use('/uploads', express.static(uploadsDir, uploadStaticOptions));
+app.use('/uploads', (req, res) => {
+  res.status(404).type('text/plain').send('Image Not Found');
+});
 
 if (imgDir) app.use(express.static(imgDir, uploadStaticOptions));
 if (swmPublicDir) app.use(express.static(swmPublicDir, uploadStaticOptions));
@@ -296,15 +304,35 @@ if (ecpStaticDir && fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
   app.get('/product/:slug', async (req, res, next) => {
     try {
       const slug = req.params.slug;
-      const { query } = require('../shared/db');
-      const prodRes = await query(
-        `SELECT product_name, description, selling_price, sale_price, featured_image, brand, product_code, total_stock
-         FROM products
-         WHERE slug = $1 OR id::text = $1
-         LIMIT 1`,
-        [slug]
-      );
-      const prod = prodRes.rows?.[0] || prodRes?.[0];
+      const redis = require('../shared/redis');
+      const cacheKey = `ecp:seo:product:${slug}`;
+      let prod = null;
+
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          prod = JSON.parse(cached);
+        }
+      } catch (e) {}
+
+      if (!prod) {
+        const { query } = require('../shared/db');
+        const prodRes = await query(
+          `SELECT p.product_name, p.description, p.selling_price, p.sale_price, p.featured_image, p.brand, p.product_code, p.slug,
+                  COALESCE((SELECT SUM(ib.available_qty) FROM inventory_balances ib WHERE ib.product_id = p.id), 0) AS total_stock
+           FROM products p
+           WHERE p.slug = $1 OR p.id::text = $1
+           LIMIT 1`,
+          [slug]
+        );
+        prod = prodRes.rows?.[0] || prodRes?.[0];
+
+        if (prod) {
+          try {
+            await redis.setex(cacheKey, 300, JSON.stringify(prod));
+          } catch (e) {}
+        }
+      }
 
       if (prod) {
         const rawSelling = parseFloat(prod.selling_price) || 0;

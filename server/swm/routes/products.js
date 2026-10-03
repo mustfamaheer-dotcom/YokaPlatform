@@ -3,6 +3,7 @@ const { query, transaction } = require('../../shared/db');
 const { requireAuth, requireRole } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 const redis = require('../../shared/redis');
+const { persistDataUri, persistGalleryImagesJson } = require('../../shared/imageStore');
 
 /**
  * GET /api/swm/products
@@ -551,6 +552,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
       reorder_level = 5,
       is_ecom_listed = false,
       featured_image = null,
+      gallery_images = null,
       variants = []
     } = req.body;
 
@@ -560,6 +562,9 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
         message: 'صورة الموديل مطلوبة كشرط أساسي ولا يمكن حفظ الصنف بدونها'
       });
     }
+
+    const persistedFeaturedImage = persistDataUri(featured_image);
+    const persistedGalleryImages = gallery_images ? persistGalleryImagesJson(gallery_images) : null;
 
     // Auto-generate code & barcode if not explicitly supplied
     const cleanCode = product_code
@@ -588,10 +593,10 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           product_code, barcode, product_name, slug, brand,
           category_id, sub_category_id, material, color, size,
           cost_price, selling_price, wholesale_price, sale_price,
-          reorder_level, is_ecom_listed, featured_image, status, created_at, updated_at
+          reorder_level, is_ecom_listed, featured_image, gallery_images, status, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, $17, 'active', NOW(), NOW()
+          $11, $12, $13, $14, $15, $16, $17, $18, 'active', NOW(), NOW()
         ) RETURNING id`,
         [
           cleanCode,
@@ -610,7 +615,8 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           sale_price ? parseFloat(sale_price) : null,
           parseInt(reorder_level, 10) || 5,
           Boolean(is_ecom_listed),
-          featured_image || null
+          persistedFeaturedImage || null,
+          persistedGalleryImages || null
         ]
       );
 
@@ -649,7 +655,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           usedSkusInBatch.add(finalSku);
 
           // Inheritance Logic: If no variant-specific image is provided, inherit the model's featured_image
-          const variantImage = v.image_url || featured_image || null;
+          const variantImage = (v.image_url ? persistDataUri(v.image_url) : null) || persistedFeaturedImage || null;
 
           await client.query(
             `INSERT INTO product_variants (
@@ -731,9 +737,13 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
       is_ecom_listed,
       reorder_level,
       featured_image,
+      gallery_images,
       color_images,
       variants
     } = req.body;
+
+    const persistedFeaturedImage = featured_image !== undefined ? (persistDataUri(featured_image) || null) : undefined;
+    const persistedGalleryImages = gallery_images !== undefined ? (persistGalleryImagesJson(gallery_images) || null) : undefined;
 
     // Check code uniqueness if changed
     if (product_code && product_code.trim().toUpperCase() !== old.product_code) {
@@ -763,8 +773,9 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
         is_ecom_listed = COALESCE($15, is_ecom_listed),
         reorder_level = COALESCE($16, reorder_level),
         featured_image = COALESCE($17, featured_image),
+        gallery_images = COALESCE($18, gallery_images),
         updated_at = NOW()
-       WHERE id = $18`,
+       WHERE id = $19`,
       [
         product_name || null,
         product_code ? product_code.trim().toUpperCase() : null,
@@ -782,7 +793,8 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
         status || null,
         is_ecom_listed !== undefined ? Boolean(is_ecom_listed) : null,
         reorder_level !== undefined ? parseInt(reorder_level, 10) : null,
-        featured_image !== undefined ? featured_image : null,
+        persistedFeaturedImage !== undefined ? persistedFeaturedImage : null,
+        persistedGalleryImages !== undefined ? persistedGalleryImages : null,
         id
       ]
     );
@@ -816,9 +828,10 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
     if (color_images && typeof color_images === 'object') {
       for (const [colorName, img] of Object.entries(color_images)) {
         if (img) {
+          const persistedImg = persistDataUri(img);
           await query(
             `UPDATE product_variants SET image_url = $1, updated_at = NOW() WHERE product_id = $2 AND color = $3`,
-            [img, id, colorName]
+            [persistedImg, id, colorName]
           );
         }
       }
@@ -829,15 +842,18 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
       for (const v of variants) {
         const vColor = v.color ? String(v.color).trim() : null;
         const vSize = v.size ? String(v.size).trim() : null;
-        const vImg = v.image_url || (vColor && color_images?.[vColor]) || null;
+        const rawImg = v.image_url || (vColor && color_images?.[vColor]) || null;
+        const vImg = rawImg ? persistDataUri(rawImg) : null;
 
-        const existingVar = await query(
-          `SELECT id FROM product_variants 
-           WHERE product_id = $1 
-             AND (color = $2 OR (color IS NULL AND $2 IS NULL))
-             AND (size = $3 OR (size IS NULL AND $3 IS NULL))`,
-          [id, vColor, vSize]
-        );
+        const existingVar = v.id
+          ? await query(`SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`, [v.id, id])
+          : await query(
+              `SELECT id FROM product_variants 
+               WHERE product_id = $1 
+                 AND (color = $2 OR (color IS NULL AND $2 IS NULL))
+                 AND (size = $3 OR (size IS NULL AND $3 IS NULL))`,
+              [id, vColor, vSize]
+            );
 
         if (existingVar.length > 0) {
           if (vImg) {
@@ -916,12 +932,14 @@ router.post('/:id/variants', requireAuth, requireRole(['super_admin', 'admin', '
       finalSku = `${finalSku}-${Math.floor(Math.random() * 900 + 100)}`;
     }
 
+    const persistedImageUrl = image_url ? persistDataUri(image_url) : null;
+
     const [newVariant] = await query(
       `INSERT INTO product_variants (
         product_id, variant_sku, color, size, material, price_modifier, image_url, status, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, 0, $6, 'active', NOW(), NOW())
       RETURNING *`,
-      [id, finalSku, cleanColor, cleanSize, material || null, image_url || null]
+      [id, finalSku, cleanColor, cleanSize, material || null, persistedImageUrl]
     );
 
     logActivity({

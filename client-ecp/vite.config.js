@@ -64,10 +64,35 @@ export default defineConfig({
             options: { cacheName: 'asset-cache' }
           },
           {
+            urlPattern: ({ url }) => url.origin === self.location.origin && (url.pathname.startsWith('/api/ecp/cart') || url.pathname.startsWith('/api/ecp/checkout')),
+            handler: 'NetworkOnly',
+            method: 'GET'
+          },
+          {
             urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/api/'),
-            handler: 'NetworkFirst',
+            handler: 'StaleWhileRevalidate',
             method: 'GET',
-            options: { cacheName: 'api-cache', networkTimeoutSeconds: 10, expiration: { maxEntries: 50, maxAgeSeconds: 86400 } }
+            options: {
+              cacheName: 'api-cache',
+              cacheableResponse: {
+                statuses: [0, 200]
+              },
+              expiration: { maxEntries: 100, maxAgeSeconds: 86400 }
+            }
+          },
+          {
+            urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/uploads/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'uploads-cache',
+              cacheableResponse: {
+                statuses: [0, 200]
+              },
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              }
+            }
           }
         ]
       }

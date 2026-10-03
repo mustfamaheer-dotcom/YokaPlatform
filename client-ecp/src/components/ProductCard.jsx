@@ -151,6 +151,7 @@ export default function ProductCard({ product, onAddToCart }) {
             src={cardMainImage}
             alt={product.product_name || 'صورة المنتج'}
             loading="lazy"
+            decoding="async"
             className={styles['product-img']}
             onLoad={() => setImageLoaded(true)}
             onError={(e) => {
@@ -164,6 +165,7 @@ export default function ProductCard({ product, onAddToCart }) {
               src={secondaryImage}
               alt={product.product_name || 'صورة إضافية'}
               loading="lazy"
+              decoding="async"
               className={styles['product-img-secondary']}
               onError={(e) => {
                 e.target.style.display = 'none';

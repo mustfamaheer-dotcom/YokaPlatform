@@ -1,6 +1,7 @@
 node_modules/
 .env
-uploads/
+uploads/*
+!uploads/products/
 build/
 .DS_Store
 *.log
@@ -13,6 +14,7 @@ client-ecp/node_modules/
 dist-deploy/
 dist-server/
 server/swm/backups/
+server/scripts/backup-images-*.csv
 scratch/
 __pycache__/
 *.py[cod]

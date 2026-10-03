@@ -12,6 +12,7 @@ const ONLINE_BRANCH_ID = parseInt(process.env.ONLINE_BRANCH_ID || '1', 10);
  */
 router.get('/categories', async (req, res) => {
   try {
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     const cacheKey = 'ecp:cache:categories';
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -74,6 +75,7 @@ router.get('/', async (req, res) => {
     const cached = await redis.get(cacheKey);
     if (cached) {
       try {
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
         return res.json({ ...JSON.parse(cached), fromCache: true });
       } catch (e) {}
     }
@@ -144,21 +146,17 @@ router.get('/', async (req, res) => {
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    // Total count
+    // Parallelize count query and product query for faster response
     const countSql = `
       SELECT COUNT(DISTINCT p.id) AS total
       FROM products p
       LEFT JOIN product_categories c ON c.id = p.category_id
       ${whereSql}
     `;
-    const [countResult] = await query(countSql, params);
-    const total = parseInt(countResult?.total || 0, 10);
 
-    // Products list with calculated available stock
+    // Products list with calculated available stock (omits gallery_images, barcode, created_at, product_code)
     const dataSql = `
       SELECT p.id,
-             p.product_code,
-             p.barcode,
              p.product_name,
              p.slug,
              p.brand,
@@ -166,11 +164,9 @@ router.get('/', async (req, res) => {
              p.sale_price,
              COALESCE(p.sale_price, p.selling_price) AS effective_price,
              p.featured_image,
-             p.gallery_images,
              p.is_featured,
              p.rating_count,
              p.average_rating,
-             p.created_at,
              c.id AS category_id,
              c.category_name,
              c.slug AS category_slug,
@@ -185,7 +181,11 @@ router.get('/', async (req, res) => {
       LIMIT ${limitNum} OFFSET ${offset}
     `;
 
-    const products = await query(dataSql, params);
+    const [[countResult], products] = await Promise.all([
+      query(countSql, params),
+      query(dataSql, params)
+    ]);
+    const total = parseInt(countResult?.total || 0, 10);
 
     // Fetch variant options for card previews
     if (products.length > 0) {
@@ -224,6 +224,7 @@ router.get('/', async (req, res) => {
 
     // Cache results for 120 seconds
     await redis.setex(cacheKey, 120, JSON.stringify(payload));
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     return res.json(payload);
   } catch (err) {
     console.error('ECP catalog error:', err);
@@ -237,6 +238,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/store-settings', async (req, res) => {
   try {
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     const cacheKey = 'ecp:cache:store-settings';
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -255,6 +257,7 @@ router.get('/store-settings', async (req, res) => {
     return res.json({ success: true, data: settingsMap });
   } catch (err) {
     console.error('ECP store-settings fetch error:', err);
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     return res.json({
       success: true,
       data: {
@@ -274,6 +277,7 @@ router.get('/store-settings', async (req, res) => {
  */
 router.get('/branches', async (req, res) => {
   try {
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     const cacheKey = 'ecp:cache:branches';
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -350,6 +354,7 @@ router.get('/:slug', async (req, res) => {
       ? variants.reduce((sum, v) => sum + parseInt(v.available_qty || 0, 10), 0)
       : parseInt(product.base_stock, 10);
 
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     return res.json({
       success: true,
       data: {

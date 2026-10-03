@@ -4,12 +4,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { requireAuth } = require('../../shared/authMiddleware');
+const { getUploadsProductsDir } = require('../../shared/imageStore');
 
 // Ensure destination directory exists: uploads/products
-const uploadDir = path.join(process.cwd(), 'uploads', 'products');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const uploadDir = getUploadsProductsDir();
 
 // Multer Disk Storage Configuration
 const storage = multer.diskStorage({
