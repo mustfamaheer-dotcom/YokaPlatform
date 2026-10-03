@@ -53,7 +53,6 @@ export default function ProductCard({ product, onAddToCart }) {
 
   const totalStock = parseInt(product.total_stock || 0, 10);
   const isAvailable = totalStock > 0;
-  const isLowStock = isAvailable && totalStock <= 3;
 
   const rawSelling = parseFloat(product.selling_price);
   const originalPrice = !isNaN(rawSelling) && rawSelling > 0 ? rawSelling : 0;
@@ -207,13 +206,6 @@ export default function ProductCard({ product, onAddToCart }) {
           </span>
         )}
 
-        {/* Low Stock Warning */}
-        {isLowStock && (
-          <span className={styles['low-stock-badge']}>
-            <span className={styles['low-stock-dot']} />
-            <span>متبقي {totalStock} فقط</span>
-          </span>
-        )}
 
         {/* Image wrapper */}
         <Link to={`/product/${product.slug || product.id}`} className={styles['product-img-wrapper']}>
