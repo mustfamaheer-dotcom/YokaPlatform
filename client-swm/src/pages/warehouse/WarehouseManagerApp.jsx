@@ -27,7 +27,6 @@ import {
   Receipt,
   Truck,
   Wallet,
-  Landmark,
   Store,
   Users as UsersIcon,
   ClipboardCheck,
@@ -49,7 +48,6 @@ import Transfers from '../Transfers';
 import Purchases from '../Purchases';
 import Suppliers from '../Suppliers';
 import SellerPayrollAndExpenseCategoriesCards from '../../components/SellerPayrollAndExpenseCategoriesCards';
-import TreasuryAdmin from '../TreasuryAdmin';
 import DailyShift from '../DailyShift';
 import BranchesDaily from '../BranchesDaily';
 import Branches from '../Branches';
@@ -184,12 +182,6 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
         title: 'القبض الخاص ومسير الرواتب',
         subtitle: 'تسوية مرتبات وعمولات البائعين، السلف والخصومات، ومسحوبات العاملين',
         icon: <Wallet size={20} color="#9333ea" />
-      },
-      p.perm_treasury !== false && {
-        id: 'treasury_admin',
-        title: 'الخزينة والسيولة النقدية',
-        subtitle: 'حركة السيولة المركزية، التحويلات، وسندات الصرف',
-        icon: <Landmark size={20} color="#9333ea" />
       }
     ].filter(Boolean);
 
@@ -282,7 +274,6 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
       case 'purchases': return p.perm_purchases !== false;
       case 'suppliers': return p.perm_suppliers !== false;
       case 'payroll_expenses': return p.perm_payroll !== false;
-      case 'treasury_admin': return p.perm_treasury !== false;
       case 'branches': return p.perm_branches !== false;
       case 'users': return p.perm_users !== false;
       default: return false;
@@ -701,7 +692,6 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
                 <SellerPayrollAndExpenseCategoriesCards currentUser={currentUser} />
               </div>
             )}
-            {activeTab === 'treasury_admin' && <TreasuryAdmin />}
 
             {/* 5. إدارة النظام والفروع */}
             {activeTab === 'branches' && (

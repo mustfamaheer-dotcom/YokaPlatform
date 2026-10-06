@@ -107,11 +107,11 @@ async function testWarehouseManager() {
       const suppRes = await authGet('/api/swm/suppliers?limit=1');
       console.log('   Section 3: Suppliers (/api/swm/suppliers) Status:', suppRes.status, 'Success:', suppRes.data?.success);
 
-      // 5. Test Section 4: Payroll & Treasury
+      // 5. Test Section 4: Payroll is Allowed, Central Treasury is Blocked
       const payrollRes = await authGet('/api/swm/treasury/employee-payroll-summary/1');
       console.log('5. Section 4: Employee Payroll (/api/swm/treasury/employee-payroll-summary/1) Status:', payrollRes.status, 'Success:', payrollRes.data?.success);
       const kpisRes = await authGet('/api/swm/treasury/kpis');
-      console.log('   Section 4: Treasury KPIs (/api/swm/treasury/kpis) Status:', kpisRes.status, 'Success:', kpisRes.data?.success);
+      console.log('   Treasury KPIs (/api/swm/treasury/kpis) Status:', kpisRes.status, '- Blocked for WM (403):', kpisRes.status === 403);
 
       // 6. Test Section 5: System & Branches
       const branchRes = await authGet('/api/swm/branches');

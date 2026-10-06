@@ -70,7 +70,6 @@ const DEFAULT_WM_PERMS = {
   perm_purchases: true,
   perm_suppliers: true,
   perm_payroll: true,
-  perm_treasury: true,
   perm_branches: true,
   perm_users: true
 };
@@ -93,7 +92,6 @@ function WarehousePermissionsEditor({ permissions, onChange, loading = false }) 
       perm_purchases: val,
       perm_suppliers: val,
       perm_payroll: val,
-      perm_treasury: val,
       perm_branches: val,
       perm_users: val
     });
@@ -130,8 +128,7 @@ function WarehousePermissionsEditor({ permissions, onChange, loading = false }) 
       title: '4. القبض الخاص ورواتب ومسحوبات العاملين',
       color: '#9333ea',
       items: [
-        { key: 'perm_payroll', label: 'مسير الرواتب ومسحوبات العاملين' },
-        { key: 'perm_treasury', label: 'الخزينة والسيولة النقدية' }
+        { key: 'perm_payroll', label: 'مسير الرواتب ومسحوبات العاملين' }
       ]
     },
     {
