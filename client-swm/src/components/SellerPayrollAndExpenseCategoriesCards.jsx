@@ -22,7 +22,8 @@ import {
   Table,
   Statistic,
   Tooltip,
-  Badge
+  Badge,
+  Segmented
 } from 'antd';
 import dayjs from 'dayjs';
 import {
@@ -38,6 +39,7 @@ import {
   DollarSign,
   TrendingUp,
   Receipt,
+  Calendar,
   Search,
   Sparkles,
   ArrowRight
@@ -57,6 +59,7 @@ import api from '../api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 const PRESET_EXPENSE_CATEGORIES = [
   'ضيافة وبوفيه',
@@ -85,9 +88,40 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
   // Navigation tabs
   const [activeTabKey, setActiveTabKey] = useState('payroll');
 
-  // Month & Global States
+  // Role check: Hide treasury balance from warehouse manager
+  const isWarehouseManager = currentUser?.role === 'warehouse_manager';
+
+  // Period / Date Duration States
+  const [periodType, setPeriodType] = useState('month'); // 'month' | 'range'
   const [payrollMonth, setPayrollMonth] = useState(dayjs().format('YYYY-MM'));
+  const [customDateRange, setCustomDateRange] = useState([
+    dayjs().startOf('month'),
+    dayjs().endOf('month')
+  ]);
   const [safeBalances, setSafeBalances] = useState({ cash: 0, visa: 0, transfer: 0, total: 0 });
+
+  // Computed active period metadata
+  const currentPeriod = useMemo(() => {
+    if (periodType === 'month') {
+      const m = dayjs(payrollMonth, 'YYYY-MM');
+      return {
+        month: payrollMonth,
+        startDate: m.startOf('month').format('YYYY-MM-DD'),
+        endDate: m.endOf('month').format('YYYY-MM-DD'),
+        label: m.format('YYYY-MM')
+      };
+    } else {
+      const start = customDateRange?.[0] ? customDateRange[0].format('YYYY-MM-DD') : dayjs().startOf('month').format('YYYY-MM-DD');
+      const end = customDateRange?.[1] ? customDateRange[1].format('YYYY-MM-DD') : dayjs().endOf('month').format('YYYY-MM-DD');
+      const inferredMonth = customDateRange?.[0] ? customDateRange[0].format('YYYY-MM') : payrollMonth;
+      return {
+        month: inferredMonth,
+        startDate: start,
+        endDate: end,
+        label: `${start} إلى ${end}`
+      };
+    }
+  }, [periodType, payrollMonth, customDateRange]);
 
   // Seller Payroll Disbursal State
   const [employeesList, setEmployeesList] = useState([]);
@@ -141,6 +175,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
 
   // 2. Fetch main treasury balances
   const fetchSafeBalances = async () => {
+    if (isWarehouseManager) return; // Do not fetch treasury KPIs for warehouse manager
     try {
       const res = await api.get('/api/swm/treasury/kpis');
       if (res.data?.success && res.data.data?.main_safe) {
@@ -158,12 +193,20 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
   };
 
   // 3. Fetch payroll history for current month
-  const fetchPayrollHistory = async (monthVal) => {
+  const fetchPayrollHistory = async (pMonth, sDate, eDate) => {
     setLoadingHistory(true);
     try {
-      const res = await api.get('/api/swm/treasury/payroll-history', {
-        params: { month: monthVal || payrollMonth, limit: 100 }
-      });
+      const start = sDate !== undefined ? sDate : currentPeriod.startDate;
+      const end = eDate !== undefined ? eDate : currentPeriod.endDate;
+      const monthVal = pMonth !== undefined ? pMonth : currentPeriod.month;
+      const params = { limit: 100 };
+      if (periodType === 'range') {
+        params.start_date = start;
+        params.end_date = end;
+      } else {
+        params.month = monthVal;
+      }
+      const res = await api.get('/api/swm/treasury/payroll-history', { params });
       if (res.data?.success) {
         setPayrollHistory(res.data.data || []);
       }
@@ -199,7 +242,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
     }
   };
 
-  const fetchSellerSummary = async (sellerId, monthVal) => {
+  const fetchSellerSummary = async (sellerId, pMonth, sDate, eDate) => {
     if (!sellerId) {
       setSellerSummary(null);
       setSummaryError(null);
@@ -209,8 +252,15 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
     setLoadingSellerSummary(true);
     setSummaryError(null);
     try {
+      const start = sDate !== undefined ? sDate : currentPeriod.startDate;
+      const end = eDate !== undefined ? eDate : currentPeriod.endDate;
+      const monthVal = pMonth !== undefined ? pMonth : currentPeriod.month;
       const res = await api.get(`/api/swm/treasury/employee-payroll-summary/${sellerId}`, {
-        params: { month: monthVal || payrollMonth }
+        params: {
+          month: monthVal,
+          start_date: start,
+          end_date: end
+        }
       });
       if (res.data?.success) {
         setSellerSummary(res.data.data);
@@ -240,12 +290,12 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
   // Auto-fetch summary whenever selectedSellerId or payrollMonth changes
   useEffect(() => {
     if (selectedSellerId) {
-      fetchSellerSummary(selectedSellerId, payrollMonth);
+      fetchSellerSummary(selectedSellerId, currentPeriod.month, currentPeriod.startDate, currentPeriod.endDate);
     } else {
       setSellerSummary(null);
       setSummaryError(null);
     }
-  }, [selectedSellerId, payrollMonth]);
+  }, [selectedSellerId, currentPeriod]);
 
   // 5. Fetch expense categories
   const fetchExpenseCategories = async () => {
@@ -265,25 +315,32 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
   // Refresh all data
   const refreshAll = () => {
     fetchEmployeesList();
-    fetchSafeBalances();
-    fetchPayrollHistory(payrollMonth);
+    if (!isWarehouseManager) fetchSafeBalances();
+    fetchPayrollHistory(currentPeriod.month, currentPeriod.startDate, currentPeriod.endDate);
     fetchExpenseCategories();
     if (selectedSellerId) {
-      fetchSellerSummary(selectedSellerId, payrollMonth);
+      fetchSellerSummary(selectedSellerId, currentPeriod.month, currentPeriod.startDate, currentPeriod.endDate);
     }
   };
 
   useEffect(() => {
     refreshAll();
-  }, [payrollMonth]);
+  }, [currentPeriod]);
 
   // Handle month picker change
   const handleMonthChange = (d) => {
     if (d) {
       const m = d.format('YYYY-MM');
       setPayrollMonth(m);
-      if (selectedSellerId) fetchSellerSummary(selectedSellerId, m);
-      fetchPayrollHistory(m);
+      setCustomDateRange([d.startOf('month'), d.endOf('month')]);
+    }
+  };
+
+  // Handle custom date range change
+  const handleCustomRangeChange = (dates) => {
+    if (dates && dates[0] && dates[1]) {
+      setCustomDateRange(dates);
+      setPayrollMonth(dates[0].format('YYYY-MM'));
     }
   };
 
@@ -306,7 +363,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
 
     const activeSafeBalances = deductSource === 'branch_safe' ? branchSafeBalances : safeBalances;
     const avail = activeSafeBalances[payrollChannel] || 0;
-    if (net > avail + 0.01) {
+    if (!isWarehouseManager && net > avail + 0.01) {
       const sourceName = deductSource === 'branch_safe' ? `خزينة فرع (${sellerSummary.employee.branch_name || 'الفرع'})` : 'الخزينة الرئيسية';
       message.error(
         `رصيد ${payrollChannel === 'cash' ? 'الكاش' : payrollChannel === 'visa' ? 'الفيزا' : 'التحويل'} بـ [${sourceName}] (${avail.toLocaleString()} ج.م) لا يكفي لصرف صافي القبض (${net.toLocaleString()} ج.م)`
@@ -318,7 +375,9 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
     try {
       const payload = {
         employee_id: sellerSummary.employee.id,
-        payout_month: payrollMonth,
+        payout_month: currentPeriod.month,
+        start_date: currentPeriod.startDate,
+        end_date: currentPeriod.endDate,
         base_salary: baseSal,
         advances_deducted: adv,
         deductions: ded,
@@ -708,49 +767,77 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
             </div>
           </div>
 
-          <Space size={12} wrap>
+          <Space size={12} wrap align="center">
+            {/* Period Selector (تحديد مدة المسير) */}
             <div
               style={{
                 background: '#f8fafc',
                 padding: '6px 12px',
                 borderRadius: 10,
-                border: '1px solid #e2e8f0',
+                border: '1px solid #cbd5e1',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8
+                gap: 8,
+                flexWrap: 'wrap'
               }}
             >
-              <Text strong style={{ fontSize: 12, color: '#475569' }}>شهر المسير:</Text>
-              <DatePicker
-                picker="month"
+              <Calendar size={16} color="#475569" />
+              <Text strong style={{ fontSize: 12, color: '#334155' }}>تحديد المدة:</Text>
+              <Segmented
                 size="middle"
-                value={dayjs(payrollMonth, 'YYYY-MM')}
-                format="YYYY-MM"
-                allowClear={false}
-                onChange={handleMonthChange}
-                style={{ width: 120 }}
+                value={periodType}
+                onChange={setPeriodType}
+                options={[
+                  { label: 'شهري', value: 'month' },
+                  { label: 'فترة مخصصة (تحديد مدة)', value: 'range' }
+                ]}
               />
+
+              {periodType === 'month' ? (
+                <DatePicker
+                  picker="month"
+                  size="middle"
+                  value={dayjs(payrollMonth, 'YYYY-MM')}
+                  format="YYYY-MM"
+                  allowClear={false}
+                  onChange={handleMonthChange}
+                  style={{ width: 120 }}
+                />
+              ) : (
+                <RangePicker
+                  size="middle"
+                  value={customDateRange}
+                  format="YYYY-MM-DD"
+                  allowClear={false}
+                  onChange={handleCustomRangeChange}
+                  placeholder={['من تاريخ', 'إلى تاريخ']}
+                  style={{ width: 235 }}
+                />
+              )}
             </div>
 
-            <div
-              style={{
-                background: '#f0fdf4',
-                padding: '6px 14px',
-                borderRadius: 10,
-                border: '1px solid #bbf7d0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}
-            >
-              <WalletOutlined style={{ color: '#15803d' }} />
-              <div>
-                <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>رصيد الخزينة المتاح (كاش):</Text>
-                <Text strong style={{ fontSize: 13, color: '#166534' }}>
-                  {(safeBalances.cash || 0).toLocaleString()} ج.م
-                </Text>
+            {/* Treasury Balance: Shown only to Admin, strictly hidden from Warehouse Manager */}
+            {!isWarehouseManager && (
+              <div
+                style={{
+                  background: '#f0fdf4',
+                  padding: '6px 14px',
+                  borderRadius: 10,
+                  border: '1px solid #bbf7d0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+                <WalletOutlined style={{ color: '#15803d' }} />
+                <div>
+                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>رصيد الخزينة المتاح (كاش):</Text>
+                  <Text strong style={{ fontSize: 13, color: '#166534' }}>
+                    {(safeBalances.cash || 0).toLocaleString()} ج.م
+                  </Text>
+                </div>
               </div>
-            </div>
+            )}
 
             <Button icon={<ReloadOutlined />} onClick={refreshAll}>
               تحديث
@@ -1065,7 +1152,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                         <Alert
                           type="warning"
                           showIcon
-                          message={`تنبيه: تم صرف راتب شهر (${payrollMonth}) لهذا الموظف مسبقاً!`}
+                          message={`تنبيه: تم صرف راتب للفترة (${currentPeriod.label}) لهذا الموظف مسبقاً!`}
                           description="يمكنك مراجعة السند في جدول سجل الرواتب أدناه، أو الصرف مجدداً في حال وجود مستحقات إضافية."
                           style={{ marginBottom: 14, borderRadius: 8, fontSize: 12 }}
                         />
@@ -1198,7 +1285,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                         const net = Math.round((baseSal - adv - ded + bns) * 100) / 100;
                         const activeSafeBalances = deductSource === 'branch_safe' ? branchSafeBalances : safeBalances;
                         const avail = activeSafeBalances[payrollChannel] || 0;
-                        const canAfford = net > 0 && net <= avail;
+                        const canAfford = isWarehouseManager ? (net > 0) : (net > 0 && net <= avail);
                         const sourceLabel = deductSource === 'branch_safe'
                           ? `خزينة فرع (${sellerSummary.employee.branch_name || 'الفرع'})`
                           : 'الخزينة الرئيسية';
@@ -1224,13 +1311,13 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                 buttonStyle="solid"
                               >
                                 <Radio.Button value="main_treasury">
-                                  🏢 الخزينة الرئيسية (كاش متاح: {(safeBalances.cash || 0).toLocaleString()} ج.م)
+                                  🏢 الخزينة الرئيسية {!isWarehouseManager && `(كاش متاح: ${(safeBalances.cash || 0).toLocaleString()} ج.م)`}
                                 </Radio.Button>
                                 <Radio.Button
                                   value="branch_safe"
                                   disabled={!sellerSummary.employee.branch_id}
                                 >
-                                  🏬 خزينة فرع {sellerSummary.employee.branch_name || 'الفرع'} (كاش متاح: {(branchSafeBalances.cash || 0).toLocaleString()} ج.م)
+                                  🏬 خزينة فرع {sellerSummary.employee.branch_name || 'الفرع'} {!isWarehouseManager && `(كاش متاح: ${(branchSafeBalances.cash || 0).toLocaleString()} ج.م)`}
                                 </Radio.Button>
                               </Radio.Group>
                               {!sellerSummary.employee.branch_id && (
@@ -1275,16 +1362,18 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                   <Radio.Button value="visa">💳 فيزا (بطاقة)</Radio.Button>
                                   <Radio.Button value="transfer">📱 تحويل بنكي</Radio.Button>
                                 </Radio.Group>
-                                <div
-                                  style={{
-                                    fontSize: 11,
-                                    marginTop: 4,
-                                    color: avail >= net ? '#16a34a' : '#dc2626',
-                                    fontWeight: 600
-                                  }}
-                                >
-                                  الرصيد المتاح بـ [{sourceLabel}]: {avail.toLocaleString()} ج.م
-                                </div>
+                                {!isWarehouseManager && (
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      marginTop: 4,
+                                      color: avail >= net ? '#16a34a' : '#dc2626',
+                                      fontWeight: 600
+                                    }}
+                                  >
+                                    الرصيد المتاح بـ [{sourceLabel}]: {avail.toLocaleString()} ج.م
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -1326,7 +1415,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                               </Col>
                             </Row>
 
-                            {!canAfford && net > 0 && (
+                            {!isWarehouseManager && !canAfford && net > 0 && (
                               <div style={{ marginTop: 8, textAlign: 'center', color: '#dc2626', fontSize: 12 }}>
                                 ⚠️ رصيد [{sourceLabel}] في هذه القناة ({avail.toLocaleString()} ج.م) لا يكفي لصرف صافي القبض ({net.toLocaleString()} ج.م). يرجى اختيار الخزينة الأخرى أو تغذية الرصيد.
                               </div>
@@ -1350,7 +1439,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                       <Space size={8}>
                         <Receipt size={18} color="#4f46e5" />
                         <Title level={5} style={{ margin: 0, fontWeight: 700 }}>
-                          سجل الرواتب المنصرفة لشهر ({payrollMonth})
+                          سجل الرواتب المنصرفة ({currentPeriod.label})
                         </Title>
                         <Tag color="blue">{payrollHistory.length} سند صرف</Tag>
                       </Space>
@@ -1372,7 +1461,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                     loading={loadingHistory}
                     bordered
                     pagination={{ pageSize: 10, showSizeChanger: true }}
-                    locale={{ emptyText: `لا توجد رواتب منصرفة مسجلة لشهر ${payrollMonth}` }}
+                    locale={{ emptyText: `لا توجد رواتب منصرفة مسجلة للفترة ${currentPeriod.label}` }}
                   />
                 </Card>
               </div>
@@ -1571,7 +1660,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
         <div style={{ marginBottom: 12 }}>
           <Alert
             type="info"
-            message={`إجمالي المصروفات والسلف المستقطعة لشهر ${payrollMonth}: ${parseFloat(sellerSummary?.advances_total || 0).toLocaleString()} ج.م`}
+            message={`إجمالي المصروفات والسلف المستقطعة للفترة (${currentPeriod.label}): ${parseFloat(sellerSummary?.advances_total || 0).toLocaleString()} ج.م`}
           />
         </div>
         <div style={{ maxHeight: 300, overflowY: 'auto' }}>

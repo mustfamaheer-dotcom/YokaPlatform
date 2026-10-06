@@ -1222,14 +1222,21 @@ router.post('/quick-withdrawal', requireAuth, requireRole(['super_admin', 'admin
 router.get('/employee-payroll-summary/:employeeId', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const { month } = req.query; // format: 'YYYY-MM'
+    const { month, start_date, end_date } = req.query;
 
-    const now = new Date();
-    const targetMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const [yearStr, monthStr] = targetMonth.split('-');
-    const startDate = `${yearStr}-${monthStr}-01`;
-    const endOfMonthDate = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0).getDate();
-    const endDate = `${yearStr}-${monthStr}-${String(endOfMonthDate).padStart(2, '0')}`;
+    let startDate, endDate, targetMonth;
+    if (start_date && end_date) {
+      startDate = start_date;
+      endDate = end_date;
+      targetMonth = month || start_date.slice(0, 7);
+    } else {
+      const now = new Date();
+      targetMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const [yearStr, monthStr] = targetMonth.split('-');
+      startDate = `${yearStr}-${monthStr}-01`;
+      const endOfMonthDate = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0).getDate();
+      endDate = `${yearStr}-${monthStr}-${String(endOfMonthDate).padStart(2, '0')}`;
+    }
 
     // 1. Fetch employee
     const [employee] = await query(`
@@ -1508,7 +1515,7 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin', 'su
  */
 router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
   try {
-    const { month, limit = 50 } = req.query;
+    const { month, start_date, end_date, limit = 50 } = req.query;
     let sql = `
       SELECT pp.*, b.branch_name, b.branch_code, u.full_name AS paid_by_name
       FROM payroll_payouts pp
@@ -1517,8 +1524,11 @@ router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin',
       WHERE 1=1
     `;
     const params = [];
-    if (month && month !== 'all') {
-      sql += ` AND pp.payout_month = $1`;
+    if (start_date && end_date) {
+      sql += ` AND DATE(pp.paid_at) >= ${params.length + 1} AND DATE(pp.paid_at) <= ${params.length + 2}`;
+      params.push(start_date, end_date);
+    } else if (month && month !== 'all') {
+      sql += ` AND pp.payout_month = ${params.length + 1}`;
       params.push(month);
     }
     sql += ` ORDER BY pp.paid_at DESC LIMIT ${parseInt(limit, 10)}`;
