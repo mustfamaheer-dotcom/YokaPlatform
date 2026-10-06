@@ -405,8 +405,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             product_name: prod.product_name,
             product_code: prod.product_code || '',
             barcode: prod.variant_sku || prod.barcode || '',
-            color: prod.color || null,
-            size: prod.size || null,
+            color: prod.color || prod.variant_color || (prod.display_name && prod.display_name.match(/\(([^)]+)\)/) ? prod.display_name.match(/\(([^)]+)\)/)[1].split('/')[0]?.trim() : null) || null,
+            size: prod.size || prod.variant_size || (prod.display_name && prod.display_name.match(/\(([^)]+)\)/) && prod.display_name.match(/\(([^)]+)\)/)[1].includes('/') ? prod.display_name.match(/\(([^)]+)\)/)[1].split('/')[1]?.trim() : null) || null,
             display_name: prod.display_name || (prod.variant_sku ? `${prod.product_name} (${prod.color || ''} / ${prod.size || ''})` : prod.product_name),
             category_name: prod.category_name || '',
             quantity: qty,
@@ -520,8 +520,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               product_name: fullProd.product_name,
               product_code: fullProd.product_code,
               barcode: variants[0]?.variant_sku || fullProd.barcode,
-              color: variants[0]?.color || null,
-              size: variants[0]?.size || null,
+              color: variants[0]?.color || fullProd.color || null,
+              size: variants[0]?.size || fullProd.size || null,
               category_name: fullProd.category_name,
               cost_price: parseFloat(variants[0]?.cost_price || fullProd.cost_price) || 0,
               selling_price: parseFloat(variants[0]?.selling_price || fullProd.selling_price) || 0
@@ -578,8 +578,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               product_name: fullProd.product_name,
               product_code: fullProd.product_code,
               barcode: variants[0]?.variant_sku || fullProd.barcode,
-              color: variants[0]?.color || null,
-              size: variants[0]?.size || null,
+              color: variants[0]?.color || fullProd.color || null,
+              size: variants[0]?.size || fullProd.size || null,
               display_name: fullProd.product_name,
               category_name: fullProd.category_name,
               cost_price: parseFloat(variants[0]?.cost_price || fullProd.cost_price) || 0,
@@ -636,9 +636,9 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       product_code: p.product_code,
       barcode: p.barcode,
       product_name: p.product_name,
-      display_name: p.product_name,
-      color: null,
-      size: null,
+      display_name: (p.color || p.size) ? `${p.product_name} (${[p.color, p.size].filter(Boolean).join(' / ')})` : p.product_name,
+      color: p.color || null,
+      size: p.size || null,
       category_id: p.category_id,
       category_name: p.category_name,
       unit_price: parseFloat(p.selling_price) || 0,
@@ -747,9 +747,9 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
           product_name: fullProd.product_name,
           product_code: fullProd.product_code,
           barcode: fullProd.barcode,
-          color: null,
-          size: null,
-          display_name: fullProd.product_name,
+          color: fullProd.color || null,
+          size: fullProd.size || null,
+          display_name: (fullProd.color || fullProd.size) ? `${fullProd.product_name} (${[fullProd.color, fullProd.size].filter(Boolean).join(' / ')})` : fullProd.product_name,
           category_name: fullProd.category_name,
           cost_price: baseCost,
           selling_price: baseSelling
@@ -1460,6 +1460,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       flatItems.push({
         product_id: it.product_id,
         variant_id: it.variant_id || null,
+        color: it.color || null,
+        size: it.size || null,
         quantity: qty,
         unit_cost: cost,
         selling_price: selling,
@@ -2782,9 +2784,13 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                             </td>
                             <td style={{ padding: '12px 10px' }}>
                               <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0f172a' }}>{item.product_name}</div>
-                              <Space size={4} style={{ marginTop: 3 }}>
-                                {item.color && <Tag color="geekblue" style={{ fontSize: 11 }}>اللون: {item.color}</Tag>}
-                                {item.size && <Tag color="purple" style={{ fontSize: 11 }}>المقاس: {item.size}</Tag>}
+                              <Space size={6} wrap style={{ marginTop: 4 }}>
+                                <Tag color="purple" style={{ fontSize: 11.5, fontWeight: 700, padding: '1px 8px', borderRadius: 4, margin: 0 }}>
+                                  المقاس: <strong style={{ color: item.size ? '#6b21a8' : '#94a3b8' }}>{item.size || '—'}</strong>
+                                </Tag>
+                                <Tag color="geekblue" style={{ fontSize: 11.5, fontWeight: 700, padding: '1px 8px', borderRadius: 4, margin: 0 }}>
+                                  اللون: <strong style={{ color: item.color ? '#1e40af' : '#94a3b8' }}>{item.color || '—'}</strong>
+                                </Tag>
                                 {item.product_code && <Text type="secondary" style={{ fontSize: 11 }}>كود: {item.product_code}</Text>}
                               </Space>
                             </td>
@@ -3461,9 +3467,13 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                             </td>
                             <td style={{ padding: '12px 10px' }}>
                               <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0f172a' }}>{item.product_name}</div>
-                              <Space size={4} style={{ marginTop: 3 }}>
-                                {item.color && <Tag color="geekblue" style={{ fontSize: 11 }}>اللون: {item.color}</Tag>}
-                                {item.size && <Tag color="purple" style={{ fontSize: 11 }}>المقاس: {item.size}</Tag>}
+                              <Space size={6} wrap style={{ marginTop: 4 }}>
+                                <Tag color="purple" style={{ fontSize: 11.5, fontWeight: 700, padding: '1px 8px', borderRadius: 4, margin: 0 }}>
+                                  المقاس: <strong style={{ color: item.size ? '#6b21a8' : '#94a3b8' }}>{item.size || '—'}</strong>
+                                </Tag>
+                                <Tag color="geekblue" style={{ fontSize: 11.5, fontWeight: 700, padding: '1px 8px', borderRadius: 4, margin: 0 }}>
+                                  اللون: <strong style={{ color: item.color ? '#1e40af' : '#94a3b8' }}>{item.color || '—'}</strong>
+                                </Tag>
                                 {item.product_code && <Text type="secondary" style={{ fontSize: 11 }}>كود: {item.product_code}</Text>}
                               </Space>
                             </td>
@@ -3732,13 +3742,17 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 pagination={false}
                 columns={[
                   {
-                    title: 'اسم الصنف',
+                    title: 'اسم الصنف والمواصفات',
                     dataIndex: 'product_name',
                     key: 'product_name',
                     render: (name, r) => (
                       <div>
                         <Text strong>{name}</Text>
-                        <div style={{ fontSize: 12, color: '#64748b' }}>كود: {r.product_code || '—'}</div>
+                        <Space size={4} wrap style={{ marginTop: 2, display: 'flex' }}>
+                          {r.size && <Tag color="purple" style={{ fontSize: 10.5, fontWeight: 700, margin: 0 }}>المقاس: {r.size}</Tag>}
+                          {r.color && <Tag color="geekblue" style={{ fontSize: 10.5, fontWeight: 700, margin: 0 }}>اللون: {r.color}</Tag>}
+                          {r.product_code && <Text type="secondary" style={{ fontSize: 11 }}>كود: {r.product_code}</Text>}
+                        </Space>
                       </div>
                     )
                   },
@@ -4049,6 +4063,18 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                     </td>
                     <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
                       <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product_name}</div>
+                      <div style={{ marginTop: 3, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {item.size && (
+                          <span style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: 10.5, padding: '1px 6px', borderRadius: 4, fontWeight: 700, border: '1px solid #d8b4fe' }}>
+                            المقاس: {item.size}
+                          </span>
+                        )}
+                        {item.color && (
+                          <span style={{ background: '#eff6ff', color: '#1e40af', fontSize: 10.5, padding: '1px 6px', borderRadius: 4, fontWeight: 700, border: '1px solid #bfdbfe' }}>
+                            اللون: {item.color}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, fontFamily: 'monospace' }}>
                       {item.quantity}
@@ -4326,6 +4352,18 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                     </td>
                     <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1' }}>
                       <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product_name}</div>
+                      <div style={{ marginTop: 3, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {item.size && (
+                          <span style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: 10.5, padding: '1px 6px', borderRadius: 4, fontWeight: 700, border: '1px solid #d8b4fe' }}>
+                            المقاس: {item.size}
+                          </span>
+                        )}
+                        {item.color && (
+                          <span style={{ background: '#eff6ff', color: '#1e40af', fontSize: 10.5, padding: '1px 6px', borderRadius: 4, fontWeight: 700, border: '1px solid #bfdbfe' }}>
+                            اللون: {item.color}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '5px 8px', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace', fontSize: '12px' }}>
                       {item.quantity} قطعة

@@ -66,6 +66,17 @@ router.get('/', requireAuth, async (req, res) => {
       SELECT p.id, p.product_code, p.barcode, p.product_name, p.slug, p.brand,
              p.cost_price, p.selling_price, p.wholesale_price, p.sale_price,
              p.status, p.is_ecom_listed, p.is_featured, p.category_id, p.featured_image,
+             p.color AS base_color, p.size AS base_size,
+             COALESCE(
+               NULLIF(STRING_AGG(DISTINCT v.color, ' / ') FILTER (WHERE v.color IS NOT NULL AND v.color != ''), ''),
+               p.color,
+               ''
+             ) AS color,
+             COALESCE(
+               NULLIF(STRING_AGG(DISTINCT v.size, ' / ') FILTER (WHERE v.size IS NOT NULL AND v.size != ''), ''),
+               p.size,
+               ''
+             ) AS size,
              c.category_name,
              COALESCE(SUM(ib.available_qty), 0) AS total_stock,
              COUNT(DISTINCT v.id) AS variant_count,

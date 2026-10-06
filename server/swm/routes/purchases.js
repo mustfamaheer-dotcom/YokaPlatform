@@ -263,9 +263,13 @@ router.get('/returns/:id', requireAuth, async (req, res) => {
 
     const items = await query(
       `SELECT pri.*,
-              p.barcode, p.product_code
+              p.barcode, p.product_code,
+              COALESCE(pv.color, p.color) AS color,
+              COALESCE(pv.size, p.size) AS size,
+              COALESCE(pv.variant_sku, p.barcode, p.product_code) AS barcode
        FROM purchase_return_items pri
        LEFT JOIN products p ON p.id = pri.product_id
+       LEFT JOIN product_variants pv ON pv.id = pri.variant_id
        WHERE pri.return_id = $1
        ORDER BY pri.id ASC`,
       [id]
@@ -570,7 +574,9 @@ router.get('/:id', requireAuth, async (req, res) => {
     const items = await query(
       `SELECT pii.*,
               p.barcode, p.product_code,
-              pv.variant_sku, pv.color, pv.size,
+              COALESCE(pv.color, p.color) AS color,
+              COALESCE(pv.size, p.size) AS size,
+              COALESCE(pv.variant_sku, p.barcode, p.product_code) AS barcode,
               COALESCE((SELECT SUM(pri.quantity) FROM purchase_return_items pri WHERE pri.purchase_item_id = pii.id), 0) AS returned_quantity
        FROM purchase_invoice_items pii
        LEFT JOIN products p ON p.id = pii.product_id

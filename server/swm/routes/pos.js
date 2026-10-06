@@ -587,8 +587,8 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
              p.cost_price,
              pv.id AS variant_id,
              pv.variant_sku,
-             pv.color,
-             pv.size,
+             COALESCE(pv.color, p.color) AS color,
+             COALESCE(pv.size, p.size) AS size,
              pv.price_modifier,
              COALESCE(ib_var.available_qty, ib_base.available_qty, 0) AS available_qty
       FROM products p
@@ -622,8 +622,8 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
         category_name: row.category_name,
         color: row.color,
         size: row.size,
-        display_name: row.variant_sku
-          ? `${row.product_name} (${row.color || ''} / ${row.size || ''})`
+        display_name: (row.color || row.size)
+          ? `${row.product_name} (${[row.color, row.size].filter(Boolean).join(' / ')})`
           : row.product_name,
         unit_price: finalPrice,
         cost_price: parseFloat(row.cost_price) || 0,
