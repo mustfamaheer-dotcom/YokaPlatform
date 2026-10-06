@@ -31,6 +31,7 @@ import {
   Users as UsersIcon,
   ClipboardCheck,
   ArrowLeftRight,
+  ScanLine,
   Lock,
   Sparkles
 } from 'lucide-react';
@@ -434,30 +435,9 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
                   بصفتك <strong>مدير المخازن</strong>، تمتلك صلاحية الإشراف والمتابعة على الأقسام المعتمدة أدناه. يتم التحكم في إتاحة كل قسم وخاصية من قبل إدارة النظام المركزية.
                 </Paragraph>
               </div>
-
-              <div style={{ display: 'flex', gap: 10 }}>
-                {permissions?.perm_pos !== false && (
-                  <Button
-                    type="primary"
-                    size="large"
-                    icon={<ScanLine size={18} style={{ marginLeft: 6 }} />}
-                    onClick={() => navigate('/pos')}
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      color: '#7e22ce',
-                      fontWeight: 800,
-                      borderRadius: 10,
-                      border: 'none',
-                      height: 44
-                    }}
-                  >
-                    فتح نقطة البيع (POS)
-                  </Button>
-                )}
-              </div>
             </div>
 
-            {/* The 5 Authorized Sections Cards */}
+            {/* The 4 Authorized Sections Cards */}
             <Row gutter={[20, 20]}>
               {categories.map((cat) => (
                 <Col xs={24} md={12} lg={12} xl={8} key={cat.id}>
