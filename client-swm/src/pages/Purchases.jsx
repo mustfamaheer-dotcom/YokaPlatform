@@ -382,7 +382,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
   const populateProductIntoRow = (rowKey, prod) => {
     const cost = parseFloat(prod.cost_price) || 0;
     const selling = parseFloat(prod.selling_price || prod.unit_price) || 0;
-    const finalKey = `${prod.product_id || prod.id}-${prod.variant_id || 'base'}`;
+    const finalKey = `${prod.product_id || prod.id}-${prod.variant_id || `${prod.color || 'c'}-${prod.size || 's'}`}`;
 
     setItems(prev => {
       const existing = prev.find(it => it.key === finalKey && it.key !== rowKey);
@@ -611,7 +611,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         params: {
           query: q?.trim() || undefined,
           category_id: catId !== 'all' ? catId : undefined,
-          branch_id: effectiveBranch
+          branch_id: effectiveBranch,
+          limit: 1000
         }
       });
       if (res.data.success && Array.isArray(res.data.data)) {
@@ -624,28 +625,52 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
     }
 
     const qLower = (q || '').trim().toLowerCase();
-    const filtered = productsList.filter(p => {
-      if (catId !== 'all' && p.category_id !== catId) return false;
-      if (!qLower) return true;
-      return (p.product_name || '').toLowerCase().includes(qLower) ||
-             (p.product_code || '').toLowerCase().includes(qLower) ||
-             (p.barcode || '').toLowerCase().includes(qLower);
-    }).map(p => ({
-      product_id: p.id,
-      variant_id: null,
-      product_code: p.product_code,
-      barcode: p.barcode,
-      product_name: p.product_name,
-      display_name: (p.color || p.size) ? `${p.product_name} (${[p.color, p.size].filter(Boolean).join(' / ')})` : p.product_name,
-      color: p.color || null,
-      size: p.size || null,
-      category_id: p.category_id,
-      category_name: p.category_name,
-      unit_price: parseFloat(p.selling_price) || 0,
-      cost_price: parseFloat(p.cost_price) || 0,
-      available_qty: parseInt(p.total_stock, 10) || 0
-    }));
-    setF1SearchResults(filtered);
+    const exploded = [];
+
+    productsList.forEach(p => {
+      if (catId !== 'all' && p.category_id !== catId) return;
+
+      const colors = (p.color && p.color.includes('/'))
+        ? p.color.split('/').map(c => c.trim()).filter(Boolean)
+        : (p.color ? [p.color.trim()] : [null]);
+
+      const sizes = (p.size && p.size.includes('/'))
+        ? p.size.split('/').map(s => s.trim()).filter(Boolean)
+        : (p.size ? [p.size.trim()] : [null]);
+
+      colors.forEach(col => {
+        sizes.forEach(siz => {
+          const varParts = [col, siz].filter(Boolean);
+          const varLabel = varParts.length > 0 ? varParts.join(' / ') : '';
+          const displayName = varLabel ? `${p.product_name} (${varLabel})` : p.product_name;
+
+          if (qLower) {
+            const matchName = displayName.toLowerCase().includes(qLower);
+            const matchCode = (p.product_code || '').toLowerCase().includes(qLower);
+            const matchBarcode = (p.barcode || '').toLowerCase().includes(qLower);
+            if (!matchName && !matchCode && !matchBarcode) return;
+          }
+
+          exploded.push({
+            product_id: p.id,
+            variant_id: null,
+            product_code: p.product_code,
+            barcode: p.barcode,
+            product_name: p.product_name,
+            display_name: displayName,
+            color: col,
+            size: siz,
+            category_id: p.category_id,
+            category_name: p.category_name,
+            unit_price: parseFloat(p.selling_price) || 0,
+            cost_price: parseFloat(p.cost_price) || 0,
+            available_qty: parseInt(p.total_stock, 10) || 0
+          });
+        });
+      });
+    });
+
+    setF1SearchResults(exploded);
     setF1Loading(false);
   };
 
@@ -5416,7 +5441,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#ffffff' }}>
               <Table
                 dataSource={f1SearchResults}
-                rowKey={(r) => `${r.product_id || r.id}-${r.variant_id || '0'}`}
+                rowKey={(r) => `${r.product_id || r.id}-${r.variant_id || `${r.color || ''}-${r.size || ''}` || '0'}`}
                 loading={f1Loading}
                 pagination={false}
                 size="middle"

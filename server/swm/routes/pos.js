@@ -8,6 +8,10 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
 router.use((req, res, next) => {
+  // Allow catalog and barcode search for warehouse managers (used in purchases and receiving)
+  if (req.path === '/search') {
+    return next();
+  }
   if (!req.user && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
     const token = req.headers.authorization.split(' ')[1];
     try {
@@ -549,7 +553,8 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
     } else {
       branchId = parseInt(branchId, 10);
     }
-    const { query: searchQuery, category_id } = req.query;
+    const { query: searchQuery, category_id, limit = 500 } = req.query;
+    const limitNum = Math.min(1000, parseInt(limit, 10) || 500);
 
     const whereClauses = [`p.status = 'active'`];
     const params = [branchId];
@@ -602,7 +607,7 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
                                           AND ib_base.branch_id = $1
       WHERE ${whereClauses.join(' AND ')}
       ORDER BY p.id DESC, pv.id ASC
-      LIMIT 60
+      LIMIT ${limitNum}
     `;
 
     const results = await query(sql, params);
