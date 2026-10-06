@@ -221,13 +221,13 @@ export default function App() {
         }
       />
 
-      {/* POS / Sales Terminal Route (salesperson, supervisor, admin, super_admin, warehouse_manager) */}
+      {/* POS / Sales Terminal Route (salesperson, supervisor, admin, super_admin) */}
       <Route
         path="/pos"
         element={
           <ProtectedRoute
             currentUser={currentUser}
-            allowedRoles={['salesperson', 'supervisor', 'admin', 'super_admin', 'warehouse_manager']}
+            allowedRoles={['salesperson', 'supervisor', 'admin', 'super_admin']}
           >
             <SellerApp
               currentUser={currentUser}

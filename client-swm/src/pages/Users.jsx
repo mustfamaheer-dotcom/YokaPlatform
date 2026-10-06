@@ -61,9 +61,6 @@ const ROLES = [
 ];
 
 const DEFAULT_WM_PERMS = {
-  perm_pos: true,
-  perm_daily_shift: true,
-  perm_branches_daily: true,
   perm_groups_items: true,
   perm_stock_audit: true,
   perm_transfers: true,
@@ -83,9 +80,6 @@ function WarehousePermissionsEditor({ permissions, onChange, loading = false }) 
 
   const setAll = (val) => {
     onChange({
-      perm_pos: val,
-      perm_daily_shift: val,
-      perm_branches_daily: val,
       perm_groups_items: val,
       perm_stock_audit: val,
       perm_transfers: val,
@@ -99,16 +93,7 @@ function WarehousePermissionsEditor({ permissions, onChange, loading = false }) 
 
   const sections = [
     {
-      title: '1. أقسام نقاط البيع والعمليات اليومية',
-      color: '#0284c7',
-      items: [
-        { key: 'perm_pos', label: 'شاشة نقطة البيع (POS الكاشير)' },
-        { key: 'perm_daily_shift', label: 'العمليات وتقفيل الوردية اليومية' },
-        { key: 'perm_branches_daily', label: 'يومية الفروع المجمعة' }
-      ]
-    },
-    {
-      title: '2. أقسام إدارة المخزون والأصناف',
+      title: '1. أقسام إدارة المخزون والأصناف',
       color: '#16a34a',
       items: [
         { key: 'perm_groups_items', label: 'دليل المجموعات والأصناف' },
@@ -117,7 +102,7 @@ function WarehousePermissionsEditor({ permissions, onChange, loading = false }) 
       ]
     },
     {
-      title: '3. أقسام المشتريات والتوريد',
+      title: '2. أقسام المشتريات والتوريد',
       color: '#d97706',
       items: [
         { key: 'perm_purchases', label: 'فواتير المشتريات والتوريد' },
@@ -125,14 +110,14 @@ function WarehousePermissionsEditor({ permissions, onChange, loading = false }) 
       ]
     },
     {
-      title: '4. القبض الخاص ورواتب ومسحوبات العاملين',
+      title: '3. القبض الخاص ورواتب ومسحوبات العاملين',
       color: '#9333ea',
       items: [
         { key: 'perm_payroll', label: 'مسير الرواتب ومسحوبات العاملين' }
       ]
     },
     {
-      title: '5. أقسام إدارة النظام والفروع',
+      title: '4. أقسام إدارة النظام والفروع',
       color: '#e11d48',
       items: [
         { key: 'perm_branches', label: 'الفروع والمستودعات' },

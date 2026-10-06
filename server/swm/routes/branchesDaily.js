@@ -1,18 +1,16 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
-
-router.use(requireWarehousePermission('branches_daily'));
+const { requireAuth, requireRole } = require('../../shared/authMiddleware');
 
 /**
  * GET /api/swm/branches-daily
- * Aggregated daily branches summary for Warehouse Admin & Super Admin:
+ * Aggregated daily branches summary for Admin & Super Admin:
  * - KPIs: Total Inflow (Sales), Total Outflow (Expenses), Net Cashflow, Invoices Count, Items Sold
  * - Payment breakdown: Cash, Visa/Cards, Transfers (InstaPay / E-Wallets)
  * - Branch-by-branch comparison summary
  * - Detailed paginated sales invoices list with cashier and customer info
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
   try {
     const {
       branch_id,

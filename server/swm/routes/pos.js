@@ -4,7 +4,25 @@ const { requireAuth, requireBranchScope, requireRole, requireWarehousePermission
 const { logActivity } = require('../../shared/activityLogger');
 const { executeEodShiftClosure } = require('../services/shiftClosingService');
 
-router.use(requireWarehousePermission('pos'));
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+
+router.use((req, res, next) => {
+  if (!req.user && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    const token = req.headers.authorization.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+    } catch (e) {}
+  }
+  if (req.user && req.user.role === 'warehouse_manager') {
+    return res.status(403).json({
+      success: false,
+      message: 'غير مسموح لحساب مدير المخازن بالوصول إلى نقاط البيع والعمليات اليومية'
+    });
+  }
+  next();
+});
 
 /**
  * Helper to get or create default cash register for branch

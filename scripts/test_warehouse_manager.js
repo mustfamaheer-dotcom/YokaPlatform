@@ -91,33 +91,35 @@ async function testWarehouseManager() {
         req.end();
       });
 
-      // 2. Test Section 1: Daily Operations
+      // 2. Test Disallowed: POS & Daily Operations (Removed from Warehouse Manager)
       const dailyRes = await authGet('/api/swm/branches-daily');
-      console.log('\n2. Section 1: Branches Daily (/api/swm/branches-daily) Status:', dailyRes.status, 'Success:', dailyRes.data?.success);
+      console.log('\n2. Blocked Section: Branches Daily (/api/swm/branches-daily) Status:', dailyRes.status, '- Blocked for WM (403):', dailyRes.status === 403);
+      const posShiftRes = await authGet('/api/swm/pos/shift/summary');
+      console.log('   Blocked Section: POS Shift Summary (/api/swm/pos/shift/summary) Status:', posShiftRes.status, '- Blocked for WM (403):', posShiftRes.status === 403);
 
-      // 3. Test Section 2: Inventory & Items
+      // 3. Test Section 1: Inventory & Items
       const prodRes = await authGet('/api/swm/products?limit=1');
-      console.log('3. Section 2: Products (/api/swm/products) Status:', prodRes.status, 'Success:', prodRes.data?.success);
+      console.log('\n3. Section 1: Products (/api/swm/products) Status:', prodRes.status, 'Success:', prodRes.data?.success);
       const transRes = await authGet('/api/swm/transfers?limit=1');
-      console.log('   Section 2: Transfers (/api/swm/transfers) Status:', transRes.status, 'Success:', transRes.data?.success);
+      console.log('   Section 1: Transfers (/api/swm/transfers) Status:', transRes.status, 'Success:', transRes.data?.success);
 
-      // 4. Test Section 3: Purchases & Suppliers
+      // 4. Test Section 2: Purchases & Suppliers
       const purchRes = await authGet('/api/swm/purchases?limit=1');
-      console.log('4. Section 3: Purchases (/api/swm/purchases) Status:', purchRes.status, 'Success:', purchRes.data?.success);
+      console.log('4. Section 2: Purchases (/api/swm/purchases) Status:', purchRes.status, 'Success:', purchRes.data?.success);
       const suppRes = await authGet('/api/swm/suppliers?limit=1');
-      console.log('   Section 3: Suppliers (/api/swm/suppliers) Status:', suppRes.status, 'Success:', suppRes.data?.success);
+      console.log('   Section 2: Suppliers (/api/swm/suppliers) Status:', suppRes.status, 'Success:', suppRes.data?.success);
 
-      // 5. Test Section 4: Payroll is Allowed, Central Treasury is Blocked
+      // 5. Test Section 3: Payroll is Allowed, Central Treasury is Blocked
       const payrollRes = await authGet('/api/swm/treasury/employee-payroll-summary/1');
-      console.log('5. Section 4: Employee Payroll (/api/swm/treasury/employee-payroll-summary/1) Status:', payrollRes.status, 'Success:', payrollRes.data?.success);
+      console.log('5. Section 3: Employee Payroll (/api/swm/treasury/employee-payroll-summary/1) Status:', payrollRes.status, 'Success:', payrollRes.data?.success);
       const kpisRes = await authGet('/api/swm/treasury/kpis');
       console.log('   Treasury KPIs (/api/swm/treasury/kpis) Status:', kpisRes.status, '- Blocked for WM (403):', kpisRes.status === 403);
 
-      // 6. Test Section 5: System & Branches
+      // 6. Test Section 4: System & Branches
       const branchRes = await authGet('/api/swm/branches');
-      console.log('6. Section 5: Branches (/api/swm/branches) Status:', branchRes.status, 'Success:', branchRes.data?.success);
+      console.log('6. Section 4: Branches (/api/swm/branches) Status:', branchRes.status, 'Success:', branchRes.data?.success);
       const userRes = await authGet('/api/swm/users?limit=1');
-      console.log('   Section 5: Users (/api/swm/users) Status:', userRes.status, 'Success:', userRes.data?.success);
+      console.log('   Section 4: Users (/api/swm/users) Status:', userRes.status, 'Success:', userRes.data?.success);
 
       // 7. Test Disallowed Section: Executive Sales Analytics
       const analyticsRes = await authGet('/api/swm/analytics/sales-dashboard');

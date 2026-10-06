@@ -31,9 +31,6 @@ import {
   Users as UsersIcon,
   ClipboardCheck,
   ArrowLeftRight,
-  Clock,
-  FileSpreadsheet,
-  ScanLine,
   Lock,
   Sparkles
 } from 'lucide-react';
@@ -48,8 +45,6 @@ import Transfers from '../Transfers';
 import Purchases from '../Purchases';
 import Suppliers from '../Suppliers';
 import SellerPayrollAndExpenseCategoriesCards from '../../components/SellerPayrollAndExpenseCategoriesCards';
-import DailyShift from '../DailyShift';
-import BranchesDaily from '../BranchesDaily';
 import Branches from '../Branches';
 import UsersPage from '../Users';
 
@@ -119,28 +114,6 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
     const p = permissions || {};
 
     const cat1Children = [
-      p.perm_pos !== false && {
-        id: 'pos_link',
-        title: 'شاشة نقطة البيع (POS)',
-        subtitle: 'الدخول لنظام مبيعات الكاشير المباشر وإصدار الفواتير',
-        icon: <ScanLine size={20} color="#0284c7" />,
-        isExternalRoute: '/pos'
-      },
-      p.perm_daily_shift !== false && {
-        id: 'daily_shift',
-        title: 'العمليات والوردية اليومية',
-        subtitle: 'حركات الكاشير وتقفيل الوردية اليومية للفرع',
-        icon: <Clock size={20} color="#0284c7" />
-      },
-      p.perm_branches_daily !== false && {
-        id: 'branches_daily',
-        title: 'يومية الفروع المجمعة',
-        subtitle: 'كشف الحساب اليومي الشامل لمبيعات ومصروفات الفروع',
-        icon: <FileSpreadsheet size={20} color="#0284c7" />
-      }
-    ].filter(Boolean);
-
-    const cat2Children = [
       p.perm_groups_items !== false && {
         id: 'groups_items',
         title: 'المجموعات والأصناف',
@@ -161,7 +134,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
       }
     ].filter(Boolean);
 
-    const cat3Children = [
+    const cat2Children = [
       p.perm_purchases !== false && {
         id: 'purchases',
         title: 'فواتير المشتريات والتوريد',
@@ -176,7 +149,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
       }
     ].filter(Boolean);
 
-    const cat4Children = [
+    const cat3Children = [
       p.perm_payroll !== false && {
         id: 'payroll_expenses',
         title: 'القبض الخاص ومسير الرواتب',
@@ -185,7 +158,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
       }
     ].filter(Boolean);
 
-    const cat5Children = [
+    const cat4Children = [
       p.perm_branches !== false && {
         id: 'branches',
         title: 'الفروع والمستودعات',
@@ -202,49 +175,40 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
 
     return [
       {
-        id: 'cat_pos',
-        number: '1',
-        title: 'نقاط البيع والعمليات اليومية',
-        color: '#0284c7',
-        bgColor: '#f0f9ff',
-        borderColor: '#bae6fd',
-        children: cat1Children
-      },
-      {
         id: 'cat_inventory',
-        number: '2',
+        number: '1',
         title: 'إدارة المخزون والأصناف',
         color: '#16a34a',
         bgColor: '#f0fdf4',
         borderColor: '#bbf7d0',
-        children: cat2Children
+        children: cat1Children
       },
       {
         id: 'cat_purchases',
-        number: '3',
+        number: '2',
         title: 'المشتريات والتوريد',
         color: '#d97706',
         bgColor: '#fffbeb',
         borderColor: '#fde68a',
-        children: cat3Children
+        children: cat2Children
       },
       {
         id: 'cat_payroll',
-        number: '4',
+        number: '3',
         title: 'القبض الخاص ورواتب ومسحوبات العاملين',
         color: '#9333ea',
         bgColor: '#faf5ff',
         borderColor: '#e9d5ff',
-        children: cat4Children
+        children: cat3Children
       },
       {
         id: 'cat_system',
-        number: '5',
+        number: '4',
         title: 'إدارة النظام والفروع',
         color: '#e11d48',
         bgColor: '#fff1f2',
         borderColor: '#fecdd3',
-        children: cat5Children
+        children: cat4Children
       }
     ].filter((cat) => cat.children.length > 0);
   }, [permissions]);
@@ -265,8 +229,6 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
     if (activeTab === 'home') return true;
     const p = permissions || {};
     switch (activeTab) {
-      case 'daily_shift': return p.perm_daily_shift !== false;
-      case 'branches_daily': return p.perm_branches_daily !== false;
       case 'groups_items': return p.perm_groups_items !== false;
       case 'stock_audit':
       case 'stock_adjustments': return p.perm_stock_audit !== false;
@@ -347,25 +309,6 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
           >
             الرئيسية (لوحة الأقسام)
           </Button>
-
-          {/* POS Direct Link Button if allowed */}
-          {permissions?.perm_pos !== false && (
-            <Button
-              type="dashed"
-              icon={<ScanLine size={15} style={{ marginLeft: 4 }} />}
-              onClick={() => navigate('/pos')}
-              style={{
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12,
-                height: 34,
-                color: '#0284c7',
-                borderColor: '#38bdf8'
-              }}
-            >
-              نقطة البيع (POS)
-            </Button>
-          )}
 
           <Tag
             style={{
@@ -650,11 +593,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
           />
         ) : (
           <>
-            {/* 1. نقاط البيع والعمليات اليومية */}
-            {activeTab === 'daily_shift' && <DailyShift currentUser={currentUser} />}
-            {activeTab === 'branches_daily' && <BranchesDaily />}
-
-            {/* 2. إدارة المخزون والأصناف */}
+            {/* 1. إدارة المخزون والأصناف */}
             {activeTab === 'groups_items' && (
               <GroupsAndItems
                 autoOpenCreate={tabExtra?.autoOpenCreate}
@@ -672,7 +611,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
               />
             )}
 
-            {/* 3. المشتريات والتوريد */}
+            {/* 2. المشتريات والتوريد */}
             {activeTab === 'purchases' && (
               <Purchases
                 autoOpenCreate={tabExtra?.autoOpenCreate}
@@ -686,14 +625,14 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
               />
             )}
 
-            {/* 4. القبض الخاص ورواتب ومسحوبات العاملين */}
+            {/* 3. القبض الخاص ورواتب ومسحوبات العاملين */}
             {activeTab === 'payroll_expenses' && (
               <div style={{ padding: '4px' }}>
                 <SellerPayrollAndExpenseCategoriesCards currentUser={currentUser} />
               </div>
             )}
 
-            {/* 5. إدارة النظام والفروع */}
+            {/* 4. إدارة النظام والفروع */}
             {activeTab === 'branches' && (
               <Branches
                 currentUser={currentUser}
