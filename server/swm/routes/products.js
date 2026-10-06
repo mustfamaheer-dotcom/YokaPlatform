@@ -1,9 +1,11 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 const redis = require('../../shared/redis');
 const { persistDataUri, persistGalleryImagesJson } = require('../../shared/imageStore');
+
+router.use(requireWarehousePermission('groups_items'));
 
 /**
  * GET /api/swm/products
@@ -533,7 +535,7 @@ const { validate, createProductSchema } = require('../../shared/validators');
  * POST /api/swm/products
  * Create product + all variants in a SINGLE atomic database transaction
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), validate(createProductSchema), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), validate(createProductSchema), async (req, res) => {
   try {
     const {
       product_code,
@@ -711,7 +713,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
  * PUT /api/swm/products/:id
  * Update product master data & sync variants/images
  */
-router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const [old] = await query(`SELECT * FROM products WHERE id = $1`, [id]);

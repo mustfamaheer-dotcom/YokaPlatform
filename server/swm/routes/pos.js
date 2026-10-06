@@ -1,8 +1,10 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireBranchScope, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireBranchScope, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 const { executeEodShiftClosure } = require('../services/shiftClosingService');
+
+router.use(requireWarehousePermission('pos'));
 
 /**
  * Helper to get or create default cash register for branch

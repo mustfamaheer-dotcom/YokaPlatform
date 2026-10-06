@@ -62,6 +62,7 @@ async function runTests() {
       category_id: catId,
       cost_price: 120.50,
       selling_price: 240.00,
+      featured_image: '/img/placeholder.png',
       variants: [
         { color: 'Black', size: 'M', price_modifier: 0 },
         { color: 'Black', size: 'L', price_modifier: 0 },

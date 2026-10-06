@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { transaction, query } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+
+router.use(requireWarehousePermission('stock_audit'));
 
 /**
  * POST /api/swm/inventory-counts/submit
@@ -13,12 +15,12 @@ const { logActivity } = require('../../shared/activityLogger');
  * 4. Inserts audit trail records in inventory_movements (adjustment_in / adjustment_out).
  * 5. Logs action via logActivity().
  */
-router.post('/submit', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.post('/submit', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const { branch_id, items, count_session, count_date, notes } = req.body;
 
     // Scoped branch resolution
-    const isRestrictedBranchUser = !['super_admin', 'admin', 'inventory_manager', 'supervisor'].includes(req.user.role);
+    const isRestrictedBranchUser = !['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager'].includes(req.user.role);
     const forcedBranchId = (isRestrictedBranchUser && req.user.branchId) ? req.user.branchId : null;
     const effectiveBranchId = forcedBranchId || (branch_id && branch_id !== 'all' && branch_id !== '' ? parseInt(branch_id, 10) : req.user.branchId);
 

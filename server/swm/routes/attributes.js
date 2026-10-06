@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+
+router.use(requireWarehousePermission('groups_items'));
 
 /**
  * GET /api/swm/attributes
@@ -44,7 +46,7 @@ router.get('/', requireAuth, async (req, res) => {
  * POST /api/swm/attributes
  * Add new size or color
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'inventory_manager']), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { attribute_type, name, code, display_order } = req.body;
     if (!attribute_type || !['size', 'color'].includes(attribute_type.toLowerCase())) {
@@ -99,7 +101,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_mana
  * PUT /api/swm/attributes/:id
  * Update size or color
  */
-router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager']), async (req, res) => {
+router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, code, display_order, status } = req.body;
@@ -148,7 +150,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_ma
  * DELETE /api/swm/attributes/:id
  * Delete size or color
  */
-router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager']), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const [attr] = await query(`SELECT * FROM product_attributes WHERE id = $1`, [id]);

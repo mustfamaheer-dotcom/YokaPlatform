@@ -1,20 +1,22 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { query } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+
+router.use(requireWarehousePermission('users'));
 
 /**
  * GET /api/swm/users
  * Paginated staff list with branch name joins
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'branch_account', 'salesperson']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'branch_account', 'salesperson', 'warehouse_manager']), async (req, res) => {
   try {
     const { role, branch_id, status, search, page = 1, limit = 100 } = req.query;
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
     // If requester is a supervisor, salesperson, or retail branch account, restrict strictly to their own branch
-    const isAdmin = ['super_admin', 'admin'].includes(req.user.role) || req.user.isMainWarehouse;
+    const isAdmin = ['super_admin', 'admin', 'warehouse_manager'].includes(req.user.role) || req.user.isMainWarehouse;
     const isSupervisor = req.user.role === 'supervisor';
     const isSalesperson = req.user.role === 'salesperson';
     const isRetailBranch = req.user.isBranchAccount && !isAdmin;
@@ -69,7 +71,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 
 /**
  * GET /api/swm/users/:id
  */
-router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const rows = await query(
@@ -96,7 +98,7 @@ router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'supervisor
  * POST /api/swm/users
  * Create user account with bcrypt password hashing
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const {
       username,
@@ -196,7 +198,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req,
  * PUT /api/swm/users/:id
  * Update staff profile, branch, role, or active status
  */
-router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const [old] = await query(`SELECT * FROM users WHERE id = $1`, [id]);

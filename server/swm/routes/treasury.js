@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireRole, requireBranchScope } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireBranchScope, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 const {
   parseBreakdownToChannels,
@@ -128,7 +128,7 @@ function genTransferRef() {
 //  GET /api/swm/treasury/registers
 //  Returns cash registers: all (admin) or own branch (supervisor/branch)
 // ────────────────────────────────────────────────────
-router.get('/registers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), async (req, res) => {
+router.get('/registers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson', 'warehouse_manager']), async (req, res) => {
   try {
     const isAdmin = ['super_admin', 'admin'].includes(req.user.role) || req.user.isMainWarehouse;
 
@@ -176,7 +176,7 @@ router.get('/registers', requireAuth, requireRole(['super_admin', 'admin', 'supe
 //  GET /api/swm/treasury/branch-safe
 //  Returns the branch safe accounts (Cash, Visa, Transfer) and recent transfer entries
 // ────────────────────────────────────────────────────
-router.get('/branch-safe', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), async (req, res) => {
+router.get('/branch-safe', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson', 'warehouse_manager']), async (req, res) => {
   try {
     const branchId = req.query.branch_id || req.user.branchId;
     if (!branchId) {
@@ -233,7 +233,7 @@ router.get('/branch-safe', requireAuth, requireRole(['super_admin', 'admin', 'su
 //  GET /api/swm/treasury/kpis
 //  Admin-only aggregated KPIs
 // ────────────────────────────────────────────────────
-router.get('/kpis', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/kpis', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), requireWarehousePermission('treasury'), async (req, res) => {
   try {
     const [totals] = await query(`
       SELECT
@@ -711,14 +711,14 @@ const handleManualCashTransfer = async (req, res) => {
   }
 };
 
-router.post('/cash-transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), handleManualCashTransfer);
-router.post('/handover-to-main', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), handleManualCashTransfer);
+router.post('/cash-transfers', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('treasury'), handleManualCashTransfer);
+router.post('/handover-to-main', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('treasury'), handleManualCashTransfer);
 
 // ────────────────────────────────────────────────────
 //  PUT /api/swm/treasury/transfers/:id/confirm
 //  Admin confirms receipt — adds amount to main register
 // ────────────────────────────────────────────────────
-router.put('/transfers/:id/confirm', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.put('/transfers/:id/confirm', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), requireWarehousePermission('treasury'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -812,7 +812,7 @@ router.put('/transfers/:id/confirm', requireAuth, requireRole(['super_admin', 'a
 //  PUT /api/swm/treasury/transfers/:id/cancel
 //  Cancel a pending transfer — refunds amount to source register
 // ────────────────────────────────────────────────────
-router.put('/transfers/:id/cancel', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson']), async (req, res) => {
+router.put('/transfers/:id/cancel', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'cashier', 'salesperson', 'warehouse_manager']), requireWarehousePermission('treasury'), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -1008,7 +1008,7 @@ router.post('/owner-transaction', requireAuth, requireRole(['super_admin', 'admi
 //  GET /api/swm/treasury/main-safe-ledger
 //  Returns audit trail of movements in the main warehouse safe
 // ────────────────────────────────────────────────────
-router.get('/main-safe-ledger', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/main-safe-ledger', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), requireWarehousePermission('treasury'), async (req, res) => {
   try {
     const { mainBranch } = await getMainWarehouseSafe();
     const rows = await query(`
@@ -1056,7 +1056,7 @@ router.get('/withdrawal-reasons', requireAuth, async (req, res) => {
  * POST /api/swm/treasury/withdrawal-reasons
  * Create a new withdrawal reason / category
  */
-router.post('/withdrawal-reasons', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.post('/withdrawal-reasons', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), requireWarehousePermission('treasury'), async (req, res) => {
   try {
     const { title, category = 'operational' } = req.body;
     if (!title || !title.trim()) {
@@ -1104,7 +1104,7 @@ router.post('/withdrawal-reasons', requireAuth, requireRole(['super_admin', 'adm
  * Deducts from Main Treasury (solvency checked) and creates an expense record
  * so it immediately reflects in Administrative Journal (اليومية الإدارية).
  */
-router.post('/quick-withdrawal', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.post('/quick-withdrawal', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), requireWarehousePermission('treasury'), async (req, res) => {
   try {
     const {
       amount,
@@ -1219,7 +1219,7 @@ router.post('/quick-withdrawal', requireAuth, requireRole(['super_admin', 'admin
  * Returns employee info, base salary, advances taken this month from expenses,
  * and previous payouts for this month.
  */
-router.get('/employee-payroll-summary/:employeeId', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.get('/employee-payroll-summary/:employeeId', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
   try {
     const { employeeId } = req.params;
     const { month } = req.query; // format: 'YYYY-MM'
@@ -1299,7 +1299,7 @@ router.get('/employee-payroll-summary/:employeeId', requireAuth, requireRole(['s
  *    so it appears immediately in Administrative Journal (اليومية الإدارية).
  * 3. Records voucher in payroll_payouts table.
  */
-router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
   try {
     const {
       employee_id,
@@ -1506,7 +1506,7 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin', 'su
  * GET /api/swm/treasury/payroll-history
  * Returns recent payroll payouts
  */
-router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), async (req, res) => {
+router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
   try {
     const { month, limit = 50 } = req.query;
     let sql = `

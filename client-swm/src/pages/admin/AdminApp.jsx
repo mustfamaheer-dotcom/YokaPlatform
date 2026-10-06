@@ -57,6 +57,7 @@ const { Text } = Typography;
 const ROLE_LABELS = {
   super_admin: { label: 'مدير عام النظام', color: 'red' },
   admin: { label: 'مدير إداري', color: 'volcano' },
+  warehouse_manager: { label: 'مدير المخازن', color: 'purple' },
   supervisor: { label: 'مشرف فرع', color: 'orange' },
   salesperson: { label: 'بائع / كاشير', color: 'blue' }
 };

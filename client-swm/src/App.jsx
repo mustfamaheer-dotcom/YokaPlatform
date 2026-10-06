@@ -11,6 +11,7 @@ import SettingsPage from './pages/admin/supervisor/SettingsPage';
 import StockAlertsPage from './pages/admin/supervisor/StockAlertsPage';
 import AdminApp from './pages/admin/AdminApp';
 import EcomWarehouseApp from './pages/ecom/EcomWarehouseApp';
+import WarehouseManagerApp from './pages/warehouse/WarehouseManagerApp';
 import api from './api';
 
 /**
@@ -52,6 +53,12 @@ function ProtectedRoute({ currentUser, allowedRoles, requiredBranchType, childre
 
   const isAllowed = allowedRoles.includes(currentUser.role) || (isSupervisor && allowedRoles.includes('supervisor'));
 
+  // Guard for warehouse manager attempting to access non-authorized portals like /dashboard or /supervisor
+  if (currentUser.role === 'warehouse_manager' && !isAllowed) {
+    message.warning('غير مصرح لك بالوصول إلى هذه الشاشة. تم توجيهك إلى بوابة مدير المخازن.');
+    return <RoleRootRedirect currentUser={currentUser} />;
+  }
+
   if (!isAllowed) {
     message.warning('غير مصرح لك بالوصول إلى هذه الصفحة. تم توجيهك إلى شاشتك المخصصة.');
     return <RoleRootRedirect currentUser={currentUser} />;
@@ -75,6 +82,12 @@ function RoleRootRedirect({ currentUser }) {
 
   const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
   const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
+  const isWarehouseManager = currentUser.role === 'warehouse_manager';
+
+  // Dedicated Warehouse Manager Portal
+  if (isWarehouseManager) {
+    return <Navigate to="/warehouse-manager" replace />;
+  }
 
   // 2. Main Admin Portal
   if (isAdmin) {
@@ -208,18 +221,20 @@ export default function App() {
         }
       />
 
-      {/* POS / Sales Terminal Route (salesperson, supervisor, admin, super_admin) */}
+      {/* POS / Sales Terminal Route (salesperson, supervisor, admin, super_admin, warehouse_manager) */}
       <Route
         path="/pos"
         element={
           <ProtectedRoute
             currentUser={currentUser}
-            allowedRoles={['salesperson', 'supervisor', 'admin', 'super_admin']}
+            allowedRoles={['salesperson', 'supervisor', 'admin', 'super_admin', 'warehouse_manager']}
           >
             <SellerApp
               currentUser={currentUser}
               onSwitchToAdmin={() => {
-                if (currentUser.role === 'supervisor') {
+                if (currentUser.role === 'warehouse_manager') {
+                  navigate('/warehouse-manager');
+                } else if (currentUser.role === 'supervisor') {
                   navigate('/supervisor-dashboard');
                 } else {
                   navigate('/dashboard');
@@ -345,6 +360,36 @@ export default function App() {
       <Route
         path="/supervisor/alerts"
         element={<Navigate to="/alerts" replace />}
+      />
+
+      {/* Dedicated Warehouse Manager Portal Route */}
+      <Route
+        path="/warehouse-manager/*"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['warehouse_manager', 'admin', 'super_admin']}
+          >
+            <WarehouseManagerApp
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/warehouse-manager"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['warehouse_manager', 'admin', 'super_admin']}
+          >
+            <WarehouseManagerApp
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            />
+          </ProtectedRoute>
+        }
       />
 
       {/* Main Admin Dashboard & Executive Portal Route (admin, super_admin) */}

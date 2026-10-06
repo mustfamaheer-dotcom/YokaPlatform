@@ -133,6 +133,8 @@ const stockAdjustmentRoutes = require('./routes/stockAdjustments');
 app.use('/api/swm/stock-adjustments', stockAdjustmentRoutes);
 const adminJournalsRoutes = require('./routes/adminJournals');
 app.use('/api/swm/admin-journals', adminJournalsRoutes);
+const wmPermissionsRoutes = require('./routes/warehouseManagerPermissions');
+app.use('/api/swm/wm-permissions', wmPermissionsRoutes);
 const treasuryRoutes = require('./routes/treasury');
 app.use('/api/swm/treasury', treasuryRoutes);
 app.use('/api/v1/treasury', treasuryRoutes);

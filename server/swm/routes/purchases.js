@@ -1,8 +1,10 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 const { addToMainTreasury, deductFromMainTreasury } = require('../services/treasuryService');
+
+router.use(requireWarehousePermission('purchases'));
 
 /**
  * GET /api/swm/purchases
@@ -286,7 +288,7 @@ router.get('/returns/:id', requireAuth, async (req, res) => {
  * POST /api/swm/purchases/returns
  * Create a new purchase return with atomic inventory decrement, refund receipt & supplier ledger adjustment
  */
-router.post('/returns', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), validate(createPurchaseReturnSchema), async (req, res) => {
+router.post('/returns', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), validate(createPurchaseReturnSchema), async (req, res) => {
   try {
     const {
       invoice_id,
@@ -595,7 +597,7 @@ router.get('/:id', requireAuth, async (req, res) => {
  * POST /api/swm/purchases
  * Create a new purchase invoice with atomic stock increment, price sync & multi-tender split payment
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), validate(createPurchaseInvoiceSchema), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), validate(createPurchaseInvoiceSchema), async (req, res) => {
   try {
     const {
       supplier_id,

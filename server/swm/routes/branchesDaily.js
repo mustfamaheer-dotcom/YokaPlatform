@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
+
+router.use(requireWarehousePermission('branches_daily'));
 
 /**
  * GET /api/swm/branches-daily
@@ -10,7 +12,7 @@ const { requireAuth, requireRole } = require('../../shared/authMiddleware');
  * - Branch-by-branch comparison summary
  * - Detailed paginated sales invoices list with cashier and customer info
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const {
       branch_id,

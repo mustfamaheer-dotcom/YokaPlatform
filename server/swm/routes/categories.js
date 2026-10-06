@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+
+router.use(requireWarehousePermission('groups_items'));
 
 /**
  * GET /api/swm/categories
@@ -28,7 +30,7 @@ router.get('/', requireAuth, async (req, res) => {
  * POST /api/swm/categories
  * Create new category
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_manager']), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { category_name, slug, parent_id, description, image_url, display_order, is_ecom_visible } = req.body;
     if (!category_name) {
@@ -80,7 +82,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'content_mana
 /**
  * PUT /api/swm/categories/:id
  */
-router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager']), async (req, res) => {
+router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const [old] = await query(`SELECT * FROM product_categories WHERE id = $1`, [id]);
@@ -136,7 +138,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_ma
 /**
  * DELETE /api/swm/categories/:id
  */
-router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'inventory_manager']), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const [cat] = await query(`SELECT * FROM product_categories WHERE id = $1`, [id]);

@@ -54,9 +54,150 @@ const { Option } = Select;
 const ROLES = [
   { value: 'super_admin', label: 'مدير عام للنظام (Super Admin)', color: 'red', portal: 'admin' },
   { value: 'admin', label: 'مدير إداري (Admin)', color: 'volcano', portal: 'admin' },
+  { value: 'warehouse_manager', label: 'مدير المخازن (Warehouse Manager)', color: 'purple', portal: 'warehouse' },
   { value: 'supervisor', label: 'مشرف فرع (Supervisor)', color: 'orange', portal: 'branch' },
   { value: 'salesperson', label: 'بائع / كاشير (Salesperson)', color: 'blue', portal: 'branch' }
 ];
+
+const DEFAULT_WM_PERMS = {
+  perm_pos: true,
+  perm_daily_shift: true,
+  perm_branches_daily: true,
+  perm_groups_items: true,
+  perm_stock_audit: true,
+  perm_transfers: true,
+  perm_purchases: true,
+  perm_suppliers: true,
+  perm_payroll: true,
+  perm_treasury: true,
+  perm_branches: true,
+  perm_users: true
+};
+
+function WarehousePermissionsEditor({ permissions, onChange, loading = false }) {
+  const perms = permissions || DEFAULT_WM_PERMS;
+
+  const toggle = (key, val) => {
+    onChange({ ...perms, [key]: val });
+  };
+
+  const setAll = (val) => {
+    onChange({
+      perm_pos: val,
+      perm_daily_shift: val,
+      perm_branches_daily: val,
+      perm_groups_items: val,
+      perm_stock_audit: val,
+      perm_transfers: val,
+      perm_purchases: val,
+      perm_suppliers: val,
+      perm_payroll: val,
+      perm_treasury: val,
+      perm_branches: val,
+      perm_users: val
+    });
+  };
+
+  const sections = [
+    {
+      title: '1. أقسام نقاط البيع والعمليات اليومية',
+      color: '#0284c7',
+      items: [
+        { key: 'perm_pos', label: 'شاشة نقطة البيع (POS الكاشير)' },
+        { key: 'perm_daily_shift', label: 'العمليات وتقفيل الوردية اليومية' },
+        { key: 'perm_branches_daily', label: 'يومية الفروع المجمعة' }
+      ]
+    },
+    {
+      title: '2. أقسام إدارة المخزون والأصناف',
+      color: '#16a34a',
+      items: [
+        { key: 'perm_groups_items', label: 'دليل المجموعات والأصناف' },
+        { key: 'perm_stock_audit', label: 'الجرد الفعلي وسندات التسوية' },
+        { key: 'perm_transfers', label: 'أذونات الصرف والتحويل بين الفروع' }
+      ]
+    },
+    {
+      title: '3. أقسام المشتريات والتوريد',
+      color: '#d97706',
+      items: [
+        { key: 'perm_purchases', label: 'فواتير المشتريات والتوريد' },
+        { key: 'perm_suppliers', label: 'دليل وحسابات الموردين' }
+      ]
+    },
+    {
+      title: '4. القبض الخاص ورواتب ومسحوبات العاملين',
+      color: '#9333ea',
+      items: [
+        { key: 'perm_payroll', label: 'مسير الرواتب ومسحوبات العاملين' },
+        { key: 'perm_treasury', label: 'الخزينة والسيولة النقدية' }
+      ]
+    },
+    {
+      title: '5. أقسام إدارة النظام والفروع',
+      color: '#e11d48',
+      items: [
+        { key: 'perm_branches', label: 'الفروع والمستودعات' },
+        { key: 'perm_users', label: 'المستخدمين والموظفين' }
+      ]
+    }
+  ];
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <Spin />
+        <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>جاري تحميل الصلاحيات...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe', borderRadius: 10, padding: 14, margin: '14px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Space align="center">
+          <LockOutlined style={{ color: '#7e22ce', fontSize: 16 }} />
+          <Text strong style={{ color: '#7e22ce', fontSize: 13.5 }}>
+            صلاحيات مدير المخازن (التحكم الإداري الكامل)
+          </Text>
+        </Space>
+        <Space size="small">
+          <Button size="small" type="primary" onClick={() => setAll(true)} style={{ backgroundColor: '#16a34a', fontSize: 11 }}>
+            تفعيل الكل
+          </Button>
+          <Button size="small" danger onClick={() => setAll(false)} style={{ fontSize: 11 }}>
+            تعطيل الكل
+          </Button>
+        </Space>
+      </div>
+
+      <Space direction="vertical" style={{ width: '100%' }} size={10}>
+        {sections.map((sec, idx) => (
+          <div key={idx} style={{ background: '#ffffff', borderRadius: 8, padding: '10px 12px', border: '1px solid #f1f5f9' }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: sec.color, marginBottom: 8 }}>
+              {sec.title}
+            </div>
+            <Row gutter={[12, 8]}>
+              {sec.items.map((it) => (
+                <Col span={12} key={it.key}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '6px 10px', borderRadius: 6 }}>
+                    <Text style={{ fontSize: 12 }}>{it.label}</Text>
+                    <Switch
+                      size="small"
+                      checked={perms[it.key] !== false}
+                      onChange={(checked) => toggle(it.key, checked)}
+                      style={{ backgroundColor: perms[it.key] !== false ? '#7e22ce' : undefined }}
+                    />
+                  </div>
+                </Col>
+              ))}
+            </Row>
+          </div>
+        ))}
+      </Space>
+    </div>
+  );
+}
 
 const getAvatarColor = (name) => {
   const colors = ['#4f46e5', '#0284c7', '#16a34a', '#d97706', '#9333ea', '#e11d48', '#0d9488'];
@@ -97,6 +238,12 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
   const selectedCreateBranchId = Form.useWatch('branch_id', createForm);
   const selectedEditBranchId = Form.useWatch('branch_id', editForm);
+  const selectedCreateRole = Form.useWatch('role', createForm);
+  const selectedEditRole = Form.useWatch('role', editForm);
+
+  const [createWmPerms, setCreateWmPerms] = useState({ ...DEFAULT_WM_PERMS });
+  const [editWmPerms, setEditWmPerms] = useState({ ...DEFAULT_WM_PERMS });
+  const [loadingEditPerms, setLoadingEditPerms] = useState(false);
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const isAdmin = ['super_admin', 'admin'].includes(currentUser?.role) || currentUser?.isMainWarehouse;
@@ -136,9 +283,18 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
       const res = await api.post('/api/swm/users', values);
       if (res.data.success) {
         const createdUser = res.data.data;
+        if (values.role === 'warehouse_manager' && createdUser?.id) {
+          try {
+            await api.put(`/api/swm/wm-permissions/${createdUser.id}`, createWmPerms);
+          } catch (e) {
+            console.error('Failed to set WM permissions on create:', e);
+          }
+        }
+
         message.success(`تم إنشاء حساب الموظف (${createdUser?.full_name || values.full_name}) بنجاح`);
         setIsCreateModalOpen(false);
         createForm.resetFields();
+        setCreateWmPerms({ ...DEFAULT_WM_PERMS });
 
         // Switch branch filter to show this user's branch so they appear immediately!
         if (values.branch_id) {
@@ -162,6 +318,24 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
   const handleOpenEdit = (user) => {
     setEditingUser(user);
+    if (user.role === 'warehouse_manager') {
+      setLoadingEditPerms(true);
+      api.get(`/api/swm/wm-permissions/${user.id}`)
+        .then((res) => {
+          if (res.data?.success && res.data.data) {
+            setEditWmPerms(res.data.data);
+          } else {
+            setEditWmPerms({ ...DEFAULT_WM_PERMS });
+          }
+        })
+        .catch(() => {
+          setEditWmPerms({ ...DEFAULT_WM_PERMS });
+        })
+        .finally(() => setLoadingEditPerms(false));
+    } else {
+      setEditWmPerms({ ...DEFAULT_WM_PERMS });
+    }
+
     editForm.setFieldsValue({
       full_name: user.full_name,
       phone: user.phone,
@@ -189,6 +363,13 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
 
       const res = await api.put(`/api/swm/users/${editingUser.id}`, payload);
       if (res.data.success) {
+        if (values.role === 'warehouse_manager') {
+          try {
+            await api.put(`/api/swm/wm-permissions/${editingUser.id}`, editWmPerms);
+          } catch (e) {
+            console.error('Failed to update WM permissions:', e);
+          }
+        }
         message.success('تم تحديث بيانات المستخدم بنجاح');
         setIsEditModalOpen(false);
         setEditingUser(null);
@@ -444,6 +625,10 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
               {isAdminRole ? (
                 <Tag icon={<CrownOutlined />} color="purple" style={{ margin: 0, fontSize: 11 }}>
                   بوابة الإدارة (Admin)
+                </Tag>
+              ) : record.role === 'warehouse_manager' ? (
+                <Tag icon={<LockOutlined />} color="purple" style={{ margin: 0, fontSize: 11 }}>
+                  بوابة مدير المخازن
                 </Tag>
               ) : isEcom ? (
                 <Tag icon={<ShoppingCartOutlined />} color="magenta" style={{ margin: 0, fontSize: 11 }}>
@@ -911,6 +1096,13 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             </Select>
           </Form.Item>
 
+          {selectedCreateRole === 'warehouse_manager' && (
+            <WarehousePermissionsEditor
+              permissions={createWmPerms}
+              onChange={setCreateWmPerms}
+            />
+          )}
+
           <div style={{ textAlign: 'left', marginTop: 20 }}>
             <Space>
               <Button onClick={() => setIsCreateModalOpen(false)}>إلغاء</Button>
@@ -1009,6 +1201,14 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
           >
             <Input.Password placeholder="••••••••" />
           </Form.Item>
+
+          {selectedEditRole === 'warehouse_manager' && (
+            <WarehousePermissionsEditor
+              permissions={editWmPerms}
+              onChange={setEditWmPerms}
+              loading={loadingEditPerms}
+            />
+          )}
 
           <div style={{ textAlign: 'left', marginTop: 16 }}>
             <Space>

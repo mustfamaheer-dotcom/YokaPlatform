@@ -1,13 +1,15 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+
+router.use(requireWarehousePermission('stock_audit'));
 
 /**
  * GET /api/swm/stock-adjustments
  * List past stock adjustment vouchers with branch, date, status filters and pagination
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const {
       branch_id,
@@ -121,7 +123,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
  * GET /api/swm/stock-adjustments/:id
  * Retrieve single voucher with complete item lines, variances, and branch details
  */
-router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -189,7 +191,7 @@ router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
  * Create a new stock adjustment voucher (draft or approved).
  * If approved: atomically updates inventory_balances and writes inventory_movements ledger.
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const {
       branch_id,
@@ -429,7 +431,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
  * PUT /api/swm/stock-adjustments/:id/approve
  * Approves a previously saved draft adjustment voucher and applies changes to inventory
  */
-router.put('/:id/approve', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.put('/:id/approve', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
 

@@ -69,9 +69,9 @@ function requireBranchScope(req, res, next) {
     return res.status(401).json({ success: false, message: 'Unauthenticated.' });
   }
 
-  const ADMIN_ROLES = ['super_admin', 'admin'];
+  const ADMIN_ROLES = ['super_admin', 'admin', 'warehouse_manager'];
   if (ADMIN_ROLES.includes(req.user.role)) {
-    // Admin has global access; can optionally filter by query/body branch_id
+    // Admin & Warehouse Manager have cross-branch visibility; can optionally filter by query/body branch_id
     const rawBranch = req.query.branch_id || req.body.branch_id;
     if (rawBranch === 'all' || rawBranch === 'retail' || rawBranch === 'ecom' || rawBranch === 'ecs') {
       req.scopedBranchId = rawBranch;
@@ -109,5 +109,69 @@ function requireBranchScope(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, requireRole, requireBranchScope };
+/**
+ * Granular Permission Guard for Warehouse Manager
+ * @param {string} permKey - Name of the permission field (e.g. 'perm_pos', 'perm_transfers')
+ */
+function requireWarehousePermission(permKey) {
+  return async (req, res, next) => {
+    // If req.user is not yet populated by an earlier middleware, try authenticating from Bearer token
+    if (!req.user && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      const token = req.headers.authorization.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        decoded.branch_id = decoded.branch_id || decoded.branchId || null;
+        decoded.branchId = decoded.branchId || decoded.branch_id || null;
+        req.user = decoded;
+      } catch (err) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired access token.'
+        });
+      }
+    }
+
+    if (!req.user) {
+      // If no token provided, defer to downstream handlers (e.g. requireAuth or public route)
+      return next();
+    }
+
+    // Super admin & admin bypass warehouse manager permission restrictions
+    if (['super_admin', 'admin'].includes(req.user.role)) {
+      return next();
+    }
+
+    // Only apply if user is warehouse_manager
+    if (req.user.role !== 'warehouse_manager') {
+      return next();
+    }
+
+    // Role is warehouse_manager -> check permissions
+    try {
+      const { query } = require('./db');
+      const rows = await query(
+        `SELECT * FROM warehouse_manager_permissions WHERE user_id = $1 LIMIT 1`,
+        [req.user.id]
+      );
+      const perms = rows[0] || null;
+
+      const column = permKey.startsWith('perm_') ? permKey : `perm_${permKey}`;
+      if (!perms || perms[column] !== true) {
+        return res.status(403).json({
+          success: false,
+          code: 'WAREHOUSE_PERMISSION_DENIED',
+          message: `تم إيقاف صلاحية (${permKey}) لحساب مدير المخازن بواسطة الإدارة.`
+        });
+      }
+
+      req.user.wmPermissions = perms;
+      next();
+    } catch (err) {
+      console.error('Error validating warehouse permission:', err);
+      return res.status(500).json({ success: false, message: 'Internal authorization error.' });
+    }
+  };
+}
+
+module.exports = { requireAuth, requireRole, requireBranchScope, requireWarehousePermission };
 

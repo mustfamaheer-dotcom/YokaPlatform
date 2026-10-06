@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+
+router.use(requireWarehousePermission('stock_audit'));
 
 /**
  * GET /api/swm/stock-audit
@@ -9,7 +11,7 @@ const { logActivity } = require('../../shared/activityLogger');
  * Supports filtering by category, search keywords, and stock status.
  * Calculates financial valuations and KPIs for physical audit sheets.
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const {
       branch_id,
@@ -197,7 +199,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
  * GET /api/swm/stock-audit/counts
  * List stock-take sessions for the user's branch
  */
-router.get('/counts', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.get('/counts', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const isBranchAccount = req.user.isBranchAccount || (!['super_admin', 'admin', 'inventory_manager'].includes(req.user.role));
     const effectiveBranchId = isBranchAccount ? req.user.branchId : (req.query.branch_id || req.user.branchId);
@@ -229,7 +231,7 @@ router.get('/counts', requireAuth, requireRole(['super_admin', 'admin', 'invento
  * GET /api/swm/stock-audit/counts/:session
  * Get detail items for a specific stock-take session
  */
-router.get('/counts/:session', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.get('/counts/:session', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const { session } = req.params;
     const isBranchAccount = req.user.isBranchAccount || (!['super_admin', 'admin', 'inventory_manager'].includes(req.user.role));
@@ -258,7 +260,7 @@ router.get('/counts/:session', requireAuth, requireRole(['super_admin', 'admin',
  * POST /api/swm/stock-audit/counts
  * Submit a physical stock-take session
  */
-router.post('/counts', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.post('/counts', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const { count_session, count_date, items, notes } = req.body;
     const branchId = req.body.branch_id || req.user.branch_id || req.user.branchId;
@@ -323,7 +325,7 @@ router.post('/counts', requireAuth, requireRole(['super_admin', 'admin', 'invent
  * POST /api/swm/stock-audit/counts/:session/convert-to-adjustment
  * Convert discrepancies from a physical stock-take into an approved stock adjustment voucher
  */
-router.post('/counts/:session/convert-to-adjustment', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor']), async (req, res) => {
+router.post('/counts/:session/convert-to-adjustment', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
   try {
     const { session } = req.params;
     const branchId = req.body.branch_id || req.user.branch_id || req.user.branchId;

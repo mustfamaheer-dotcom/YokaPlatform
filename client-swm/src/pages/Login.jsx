@@ -59,9 +59,12 @@ export default function Login({ onLoginSuccess }) {
         const isEcom = user.branchType === 'ecom_warehouse' || user.branchCode === 'BR-ECOM';
         const isSupervisor = user.role === 'supervisor' || user.isSupervisor === true;
         const isAdmin = ['admin', 'super_admin'].includes(user.role);
+        const isWarehouseManager = user.role === 'warehouse_manager';
 
         let targetRoute = '/pos';
-        if (isEcom) {
+        if (isWarehouseManager) {
+          targetRoute = '/warehouse-manager';
+        } else if (isEcom) {
           targetRoute = '/ecom';
         } else if (isAdmin) {
           targetRoute = '/dashboard';

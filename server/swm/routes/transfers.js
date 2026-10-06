@@ -1,13 +1,15 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
+
+router.use(requireWarehousePermission('transfers'));
 
 /**
  * GET /api/swm/transfers/metrics
  * Summary stats of stock transfers
  */
-router.get('/metrics', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/metrics', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const [stats] = await query(`
       SELECT
@@ -37,7 +39,7 @@ router.get('/metrics', requireAuth, requireRole(['super_admin', 'admin']), async
  * GET /api/swm/transfers/branch-stock/:branchId
  * Get available products with current stock in the specified sending branch
  */
-router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const { branchId } = req.params;
     const { search } = req.query;
@@ -101,7 +103,7 @@ router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', '
  * GET /api/swm/transfers
  * List stock transfers with filters and pagination
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const { from_branch_id, to_branch_id, date, search, page = 1, limit = 5000 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
@@ -182,7 +184,7 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin']), async (req, 
  * GET /api/swm/transfers/:id
  * Retrieve single dispatch note with line items and branch contacts for PDF/Print
  */
-router.get('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -250,7 +252,7 @@ router.get('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (re
  * - Logs transfer_out and transfer_in audit records in inventory_movements
  * - Creates stock_transfers and stock_transfer_items records
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const {
       from_branch_id,

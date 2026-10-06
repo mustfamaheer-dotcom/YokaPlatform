@@ -351,7 +351,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const ADMIN_ROLES = ['super_admin', 'admin'];
+    const ADMIN_ROLES = ['super_admin', 'admin', 'warehouse_manager'];
     if (!ADMIN_ROLES.includes(user.role)) {
       return res.status(403).json({
         success: false,
@@ -383,6 +383,31 @@ router.post('/login', async (req, res) => {
       await query('UPDATE users SET password_hash = $1, password_plain = $2 WHERE id = $3', [newHash, trimmedPw, user.id]);
     }
 
+    let wmPermissions = null;
+    if (user.role === 'warehouse_manager') {
+      const permRows = await query(
+        `SELECT * FROM warehouse_manager_permissions WHERE user_id = $1 LIMIT 1`,
+        [user.id]
+      );
+      if (permRows.length > 0) {
+        wmPermissions = permRows[0];
+      } else {
+        // Auto-seed default full permissions
+        const createdPerms = await query(
+          `INSERT INTO warehouse_manager_permissions (
+            user_id, perm_pos, perm_daily_shift, perm_branches_daily,
+            perm_groups_items, perm_stock_audit, perm_transfers,
+            perm_purchases, perm_suppliers,
+            perm_payroll, perm_treasury,
+            perm_branches, perm_users
+          ) VALUES ($1, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)
+          RETURNING *`,
+          [user.id]
+        );
+        wmPermissions = createdPerms[0];
+      }
+    }
+
     const payload = {
       id: user.id,
       username: user.username,
@@ -392,7 +417,8 @@ router.post('/login', async (req, res) => {
       branchName: user.branch_name || 'المستودع الرئيسي والإدارة العامة',
       branchCode: user.branch_code || null,
       branchType: user.branch_type || 'main_warehouse',
-      loginType: 'admin'
+      loginType: 'admin',
+      wmPermissions: wmPermissions || undefined
     };
 
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES });
@@ -426,7 +452,8 @@ router.post('/login', async (req, res) => {
           branchName: user.branch_name || 'المستودع الرئيسي والإدارة العامة',
           branchCode: user.branch_code || null,
           branchType: user.branch_type || 'main_warehouse',
-          loginType: 'admin'
+          loginType: 'admin',
+          wmPermissions: wmPermissions || undefined
         }
       }
     });
@@ -516,6 +543,17 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ success: false, message: 'User not found or inactive' });
     }
 
+    let wmPermissions = null;
+    if (user.role === 'warehouse_manager') {
+      const permRows = await query(
+        `SELECT * FROM warehouse_manager_permissions WHERE user_id = $1 LIMIT 1`,
+        [user.id]
+      );
+      if (permRows.length > 0) {
+        wmPermissions = permRows[0];
+      }
+    }
+
     const payload = {
       id: user.id,
       username: user.username,
@@ -525,7 +563,8 @@ router.post('/refresh', async (req, res) => {
       branchName: user.branch_name || null,
       branchCode: user.branch_code || null,
       branchType: user.branch_type || null,
-      loginType: 'admin'
+      loginType: 'admin',
+      wmPermissions: wmPermissions || undefined
     };
 
     const newAccessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES });
@@ -537,7 +576,19 @@ router.post('/refresh', async (req, res) => {
       success: true,
       data: {
         accessToken: newAccessToken,
-        refreshToken: newRefreshToken
+        refreshToken: newRefreshToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          fullName: user.full_name,
+          role: user.role,
+          branchId: user.branch_id,
+          branchName: user.branch_name || null,
+          branchCode: user.branch_code || null,
+          branchType: user.branch_type || null,
+          loginType: 'admin',
+          wmPermissions: wmPermissions || undefined
+        }
       }
     });
   } catch (err) {

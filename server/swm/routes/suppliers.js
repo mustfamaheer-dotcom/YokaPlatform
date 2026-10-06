@@ -1,8 +1,10 @@
 const router = require('express').Router();
 const { query, transaction } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 const { deductFromMainTreasury } = require('../services/treasuryService');
+
+router.use(requireWarehousePermission('suppliers'));
 
 /**
  * GET /api/swm/suppliers
@@ -107,7 +109,7 @@ const { validate, createSupplierSchema, supplierPaymentSchema } = require('../..
  * POST /api/swm/suppliers
  * Create a new supplier (restricted to exact 5 fields, atomic transaction)
  */
-router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), validate(createSupplierSchema), async (req, res) => {
+router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), validate(createSupplierSchema), async (req, res) => {
   try {
     const {
       supplier_name,
@@ -167,7 +169,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
  * PUT /api/swm/suppliers/:id
  * Update supplier details
  */
-router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const [old] = await query(`SELECT * FROM suppliers WHERE id = $1`, [id]);
@@ -381,7 +383,7 @@ router.get('/:id/ledger', requireAuth, async (req, res) => {
  * POST /api/swm/suppliers/:id/pay
  * Record payment to supplier with Multi-tender Split Payment support and atomic transaction
  */
-router.post('/:id/pay', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), validate(supplierPaymentSchema), async (req, res) => {
+router.post('/:id/pay', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), validate(supplierPaymentSchema), async (req, res) => {
   try {
     const { id } = req.params;
     const {
