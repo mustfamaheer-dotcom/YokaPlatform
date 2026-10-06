@@ -33,16 +33,34 @@
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
   transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1),
+              background-color 0.35s ease,
               box-shadow 0.4s cubic-bezier(0.32, 0.72, 0, 1),
               border-color 0.35s ease;
   user-select: none;
 }
 
 .product-card:hover {
-  transform: translateY(-6px);
-  border-color: rgba(200, 164, 92, 0.45);
-  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.10),
-              0 0 0 1px rgba(200, 164, 92, 0.25);
+  transform: translateY(-8px) scale(1.025);
+  background-color: #0B0F17 !important;
+  border-color: #C8A45C !important;
+  box-shadow: 0 24px 48px -10px rgba(0, 0, 0, 0.6),
+              0 0 0 1px #C8A45C;
+}
+
+.product-card:hover .product-title {
+  color: #DFCA95 !important;
+}
+
+.product-card:hover .product-price {
+  color: #DFCA95 !important;
+}
+
+.product-card:hover .product-currency {
+  color: #C8A45C !important;
+}
+
+.product-card:hover .product-category-tag {
+  color: #DFCA95 !important;
 }
 
 /* Image Wrapper: Elegant Framed Inset */
@@ -115,7 +133,7 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Circular Gold Discount Badge (As in Mockup) */
+/* Circular Direct Solid Red Discount Badge (Direct Color Standard) */
 .discount-badge {
   position: absolute;
   top: 12px;
@@ -123,8 +141,8 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #C8A45C;
-  color: #FFFFFF;
+  background: #DC2626 !important;
+  color: #FFFFFF !important;
   font-size: 12px;
   font-weight: 800;
   display: flex;
@@ -132,8 +150,8 @@
   justify-content: center;
   z-index: 4;
   direction: ltr;
-  box-shadow: 0 4px 14px rgba(200, 164, 92, 0.35);
-  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  border: 2px solid #FFFFFF;
   letter-spacing: -0.2px;
 }
 

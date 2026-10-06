@@ -167,12 +167,12 @@ export default function Dashboard({ onNavigate }) {
       {/* 1. Header & Period Filter Bar */}
       <div
         style={{
-          background: '#ffffff',
+          background: 'linear-gradient(135deg, #0B0F17 0%, #151D2A 50%, #0B0F17 100%)',
           borderRadius: 14,
           padding: '16px 20px',
           marginBottom: 16,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          border: '1px solid #f1f5f9',
+          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.45)',
+          border: '1.5px solid rgba(200, 164, 92, 0.4)',
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
@@ -182,12 +182,12 @@ export default function Dashboard({ onNavigate }) {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <LayoutDashboard size={20} color="#4f46e5" />
-            <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 'clamp(16px, 4vw, 20px)' }}>
+            <LayoutDashboard size={20} color="#C8A45C" />
+            <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 'clamp(16px, 4vw, 20px)', color: '#DFCA95' }}>
               لوحة المتابعة التنفيذية والإدارية
             </Title>
           </div>
-          <Text type="secondary" style={{ fontSize: 13, marginTop: 4, display: 'block' }}>
+          <Text style={{ fontSize: 13, marginTop: 4, display: 'block', color: '#E2D4B7' }}>
             مراقبة الأداء المالي، مبيعات الفروع، وحالة المخزون المركزي لحظة بلحظة
           </Text>
         </div>
@@ -207,10 +207,16 @@ export default function Dashboard({ onNavigate }) {
           </Radio.Group>
 
           <Button
-            icon={<RefreshCw size={15} style={{ marginLeft: 4 }} />}
+            icon={<RefreshCw size={15} style={{ marginLeft: 4, color: '#C8A45C' }} />}
             onClick={() => fetchDashboardData(dateMode)}
             loading={loading}
-            style={{ borderRadius: 8 }}
+            style={{
+              borderRadius: 8,
+              backgroundColor: '#0B0F17',
+              borderColor: '#C8A45C',
+              color: '#DFCA95',
+              fontWeight: 700
+            }}
           >
             تحديث
           </Button>
@@ -230,21 +236,21 @@ export default function Dashboard({ onNavigate }) {
           }
         }}
         style={{
-          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
-          color: '#ffffff',
+          background: 'linear-gradient(135deg, #0B0F17 0%, #151D2A 50%, #0B0F17 100%)',
+          color: '#DFCA95',
           borderRadius: 16,
           padding: '20px 24px',
           marginBottom: 18,
           minHeight: 'auto',
           height: 'auto',
           cursor: 'pointer',
-          boxShadow: '0 8px 24px -4px rgba(49, 46, 129, 0.28)',
+          boxShadow: '0 8px 25px -4px rgba(0, 0, 0, 0.5), 0 0 15px rgba(200, 164, 92, 0.15)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: 16,
-          border: '1.5px solid #4338ca',
+          border: '1.5px solid #C8A45C',
           transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
       >
@@ -254,35 +260,35 @@ export default function Dashboard({ onNavigate }) {
               width: 52,
               height: 52,
               borderRadius: 14,
-              background: 'rgba(255, 255, 255, 0.12)',
+              background: 'rgba(200, 164, 92, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              backdropFilter: 'blur(8px)'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              border: '1px solid rgba(200, 164, 92, 0.4)'
             }}
           >
-            <BarChart3 size={28} color="#38bdf8" />
+            <BarChart3 size={28} color="#DFCA95" />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <span style={{ fontSize: 17, fontWeight: 800, color: '#ffffff' }}>
+              <span style={{ fontSize: 17, fontWeight: 800, color: '#DFCA95' }}>
                 بطاقة تقارير ومبيعات الفرع الشاملة والتحليلات (Comprehensive Sales & Reports)
               </span>
-              <Tag color="cyan" style={{ fontWeight: 700, fontSize: 11, borderRadius: 6, margin: 0 }}>
+              <Tag style={{ fontWeight: 700, fontSize: 11, borderRadius: 6, margin: 0, backgroundColor: 'rgba(200, 164, 92, 0.15)', borderColor: '#C8A45C', color: '#DFCA95' }}>
                 لوحة المدير حصرياً
               </Tag>
             </div>
-            <Paragraph style={{ color: '#c7d2fe', fontSize: 13, margin: 0, maxWidth: 660, lineHeight: 1.5 }}>
+            <Paragraph style={{ color: '#E2D4B7', fontSize: 13, margin: 0, maxWidth: 660, lineHeight: 1.5 }}>
               تحليلات المبيعات وصافي الإيرادات، الرسوم البيانية التفاعلية (Recharts)، أداء البائعين، تدقيق المرتجعات، ودفتر المصروفات بنطاق زمني مخصص.
             </Paragraph>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ textAlign: 'left', background: 'rgba(255, 255, 255, 0.08)', padding: '6px 14px', borderRadius: 10 }}>
-            <span style={{ fontSize: 11, color: '#93c5fd', display: 'block' }}>إجمالي المبيعات المحققة</span>
-            <strong style={{ fontSize: 17, color: '#ffffff', fontWeight: 800 }}>
+          <div style={{ textAlign: 'left', background: 'rgba(200, 164, 92, 0.12)', border: '1px solid rgba(200, 164, 92, 0.35)', padding: '6px 14px', borderRadius: 10 }}>
+            <span style={{ fontSize: 11, color: '#DFCA95', display: 'block' }}>إجمالي المبيعات المحققة</span>
+            <strong style={{ fontSize: 17, color: '#F3E8C8', fontWeight: 800 }}>
               {kpi.totalInflow.toLocaleString('ar-EG')} ج.م
             </strong>
           </div>
@@ -290,16 +296,16 @@ export default function Dashboard({ onNavigate }) {
             type="primary"
             icon={<ArrowLeft size={16} />}
             style={{
-              backgroundColor: '#38bdf8',
-              borderColor: '#38bdf8',
-              color: '#0f172a',
+              backgroundColor: '#C8A45C',
+              borderColor: '#DFCA95',
+              color: '#0B0F17',
               borderRadius: 10,
               fontWeight: 800,
               height: 42,
               padding: '0 18px',
               display: 'inline-flex',
               alignItems: 'center',
-              boxShadow: '0 4px 12px rgba(56, 189, 248, 0.35)'
+              boxShadow: '0 4px 14px rgba(200, 164, 92, 0.35)'
             }}
           >
             فتح التقارير والرسوم
@@ -316,25 +322,25 @@ export default function Dashboard({ onNavigate }) {
             onClick={() => onNavigate('branches_daily')}
             style={{
               borderRadius: 14,
-              backgroundColor: '#ecfdf5',
-              border: '1px solid #a7f3d0',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
               cursor: 'pointer',
               height: '100%',
-              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.08)'
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
             }}
             styles={{ body: { padding: '14px 16px' } }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text strong style={{ color: '#047857', fontSize: 13 }}>
-                📥 إجمالي المبيعات
+              <Text strong style={{ color: '#DFCA95', fontSize: 13 }}>
+                إجمالي المبيعات
               </Text>
-              <ArrowUpRight size={16} color="#059669" />
+              <ArrowUpRight size={16} color="#C8A45C" />
             </div>
-            <div style={{ color: '#065f46', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
+            <div style={{ color: '#F3E8C8', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
               {kpi.totalInflow.toLocaleString('ar-EG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-              <span style={{ fontSize: 12, fontWeight: 500, marginRight: 4 }}>ج.م</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#DFCA95', marginRight: 4 }}>ج.م</span>
             </div>
-            <div style={{ fontSize: 11, color: '#059669', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: '#DFCA95', marginTop: 4 }}>
               {dateMode === 'today' ? 'مبيعات اليوم المحصلة' : 'إجمالي المبيعات بالفترة'}
             </div>
           </Card>
@@ -347,25 +353,25 @@ export default function Dashboard({ onNavigate }) {
             onClick={() => onNavigate('branches_daily')}
             style={{
               borderRadius: 14,
-              backgroundColor: '#eff6ff',
-              border: '1px solid #bfdbfe',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
               cursor: 'pointer',
               height: '100%',
-              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.08)'
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
             }}
             styles={{ body: { padding: '14px 16px' } }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text strong style={{ color: '#1d4ed8', fontSize: 13 }}>
-                🧾 فواتير العمليات
+              <Text strong style={{ color: '#DFCA95', fontSize: 13 }}>
+                فواتير العمليات
               </Text>
-              <FileSpreadsheet size={16} color="#2563eb" />
+              <FileSpreadsheet size={16} color="#C8A45C" />
             </div>
-            <div style={{ color: '#1e40af', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
+            <div style={{ color: '#F3E8C8', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
               {kpi.invoicesCount.toLocaleString('ar-EG')}
-              <span style={{ fontSize: 12, fontWeight: 500, marginRight: 4 }}>فاتورة</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#DFCA95', marginRight: 4 }}>فاتورة</span>
             </div>
-            <div style={{ fontSize: 11, color: '#2563eb', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: '#DFCA95', marginTop: 4 }}>
               {kpi.totalItemsSold.toLocaleString('ar-EG')} قطعة مباعة
             </div>
           </Card>
@@ -377,24 +383,24 @@ export default function Dashboard({ onNavigate }) {
             variant="borderless"
             style={{
               borderRadius: 14,
-              backgroundColor: kpi.netCashflow >= 0 ? '#f0fdf4' : '#fff1f2',
-              border: `1px solid ${kpi.netCashflow >= 0 ? '#bbf7d0' : '#fecdd3'}`,
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
               height: '100%',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
             }}
             styles={{ body: { padding: '14px 16px' } }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text strong style={{ color: kpi.netCashflow >= 0 ? '#15803d' : '#be123c', fontSize: 13 }}>
-                💎 صافي التدفق
+              <Text strong style={{ color: '#DFCA95', fontSize: 13 }}>
+                صافي التدفق
               </Text>
-              <Wallet size={16} color={kpi.netCashflow >= 0 ? '#16a34a' : '#e11d48'} />
+              <Wallet size={16} color="#C8A45C" />
             </div>
-            <div style={{ color: kpi.netCashflow >= 0 ? '#14532d' : '#9f1239', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
+            <div style={{ color: '#F3E8C8', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
               {kpi.netCashflow.toLocaleString('ar-EG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-              <span style={{ fontSize: 12, fontWeight: 500, marginRight: 4 }}>ج.م</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#DFCA95', marginRight: 4 }}>ج.م</span>
             </div>
-            <div style={{ fontSize: 11, color: kpi.netCashflow >= 0 ? '#15803d' : '#be123c', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: '#DFCA95', marginTop: 4 }}>
               الوارد مطروحاً منه المصروفات
             </div>
           </Card>
@@ -407,25 +413,25 @@ export default function Dashboard({ onNavigate }) {
             onClick={() => onNavigate('treasury_admin')}
             style={{
               borderRadius: 14,
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
               cursor: 'pointer',
               height: '100%',
-              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.08)'
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
             }}
             styles={{ body: { padding: '14px 16px' } }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text strong style={{ color: '#b91c1c', fontSize: 13 }}>
-                📤 المصروفات
+              <Text strong style={{ color: '#DFCA95', fontSize: 13 }}>
+                المصروفات
               </Text>
-              <ArrowDownRight size={16} color="#dc2626" />
+              <ArrowDownRight size={16} color="#C8A45C" />
             </div>
-            <div style={{ color: '#991b1b', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
+            <div style={{ color: '#F3E8C8', fontSize: 'clamp(18px, 4.5vw, 24px)', fontWeight: 800 }}>
               {kpi.totalOutflow.toLocaleString('ar-EG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-              <span style={{ fontSize: 12, fontWeight: 500, marginRight: 4 }}>ج.م</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#DFCA95', marginRight: 4 }}>ج.م</span>
             </div>
-            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: '#DFCA95', marginTop: 4 }}>
               سندات صرف ومصروفات تشغيلية
             </div>
           </Card>
@@ -438,15 +444,39 @@ export default function Dashboard({ onNavigate }) {
           <div
             className="stat-metric-card"
             onClick={() => onNavigate('products')}
-            style={{ cursor: 'pointer', height: '100%' }}
+            style={{
+              cursor: 'pointer',
+              height: '100%',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
+            }}
           >
-            <div className="quick-action-icon-box" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+            <div
+              className="quick-action-icon-box"
+              style={{
+                background: 'rgba(200, 164, 92, 0.15)',
+                color: '#DFCA95',
+                border: '1px solid rgba(200, 164, 92, 0.3)',
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <Boxes size={22} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>كتالوج المخزون</Text>
-              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 700, color: '#1e1b4b' }}>
-                {stats.productsCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}>صنف</span>
+              <span style={{ fontSize: 12, display: 'block', color: '#E2D4B7' }}>كتالوج المخزون</span>
+              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 800, color: '#F3E8C8' }}>
+                {stats.productsCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 500, color: '#DFCA95' }}>صنف</span>
               </div>
             </div>
           </div>
@@ -456,15 +486,39 @@ export default function Dashboard({ onNavigate }) {
           <div
             className="stat-metric-card"
             onClick={() => onNavigate('branches')}
-            style={{ cursor: 'pointer', height: '100%' }}
+            style={{
+              cursor: 'pointer',
+              height: '100%',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
+            }}
           >
-            <div className="quick-action-icon-box" style={{ background: '#dcfce7', color: '#15803d' }}>
+            <div
+              className="quick-action-icon-box"
+              style={{
+                background: 'rgba(200, 164, 92, 0.15)',
+                color: '#DFCA95',
+                border: '1px solid rgba(200, 164, 92, 0.3)',
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <Store size={22} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>الفروع والمستودعات</Text>
-              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 700, color: '#064e3b' }}>
-                {stats.branchesCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}>فرع</span>
+              <span style={{ fontSize: 12, display: 'block', color: '#E2D4B7' }}>الفروع والمستودعات</span>
+              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 800, color: '#F3E8C8' }}>
+                {stats.branchesCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 500, color: '#DFCA95' }}>فرع</span>
               </div>
             </div>
           </div>
@@ -474,15 +528,39 @@ export default function Dashboard({ onNavigate }) {
           <div
             className="stat-metric-card"
             onClick={() => onNavigate('orders')}
-            style={{ cursor: 'pointer', height: '100%' }}
+            style={{
+              cursor: 'pointer',
+              height: '100%',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
+            }}
           >
-            <div className="quick-action-icon-box" style={{ background: '#f5f3ff', color: '#7c3aed' }}>
+            <div
+              className="quick-action-icon-box"
+              style={{
+                background: 'rgba(200, 164, 92, 0.15)',
+                color: '#DFCA95',
+                border: '1px solid rgba(200, 164, 92, 0.3)',
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <ShoppingBag size={22} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>طلبات أونلاين معلقة</Text>
-              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 700, color: '#5b21b6' }}>
-                {stats.pendingOrdersCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}>طلب</span>
+              <span style={{ fontSize: 12, display: 'block', color: '#E2D4B7' }}>طلبات أونلاين معلقة</span>
+              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 800, color: '#F3E8C8' }}>
+                {stats.pendingOrdersCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 500, color: '#DFCA95' }}>طلب</span>
               </div>
             </div>
           </div>
@@ -492,15 +570,39 @@ export default function Dashboard({ onNavigate }) {
           <div
             className="stat-metric-card"
             onClick={() => onNavigate('users')}
-            style={{ cursor: 'pointer', height: '100%' }}
+            style={{
+              cursor: 'pointer',
+              height: '100%',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)'
+            }}
           >
-            <div className="quick-action-icon-box" style={{ background: '#fef3c7', color: '#b45309' }}>
+            <div
+              className="quick-action-icon-box"
+              style={{
+                background: 'rgba(200, 164, 92, 0.15)',
+                color: '#DFCA95',
+                border: '1px solid rgba(200, 164, 92, 0.3)',
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <Users size={22} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>الموظفين والمستخدمين</Text>
-              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 700, color: '#78350f' }}>
-                {stats.usersCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}>مستخدم</span>
+              <span style={{ fontSize: 12, display: 'block', color: '#E2D4B7' }}>الموظفين والمستخدمين</span>
+              <div style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 800, color: '#F3E8C8' }}>
+                {stats.usersCount.toLocaleString('ar-EG')} <span style={{ fontSize: 12, fontWeight: 500, color: '#DFCA95' }}>مستخدم</span>
               </div>
             </div>
           </div>
@@ -515,26 +617,32 @@ export default function Dashboard({ onNavigate }) {
             title={
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Space>
-                  <Store size={18} color="#059669" />
-                  <span style={{ fontWeight: 700, fontSize: 15 }}>أداء ومبيعات الفروع المباشر</span>
+                  <Store size={18} color="#C8A45C" />
+                  <span style={{ fontWeight: 800, fontSize: 15, color: '#DFCA95' }}>أداء ومبيعات الفروع المباشر</span>
                 </Space>
                 <Button
                   type="link"
                   size="small"
                   onClick={() => onNavigate('branches_daily')}
-                  style={{ fontWeight: 600, color: '#4f46e5', padding: 0 }}
+                  style={{ fontWeight: 700, color: '#DFCA95', padding: 0 }}
                 >
                   عرض اليومية المفصلة ⬅
                 </Button>
               </div>
             }
             variant="borderless"
-            style={{ borderRadius: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', height: '100%' }}
+            style={{
+              borderRadius: 14,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
+              height: '100%'
+            }}
             styles={{ body: { padding: '14px 16px' } }}
           >
             {branchesComparison.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8' }}>
-                <Store size={36} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+              <div style={{ textAlign: 'center', padding: '30px 0', color: '#DFCA95' }}>
+                <Store size={36} style={{ margin: '0 auto 8px', opacity: 0.5, color: '#C8A45C' }} />
                 <div>لا توجد مبيعات مسجلة في هذا النطاق الزمني</div>
               </div>
             ) : (
@@ -545,24 +653,24 @@ export default function Dashboard({ onNavigate }) {
                     <div
                       key={b.branch_id}
                       style={{
-                        background: '#f8fafc',
+                        background: '#151D2A',
                         padding: '12px 14px',
                         borderRadius: 10,
-                        border: '1px solid #e2e8f0'
+                        border: '1px solid rgba(200, 164, 92, 0.25)'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
                         <Space size={6}>
-                          <Tag color="purple" style={{ fontWeight: 600, margin: 0 }}>
+                          <Tag style={{ fontWeight: 700, margin: 0, backgroundColor: '#0B0F17', borderColor: '#C8A45C', color: '#DFCA95', borderRadius: 6 }}>
                             {b.branch_name}
                           </Tag>
-                          <Text type="secondary" style={{ fontSize: 11 }}>({b.branch_code})</Text>
+                          <span style={{ fontSize: 11, color: '#E2D4B7' }}>({b.branch_code})</span>
                         </Space>
                         <div style={{ textAlign: 'left' }}>
-                          <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>
+                          <span style={{ fontWeight: 800, color: '#F3E8C8', fontSize: 14 }}>
                             {Number(b.total_inflow || 0).toLocaleString()} ج.م
                           </span>
-                          <span style={{ fontSize: 11, color: '#64748b', marginRight: 6 }}>
+                          <span style={{ fontSize: 11, color: '#DFCA95', marginRight: 6 }}>
                             ({sharePct}%)
                           </span>
                         </div>
@@ -570,16 +678,17 @@ export default function Dashboard({ onNavigate }) {
 
                       <Progress
                         percent={sharePct}
-                        strokeColor="#4f46e5"
+                        strokeColor="#C8A45C"
+                        trailColor="rgba(255, 255, 255, 0.1)"
                         showInfo={false}
                         size="small"
                         style={{ margin: '4px 0 6px' }}
                       />
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }}>
-                        <span>عدد الفواتير: <strong>{b.invoices_count || 0}</strong></span>
-                        <span>القطع المباعة: <strong>{b.items_sold || 0}</strong></span>
-                        <span>صافي الفرع: <strong style={{ color: b.net_balance >= 0 ? '#059669' : '#dc2626' }}>{Number(b.net_balance || 0).toLocaleString()} ج.م</strong></span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#E2D4B7' }}>
+                        <span>عدد الفواتير: <strong style={{ color: '#F3E8C8' }}>{b.invoices_count || 0}</strong></span>
+                        <span>القطع المباعة: <strong style={{ color: '#F3E8C8' }}>{b.items_sold || 0}</strong></span>
+                        <span>صافي الفرع: <strong style={{ color: b.net_balance >= 0 ? '#DFCA95' : '#EF4444' }}>{Number(b.net_balance || 0).toLocaleString()} ج.م</strong></span>
                       </div>
                     </div>
                   );
@@ -594,62 +703,68 @@ export default function Dashboard({ onNavigate }) {
           <Card
             title={
               <Space>
-                <CreditCard size={18} color="#2563eb" />
-                <span style={{ fontWeight: 700, fontSize: 15 }}>توزيع قنوات السداد والتحصيل</span>
+                <CreditCard size={18} color="#C8A45C" />
+                <span style={{ fontWeight: 800, fontSize: 15, color: '#DFCA95' }}>توزيع قنوات السداد والتحصيل</span>
               </Space>
             }
             variant="borderless"
-            style={{ borderRadius: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', height: '100%' }}
+            style={{
+              borderRadius: 14,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+              background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+              border: '1.5px solid rgba(200, 164, 92, 0.38)',
+              height: '100%'
+            }}
             styles={{ body: { padding: '14px 16px' } }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Cash */}
-              <div style={{ background: '#f0fdf4', padding: '12px 14px', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+              <div style={{ background: '#151D2A', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(200, 164, 92, 0.25)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <Space size={6}>
-                    <Wallet size={16} color="#16a34a" />
-                    <span style={{ fontWeight: 600, fontSize: 13, color: '#166534' }}>💵 نقداً (كاش)</span>
+                    <Wallet size={16} color="#C8A45C" />
+                    <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>نقداً (كاش)</span>
                   </Space>
                   <div>
-                    <strong style={{ color: '#14532d', fontSize: 14 }}>{paymentBreakdown.cash.toLocaleString()} ج.م</strong>{' '}
-                    <span style={{ color: '#15803d', fontSize: 11 }}>({cashPct}%)</span>
+                    <strong style={{ color: '#F3E8C8', fontSize: 14 }}>{paymentBreakdown.cash.toLocaleString()} ج.م</strong>{' '}
+                    <span style={{ color: '#DFCA95', fontSize: 11 }}>({cashPct}%)</span>
                   </div>
                 </div>
-                <Progress percent={cashPct} strokeColor="#16a34a" showInfo={false} size="small" />
+                <Progress percent={cashPct} strokeColor="#C8A45C" trailColor="rgba(255, 255, 255, 0.1)" showInfo={false} size="small" />
               </div>
 
               {/* Visa / Card */}
-              <div style={{ background: '#eff6ff', padding: '12px 14px', borderRadius: 10, border: '1px solid #bfdbfe' }}>
+              <div style={{ background: '#151D2A', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(200, 164, 92, 0.25)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <Space size={6}>
-                    <CreditCard size={16} color="#2563eb" />
-                    <span style={{ fontWeight: 600, fontSize: 13, color: '#1e40af' }}>💳 بطاقات بنكية (فيزا / ماستر)</span>
+                    <CreditCard size={16} color="#C8A45C" />
+                    <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>بطاقات بنكية (فيزا / ماستر)</span>
                   </Space>
                   <div>
-                    <strong style={{ color: '#1e3a8a', fontSize: 14 }}>{paymentBreakdown.card.toLocaleString()} ج.م</strong>{' '}
-                    <span style={{ color: '#2563eb', fontSize: 11 }}>({cardPct}%)</span>
+                    <strong style={{ color: '#F3E8C8', fontSize: 14 }}>{paymentBreakdown.card.toLocaleString()} ج.م</strong>{' '}
+                    <span style={{ color: '#DFCA95', fontSize: 11 }}>({cardPct}%)</span>
                   </div>
                 </div>
-                <Progress percent={cardPct} strokeColor="#2563eb" showInfo={false} size="small" />
+                <Progress percent={cardPct} strokeColor="#C8A45C" trailColor="rgba(255, 255, 255, 0.1)" showInfo={false} size="small" />
               </div>
 
               {/* Transfers / InstaPay */}
-              <div style={{ background: '#fdf4ff', padding: '12px 14px', borderRadius: 10, border: '1px solid #f5d0fe' }}>
+              <div style={{ background: '#151D2A', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(200, 164, 92, 0.25)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <Space size={6}>
-                    <TrendingUp size={16} color="#a21caf" />
-                    <span style={{ fontWeight: 600, fontSize: 13, color: '#86198f' }}>📱 إنستاباي ومحافظ إلكترونية</span>
+                    <TrendingUp size={16} color="#C8A45C" />
+                    <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>إنستاباي ومحافظ إلكترونية</span>
                   </Space>
                   <div>
-                    <strong style={{ color: '#701a75', fontSize: 14 }}>{paymentBreakdown.transfer.toLocaleString()} ج.م</strong>{' '}
-                    <span style={{ color: '#a21caf', fontSize: 11 }}>({transferPct}%)</span>
+                    <strong style={{ color: '#F3E8C8', fontSize: 14 }}>{paymentBreakdown.transfer.toLocaleString()} ج.م</strong>{' '}
+                    <span style={{ color: '#DFCA95', fontSize: 11 }}>({transferPct}%)</span>
                   </div>
                 </div>
-                <Progress percent={transferPct} strokeColor="#c026d3" showInfo={false} size="small" />
+                <Progress percent={transferPct} strokeColor="#DFCA95" trailColor="rgba(255, 255, 255, 0.1)" showInfo={false} size="small" />
               </div>
 
-              <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center', paddingTop: 4 }}>
-                إجمالي المبالغ المسددة: <strong>{totalPaymentSum.toLocaleString()} ج.م</strong>
+              <div style={{ fontSize: 12, color: '#E2D4B7', textAlign: 'center', paddingTop: 4 }}>
+                إجمالي المبالغ المسددة: <strong style={{ color: '#DFCA95' }}>{totalPaymentSum.toLocaleString()} ج.م</strong>
               </div>
             </div>
           </Card>
@@ -660,12 +775,18 @@ export default function Dashboard({ onNavigate }) {
       <Card
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 4, height: 18, background: '#4f46e5', borderRadius: 2 }} />
-            <span style={{ fontWeight: 700, fontSize: 15 }}>بوابات التحكم والعمليات السريعة</span>
+            <div style={{ width: 4, height: 18, background: '#C8A45C', borderRadius: 2 }} />
+            <span style={{ fontWeight: 800, fontSize: 15, color: '#DFCA95' }}>بوابات التحكم والعمليات السريعة</span>
           </div>
         }
         variant="borderless"
-        style={{ borderRadius: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', marginBottom: 16 }}
+        style={{
+          borderRadius: 14,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+          background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+          border: '1.5px solid rgba(200, 164, 92, 0.38)',
+          marginBottom: 16
+        }}
         styles={{ body: { padding: '16px' } }}
       >
         <Row gutter={[12, 12]}>
@@ -681,12 +802,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #c7d2fe',
-                background: '#eef2ff'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <BarChart3 size={18} color="#4f46e5" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#3730a3' }}>التقارير الشاملة</span>
+              <BarChart3 size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>التقارير الشاملة</span>
             </Button>
           </Col>
 
@@ -702,12 +824,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#faf5ff'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <FileSpreadsheet size={18} color="#7c3aed" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#581c87' }}>يومية الفروع</span>
+              <FileSpreadsheet size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>يومية الفروع</span>
             </Button>
           </Col>
 
@@ -723,12 +846,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#eff6ff'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <ShoppingBag size={18} color="#2563eb" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#1e40af' }}>طلبات المتجر</span>
+              <ShoppingBag size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>طلبات المتجر</span>
             </Button>
           </Col>
 
@@ -744,12 +868,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#ecfdf5'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <ScanLine size={18} color="#059669" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#065f46' }}>كاشير ونقاط بيع</span>
+              <ScanLine size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>كاشير ونقاط بيع</span>
             </Button>
           </Col>
 
@@ -765,12 +890,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <Boxes size={18} color="#4f46e5" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#312e81' }}>كتالوج المخزون</span>
+              <Boxes size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>كتالوج المخزون</span>
             </Button>
           </Col>
 
@@ -786,12 +912,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#fffbeb'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <Wallet size={18} color="#d97706" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#78350f' }}>إدارة الخزائن</span>
+              <Wallet size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>إدارة الخزائن</span>
             </Button>
           </Col>
 
@@ -807,12 +934,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#fdf4ff'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <BookOpenCheck size={18} color="#c026d3" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#701a75' }}>اليوميات والقيود</span>
+              <BookOpenCheck size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>اليوميات والقيود</span>
             </Button>
           </Col>
 
@@ -828,12 +956,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#fef2f2'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <Truck size={18} color="#dc2626" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#991b1b' }}>الموردين والحسابات</span>
+              <Truck size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>الموردين والحسابات</span>
             </Button>
           </Col>
 
@@ -849,12 +978,13 @@ export default function Dashboard({ onNavigate }) {
                 justifyContent: 'flex-start',
                 gap: 8,
                 padding: '0 12px',
-                border: '1px solid #e2e8f0',
-                background: '#f0fdfa'
+                border: '1px solid rgba(200, 164, 92, 0.35)',
+                background: '#151D2A',
+                color: '#DFCA95'
               }}
             >
-              <Layers size={18} color="#0d9488" />
-              <span style={{ fontWeight: 600, fontSize: 13, color: '#134e4a' }}>أذونات التحويل</span>
+              <Layers size={18} color="#C8A45C" />
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#DFCA95' }}>أذونات التحويل</span>
             </Button>
           </Col>
         </Row>
@@ -864,44 +994,49 @@ export default function Dashboard({ onNavigate }) {
       <Card
         title={
           <Space>
-            <Server size={18} color="#475569" />
-            <span style={{ fontWeight: 600, fontSize: 14 }}>حالة البنية التحتية والاتصال الحي</span>
+            <Server size={18} color="#C8A45C" />
+            <span style={{ fontWeight: 800, fontSize: 14, color: '#DFCA95' }}>حالة البنية التحتية والاتصال الحي</span>
           </Space>
         }
         variant="borderless"
-        style={{ borderRadius: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+        style={{
+          borderRadius: 14,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+          background: 'linear-gradient(145deg, #0B0F17 0%, #151D2A 100%)',
+          border: '1.5px solid rgba(200, 164, 92, 0.38)'
+        }}
         styles={{ body: { padding: '14px 16px' } }}
       >
         <Row gutter={[16, 12]}>
           <Col xs={12} sm={6}>
-            <div style={{ fontSize: 12, color: '#64748b' }}>محرك قاعدة البيانات</div>
+            <div style={{ fontSize: 12, color: '#E2D4B7' }}>محرك قاعدة البيانات</div>
             <div style={{ marginTop: 4 }}>
-              <Tag color="cyan" style={{ margin: 0, fontWeight: 600 }}>
+              <Tag style={{ margin: 0, fontWeight: 700, backgroundColor: '#151D2A', borderColor: '#C8A45C', color: '#DFCA95' }}>
                 {systemHealth?.dbClient === 'pg' ? 'PostgreSQL (Cloud)' : 'MySQL 8.0'}
               </Tag>
             </div>
           </Col>
 
           <Col xs={12} sm={6}>
-            <div style={{ fontSize: 12, color: '#64748b' }}>اتصال السيرفر</div>
+            <div style={{ fontSize: 12, color: '#E2D4B7' }}>اتصال السيرفر</div>
             <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span className="pulse-dot" />
-              <span style={{ color: '#059669', fontWeight: 600, fontSize: 13 }}>متصل وجاهز</span>
+              <span style={{ color: '#DFCA95', fontWeight: 700, fontSize: 13 }}>متصل وجاهز</span>
             </div>
           </Col>
 
           <Col xs={12} sm={6}>
-            <div style={{ fontSize: 12, color: '#64748b' }}>البيئة التشغيلية</div>
+            <div style={{ fontSize: 12, color: '#E2D4B7' }}>البيئة التشغيلية</div>
             <div style={{ marginTop: 4 }}>
-              <Tag color="geekblue" style={{ margin: 0 }}>
+              <Tag style={{ margin: 0, fontWeight: 700, backgroundColor: '#151D2A', borderColor: '#C8A45C', color: '#DFCA95' }}>
                 {systemHealth?.environment || 'production'}
               </Tag>
             </div>
           </Col>
 
           <Col xs={12} sm={6}>
-            <div style={{ fontSize: 12, color: '#64748b' }}>زمن التشغيل (Uptime)</div>
-            <div style={{ marginTop: 4, fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
+            <div style={{ fontSize: 12, color: '#E2D4B7' }}>زمن التشغيل (Uptime)</div>
+            <div style={{ marginTop: 4, fontWeight: 800, color: '#F3E8C8', fontSize: 13 }}>
               {systemHealth?.uptime ? `${Math.round(systemHealth.uptime)} ثانية` : 'نشط مستقر'}
             </div>
           </Col>

@@ -1,10 +1,10 @@
 :root {
-  /* === Admin Primary (Indigo) === */
-  --color-admin-primary:    #4F46E5;
-  --color-admin-primary-h:  #4338CA;   /* hover */
-  --color-admin-primary-s:  #EEF2FF;   /* soft surface */
-  --color-admin-primary-b:  #C7D2FE;   /* border */
-  --color-indigo-electric:  #6366F1;   /* pulse glow */
+  /* === Admin Primary (Yoka Store Brand Gold) === */
+  --color-admin-primary:    #C8A45C;
+  --color-admin-primary-h:  #B38E46;   /* hover */
+  --color-admin-primary-s:  rgba(200, 164, 92, 0.12);   /* soft surface */
+  --color-admin-primary-b:  rgba(200, 164, 92, 0.35);   /* border */
+  --color-gold-electric:    #DFCA95;   /* pulse glow */
 
   /* === POS Operational Streams === */
   --color-pos-sale:         #059669;
@@ -244,9 +244,10 @@ body {
 }
 
 .auth-portal-btn.active-admin {
-  background: #4f46e5;
-  color: #ffffff;
-  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.3);
+  background: #C8A45C;
+  color: #0B0F17;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(200, 164, 92, 0.35);
 }
 
 .auth-portal-btn.active-branch {
@@ -537,7 +538,10 @@ body {
   border-radius: 14px !important;
   border: 1px solid #e2e8f0 !important;
   background: #ffffff !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease !important;
   cursor: pointer;
   overflow: hidden;
   position: relative;
@@ -558,24 +562,25 @@ body {
 }
 
 .quick-action-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.08), 0 4px 8px -4px rgba(15, 23, 42, 0.04) !important;
-  border-color: #cbd5e1 !important;
+  transform: translateY(-6px) scale(1.025) !important;
+  background: #0B0F17 !important;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.45), 0 0 0 1px #C8A45C !important;
+  border-color: #C8A45C !important;
 }
 
-.quick-action-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
+.quick-action-card:hover h5,
+.quick-action-card:hover .ant-typography {
+  color: #DFCA95 !important;
+}
+
+.quick-action-card:hover .quick-card-desc {
+  color: #C8A45C !important;
 }
 
 .quick-action-card:hover .quick-action-icon-box {
-  transform: scale(1.08);
+  transform: scale(1.12);
+  background: rgba(200, 164, 92, 0.2) !important;
+  color: #DFCA95 !important;
 }
 
 .quick-card-desc {
@@ -622,20 +627,36 @@ body {
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease !important;
   box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
   user-select: none;
   outline: none;
 }
 
 .pos-nav-hero-card:focus-visible {
-  outline: 3px solid #6366f1;
+  outline: 3px solid #C8A45C;
   outline-offset: 2px;
 }
 
 .pos-nav-hero-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.12), 0 8px 16px -6px rgba(15, 23, 42, 0.06) !important;
+  transform: translateY(-8px) scale(1.025) !important;
+  background: #0B0F17 !important;
+  border-color: #C8A45C !important;
+  box-shadow: 0 24px 45px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px #C8A45C !important;
+}
+
+.pos-nav-hero-card:hover h2,
+.pos-nav-hero-card:hover h3,
+.pos-nav-hero-card:hover h4,
+.pos-nav-hero-card:hover .ant-typography {
+  color: #DFCA95 !important;
+}
+
+.pos-nav-hero-card:hover p {
+  color: #C8A45C !important;
 }
 
 .pos-nav-hero-card:active {
@@ -1604,40 +1625,9 @@ body {
   padding: 0 4px;
 }
 
-/* Back/home button — consistent across every page */
+/* Back/home button — unified in top navigation breadcrumbs */
 .swm-back-home-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  min-width: 40px;
-  padding: 0 16px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--slate-200);
-  background: var(--card-bg);
-  color: var(--navy);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--transition-base);
-  flex-shrink: 0;
-  user-select: none;
-  outline: none;
-}
-
-.swm-back-home-btn:hover {
-  background: var(--slate-100);
-  border-color: var(--color-admin-primary);
-  color: var(--color-admin-primary);
-}
-
-.swm-back-home-btn:focus-visible {
-  outline: 2px solid var(--color-admin-primary);
-  outline-offset: 2px;
-}
-
-.swm-back-home-btn:active {
-  transform: scale(0.97);
+  display: none !important;
 }
 
 /* Page title area next to the back button */
@@ -2573,4 +2563,186 @@ html, body, #root {
   }
 }
 
+/* =========================================================================
+   Brand-Aligned Navigation Cards & Elevated Hover Interaction
+   Hover state: Scale up (scale(1.025) translateY(-4px)), Pure Dark BG (#0B0F17), Gold Text (#DFCA95)
+   ========================================================================= */
+.admin-nav-item-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.25s ease,
+              border-color 0.25s ease,
+              box-shadow 0.25s ease !important;
+}
+
+.admin-nav-item-card:hover {
+  background-color: #0B0F17 !important;
+  border-color: #C8A45C !important;
+  transform: translateY(-4px) scale(1.025) !important;
+  box-shadow: 0 12px 25px -4px rgba(0, 0, 0, 0.45), 0 0 18px rgba(200, 164, 92, 0.25) !important;
+}
+
+.admin-nav-item-card:hover .nav-item-title,
+.admin-nav-item-card:hover strong {
+  color: #DFCA95 !important;
+}
+
+.admin-nav-item-card:hover .nav-item-sub,
+.admin-nav-item-card:hover span {
+  color: #E2D4B7 !important;
+}
+
+.admin-nav-item-card:hover .nav-item-icon-box {
+  background-color: rgba(200, 164, 92, 0.2) !important;
+  border-color: #C8A45C !important;
+}
+
+.admin-nav-item-card:hover .nav-item-icon-box svg {
+  stroke: #DFCA95 !important;
+  color: #DFCA95 !important;
+}
+
+.admin-nav-item-card:hover .nav-item-chevron,
+.admin-nav-item-card:hover svg.lucide-chevron-left {
+  color: #DFCA95 !important;
+  stroke: #DFCA95 !important;
+  transform: translateX(-4px);
+}
+
+/* Home Page Navigation Entries (.swm-entry-btn) */
+.swm-entry-btn {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.25s ease,
+              border-color 0.25s ease,
+              box-shadow 0.25s ease !important;
+}
+
+.swm-entry-btn:hover {
+  background-color: #0B0F17 !important;
+  border-color: #C8A45C !important;
+  transform: translateY(-4px) scale(1.025) !important;
+  box-shadow: 0 12px 25px -4px rgba(0, 0, 0, 0.45), 0 0 18px rgba(200, 164, 92, 0.25) !important;
+}
+
+.swm-entry-btn:hover strong,
+.swm-entry-btn:hover .swm-entry-text strong {
+  color: #DFCA95 !important;
+}
+
+.swm-entry-btn:hover span,
+.swm-entry-btn:hover .swm-entry-text span {
+  color: #E2D4B7 !important;
+}
+
+.swm-entry-btn:hover .swm-entry-icon-wrap {
+  background-color: rgba(200, 164, 92, 0.2) !important;
+  color: #DFCA95 !important;
+}
+
+.swm-entry-btn:hover .swm-entry-arrow {
+  color: #DFCA95 !important;
+  stroke: #DFCA95 !important;
+  transform: rotate(180deg) translateX(4px) !important;
+}
+
+/* =========================================================================
+   UNIVERSAL PRINT & PDF REPORT BUTTONS (Brand Dark Onyx BG + Gold Text/Icon)
+   ========================================================================= */
+button:has(.anticon-printer),
+button:has(.anticon-file-pdf),
+button:has(svg.lucide-printer),
+.ant-btn:has(.anticon-printer),
+.ant-btn:has(.anticon-file-pdf),
+.ant-btn:has(svg.lucide-printer),
+.btn-print,
+.print-btn,
+.btn-pdf {
+  background-color: #0B0F17 !important;
+  color: #DFCA95 !important;
+  border: 1.5px solid #C8A45C !important;
+  font-weight: 700 !important;
+  transition: all 0.25s ease !important;
+}
+
+button:has(.anticon-printer):hover,
+button:has(.anticon-file-pdf):hover,
+button:has(svg.lucide-printer):hover,
+.ant-btn:has(.anticon-printer):hover,
+.ant-btn:has(.anticon-file-pdf):hover,
+.ant-btn:has(svg.lucide-printer):hover,
+.btn-print:hover,
+.print-btn:hover,
+.btn-pdf:hover {
+  background-color: #151D2A !important;
+  border-color: #DFCA95 !important;
+  color: #F8FAFC !important;
+  box-shadow: 0 4px 14px rgba(200, 164, 92, 0.35) !important;
+  transform: translateY(-2px) !important;
+}
+
+button:has(.anticon-printer) .anticon,
+button:has(.anticon-file-pdf) .anticon,
+button:has(svg.lucide-printer) svg,
+.ant-btn:has(.anticon-printer) .anticon,
+.ant-btn:has(.anticon-file-pdf) .anticon,
+.ant-btn:has(svg.lucide-printer) svg,
+.btn-print svg,
+.btn-print .anticon,
+.print-btn svg,
+.print-btn .anticon {
+  color: #C8A45C !important;
+  stroke: #C8A45C !important;
+}
+
+/* SWM Separated Table Styling (Clear row separation for invoices and reports) */
+.swm-separated-table .ant-table {
+  background: transparent !important;
+}
+.swm-separated-table .ant-table-thead > tr > th {
+  background-color: #0F172A !important;
+  color: #DFCA95 !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  border-bottom: 2px solid #C8A45C !important;
+  padding: 13px 16px !important;
+  white-space: nowrap !important;
+}
+.swm-separated-table .ant-table-tbody > tr > td {
+  padding: 14px 16px !important;
+  border-bottom: 1.5px solid #E2E8F0 !important;
+  vertical-align: middle !important;
+  font-size: 13px !important;
+  background-color: #FFFFFF;
+  transition: background-color 0.18s ease;
+}
+.swm-separated-table .ant-table-tbody > tr:nth-child(even) > td {
+  background-color: #F8FAFC !important;
+}
+.swm-separated-table .ant-table-tbody > tr:hover > td {
+  background-color: #EFF6FF !important;
+}
+
+/* Live Branch Monitoring Card Styles & Hover Effects */
+.live-branch-card {
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  background: #FFFFFF !important;
+  border: 1.5px solid #E2E8F0 !important;
+}
+
+.live-branch-card:hover {
+  transform: translateY(-5px) scale(1.008) !important;
+  box-shadow: 0 16px 32px -6px rgba(15, 23, 42, 0.14), 0 6px 12px -2px rgba(15, 23, 42, 0.08) !important;
+  border-color: #C8A45C !important;
+}
+
+.live-branch-card.is-open {
+  border-color: #86EFAC !important;
+}
+
+.live-branch-card.is-open:hover {
+  border-color: #16A34A !important;
+  box-shadow: 0 16px 32px -6px rgba(22, 163, 74, 0.22), 0 6px 12px -2px rgba(22, 163, 74, 0.12) !important;
+}
 

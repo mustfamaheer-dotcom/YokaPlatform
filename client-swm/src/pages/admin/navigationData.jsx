@@ -166,7 +166,7 @@ export const NAVIGATION_CATEGORIES = [
     title: 'إدارة النظام والفروع',
     subtitle: 'هيكل الفروع والمستودعات، حسابات المستخدمين، وتعيين الصلاحيات',
     icon: <Store />,
-    badge: 'قسمان',
+    badge: '3 أقسام',
     children: [
       {
         id: 'branches',
@@ -174,6 +174,13 @@ export const NAVIGATION_CATEGORIES = [
         subtitle: 'إدارة الفروع، نقاط البيع، والمستودعات وتعيين الصلاحيات',
         icon: <Store />,
         badge: 'الفروع'
+      },
+      {
+        id: 'branch_shifts',
+        title: 'مراقبة فتح/إغلاق الفروع والورديات',
+        subtitle: 'متابعة حية لتواجد الكاشيرية، مواعيد الدخول والخروج، وسجل الورديات',
+        icon: <Store />,
+        badge: 'العمليات'
       },
       {
         id: 'users',

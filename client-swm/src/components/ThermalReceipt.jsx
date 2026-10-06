@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Typography, Space } from 'antd';
-import { PrinterOutlined, CloseOutlined, FilePdfOutlined } from '@ant-design/icons';
+import { PrinterOutlined, CloseOutlined, FilePdfOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { printHtmlContent } from '../utils/printUtils';
 
@@ -35,16 +35,70 @@ export default function ThermalReceipt({ invoice, onClose }) {
   return (
     <div>
       {/* Top Action Bar (Hidden during print) */}
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Space>
-          <Button icon={<PrinterOutlined />} type="primary" size="large" onClick={handlePrint} style={{ backgroundColor: '#0f172a' }}>
-            طباعة الإيصال الحراري (80mm)
+      <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+          <Button
+            icon={<PrinterOutlined />}
+            type="primary"
+            size="large"
+            onClick={handlePrint}
+            className="btn-print"
+            style={{
+              flex: 1,
+              backgroundColor: '#0B0F17',
+              color: '#DFCA95',
+              borderColor: '#C8A45C',
+              fontWeight: 800,
+              borderRadius: 8,
+              height: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            طباعة الإيصال (80mm)
           </Button>
-          <Button icon={<FilePdfOutlined />} size="large" onClick={handlePrint}>
-            حفظ PDF
+          <Button
+            icon={<FilePdfOutlined />}
+            size="large"
+            onClick={handlePrint}
+            className="btn-print"
+            style={{
+              flex: 1,
+              backgroundColor: '#0B0F17',
+              color: '#DFCA95',
+              borderColor: '#C8A45C',
+              fontWeight: 800,
+              borderRadius: 8,
+              height: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            تصدير PDF
           </Button>
-        </Space>
-        {onClose && <Button icon={<CloseOutlined />} onClick={onClose}>إغلاق</Button>}
+        </div>
+        {onClose && (
+          <Button
+            size="middle"
+            icon={<CheckCircleOutlined />}
+            onClick={onClose}
+            style={{
+              width: '100%',
+              borderRadius: 8,
+              fontWeight: 700,
+              height: 38,
+              backgroundColor: '#F8FAFC',
+              borderColor: '#CBD5E1',
+              color: '#0F172A'
+            }}
+          >
+            إغلاق وبدء فاتورة جديدة (Esc)
+          </Button>
+        )}
       </div>
 
       {/* 80mm Receipt Container */}

@@ -1531,19 +1531,36 @@ export default function AdminJournals() {
             }}
           >
             <Button
-              type="primary"
-              icon={<ArrowRightOutlined />}
+              icon={<ArrowRightOutlined style={{ color: '#DFCA95', fontSize: 15 }} />}
               onClick={() => setActiveSection(null)}
               style={{
-                fontWeight: 700,
+                fontWeight: 800,
                 borderRadius: 8,
-                backgroundColor: '#0f172a',
-                borderColor: '#0f172a',
-                height: 38,
-                padding: '0 18px'
+                backgroundColor: '#0B0F17',
+                borderColor: '#C8A45C',
+                color: '#DFCA95',
+                height: 40,
+                padding: '0 20px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 4px 12px rgba(11, 15, 23, 0.25)',
+                transition: 'all 0.25s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#161F30';
+                e.currentTarget.style.borderColor = '#F3E5AB';
+                e.currentTarget.style.color = '#F3E5AB';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#0B0F17';
+                e.currentTarget.style.borderColor = '#C8A45C';
+                e.currentTarget.style.color = '#DFCA95';
+                e.currentTarget.style.transform = 'none';
               }}
             >
-              العودة للأقسام الرئيسية (اليوميات والرقابة)
+              <span style={{ color: '#DFCA95', fontWeight: 800 }}>العودة للأقسام الرئيسية (اليوميات والرقابة)</span>
             </Button>
           </div>
 
@@ -1603,7 +1620,8 @@ export default function AdminJournals() {
                       <Button
                         icon={<PrinterOutlined />}
                         onClick={() => setPrintModalOpen(true)}
-                        style={{ borderRadius: 8, borderColor: '#0f766e', color: '#0f766e', fontWeight: 600 }}
+                        className="btn-print"
+                        style={{ borderRadius: 8, backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
                       >
                         طباعة تقرير اليومية (A4)
                       </Button>
@@ -2196,9 +2214,15 @@ export default function AdminJournals() {
           <Button
             key="print"
             type="primary"
-            icon={<PrinterOutlined />}
+            icon={<PrinterOutlined style={{ color: '#DFCA95' }} />}
             onClick={handleExecutePrint}
-            style={{ backgroundColor: '#0f766e' }}
+            style={{
+              backgroundColor: '#0B0F17',
+              borderColor: '#C8A45C',
+              color: '#DFCA95',
+              fontWeight: 800,
+              borderRadius: 8
+            }}
           >
             بدء الطباعة الورقية (A4)
           </Button>

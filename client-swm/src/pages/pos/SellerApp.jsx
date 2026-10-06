@@ -346,12 +346,13 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
             {/* Welcome Hub Banner */}
             <div
               style={{
-                background: 'linear-gradient(135deg, #064e3b 0%, #047857 50%, #059669 100%)',
-                color: '#ffffff',
+                background: 'linear-gradient(135deg, #0B0F17 0%, #151D2A 50%, #0B0F17 100%)',
+                color: '#DFCA95',
                 borderRadius: 16,
                 padding: '24px 32px',
                 marginBottom: 28,
-                boxShadow: '0 10px 25px -5px rgba(5, 150, 105, 0.25)',
+                border: '1.5px solid rgba(200, 164, 92, 0.4)',
+                boxShadow: '0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 0 25px rgba(200, 164, 92, 0.12)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -361,15 +362,15 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <span style={{ fontSize: 22, fontWeight: 800 }}>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: '#DFCA95' }}>
                     مرحباً بك، {currentUser?.fullName || currentUser?.username} 👋
                   </span>
-                  <Tag color="green" style={{ fontWeight: 700, fontSize: 12, borderRadius: 6, background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff' }}>
+                  <Tag style={{ fontWeight: 700, fontSize: 12, borderRadius: 6, backgroundColor: 'rgba(200, 164, 92, 0.15)', borderColor: '#C8A45C', color: '#DFCA95' }}>
                     بوابة الكاشير والمبيعات السريعة
                   </Tag>
                 </div>
-                <Paragraph style={{ color: '#d1fae5', fontSize: 14, margin: 0, maxWidth: 760, lineHeight: 1.6 }}>
-                  الفرع الحالي: <strong style={{ color: '#ffffff' }}>{branchName}</strong> • اختر أحد الأقسام أدناه لبدء عملية بيع فورية، تقفيل وتسليم الوردية، تسجيل المصروفات، أو مراجعة نواقص المخزون.
+                <Paragraph style={{ color: '#E2D4B7', fontSize: 14, margin: 0, maxWidth: 850, lineHeight: 1.6 }}>
+                  الفرع الحالي: <strong style={{ color: '#F3E8C8' }}>{branchName}</strong> • اختر أحد الأقسام أدناه لبدء عملية بيع فورية، تقفيل وتسليم الوردية، تسجيل المصروفات، أو مراجعة نواقص المخزون.
                 </Paragraph>
               </div>
             </div>

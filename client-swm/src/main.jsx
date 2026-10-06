@@ -27,11 +27,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       locale={arEG}
       theme={{
         token: {
-          colorPrimary: '#4F46E5',
+          colorPrimary: '#C8A45C',
+          colorLink: '#C8A45C',
+          colorLinkHover: '#B38E46',
           colorSuccess: '#16A34A',
           colorError: '#DC2626',
           colorWarning: '#F59E0B',
-          colorInfo: '#2563EB',
+          colorInfo: '#C8A45C',
           fontFamily: 'Cairo, Inter, sans-serif',
           borderRadius: 10,
           borderRadiusLG: 14,
@@ -47,13 +49,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         },
         components: {
           Button: {
+            colorPrimary: '#C8A45C',
+            colorPrimaryHover: '#DFCA95',
+            colorPrimaryActive: '#B38E46',
+            primaryColor: '#0B0F17',
             paddingInline: 18,
-            fontWeight: 600,
+            fontWeight: 700,
           },
           Table: {
             headerBg: '#F8FAFC',
             headerColor: '#334155',
-            rowHoverBg: '#F1F5F9',
+            rowHoverBg: '#FBF9F5',
             borderColor: '#E2E8F0',
           },
           Card: {
@@ -63,9 +69,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             borderRadiusLG: 16,
           },
           Tabs: {
-            inkBarColor: '#4F46E5',
-            itemActiveColor: '#4F46E5',
-            itemSelectedColor: '#4F46E5',
+            inkBarColor: '#C8A45C',
+            itemActiveColor: '#C8A45C',
+            itemSelectedColor: '#C8A45C',
           },
         }
       }}

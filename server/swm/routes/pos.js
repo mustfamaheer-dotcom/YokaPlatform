@@ -29,23 +29,52 @@ router.use((req, res, next) => {
 });
 
 /**
+ * Safely resolves a numerical branchId from request (handles 'all', string branch ids, or missing branch)
+ */
+async function resolveBranchId(req) {
+  let raw = req.scopedBranchId || req.query?.branch_id || req.body?.branch_id;
+  let parsed = parseInt(raw, 10);
+  if (parsed && !isNaN(parsed) && parsed > 0) {
+    return parsed;
+  }
+  if (req.user && req.user.branchId && !isNaN(parseInt(req.user.branchId, 10))) {
+    return parseInt(req.user.branchId, 10);
+  }
+  try {
+    const [mainB] = await query(`SELECT id FROM branches WHERE status = 'active' ORDER BY is_main DESC, id ASC LIMIT 1`);
+    if (mainB && mainB.id) return mainB.id;
+  } catch (e) {}
+  return 1;
+}
+
+/**
  * Helper to get or create default cash register for branch
  */
 async function getOrCreateBranchRegister(branchId) {
+  let numBranchId = parseInt(branchId, 10);
+  if (!numBranchId || isNaN(numBranchId) || numBranchId <= 0) {
+    try {
+      const [mainB] = await query(`SELECT id FROM branches WHERE status = 'active' ORDER BY is_main DESC, id ASC LIMIT 1`);
+      numBranchId = mainB ? mainB.id : 1;
+    } catch (e) {
+      numBranchId = 1;
+    }
+  }
+
   let [register] = await query(
     `SELECT * FROM cash_registers WHERE branch_id = $1 ORDER BY is_main DESC, id ASC LIMIT 1`,
-    [branchId]
+    [numBranchId]
   );
 
   if (!register) {
-    const regCode = `REG-B${branchId}-01`;
+    const regCode = `REG-B${numBranchId}-01`;
     const [created] = await query(
       `INSERT INTO cash_registers (
         register_code, branch_id, register_name, is_main, current_balance,
         opening_balance, status, created_at, updated_at
       ) VALUES ($1, $2, $3, true, 0, 0, 'closed', NOW(), NOW())
       RETURNING *`,
-      [regCode, branchId, `Main Register Branch ${branchId}`]
+      [regCode, numBranchId, `Main Register Branch ${numBranchId}`]
     );
     register = created;
   }
@@ -111,7 +140,7 @@ function resolveInvoicePaymentBreakdown(inv) {
  */
 router.get('/session/current', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const register = await getOrCreateBranchRegister(branchId);
 
     // Auto-close check if session spans past 1:00 AM cutoff
@@ -165,7 +194,7 @@ router.get('/session/current', requireAuth, requireBranchScope, async (req, res)
  */
 router.get('/seller-dashboard', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const register = await getOrCreateBranchRegister(branchId);
 
     // 1. Daily Sales Total
@@ -218,7 +247,7 @@ router.get('/seller-dashboard', requireAuth, requireBranchScope, async (req, res
  */
 router.post('/session/open', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const { opening_balance = 0, notes } = req.body;
     const initialCash = Math.max(0, parseFloat(opening_balance) || 0);
 
@@ -271,7 +300,7 @@ router.post('/session/open', requireAuth, requireBranchScope, async (req, res) =
  */
 router.get('/shift/current', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const register = await getOrCreateBranchRegister(branchId);
 
     // Fetch active shift
@@ -402,7 +431,7 @@ router.get('/shift/current', requireAuth, requireBranchScope, async (req, res) =
  */
 const handleShiftCloseEndpoint = async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const { actual_cash, next_opening_float, notes } = req.body;
 
     const result = await executeEodShiftClosure({
@@ -476,7 +505,7 @@ router.post('/session/auto-close', requireAuth, requireRole(['super_admin', 'adm
  */
 router.post('/session/cash-in-out', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const { type, amount, reason } = req.body;
 
     if (!['cash_in', 'cash_out'].includes(type)) {
@@ -649,7 +678,7 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
  */
 router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const {
       customer_name = 'Walk-in Customer',
       customer_phone,
@@ -959,7 +988,7 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
  */
 router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const branchId = await resolveBranchId(req);
     const {
       customer_name = 'عميل مرتجع',
       customer_phone,

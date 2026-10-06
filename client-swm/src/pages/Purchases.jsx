@@ -2047,7 +2047,23 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       title: 'رقم الفاتورة',
       dataIndex: 'invoice_number',
       key: 'invoice_number',
-      render: (num) => <Text code strong>{num}</Text>
+      render: (num) => (
+        <span
+          style={{
+            backgroundColor: '#0F172A',
+            color: '#DFCA95',
+            border: '1px solid #C8A45C',
+            padding: '3px 8px',
+            borderRadius: 6,
+            fontFamily: 'monospace',
+            fontWeight: 800,
+            fontSize: 12.5,
+            display: 'inline-block'
+          }}
+        >
+          {num}
+        </span>
+      )
     },
     {
       title: 'المورد',
@@ -2055,8 +2071,12 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       key: 'supplier_name',
       render: (name, r) => (
         <div>
-          <Text strong>{name}</Text>
-          <div style={{ fontSize: 12, color: '#64748b' }}>{r.supplier_code}</div>
+          <div style={{ fontWeight: 800, color: '#0F172A', fontSize: 13.5 }}>{name}</div>
+          {r.supplier_code && (
+            <Tag color="cyan" style={{ fontSize: 10.5, borderRadius: 4, margin: '3px 0 0', fontWeight: 600 }}>
+              {r.supplier_code}
+            </Tag>
+          )}
         </div>
       )
     },
@@ -2064,25 +2084,41 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       title: 'المستودع المستلم',
       dataIndex: 'warehouse_name',
       key: 'warehouse_name',
-      render: (w) => <Tag color="blue">{w}</Tag>
+      render: (w) => (
+        <Tag color="blue" style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+          {w || 'الفرع الرئيسي'}
+        </Tag>
+      )
     },
     {
       title: 'تاريخ الفاتورة',
       dataIndex: 'invoice_date',
       key: 'invoice_date',
-      render: (d) => new Date(d).toLocaleDateString('ar-EG')
+      render: (d) => (
+        <span style={{ color: '#334155', fontWeight: 600, fontSize: 12.5 }}>
+          {new Date(d).toLocaleDateString('ar-EG')}
+        </span>
+      )
     },
     {
       title: 'إجمالي الأصناف',
       dataIndex: 'items_count',
       key: 'items_count',
-      render: (cnt, r) => `${cnt} صنف (${r.total_units} قطعة)`
+      render: (cnt, r) => (
+        <Tag color="purple" style={{ fontSize: 12, borderRadius: 6, fontWeight: 700, padding: '2px 8px' }}>
+          {cnt} صنف ({r.total_units} قطعة)
+        </Tag>
+      )
     },
     {
       title: 'القيمة الإجمالية',
       dataIndex: 'final_amount',
       key: 'final_amount',
-      render: (val) => <Text strong>{parseFloat(val).toLocaleString()} ج.م</Text>
+      render: (val) => (
+        <span style={{ fontWeight: 800, color: '#0F172A', fontSize: 14 }}>
+          {parseFloat(val).toLocaleString()} ج.م
+        </span>
+      )
     },
     {
       title: 'حالة السداد',
@@ -2090,12 +2126,16 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       key: 'payment_status',
       render: (st, r) => {
         const map = {
-          paid: { label: 'مسدد بالكامل', color: 'green' },
-          partial: { label: `مسدد جزئياً (${parseFloat(r.paid_amount || 0).toLocaleString()} ج.م)`, color: 'orange' },
-          unpaid: { label: 'آجل (غير مسدد)', color: 'red' }
+          paid: { label: 'مسدد بالكامل', color: 'success' },
+          partial: { label: `مسدد جزئياً (${parseFloat(r.paid_amount || 0).toLocaleString()} ج.م)`, color: 'warning' },
+          unpaid: { label: 'آجل (غير مسدد)', color: 'error' }
         };
         const item = map[st] || { label: st, color: 'default' };
-        return <Tag color={item.color}>{item.label}</Tag>;
+        return (
+          <Tag color={item.color} style={{ fontSize: 12, borderRadius: 6, fontWeight: 700, padding: '3px 10px' }}>
+            {item.label}
+          </Tag>
+        );
       }
     },
     {
@@ -2107,6 +2147,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             size="middle"
             icon={<EyeOutlined />}
             onClick={() => handleViewDetails(record)}
+            style={{ borderRadius: 6, fontWeight: 600 }}
           >
             عرض الفاتورة
           </Button>
@@ -2115,6 +2156,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             danger
             icon={<RollbackOutlined />}
             onClick={() => handleOpenLinkedReturnModal(record)}
+            style={{ borderRadius: 6, fontWeight: 600 }}
           >
             إرجاع للمورد
           </Button>
@@ -2312,6 +2354,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
                 <Card styles={{ body: { padding: 0 } }}>
                   <Table
+                    className="swm-separated-table"
                     columns={invoiceColumns}
                     dataSource={invoices}
                     rowKey="id"
@@ -2391,6 +2434,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
                 <Card styles={{ body: { padding: 0 } }}>
                   <Table
+                    className="swm-separated-table"
                     columns={returnColumns}
                     dataSource={returnsList}
                     rowKey="id"
@@ -2442,8 +2486,10 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         open={isCreateOpen}
         onCancel={() => setIsCreateOpen(false)}
         footer={null}
-        width="96vw"
-        style={{ top: 10, maxWidth: 1480, paddingBottom: 0 }}
+        width="100vw"
+        style={{ top: 0, margin: 0, maxWidth: '100vw', paddingBottom: 0 }}
+        bodyStyle={{ height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' }}
+        styles={{ body: { height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' } }}
         destroyOnHidden={false}
       >
         <Form layout="vertical">
@@ -2526,35 +2572,24 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             </Row>
           </Card>
 
-          {/* Quick Shortcuts Helper Bar */}
-          <div style={{
-            background: '#f1f5f9',
-            padding: '10px 14px',
-            borderRadius: 8,
-            border: '1px solid #cbd5e1',
-            marginBottom: 14,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 10
-          }}>
-            <div style={{ fontSize: 13, color: '#334155' }}>
-              ⚡ <strong>طريقة العمل السريعة:</strong> اضغط <strong>[F11]</strong> لإضافة صنف جديد، <strong>[F1]</strong> للبحث السريع عن الصنف، ثم <strong>[F4]</strong> لاعتماد الفاتورة وتوريد المخزون فوراً!
+          {/* Items Section Header & Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>
+              📦 أصناف الفاتورة وأسعار التكلفة والبيع (Invoice Items & Master Prices Sync)
             </div>
             <Space wrap>
               <Button
                 type="dashed"
                 icon={<PlusOutlined />}
                 onClick={handleAddItem}
-                style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 600 }}
+                style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 700, borderRadius: 6 }}
               >
                 + إضافة صنف [F11]
               </Button>
               <Button
                 icon={<SearchOutlined />}
                 onClick={() => handleOpenF1SearchModal('invoice')}
-                style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 600 }}
+                style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 700, borderRadius: 6 }}
               >
                 🔍 بحث سريع عن الأصناف [F1]
               </Button>
@@ -2562,16 +2597,13 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 <Button
                   icon={<ReloadOutlined spin={refreshingProducts} />}
                   onClick={handleRefreshProductsList}
+                  style={{ borderRadius: 6 }}
                 >
                   تحديث
                 </Button>
               </Tooltip>
             </Space>
           </div>
-
-          <Divider orientation="left" style={{ margin: '14px 0 12px 0' }}>
-            أصناف الفاتورة وأسعار التكلفة والبيع (Invoice Items & Master Prices Sync)
-          </Divider>
 
           {/* Products & Variants Tabular Grid (POS Cart Table Style) */}
           <div style={{ marginBottom: 16 }}>
@@ -3136,8 +3168,10 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         open={isStandaloneReturnOpen}
         onCancel={() => setIsStandaloneReturnOpen(false)}
         footer={null}
-        width="96vw"
-        style={{ top: 10, maxWidth: 1480, paddingBottom: 0 }}
+        width="100vw"
+        style={{ top: 0, margin: 0, maxWidth: '100vw', paddingBottom: 0 }}
+        bodyStyle={{ height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' }}
+        styles={{ body: { height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' } }}
         destroyOnHidden={false}
       >
         <Form layout="vertical">
@@ -3210,21 +3244,10 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             </Row>
           </Card>
 
-          {/* Quick Shortcuts Helper Bar */}
-          <div style={{
-            background: '#fef2f2',
-            padding: '10px 14px',
-            borderRadius: 8,
-            border: '1px solid #fecaca',
-            marginBottom: 14,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 10
-          }}>
-            <div style={{ fontSize: 13, color: '#991b1b' }}>
-              ⚡ <strong>طريقة العمل السريعة:</strong> اضغط <strong>[F11]</strong> لإضافة سطر مرتجع، <strong>[F1]</strong> للبحث السريع عن الصنف، ثم <strong>[F4]</strong> لاعتماد المرتجع وخصم المخزون!
+          {/* Return Items Section Header & Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#991b1b' }}>
+              📦 الأصناف المراد إرجاعها للمورد (Return Items Grid)
             </div>
             <Space wrap>
               <Button
@@ -3232,14 +3255,14 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 danger
                 icon={<PlusOutlined />}
                 onClick={handleAddStandaloneItem}
-                style={{ fontWeight: 600 }}
+                style={{ fontWeight: 700, borderRadius: 6 }}
               >
                 + إضافة سطر مرتجع [F11]
               </Button>
               <Button
                 icon={<SearchOutlined />}
                 onClick={() => handleOpenF1SearchModal('return')}
-                style={{ borderColor: '#dc2626', color: '#dc2626', background: '#fff', fontWeight: 600 }}
+                style={{ borderColor: '#dc2626', color: '#dc2626', background: '#fff', fontWeight: 700, borderRadius: 6 }}
               >
                 🔍 بحث سريع عن الأصناف [F1]
               </Button>
@@ -3247,16 +3270,13 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 <Button
                   icon={<ReloadOutlined spin={refreshingProducts} />}
                   onClick={handleRefreshProductsList}
+                  style={{ borderRadius: 6 }}
                 >
                   تحديث
                 </Button>
               </Tooltip>
             </Space>
           </div>
-
-          <Divider orientation="left" style={{ margin: '14px 0 12px 0' }}>
-            الأصناف المراد إرجاعها (Return Items Grid)
-          </Divider>
 
           {/* Return Items Tabular Grid */}
           <div style={{ marginBottom: 16 }}>
@@ -3949,6 +3969,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 type="primary"
                 icon={<PrinterOutlined />}
                 onClick={handlePrintInvoice}
+                className="btn-print"
+                style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
               >
                 طباعة الفاتورة
               </Button>
@@ -3978,7 +4000,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
           >
             إرجاع للمورد
           </Button>,
-          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrintInvoice}>
+          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrintInvoice} className="btn-print" style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}>
             طباعة الفاتورة
           </Button>
         ]}
@@ -4246,9 +4268,10 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             <span>إشعار مرتجع مشتريات للمورد: {selectedReturn?.return_number || ''}</span>
             <Button
               type="primary"
-              danger
               icon={<PrinterOutlined />}
               onClick={handlePrintReturn}
+              className="btn-print"
+              style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
             >
               طباعة إشعار المرتجع
             </Button>
@@ -4258,7 +4281,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         onCancel={() => setReturnDetailsOpen(false)}
         footer={[
           <Button key="close" onClick={() => setReturnDetailsOpen(false)}>إغلاق</Button>,
-          <Button key="print" type="primary" danger icon={<PrinterOutlined />} onClick={handlePrintReturn}>
+          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrintReturn} className="btn-print" style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}>
             طباعة إشعار المرتجع
           </Button>
         ]}
@@ -5350,22 +5373,6 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             </div>
 
             <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={() => handleOpenMasterCreate(f1TargetItemKey)}
-              style={{
-                borderColor: '#059669',
-                color: '#059669',
-                background: '#ecfdf5',
-                fontWeight: 700,
-                borderRadius: 6,
-                marginBottom: 8
-              }}
-            >
-              + إضافة صنف جديد
-            </Button>
-
-            <Button
               type={f1CategoryFilter === 'all' ? 'primary' : 'text'}
               style={{
                 textAlign: 'right',
@@ -5420,22 +5427,6 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 autoFocus
                 style={{ borderRadius: 8, flex: 1 }}
               />
-              <Button
-                type="primary"
-                size="large"
-                icon={<PlusOutlined />}
-                onClick={() => handleOpenMasterCreate(f1TargetItemKey)}
-                style={{
-                  backgroundColor: '#059669',
-                  borderColor: '#059669',
-                  fontWeight: 700,
-                  borderRadius: 8,
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(5,150,105,0.2)'
-                }}
-              >
-                ✨ صنف جديد للمنظومة
-              </Button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#ffffff' }}>

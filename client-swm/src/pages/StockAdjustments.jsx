@@ -1109,7 +1109,8 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
             type="primary"
             icon={<PrinterOutlined />}
             onClick={handleExecutePrintVoucher}
-            style={{ backgroundColor: '#16a34a' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
           >
             طباعة السند الرسمي (A4)
           </Button>

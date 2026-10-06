@@ -152,6 +152,11 @@ const visitorAnalyticsRoutes = require('./routes/visitorAnalytics');
 app.use('/api/swm/visitor-analytics', visitorAnalyticsRoutes);
 const uploadRoutes = require('./routes/uploads');
 app.use('/api/swm/upload', uploadRoutes);
+const branchShiftsMonitorRoutes = require('./routes/branchShiftsMonitor');
+app.use('/api/swm/branch-shifts-monitor', branchShiftsMonitorRoutes);
+app.use('/api/swm/branch-shifts', branchShiftsMonitorRoutes);
+app.use('/api/branch-shifts-monitor', branchShiftsMonitorRoutes);
+app.use('/api/branch-shifts', branchShiftsMonitorRoutes);
 
 // ECP (E-Commerce Platform) Public API Routes
 const ecpCatalogRoutes = require('../ecp/routes/catalog');

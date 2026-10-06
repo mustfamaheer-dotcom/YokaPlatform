@@ -31,10 +31,10 @@ export default function ShippingWaybillA4({ order, onClose }) {
       {/* Action Bar (Hidden during print) */}
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Space>
-          <Button type="primary" size="large" icon={<PrinterOutlined />} onClick={handlePrint} style={{ backgroundColor: '#0f172a' }}>
+          <Button type="primary" size="large" icon={<PrinterOutlined />} onClick={handlePrint} className="btn-print" style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}>
             طباعة بوليصة الشحن (A4)
           </Button>
-          <Button size="large" icon={<FilePdfOutlined />} onClick={handlePrint}>
+          <Button size="large" icon={<FilePdfOutlined />} onClick={handlePrint} className="btn-print" style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}>
             حفظ كملف PDF
           </Button>
         </Space>

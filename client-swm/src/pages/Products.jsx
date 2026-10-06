@@ -48,6 +48,7 @@ import VariantMatrix from '../components/VariantMatrix';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import BarcodeImage from '../components/BarcodeImage';
 import { generateValidEAN13 } from '../utils/barcode';
+import useDebounce from '../hooks/useDebounce';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -58,6 +59,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 280);
   const [selectedCategory, setSelectedCategory] = useState(undefined);
 
   // Review & Inspect Product Modal State
@@ -172,12 +174,12 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
   };
 
   // Fetch products
-  const fetchProducts = async () => {
+  const fetchProducts = async (currentSearch = debouncedSearch, currentCat = selectedCategory) => {
     setLoading(true);
     try {
       const params = { limit: 5000 };
-      if (search) params.search = search;
-      if (selectedCategory) params.category_id = selectedCategory;
+      if (currentSearch) params.search = currentSearch;
+      if (currentCat) params.category_id = currentCat;
 
       const res = await api.get('/api/swm/products', { params });
       if (res.data.success) {
@@ -188,8 +190,6 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
     } finally {
       setLoading(false);
     }
-  };
-
   // Fetch categories
   const fetchCategories = async () => {
     try {
@@ -240,10 +240,13 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
   };
 
   useEffect(() => {
-    fetchProducts();
     fetchCategories();
     fetchAttributes();
-  }, [selectedCategory]);
+  }, []);
+
+  useEffect(() => {
+    fetchProducts(debouncedSearch, selectedCategory);
+  }, [debouncedSearch, selectedCategory]);
 
   // Inline Quick Add Category
   const handleQuickAddCategory = async () => {

@@ -730,17 +730,62 @@ export default function POS({ currentUser }) {
           )}
         </div>
 
-        {/* Left Side: Clean Workflow Shortcuts Only (Financial Controls completely removed) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Tag color="purple" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
-            1️⃣ F11: إضافة سطر
-          </Tag>
-          <Tag color="blue" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
-            2️⃣ F1: بحث المجاميع
-          </Tag>
-          <Tag color="green" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600 }}>
-            3️⃣ F4: إتمام وحفظ
-          </Tag>
+        {/* Left Side: Clean Workflow Shortcuts with direct, vivid colors */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              backgroundColor: '#4F46E5',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: 12.5,
+              padding: '5px 12px',
+              borderRadius: 8,
+              border: '1px solid #4338CA',
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.35)'
+            }}
+          >
+            <span style={{ backgroundColor: '#312E81', color: '#DFCA95', padding: '1px 6px', borderRadius: 4, fontSize: 11.5, fontWeight: 900 }}>F11</span>
+            <span>إضافة سطر</span>
+          </span>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              backgroundColor: '#0284C7',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: 12.5,
+              padding: '5px 12px',
+              borderRadius: 8,
+              border: '1px solid #0369A1',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)'
+            }}
+          >
+            <span style={{ backgroundColor: '#0C4A6E', color: '#DFCA95', padding: '1px 6px', borderRadius: 4, fontSize: 11.5, fontWeight: 900 }}>F1</span>
+            <span>بحث المجاميع</span>
+          </span>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              backgroundColor: '#16A34A',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: 12.5,
+              padding: '5px 12px',
+              borderRadius: 8,
+              border: '1px solid #15803D',
+              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.35)'
+            }}
+          >
+            <span style={{ backgroundColor: '#14532D', color: '#DFCA95', padding: '1px 6px', borderRadius: 4, fontSize: 11.5, fontWeight: 900 }}>F4</span>
+            <span>إتمام وحفظ</span>
+          </span>
         </div>
       </div>
 
@@ -796,9 +841,9 @@ export default function POS({ currentUser }) {
               </Col>
 
               <Col xs={24} md={16}>
-                <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                <div style={{ background: '#f8fafc', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <Text style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>
                       اسم العميل {supervisorSettings.require_customer_name ? <span style={{ color: 'red' }}>*</span> : '(اختياري)'}:
                     </Text>
                     <Input
@@ -812,7 +857,7 @@ export default function POS({ currentUser }) {
                   </div>
 
                   <div style={{ width: 140 }}>
-                    <Text style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 2 }}>
+                    <Text style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>
                       الهاتف {supervisorSettings.require_customer_phone ? <span style={{ color: 'red' }}>*</span> : '(اختياري)'}:
                     </Text>
                     <Input
@@ -825,20 +870,20 @@ export default function POS({ currentUser }) {
                     />
                   </div>
 
-                  <div style={{ paddingTop: 18 }}>
+                  <div>
                     <Space size={6}>
                       <Button
                         type="primary"
                         icon={<PlusOutlined />}
                         onClick={handleStep1AddEmptyRow}
-                        style={{ backgroundColor: '#7c3aed' }}
+                        style={{ backgroundColor: '#7c3aed', borderRadius: 6, fontWeight: 700 }}
                       >
                         سطر (F11)
                       </Button>
                       <Button
                         icon={<SearchOutlined />}
                         onClick={handleStep2OpenSearchModal}
-                        style={{ borderColor: '#2563eb', color: '#2563eb' }}
+                        style={{ borderColor: '#2563eb', color: '#2563eb', borderRadius: 6, fontWeight: 700 }}
                       >
                         بحث (F1)
                       </Button>
@@ -1425,7 +1470,8 @@ export default function POS({ currentUser }) {
         open={receiptModalVisible}
         onCancel={() => setReceiptModalVisible(false)}
         footer={null}
-        width={380}
+        width={480}
+        centered
         destroyOnHidden
       >
         <ThermalReceipt

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Row, Col, Card, Select, Slider, Input, Button, Pagination, Spin, Skeleton, Empty, Typography, Space, Tag, Drawer, Grid } from 'antd';
 import { FilterOutlined, SearchOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/SEO';
+import useDebounce from '../hooks/useDebounce';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -30,12 +31,19 @@ export default function Catalog({ onAddToCart }) {
   const [size, setSize] = useState(searchParams.get('size') || '');
   const [sort, setSort] = useState(searchParams.get('sort') || 'newest');
 
+  // Debounced text inputs for real-time instant reactivity
+  const debouncedSearch = useDebounce(search, 280);
+  const debouncedBrand = useDebounce(brand, 280);
+  const debouncedPriceRange = useDebounce(priceRange, 250);
+
+  const isInitialMount = useRef(true);
+
   useEffect(() => {
     fetchCategories();
   }, []);
 
+  // Sync state when URL params change externally
   useEffect(() => {
-    // Sync URL params when they change externally
     const s = searchParams.get('search') || '';
     const b = searchParams.get('brand') || '';
     const c = searchParams.get('category_id') || '';
@@ -50,9 +58,45 @@ export default function Catalog({ onAddToCart }) {
     if (focus === 'search') {
       setFilterDrawerVisible(true);
     }
-
-    fetchProducts(1, { search: s, brand: b, category_id: c, sort: so });
   }, [searchParams]);
+
+  // Real-time automatic instant query trigger whenever any filter changes
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      fetchProducts(1, {
+        search: debouncedSearch,
+        brand: debouncedBrand,
+        category_id: categoryId,
+        color,
+        size,
+        priceRange: debouncedPriceRange,
+        sort
+      });
+      return;
+    }
+
+    // Reflect to URL search params without page reload
+    const nextParams = {};
+    if (debouncedSearch) nextParams.search = debouncedSearch;
+    if (categoryId) nextParams.category_id = categoryId;
+    if (debouncedBrand) nextParams.brand = debouncedBrand;
+    if (color) nextParams.color = color;
+    if (size) nextParams.size = size;
+    if (sort && sort !== 'newest') nextParams.sort = sort;
+
+    setSearchParams(nextParams, { replace: true });
+
+    fetchProducts(1, {
+      search: debouncedSearch,
+      brand: debouncedBrand,
+      category_id: categoryId,
+      color,
+      size,
+      priceRange: debouncedPriceRange,
+      sort
+    });
+  }, [debouncedSearch, debouncedBrand, categoryId, debouncedPriceRange, color, size, sort]);
 
   const fetchCategories = async () => {
     try {
@@ -65,20 +109,28 @@ export default function Catalog({ onAddToCart }) {
     }
   };
 
-  const fetchProducts = async (page = 1, overrideFilters = {}) => {
+  const fetchProducts = async (page = 1, currentFilters = {}) => {
     setLoading(true);
     try {
+      const activeSearch = currentFilters.search !== undefined ? currentFilters.search : debouncedSearch;
+      const activeCategory = currentFilters.category_id !== undefined ? currentFilters.category_id : categoryId;
+      const activeBrand = currentFilters.brand !== undefined ? currentFilters.brand : debouncedBrand;
+      const activePrice = currentFilters.priceRange || debouncedPriceRange;
+      const activeColor = currentFilters.color !== undefined ? currentFilters.color : color;
+      const activeSize = currentFilters.size !== undefined ? currentFilters.size : size;
+      const activeSort = currentFilters.sort || sort;
+
       const params = {
         page,
         limit: 12,
-        search: overrideFilters.search !== undefined ? overrideFilters.search : search,
-        category_id: overrideFilters.category_id !== undefined ? overrideFilters.category_id : categoryId,
-        brand: overrideFilters.brand !== undefined ? overrideFilters.brand : brand,
-        min_price: priceRange[0] > 0 ? priceRange[0] : undefined,
-        max_price: priceRange[1] < 5000 ? priceRange[1] : undefined,
-        color: color || undefined,
-        size: size || undefined,
-        sort: overrideFilters.sort || sort
+        search: activeSearch || undefined,
+        category_id: activeCategory || undefined,
+        brand: activeBrand || undefined,
+        min_price: activePrice[0] > 0 ? activePrice[0] : undefined,
+        max_price: activePrice[1] < 5000 ? activePrice[1] : undefined,
+        color: activeColor || undefined,
+        size: activeSize || undefined,
+        sort: activeSort
       };
 
       const res = await api.get('/api/ecp/catalog', { params });
@@ -94,11 +146,6 @@ export default function Catalog({ onAddToCart }) {
     }
   };
 
-  const handleApplyFilters = () => {
-    fetchProducts(1);
-    setFilterDrawerVisible(false); // Close mobile drawer if open
-  };
-
   const handleResetFilters = () => {
     setSearch('');
     setCategoryId('');
@@ -107,8 +154,7 @@ export default function Catalog({ onAddToCart }) {
     setColor('');
     setSize('');
     setSort('newest');
-    setSearchParams({});
-    fetchProducts(1, { search: '', category_id: '', brand: '', sort: 'newest' });
+    setSearchParams({}, { replace: true });
     setFilterDrawerVisible(false);
   };
 
@@ -201,14 +247,22 @@ export default function Catalog({ onAddToCart }) {
         </Space>
       </div>
 
-      <Button
-        type="primary"
-        block
-        onClick={handleApplyFilters}
-        style={{ backgroundColor: '#C8A45C', color: '#0F172A', borderRadius: 8, height: 44, fontWeight: 800, border: 'none', boxShadow: '0 2px 8px rgba(200, 164, 92, 0.25)' }}
-      >
-        تطبيق الفلاتر
-      </Button>
+      {/* Live Filtering Indicator & Close Drawer for Mobile */}
+      <div style={{ marginTop: 24, textAlign: 'center' }}>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8, color: '#C8A45C', fontWeight: 600 }}>
+          ⚡ التحديث فوري ومباشر دون حاجة للضغط
+        </Text>
+        {isMobile && (
+          <Button
+            type="primary"
+            block
+            onClick={() => setFilterDrawerVisible(false)}
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderRadius: 8, height: 44, fontWeight: 800, border: '1px solid #C8A45C' }}
+          >
+            إغلاق الفلاتر وعرض النتائج
+          </Button>
+        )}
+      </div>
     </>
   );
 

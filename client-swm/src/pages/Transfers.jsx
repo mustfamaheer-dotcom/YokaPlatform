@@ -771,7 +771,8 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
               size="middle"
               icon={<PrinterOutlined />}
               onClick={() => handleViewPrint(row.id)}
-              style={{ backgroundColor: '#1e293b', minHeight: 36, borderRadius: 6 }}
+              className="btn-print"
+              style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', minHeight: 36, borderRadius: 6, fontWeight: 700 }}
             >
               طباعة
             </Button>
@@ -1569,7 +1570,8 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
                     setReviewModalVisible(false);
                     handleViewPrint(reviewedTransfer.id);
                   }}
-                  style={{ backgroundColor: '#1e293b' }}
+                  className="btn-print"
+                  style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
                 >
                   طباعة الإذن الرسمي A4
                 </Button>

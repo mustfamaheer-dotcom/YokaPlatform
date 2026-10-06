@@ -130,7 +130,10 @@ a {
 
 /* Category Cards & Responsive Strip */
 .category-card {
-  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background-color 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease;
   border: 1px solid var(--border-color);
   background: #FFFFFF;
   border-radius: 16px;
@@ -140,15 +143,21 @@ a {
 }
 
 .category-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--gold);
-  box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(200, 164, 92, 0.3);
+  transform: translateY(-6px) scale(1.025);
+  background: #0B0F17 !important;
+  border-color: var(--gold) !important;
+  box-shadow: 0 16px 32px -6px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--gold);
+}
+
+.category-card:hover .category-card-title,
+.category-card:hover span {
+  color: #DFCA95 !important;
 }
 
 .category-card:hover .category-icon-wrapper {
   background: var(--gold);
-  color: var(--navy);
-  transform: scale(1.08);
+  color: #0B0F17;
+  transform: scale(1.1);
 }
 
 .category-icon-wrapper {
@@ -157,7 +166,10 @@ a {
 
 /* Trust & Shopping Highlights Card */
 .trust-feature-card {
-  transition: all 0.25s ease;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background-color 0.35s ease,
+              border-color 0.35s ease,
+              box-shadow 0.35s ease;
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
   border-radius: 14px;
@@ -169,9 +181,16 @@ a {
 }
 
 .trust-feature-card:hover {
-  border-color: var(--gold);
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
-  transform: translateY(-2px);
+  transform: translateY(-5px) scale(1.02);
+  background: #0B0F17 !important;
+  border-color: var(--gold) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--gold);
+}
+
+.trust-feature-card:hover h4,
+.trust-feature-card:hover p,
+.trust-feature-card:hover span {
+  color: #DFCA95 !important;
 }
 
 /* Category Pills Filter */
@@ -902,9 +921,9 @@ a {
 }
 
 .print-invoice-highlight-btn {
-  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
-  color: #FFFFFF !important;
-  border: 2px solid #C8A45C !important;
+  background: #0B0F17 !important;
+  color: #DFCA95 !important;
+  border: 1.5px solid #C8A45C !important;
   border-radius: 10px !important;
   height: 44px !important;
   padding: 0 22px !important;
@@ -921,15 +940,65 @@ a {
 }
 
 .print-invoice-highlight-btn:hover {
-  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%) !important;
+  background: #151D2A !important;
   border-color: #DFCA95 !important;
   color: #F8FAFC !important;
   transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 4px 16px rgba(200, 164, 92, 0.35) !important;
 }
 
 .print-invoice-highlight-btn .anticon {
   color: #C8A45C !important;
   font-size: 17px !important;
+}
+
+/* =========================================================================
+   UNIVERSAL PRINT & PDF REPORT BUTTONS (Brand Dark Onyx BG + Gold Text/Icon)
+   ========================================================================= */
+button:has(.anticon-printer),
+button:has(.anticon-file-pdf),
+button:has(svg.lucide-printer),
+.ant-btn:has(.anticon-printer),
+.ant-btn:has(.anticon-file-pdf),
+.ant-btn:has(svg.lucide-printer),
+.btn-print,
+.print-btn,
+.btn-pdf {
+  background-color: #0B0F17 !important;
+  color: #DFCA95 !important;
+  border: 1.5px solid #C8A45C !important;
+  font-weight: 700 !important;
+  transition: all 0.25s ease !important;
+}
+
+button:has(.anticon-printer):hover,
+button:has(.anticon-file-pdf):hover,
+button:has(svg.lucide-printer):hover,
+.ant-btn:has(.anticon-printer):hover,
+.ant-btn:has(.anticon-file-pdf):hover,
+.ant-btn:has(svg.lucide-printer):hover,
+.btn-print:hover,
+.print-btn:hover,
+.btn-pdf:hover {
+  background-color: #151D2A !important;
+  border-color: #DFCA95 !important;
+  color: #F8FAFC !important;
+  box-shadow: 0 4px 14px rgba(200, 164, 92, 0.35) !important;
+  transform: translateY(-2px) !important;
+}
+
+button:has(.anticon-printer) .anticon,
+button:has(.anticon-file-pdf) .anticon,
+button:has(svg.lucide-printer) svg,
+.ant-btn:has(.anticon-printer) .anticon,
+.ant-btn:has(.anticon-file-pdf) .anticon,
+.ant-btn:has(svg.lucide-printer) svg,
+.btn-print svg,
+.btn-print .anticon,
+.print-btn svg,
+.print-btn .anticon {
+  color: #C8A45C !important;
+  stroke: #C8A45C !important;
 }
 
 .invoice-action-notice {

@@ -411,45 +411,57 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
             {/* Top Welcome Banner */}
             <div
               style={{
-                background: 'linear-gradient(135deg, #7e22ce 0%, #4c1d95 100%)',
+                background: 'linear-gradient(135deg, #0B0F17 0%, #151D2A 50%, #0B0F17 100%)',
                 borderRadius: 16,
-                padding: '24px 28px',
-                color: '#FFFFFF',
+                padding: '26px 30px',
+                color: '#DFCA95',
                 marginBottom: 24,
-                boxShadow: '0 10px 25px -5px rgba(126, 34, 206, 0.25)',
+                border: '1px solid rgba(200, 164, 92, 0.4)',
+                boxShadow: '0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 0 25px rgba(200, 164, 92, 0.12)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexWrap: 'wrap',
-                gap: 16
+                gap: 16,
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
-              <div>
-                <Space align="center" style={{ marginBottom: 6 }}>
-                  <Sparkles size={22} color="#fde047" />
-                  <Title level={3} style={{ color: '#FFFFFF', margin: 0, fontWeight: 800 }}>
-                    مرحباً بك، {currentUser?.fullName || currentUser?.username}
-                  </Title>
-                </Space>
-                <Paragraph style={{ color: '#e9d5ff', margin: 0, fontSize: 14, maxWidth: 800 }}>
-                  بصفتك <strong>مدير المخازن</strong>، تمتلك صلاحية الإشراف والمتابعة على الأقسام المعتمدة أدناه. يتم التحكم في إتاحة كل قسم وخاصية من قبل إدارة النظام المركزية.
+              {/* Subtle metallic gold highlight glow */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: -40,
+                  right: -40,
+                  width: 140,
+                  height: 140,
+                  background: 'radial-gradient(circle, rgba(200, 164, 92, 0.25) 0%, transparent 70%)',
+                  pointerEvents: 'none'
+                }}
+              />
+              <div style={{ position: 'relative', zIndex: 1, width: '100%' }}>
+                <Title level={3} style={{ color: '#DFCA95', margin: '0 0 8px 0', fontWeight: 800, letterSpacing: -0.2 }}>
+                  مرحباً بك، {currentUser?.fullName || currentUser?.username}
+                </Title>
+                <Paragraph style={{ color: '#E2D4B7', margin: 0, fontSize: 14, maxWidth: 850, lineHeight: 1.6 }}>
+                  بصفتك <strong style={{ color: '#F3E8C8' }}>مدير المخازن</strong>، تمتلك صلاحية الإشراف والمتابعة على الأقسام المعتمدة أدناه. يتم التحكم في إتاحة كل قسم وخاصية من قبل إدارة النظام المركزية.
                 </Paragraph>
               </div>
             </div>
 
-            {/* The 4 Authorized Sections Cards */}
+            {/* The Authorized Sections Cards */}
             <Row gutter={[20, 20]}>
               {categories.map((cat) => (
                 <Col xs={24} md={12} lg={12} xl={8} key={cat.id}>
                   <Card
                     style={{
                       height: '100%',
-                      borderRadius: 14,
-                      border: `1.5px solid ${cat.borderColor}`,
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                      borderRadius: 16,
+                      border: '1.5px solid #E2E8F0',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
                       overflow: 'hidden'
                     }}
-                    bodyStyle={{ padding: '20px' }}
+                    styles={{ body: { padding: '22px' } }}
                   >
                     {/* Category Title Header */}
                     <div
@@ -457,42 +469,55 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        paddingBottom: 12,
-                        borderBottom: '1px solid #f1f5f9',
-                        marginBottom: 14
+                        paddingBottom: 14,
+                        borderBottom: '1px solid #F1F5F9',
+                        marginBottom: 16
                       }}
                     >
-                      <Space align="center">
+                      <Space align="center" size={10}>
                         <span
                           style={{
-                            width: 28,
-                            height: 28,
+                            width: 32,
+                            height: 32,
                             borderRadius: '50%',
-                            backgroundColor: cat.color,
-                            color: '#FFFFFF',
+                            backgroundColor: '#0B0F17',
+                            border: '1.5px solid #C8A45C',
+                            color: '#DFCA95',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontWeight: 800,
-                            fontSize: 14
+                            fontSize: 15,
+                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)'
                           }}
                         >
                           {cat.number}
                         </span>
-                        <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
+                        <Text strong style={{ fontSize: 16, color: '#0F172A' }}>
                           {cat.title}
                         </Text>
                       </Space>
-                      <Tag color="purple" style={{ borderRadius: 6, fontWeight: 700 }}>
+                      <Tag
+                        style={{
+                          borderRadius: 8,
+                          fontWeight: 700,
+                          fontSize: 12,
+                          color: '#C8A45C',
+                          backgroundColor: 'rgba(200, 164, 92, 0.08)',
+                          border: '1px solid rgba(200, 164, 92, 0.35)',
+                          padding: '2px 8px'
+                        }}
+                      >
                         {cat.children.length} أقسام
                       </Tag>
                     </div>
 
-                    {/* Sub-Items List */}
-                    <Space direction="vertical" style={{ width: '100%' }} size={10}>
+                    {/* Sub-Items List with Elevated Dark BG & Gold Text Hover */}
+                    <Space direction="vertical" style={{ width: '100%' }} size={12}>
                       {cat.children.map((child) => (
                         <div
                           key={child.id}
+                          className="admin-nav-item-card"
                           onClick={() => {
                             if (child.isExternalRoute) {
                               navigate(child.isExternalRoute);
@@ -501,54 +526,51 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
                             }
                           }}
                           style={{
-                            padding: '12px 14px',
+                            padding: '12px 16px',
                             backgroundColor: '#FFFFFF',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: 10,
+                            border: '1px solid #E2E8F0',
+                            borderRadius: 12,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            transition: 'all 0.2s ease',
                             userSelect: 'none'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = cat.color;
-                            e.currentTarget.style.backgroundColor = cat.bgColor;
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.06)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#e2e8f0';
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = 'none';
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                             <div
+                              className="nav-item-icon-box"
                               style={{
-                                width: 38,
-                                height: 38,
+                                width: 40,
+                                height: 40,
                                 borderRadius: 10,
-                                backgroundColor: cat.bgColor,
+                                backgroundColor: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center'
+                                justifyContent: 'center',
+                                transition: 'all 0.25s ease'
                               }}
                             >
                               {child.icon}
                             </div>
                             <div>
-                              <Text strong style={{ display: 'block', fontSize: 13.5, color: '#0f172a' }}>
+                              <Text
+                                strong
+                                className="nav-item-title"
+                                style={{ display: 'block', fontSize: 13.5, color: '#0F172A', transition: 'color 0.25s ease' }}
+                              >
                                 {child.title}
                               </Text>
-                              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                              <Text
+                                className="nav-item-sub"
+                                style={{ fontSize: 11.5, color: '#64748B', transition: 'color 0.25s ease' }}
+                              >
                                 {child.subtitle}
                               </Text>
                             </div>
                           </div>
-                          <ChevronLeft size={16} color="#94a3b8" />
+                          <ChevronLeft size={16} className="nav-item-chevron" style={{ color: '#94A3B8', transition: 'all 0.25s ease' }} />
                         </div>
                       ))}
                     </Space>

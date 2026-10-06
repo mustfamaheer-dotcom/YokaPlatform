@@ -464,10 +464,10 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
             <span>كشف حساب المورد: {selectedSupplierLedger?.supplier?.supplier_name || ''}</span>
             <Button
               type="primary"
-              ghost
               icon={<PrinterOutlined />}
               onClick={() => setPrintStatementModal(true)}
-              style={{ marginLeft: 16 }}
+              className="btn-print"
+              style={{ marginLeft: 16, backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
             >
               طباعة كشف الحساب
             </Button>
@@ -597,7 +597,7 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
         width={850}
         footer={[
           <Button key="close" onClick={() => setPrintStatementModal(false)}>إغلاق</Button>,
-          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrintStatement}>
+          <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handlePrintStatement} className="btn-print" style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}>
             طباعة المستند
           </Button>
         ]}

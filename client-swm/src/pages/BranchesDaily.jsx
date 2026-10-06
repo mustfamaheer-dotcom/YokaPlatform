@@ -491,7 +491,8 @@ export default function BranchesDaily() {
             type="primary"
             icon={<PrinterOutlined />}
             onClick={handlePrintSummary}
-            style={{ backgroundColor: '#4f46e5' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
           >
             طباعة تقرير اليومية الشامل
           </Button>
@@ -877,7 +878,8 @@ export default function BranchesDaily() {
             key="thermal"
             icon={<PrinterOutlined />}
             onClick={() => setThermalModalVisible(true)}
-            style={{ backgroundColor: '#0f172a', color: '#fff' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
           >
             طباعة إيصال حراري (80mm)
           </Button>,
@@ -894,7 +896,8 @@ export default function BranchesDaily() {
                 });
               }
             }}
-            style={{ backgroundColor: '#16a34a' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
           >
             طباعة الفاتورة (A4)
           </Button>
@@ -1085,7 +1088,8 @@ export default function BranchesDaily() {
                   });
                 }
               }}
-              style={{ backgroundColor: '#0f172a' }}
+              className="btn-print"
+              style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
             >
               طباعة التقرير (A4 Landscape)
             </Button>
@@ -1108,7 +1112,8 @@ export default function BranchesDaily() {
                 });
               }
             }}
-            style={{ backgroundColor: '#0f172a' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
           >
             طباعة التقرير
           </Button>

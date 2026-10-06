@@ -59,6 +59,7 @@ import TreasuryAdmin from '../TreasuryAdmin';
 import EcomInventory from '../EcomInventory';
 import SalesReportsPage from './supervisor/SalesReportsPage';
 import SellerPayrollAndExpenseCategoriesCards from '../../components/SellerPayrollAndExpenseCategoriesCards';
+import BranchShiftMonitor from '../BranchShiftMonitor';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -97,6 +98,11 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
     }
   };
 
+  // Check if current user is system owner / central admin (POS is for store cashiers, not the central owner)
+  const isSystemOwner = useMemo(() => {
+    return ['super_admin', 'admin', 'general_manager'].includes(currentUser?.role) || !currentUser?.branch_id;
+  }, [currentUser]);
+
   // Build the 6 Administrative System Categories (Exact same UI style as Warehouse Manager)
   const categories = useMemo(() => {
     return [
@@ -108,13 +114,13 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         bgColor: '#f0f9ff',
         borderColor: '#bae6fd',
         children: [
-          {
+          !isSystemOwner ? {
             id: 'pos_link',
             title: 'شاشة نقطة البيع (POS)',
             subtitle: 'الدخول لنظام مبيعات الكاشير المباشر وإصدار الفواتير',
             icon: <ScanLine size={20} color="#0284c7" />,
             isExternalRoute: '/pos'
-          },
+          } : null,
           {
             id: 'daily_shift',
             title: 'العمليات والوردية اليومية',
@@ -126,8 +132,14 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             title: 'يومية الفروع المجمعة',
             subtitle: 'كشف الحساب اليومي الشامل لمبيعات ومصروفات ونقدية كل فرع',
             icon: <FileSpreadsheet size={20} color="#0284c7" />
+          },
+          {
+            id: 'branch_shifts',
+            title: 'مراقبة فتح/إغلاق الفروع والورديات',
+            subtitle: 'متابعة حية لتواجد الكاشيرية، مواعيد الدخول والخروج، وحالة الفروع',
+            icon: <Store size={20} color="#0284c7" />
           }
-        ]
+        ].filter(Boolean)
       },
       {
         id: 'cat_inventory',
@@ -238,7 +250,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
       {
         id: 'cat_management',
         number: '6',
-        title: 'إدارة النظام والفروع والتحليلات',
+        title: 'إدارة النظام والفروع',
         color: '#4f46e5',
         bgColor: '#faf5ff',
         borderColor: '#e9d5ff',
@@ -254,18 +266,22 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             title: 'المستخدمين والصلاحيات',
             subtitle: 'إدارة حسابات المديرين، المشرفين، والبائعين وصلاحيات مدير المخازن',
             icon: <UsersIcon size={20} color="#4f46e5" />
-          },
+          }
+        ]
+      },
+      {
+        id: 'cat_analytics',
+        number: '7',
+        title: 'التقارير والتحليلات المتقدمة',
+        color: '#0284c7',
+        bgColor: '#f0f9ff',
+        borderColor: '#bae6fd',
+        children: [
           {
             id: 'sales_reports',
             title: 'تحليلات المبيعات والإيرادات المركزية',
             subtitle: 'الرسوم البيانية، مقارنة أداء الفروع، وتقييم أداء البائعين',
-            icon: <BarChart3 size={20} color="#4f46e5" />
-          },
-          {
-            id: 'kpis_dashboard',
-            title: 'لوحة القيادة والمؤشرات العامة',
-            subtitle: 'ملخص مؤشرات الأداء الشاملة والبطاقات التحليلية التنفيذية',
-            icon: <LayoutDashboard size={20} color="#4f46e5" />
+            icon: <BarChart3 size={20} color="#0284c7" />
           }
         ]
       }
@@ -343,7 +359,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
               >
                 يوكا ستور
               </span>
-              <span style={{ color: '#0F766E', fontSize: 11, fontWeight: 700 }}>
+              <span style={{ color: '#C8A45C', fontSize: 11, fontWeight: 700 }}>
                 لوحة الإدارة والتحكم الشامل
               </span>
             </div>
@@ -360,55 +376,62 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
 
           {/* Primary Navigation Hub Button */}
           <Button
-            type={activeTab === 'home' ? 'primary' : 'default'}
-            icon={<Compass size={16} style={{ marginLeft: 4 }} />}
+            type="primary"
+            icon={<Compass size={16} style={{ marginLeft: 4, color: activeTab === 'home' ? '#DFCA95' : '#0B0F17' }} />}
             onClick={() => handleNavigate('home')}
             style={{
               borderRadius: 8,
-              fontWeight: 700,
+              fontWeight: 800,
               fontSize: 12.5,
-              height: 34,
+              height: 36,
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: activeTab === 'home' ? '#0F766E' : '#FFFFFF',
-              borderColor: activeTab === 'home' ? '#0F766E' : '#CBD5E1',
-              color: activeTab === 'home' ? '#FFFFFF' : '#0F172A'
+              backgroundColor: activeTab === 'home' ? '#0B0F17' : '#FFFFFF',
+              borderColor: activeTab === 'home' ? '#C8A45C' : '#CBD5E1',
+              color: activeTab === 'home' ? '#DFCA95' : '#0F172A',
+              boxShadow: activeTab === 'home' ? '0 2px 8px rgba(11, 15, 23, 0.25)' : 'none'
             }}
           >
             الرئيسية (لوحة الأقسام)
           </Button>
 
-          {/* POS Direct Link Button */}
-          <Button
-            type="dashed"
-            icon={<ScanLine size={15} style={{ marginLeft: 4 }} />}
-            onClick={() => (onSwitchToPos ? onSwitchToPos() : navigate('/pos'))}
-            style={{
-              borderRadius: 8,
-              fontWeight: 700,
-              fontSize: 12,
-              height: 34,
-              color: '#0284c7',
-              borderColor: '#38bdf8'
-            }}
-          >
-            نقطة البيع (POS)
-          </Button>
+          {/* POS Direct Link Button - Only visible for branch operators, not central system owner / admin */}
+          {!isSystemOwner && (
+            <Button
+              type="dashed"
+              icon={<ScanLine size={15} style={{ marginLeft: 4 }} />}
+              onClick={() => (onSwitchToPos ? onSwitchToPos() : navigate('/pos'))}
+              style={{
+                borderRadius: 8,
+                fontWeight: 700,
+                fontSize: 12,
+                height: 34,
+                color: '#0284c7',
+                borderColor: '#38bdf8'
+              }}
+            >
+              نقطة البيع (POS)
+            </Button>
+          )}
 
-          {/* Global Cross-Branch Tag */}
+          {/* Global Cross-Branch Tag/Button */}
           <Tag
             style={{
               fontSize: 12,
-              padding: '3px 8px',
-              fontWeight: 700,
+              padding: '6px 12px',
+              fontWeight: 800,
               borderRadius: 8,
-              backgroundColor: '#F0FDFA',
-              color: '#0F766E',
-              border: '1px solid #CCFBF1',
-              margin: 0
+              backgroundColor: '#0B0F17',
+              color: '#DFCA95',
+              border: '1px solid #C8A45C',
+              boxShadow: '0 2px 6px rgba(11, 15, 23, 0.18)',
+              margin: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4
             }}
           >
-            <MapPin size={12} style={{ marginLeft: 4, display: 'inline' }} />
+            <MapPin size={13} style={{ marginLeft: 4, display: 'inline', color: '#DFCA95' }} />
             كافة الفروع والمستودعات — صلاحيات شاملة
           </Tag>
         </div>
@@ -417,8 +440,8 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Avatar
-              style={{ backgroundColor: '#0F766E', border: '1px solid #0D5D56' }}
-              icon={<ShieldCheck size={18} />}
+              style={{ backgroundColor: '#0B0F17', border: '1.5px solid #C8A45C', color: '#DFCA95' }}
+              icon={<ShieldCheck size={18} color="#DFCA95" />}
             />
             <div style={{ lineHeight: 1.2, textAlign: 'right' }}>
               <Text strong style={{ display: 'block', fontSize: 13, color: '#0F172A' }}>
@@ -465,8 +488,9 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
                 type="link"
                 size="small"
                 onClick={() => handleNavigate('home')}
-                style={{ padding: 0, fontWeight: 700, color: '#0F766E' }}
+                style={{ padding: 0, fontWeight: 800, color: '#C8A45C', display: 'inline-flex', alignItems: 'center', gap: 5 }}
               >
+                <Compass size={14} color="#C8A45C" />
                 الرئيسية
               </Button>
               {activeMeta && (
@@ -482,15 +506,6 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
                 </>
               )}
             </div>
-
-            <Button
-              size="small"
-              icon={<ArrowRight size={14} style={{ marginLeft: 4 }} />}
-              onClick={() => handleNavigate('home')}
-              style={{ borderRadius: 6, fontWeight: 600 }}
-            >
-              العودة للرئيسية
-            </Button>
           </div>
         )}
 
@@ -500,63 +515,41 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             {/* Top Welcome Banner */}
             <div
               style={{
-                background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
+                background: 'linear-gradient(135deg, #0B0F17 0%, #151D2A 50%, #0B0F17 100%)',
                 borderRadius: 16,
-                padding: '24px 28px',
-                color: '#FFFFFF',
+                padding: '26px 30px',
+                color: '#DFCA95',
                 marginBottom: 24,
-                boxShadow: '0 10px 25px -5px rgba(15, 118, 110, 0.25)',
+                border: '1px solid rgba(200, 164, 92, 0.4)',
+                boxShadow: '0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 0 25px rgba(200, 164, 92, 0.12)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexWrap: 'wrap',
-                gap: 16
+                gap: 16,
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
-              <div>
-                <Space align="center" style={{ marginBottom: 6 }}>
-                  <Sparkles size={22} color="#fde047" />
-                  <Title level={3} style={{ color: '#FFFFFF', margin: 0, fontWeight: 800 }}>
-                    مرحباً بك، {currentUser?.fullName || currentUser?.username}
-                  </Title>
-                </Space>
-                <Paragraph style={{ color: '#ccfbf1', margin: 0, fontSize: 14, maxWidth: 850 }}>
-                  بصفتك <strong>مدير النظام المركزي</strong>، تمتلك صلاحيات كاملة وشاملة لإدارة ومراقبة كافة الفروع، المستودعات، المخزون، والعمليات المالية والتنفيذية.
+              {/* Subtle metallic gold highlight glow */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: -40,
+                  right: -40,
+                  width: 140,
+                  height: 140,
+                  background: 'radial-gradient(circle, rgba(200, 164, 92, 0.25) 0%, transparent 70%)',
+                  pointerEvents: 'none'
+                }}
+              />
+              <div style={{ position: 'relative', zIndex: 1, width: '100%' }}>
+                <Title level={3} style={{ color: '#DFCA95', margin: '0 0 8px 0', fontWeight: 800, letterSpacing: -0.2 }}>
+                  مرحباً بك، {currentUser?.fullName || currentUser?.username}
+                </Title>
+                <Paragraph style={{ color: '#E2D4B7', margin: 0, fontSize: 14.5, maxWidth: 950, lineHeight: 1.7 }}>
+                  بصفتك <strong style={{ color: '#F3E8C8' }}>مدير النظام المركزي</strong>، تمتلك صلاحيات كاملة وشاملة لإدارة ومراقبة كافة الفروع، المستودعات، المخزون، والعمليات المالية والتنفيذية.
                 </Paragraph>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10 }}>
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<ScanLine size={18} style={{ marginLeft: 6 }} />}
-                  onClick={() => (onSwitchToPos ? onSwitchToPos() : navigate('/pos'))}
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    color: '#0f766e',
-                    fontWeight: 800,
-                    borderRadius: 10,
-                    border: 'none',
-                    height: 44
-                  }}
-                >
-                  فتح نقطة البيع (POS)
-                </Button>
-                <Button
-                  size="large"
-                  icon={<LayoutDashboard size={18} style={{ marginLeft: 6 }} />}
-                  onClick={() => handleNavigate('kpis_dashboard')}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    color: '#FFFFFF',
-                    fontWeight: 700,
-                    borderRadius: 10,
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    height: 44
-                  }}
-                >
-                  لوحة المؤشرات (KPIs)
-                </Button>
               </div>
             </div>
 
@@ -567,12 +560,12 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
                   <Card
                     style={{
                       height: '100%',
-                      borderRadius: 14,
-                      border: `1.5px solid ${cat.borderColor}`,
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                      borderRadius: 16,
+                      border: '1.5px solid #E2E8F0',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
                       overflow: 'hidden'
                     }}
-                    styles={{ body: { padding: '20px' } }}
+                    styles={{ body: { padding: '22px' } }}
                   >
                     {/* Category Title Header */}
                     <div
@@ -580,42 +573,55 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        paddingBottom: 12,
-                        borderBottom: '1px solid #f1f5f9',
-                        marginBottom: 14
+                        paddingBottom: 14,
+                        borderBottom: '1px solid #F1F5F9',
+                        marginBottom: 16
                       }}
                     >
-                      <Space align="center">
+                      <Space align="center" size={10}>
                         <span
                           style={{
-                            width: 28,
-                            height: 28,
+                            width: 32,
+                            height: 32,
                             borderRadius: '50%',
-                            backgroundColor: cat.color,
-                            color: '#FFFFFF',
+                            backgroundColor: '#0B0F17',
+                            border: '1.5px solid #C8A45C',
+                            color: '#DFCA95',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontWeight: 800,
-                            fontSize: 14
+                            fontSize: 15,
+                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)'
                           }}
                         >
                           {cat.number}
                         </span>
-                        <Text strong style={{ fontSize: 15, color: '#0f172a' }}>
+                        <Text strong style={{ fontSize: 16, color: '#0F172A' }}>
                           {cat.title}
                         </Text>
                       </Space>
-                      <Tag color="cyan" style={{ borderRadius: 6, fontWeight: 700 }}>
+                      <Tag
+                        style={{
+                          borderRadius: 8,
+                          fontWeight: 700,
+                          fontSize: 12,
+                          color: '#C8A45C',
+                          backgroundColor: 'rgba(200, 164, 92, 0.08)',
+                          border: '1px solid rgba(200, 164, 92, 0.35)',
+                          padding: '2px 8px'
+                        }}
+                      >
                         {cat.children.length} أقسام
                       </Tag>
                     </div>
 
-                    {/* Sub-Items List */}
-                    <Space direction="vertical" style={{ width: '100%' }} size={10}>
+                    {/* Sub-Items List with Elevated Dark BG & Gold Text Hover */}
+                    <Space direction="vertical" style={{ width: '100%' }} size={12}>
                       {cat.children.map((child) => (
                         <div
                           key={child.id}
+                          className="admin-nav-item-card"
                           onClick={() => {
                             if (child.isExternalRoute) {
                               navigate(child.isExternalRoute);
@@ -624,54 +630,51 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
                             }
                           }}
                           style={{
-                            padding: '12px 14px',
+                            padding: '12px 16px',
                             backgroundColor: '#FFFFFF',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: 10,
+                            border: '1px solid #E2E8F0',
+                            borderRadius: 12,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            transition: 'all 0.2s ease',
                             userSelect: 'none'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = cat.color;
-                            e.currentTarget.style.backgroundColor = cat.bgColor;
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.06)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#e2e8f0';
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = 'none';
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                             <div
+                              className="nav-item-icon-box"
                               style={{
-                                width: 38,
-                                height: 38,
+                                width: 40,
+                                height: 40,
                                 borderRadius: 10,
-                                backgroundColor: cat.bgColor,
+                                backgroundColor: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyCenter: 'center'
+                                justifyContent: 'center',
+                                transition: 'all 0.25s ease'
                               }}
                             >
                               {child.icon}
                             </div>
                             <div>
-                              <Text strong style={{ display: 'block', fontSize: 13.5, color: '#0f172a' }}>
+                              <Text
+                                strong
+                                className="nav-item-title"
+                                style={{ display: 'block', fontSize: 13.5, color: '#0F172A', transition: 'color 0.25s ease' }}
+                              >
                                 {child.title}
                               </Text>
-                              <Text type="secondary" style={{ fontSize: 11.5 }}>
+                              <Text
+                                className="nav-item-sub"
+                                style={{ fontSize: 11.5, color: '#64748B', transition: 'color 0.25s ease' }}
+                              >
                                 {child.subtitle}
                               </Text>
                             </div>
                           </div>
-                          <ChevronLeft size={16} color="#94a3b8" />
+                          <ChevronLeft size={16} className="nav-item-chevron" style={{ color: '#94A3B8', transition: 'all 0.25s ease' }} />
                         </div>
                       ))}
                     </Space>
@@ -747,6 +750,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
           <EcomInventory currentUser={currentUser} onNavigate={handleNavigate} />
         )}
         {activeTab === 'daily_shift' && <DailyShift currentUser={currentUser} />}
+        {activeTab === 'branch_shifts' && <BranchShiftMonitor currentUser={currentUser} />}
       </Content>
     </Layout>
   );

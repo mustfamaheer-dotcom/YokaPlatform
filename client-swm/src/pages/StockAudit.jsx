@@ -560,7 +560,8 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             type="primary"
             icon={<PrinterOutlined />}
             onClick={handleOpenPrintModal}
-            style={{ backgroundColor: '#0f766e', height: 44, borderRadius: 8, fontWeight: 700 }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             طباعة كشف الجرد الميداني (A4)
           </Button>
@@ -854,7 +855,8 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             type="primary"
             icon={<PrinterOutlined />}
             onClick={handleExecutePrint}
-            style={{ backgroundColor: '#0f766e' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
             disabled={exportLoading || printableItems.length === 0}
           >
             بدء الطباعة الورقية (A4)

@@ -259,11 +259,17 @@ export default function OrderSuccess() {
                   </Button>
                   <Button
                     size="small"
-                    icon={<PrinterOutlined />}
+                    icon={<PrinterOutlined style={{ color: '#C8A45C' }} />}
                     onClick={() => window.print()}
-                    style={{ borderRadius: 6 }}
+                    style={{
+                      backgroundColor: '#0B0F17',
+                      borderColor: '#C8A45C',
+                      color: '#DFCA95',
+                      fontWeight: 700,
+                      borderRadius: 6
+                    }}
                   >
-                    طباعة
+                    طباعة الفاتورة
                   </Button>
                 </Space>
               </div>

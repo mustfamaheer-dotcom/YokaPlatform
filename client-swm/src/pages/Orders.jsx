@@ -1275,7 +1275,7 @@ export default function Orders({
               <Text strong style={{ fontSize: 16 }}>تفاصيل الطلب: {selectedOrder?.order_number}</Text>
               {selectedOrder && getStatusTag(selectedOrder.order_status)}
             </Space>
-            <Button icon={<PrinterOutlined />} type="primary" onClick={() => setWaybillModalOpen(true)} style={{ backgroundColor: '#0f172a' }}>
+            <Button icon={<PrinterOutlined />} type="primary" onClick={() => setWaybillModalOpen(true)} className="btn-print" style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}>
               معاينة وطباعة بوليصة الشحن (A4)
             </Button>
           </div>

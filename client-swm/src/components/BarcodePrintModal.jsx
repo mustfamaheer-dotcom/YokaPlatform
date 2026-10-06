@@ -280,7 +280,8 @@ export default function BarcodePrintModal({
           icon={<PrinterOutlined />}
           disabled={totalStickersToPrint === 0}
           onClick={handlePrint}
-          style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', fontWeight: 700, height: 38 }}
+          className="btn-print"
+          style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700, height: 38 }}
         >
           طباعة {totalStickersToPrint} ملصق باركود الآن
         </Button>

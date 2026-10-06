@@ -320,6 +320,8 @@ export default function DailyShift({ currentUser }) {
               size="small"
               icon={<PrinterOutlined />}
               onClick={() => handleViewInvoice(row.rawId)}
+              className="btn-print"
+              style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 600 }}
             >
               طباعة
             </Button>
@@ -398,7 +400,8 @@ export default function DailyShift({ currentUser }) {
             type="primary"
             icon={<PrinterOutlined />}
             onClick={() => setShiftPrintModalVisible(true)}
-            style={{ backgroundColor: '#0f172a' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
           >
             طباعة تقرير الشيفت (A4)
           </Button>
@@ -718,7 +721,8 @@ export default function DailyShift({ currentUser }) {
                   });
                 }
               }}
-              style={{ backgroundColor: '#0f172a' }}
+              className="btn-print"
+              style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
             >
               طباعة التقرير (A4)
             </Button>
@@ -741,7 +745,8 @@ export default function DailyShift({ currentUser }) {
                 });
               }
             }}
-            style={{ backgroundColor: '#0f172a' }}
+            className="btn-print"
+            style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
           >
             طباعة تقرير الشيفت
           </Button>

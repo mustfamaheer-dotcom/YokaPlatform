@@ -603,16 +603,53 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
   try {
     const { refreshToken } = req.body;
+    let userId = null;
+    let branchId = null;
+    let username = null;
+
+    // Extract authorization header if present
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const verified = jwt.verify(token, JWT_SECRET);
+        userId = verified.userId || verified.id;
+        branchId = verified.branchId;
+        username = verified.username;
+      } catch (e) {
+        // Continue fallback to refreshToken
+      }
+    }
+
     if (refreshToken) {
       try {
         const decoded = jwt.decode(refreshToken);
         if (decoded?.id) {
           await redis.del(`refresh:${decoded.id}`);
+          if (!userId && !String(decoded.id).startsWith('branch_')) {
+            userId = decoded.id;
+          }
+          if (!branchId && decoded.branchId) {
+            branchId = decoded.branchId;
+          }
         }
       } catch (e) {
         // ignore decoding errors
       }
     }
+
+    // Audit LOGOUT in activity_logs
+    logActivity({
+      userId: userId ? parseInt(userId, 10) : null,
+      branchId: branchId ? parseInt(branchId, 10) : null,
+      actionType: 'LOGOUT',
+      entityType: 'users',
+      entityId: userId ? String(userId) : null,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `User/Session ${username || userId || 'unknown'} logged out`
+    });
+
     return res.json({ success: true, message: 'Logged out successfully' });
   } catch (err) {
     return res.json({ success: true, message: 'Logged out successfully' });

@@ -718,7 +718,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
           size="small"
           icon={<PrinterOutlined />}
           onClick={() => handleOpenReceipt(record)}
-          style={{ color: '#4f46e5', borderColor: '#c7d2fe' }}
+          className="btn-print"
+          style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 600 }}
         >
           سند الصرف
         </Button>
@@ -1721,7 +1722,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
               type="primary"
               icon={<PrinterOutlined />}
               onClick={handlePrintReceipt}
-              style={{ backgroundColor: '#4f46e5' }}
+              className="btn-print"
+              style={{ backgroundColor: '#0B0F17', color: '#DFCA95', borderColor: '#C8A45C', fontWeight: 700 }}
             >
               طباعة السند
             </Button>
