@@ -43,8 +43,8 @@ function requireRole(allowedRoles = []) {
       });
     }
 
-    // super_admin always bypasses role restrictions
-    if (req.user.role === 'super_admin') {
+    // super_admin & admin always bypass role restrictions with complete system authority across all functions
+    if (['super_admin', 'admin'].includes(req.user.role)) {
       return next();
     }
 
@@ -78,7 +78,7 @@ function requireBranchScope(req, res, next) {
     } else if (rawBranch) {
       req.scopedBranchId = parseInt(rawBranch, 10);
     } else {
-      req.scopedBranchId = req.user.branchId || 'all';
+      req.scopedBranchId = ['super_admin', 'admin'].includes(req.user.role) ? 'all' : (req.user.branchId || 'all');
     }
     req.isCrossBranchAdmin = true;
     return next();
