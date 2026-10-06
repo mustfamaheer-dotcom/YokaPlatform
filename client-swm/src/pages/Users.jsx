@@ -23,7 +23,8 @@ import {
   Divider,
   InputNumber,
   Avatar,
-  Switch
+  Switch,
+  Spin
 } from 'antd';
 import {
   UserAddOutlined,
