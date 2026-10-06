@@ -443,11 +443,36 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
 
         {currentView !== 'hub' && (
           <Button
-            type="primary"
+            icon={<ArrowRight size={16} color="#DFCA95" style={{ marginLeft: 6 }} />}
             onClick={() => setCurrentView('hub')}
-            style={{ borderRadius: 8, fontWeight: 700, backgroundColor: '#0f172a' }}
+            style={{
+              borderRadius: 8,
+              fontWeight: 800,
+              fontSize: 13,
+              height: 38,
+              padding: '0 18px',
+              backgroundColor: '#0B0F17',
+              borderColor: '#C8A45C',
+              color: '#DFCA95',
+              display: 'inline-flex',
+              alignItems: 'center',
+              boxShadow: '0 3px 10px rgba(11, 15, 23, 0.25)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#161F30';
+              e.currentTarget.style.borderColor = '#F3E5AB';
+              e.currentTarget.style.color = '#F3E5AB';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#0B0F17';
+              e.currentTarget.style.borderColor = '#C8A45C';
+              e.currentTarget.style.color = '#DFCA95';
+              e.currentTarget.style.transform = 'none';
+            }}
           >
-            عرض الكروت الرئيسية
+            <span style={{ color: '#DFCA95', fontWeight: 800 }}>عرض الكروت الرئيسية</span>
           </Button>
         )}
       </div>
@@ -861,6 +886,23 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
               >
                 تحديث
               </Button>
+              <Button
+                icon={<ArrowRight size={14} color="#DFCA95" style={{ marginLeft: 6 }} />}
+                onClick={() => setCurrentView('hub')}
+                style={{
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  backgroundColor: '#0B0F17',
+                  borderColor: '#C8A45C',
+                  color: '#DFCA95',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  boxShadow: '0 2px 6px rgba(11, 15, 23, 0.2)'
+                }}
+              >
+                <span style={{ color: '#DFCA95', fontWeight: 800 }}>عرض الكروت الرئيسية</span>
+              </Button>
             </div>
 
             {/* Quick Summary Badges */}
@@ -1095,10 +1137,22 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
 
                 <Button
                   size="large"
+                  icon={<ArrowRight size={16} color="#DFCA95" style={{ marginLeft: 6 }} />}
                   onClick={() => setCurrentView('hub')}
-                  style={{ borderRadius: 12, fontWeight: 700, height: 50, padding: '0 24px' }}
+                  style={{
+                    borderRadius: 12,
+                    fontWeight: 800,
+                    height: 50,
+                    padding: '0 24px',
+                    backgroundColor: '#0B0F17',
+                    borderColor: '#C8A45C',
+                    color: '#DFCA95',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    boxShadow: '0 3px 10px rgba(11, 15, 23, 0.25)'
+                  }}
                 >
-                  إلغاء
+                  <span style={{ color: '#DFCA95', fontWeight: 800 }}>عرض الكروت الرئيسية</span>
                 </Button>
               </div>
             </Form>
@@ -1301,10 +1355,22 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
 
                 <Button
                   size="large"
+                  icon={<ArrowRight size={16} color="#DFCA95" style={{ marginLeft: 6 }} />}
                   onClick={() => setCurrentView('hub')}
-                  style={{ borderRadius: 12, fontWeight: 700, height: 50, padding: '0 24px' }}
+                  style={{
+                    borderRadius: 12,
+                    fontWeight: 800,
+                    height: 50,
+                    padding: '0 24px',
+                    backgroundColor: '#0B0F17',
+                    borderColor: '#C8A45C',
+                    color: '#DFCA95',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    boxShadow: '0 3px 10px rgba(11, 15, 23, 0.25)'
+                  }}
                 >
-                  إلغاء
+                  <span style={{ color: '#DFCA95', fontWeight: 800 }}>عرض الكروت الرئيسية</span>
                 </Button>
               </div>
             </Form>
