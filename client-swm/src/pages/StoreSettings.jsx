@@ -98,7 +98,12 @@ export default function StoreSettings({ currentUser }) {
     seo_keywords: 'يوكا ستور, ملابس رجالي, ملابس حريمي, موضة كاجوال, تسوق أونلاين مصر, شحن محافظات, دفع عند الاستلام, Yoka Store',
     google_site_verification: '',
     google_analytics_id: '',
-    facebook_pixel_id: ''
+    facebook_pixel_id: '',
+    loyalty_enabled: 'true',
+    loyalty_points_per_egp: 10,
+    loyalty_point_value: 0.50,
+    loyalty_min_redeem: 100,
+    loyalty_max_redeem_pct: 50
   });
 
   const fetchBranches = async () => {
@@ -215,7 +220,12 @@ export default function StoreSettings({ currentUser }) {
           seo_keywords: merged.seo_keywords,
           google_site_verification: merged.google_site_verification,
           google_analytics_id: merged.google_analytics_id,
-          facebook_pixel_id: merged.facebook_pixel_id
+          facebook_pixel_id: merged.facebook_pixel_id,
+          loyalty_enabled: merged.loyalty_enabled !== 'false',
+          loyalty_points_per_egp: parseFloat(merged.loyalty_points_per_egp) || 10,
+          loyalty_point_value: parseFloat(merged.loyalty_point_value) || 0.50,
+          loyalty_min_redeem: parseInt(merged.loyalty_min_redeem, 10) || 100,
+          loyalty_max_redeem_pct: parseFloat(merged.loyalty_max_redeem_pct) || 50
         });
       }
     } catch (err) {
@@ -273,7 +283,12 @@ export default function StoreSettings({ currentUser }) {
         seo_keywords: values.seo_keywords || '',
         google_site_verification: values.google_site_verification || '',
         google_analytics_id: values.google_analytics_id || '',
-        facebook_pixel_id: values.facebook_pixel_id || ''
+        facebook_pixel_id: values.facebook_pixel_id || '',
+        loyalty_enabled: values.loyalty_enabled ? 'true' : 'false',
+        loyalty_points_per_egp: String(values.loyalty_points_per_egp || 10),
+        loyalty_point_value: String(values.loyalty_point_value || 0.5),
+        loyalty_min_redeem: String(values.loyalty_min_redeem || 100),
+        loyalty_max_redeem_pct: String(values.loyalty_max_redeem_pct || 50)
       };
 
       const res = await api.post('/api/swm/store-settings/bulk', { settings: payload });
@@ -630,6 +645,120 @@ export default function StoreSettings({ currentUser }) {
             >
               <Input placeholder="يوكا ستور, ملابس, أزياء, كاجوال, شحن محافظات" style={{ borderRadius: 8 }} />
             </Form.Item>
+          </Card>
+        </Space>
+      )
+    },
+    {
+      key: 'loyalty_points',
+      label: (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+          <Award style={{ width: 16, height: 16, color: '#C8A45C' }} />
+          <span>نقاط وولاء العملاء (Loyalty & Points)</span>
+        </span>
+      ),
+      children: (
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="محرك ولاء العملاء واكتساب واستبدال النقاط في فروع التجزئة (Loyalty & Points Accrual Engine)"
+            description="يمكنك تفعيل أو إيقاف نظام النقاط، وتحديد معادلة احتساب النقاط لكل جنيه مشتريات، وقيمة استبدال النقطة بالجنيه المصري، والحد الأدنى للنقاط للاستبدال وسقف الخصم المسموح به من الفاتورة."
+            style={{ borderRadius: 10 }}
+          />
+
+          <Card
+            title={
+              <Space>
+                <Award style={{ width: 18, height: 18, color: '#C8A45C' }} />
+                <span>إعدادات وقواعد برنامج الولاء</span>
+              </Space>
+            }
+            style={{ borderRadius: 12, border: '1px solid #e2e8f0' }}
+          >
+            <Form.Item
+              name="loyalty_enabled"
+              label="تفعيل نظام نقاط وولاء العملاء"
+              valuePropName="checked"
+              extra="عند التفعيل، يمكن للكاشير البحث عن العملاء بالهاتف واحتساب واستبدال النقاط آلياً على فواتير الـ POS"
+            >
+              <Switch checkedChildren="مفعّل" unCheckedChildren="معطّل" />
+            </Form.Item>
+
+            <Divider style={{ margin: '16px 0' }} />
+
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="loyalty_points_per_egp"
+                  label="معادلة اكتساب النقاط (مشتريات ⟵ نقاط)"
+                  extra="كم جنيه مشتريات يمنح العميل نقطة واحدة؟ (مثلاً: 10 يعني كل 10 ج.م = 1 نقطة)"
+                  rules={[{ required: true, message: 'مطلوب تحديد النسبة' }]}
+                >
+                  <InputNumber
+                    min={1}
+                    max={1000}
+                    precision={0}
+                    style={{ width: '100%', borderRadius: 8 }}
+                    addonAfter="جنيه = 1 نقطة"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="loyalty_point_value"
+                  label="قيمة النقطة عند الاستبدال (نقاط ⟵ خصم مالي)"
+                  extra="كم يساوي كل نقطة واحدة بالجنيه المصري عند الخصم من الفاتورة؟ (مثلاً: 0.50 ج.م)"
+                  rules={[{ required: true, message: 'مطلوب تحديد قيمة النقطة' }]}
+                >
+                  <InputNumber
+                    min={0.01}
+                    max={100}
+                    step={0.05}
+                    precision={2}
+                    style={{ width: '100%', borderRadius: 8 }}
+                    addonAfter="ج.م لكل نقطة"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="loyalty_min_redeem"
+                  label="الحد الأدنى للنقاط للاستبدال"
+                  extra="أقل رصيد نقاط يجب أن يمتلكه العميل ليتمكن من بدء استبدالها (مثلاً: 100 نقطة)"
+                  rules={[{ required: true, message: 'مطلوب تحديد الحد الأدنى' }]}
+                >
+                  <InputNumber
+                    min={1}
+                    max={10000}
+                    precision={0}
+                    style={{ width: '100%', borderRadius: 8 }}
+                    addonAfter="نقطة كحد أدنى"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="loyalty_max_redeem_pct"
+                  label="أقصى نسبة خصم بالنقاط من الفاتورة (%)"
+                  extra="الحد الأقصى لنسبة الفاتورة التي يمكن سدادها بنقاط الولاء (مثلاً: 50% لمنع استبدال 100% من الفاتورة)"
+                  rules={[{ required: true, message: 'مطلوب تحديد سقف النسبة' }]}
+                >
+                  <InputNumber
+                    min={1}
+                    max={100}
+                    precision={0}
+                    style={{ width: '100%', borderRadius: 8 }}
+                    addonAfter="% من الإجمالي"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
           </Card>
         </Space>
       )

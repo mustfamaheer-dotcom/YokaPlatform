@@ -220,6 +220,13 @@ export default function ThermalReceipt({ invoice, onClose }) {
             </div>
           )}
 
+          {parseFloat(invoice.points_discount || 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#b45309', padding: '2px 0' }}>
+              <span>خصم نقاط الولاء ({invoice.points_redeemed || 0} نقطة):</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>-{parseFloat(invoice.points_discount).toFixed(2)} ج.م</span>
+            </div>
+          )}
+
           {parseFloat(invoice.tax_amount) > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#475569', padding: '2px 0' }}>
               <span>ضريبة القيمة المضافة:</span>
@@ -280,6 +287,43 @@ export default function ThermalReceipt({ invoice, onClose }) {
             </div>
           )}
         </div>
+
+        {/* Customer Loyalty & Points Accrual Block */}
+        {((invoice.points_earned > 0) || (invoice.points_redeemed > 0) || (invoice.customer_points_balance !== undefined && invoice.customer_points_balance !== null)) && (
+          <div style={{
+            fontSize: '10px',
+            background: '#fffdf5',
+            padding: '6px 8px',
+            borderRadius: 6,
+            marginBottom: 8,
+            border: '1px dashed #C8A45C',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontWeight: 800, color: '#92400e', marginBottom: 2 }}>
+              🏆 برنامج ولاء العملاء (Yoka Points)
+            </div>
+            {invoice.customer_code && (
+              <div style={{ color: '#475569', fontSize: '9px' }}>
+                كود العميل: <strong>{invoice.customer_code}</strong>
+              </div>
+            )}
+            {invoice.points_redeemed > 0 && (
+              <div style={{ color: '#b45309' }}>
+                تم استبدال: <strong>{invoice.points_redeemed}</strong> نقطة (خصم {parseFloat(invoice.points_discount || 0).toFixed(2)} ج.م)
+              </div>
+            )}
+            {invoice.points_earned > 0 && (
+              <div style={{ color: '#15803d' }}>
+                نقاط مكتسبة بهذه الفاتورة: <strong>+{invoice.points_earned}</strong> نقطة
+              </div>
+            )}
+            {invoice.customer_points_balance !== undefined && invoice.customer_points_balance !== null && (
+              <div style={{ fontWeight: 700, color: '#0f172a', borderTop: '1px dashed #e2e8f0', marginTop: 3, paddingTop: 2 }}>
+                رصيد نقاطك الحالي: <strong>{invoice.customer_points_balance}</strong> نقطة
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer & Return Policy */}
         <div style={{ textAlign: 'center', fontSize: '9.5px', color: '#64748b', borderTop: '1.5px dashed #334155', paddingTop: 6 }}>

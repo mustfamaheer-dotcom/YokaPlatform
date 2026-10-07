@@ -9,12 +9,14 @@ import {
   Tag,
   Card,
   Row,
-  Col
+  Col,
+  Dropdown
 } from 'antd';
 import {
   Compass,
   ArrowRight,
   ChevronLeft,
+  ChevronDown,
   LogOut,
   ShieldCheck,
   MapPin,
@@ -36,7 +38,10 @@ import {
   TrendingUp,
   PackageCheck,
   BookOpenCheck,
-  LayoutDashboard
+  LayoutDashboard,
+  Sliders,
+  Crown,
+  Award
 } from 'lucide-react';
 import ScrollToTopTabs from '../../components/ScrollToTopTabs';
 import yokaLogo from '../../assets/yokaStoreTransparent.png';
@@ -60,6 +65,9 @@ import EcomInventory from '../EcomInventory';
 import SalesReportsPage from './supervisor/SalesReportsPage';
 import SellerPayrollAndExpenseCategoriesCards from '../../components/SellerPayrollAndExpenseCategoriesCards';
 import BranchShiftMonitor from '../BranchShiftMonitor';
+import Customers from '../Customers';
+import StoreSettings from '../StoreSettings';
+import LoyaltySettings from '../LoyaltySettings';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -98,6 +106,16 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
     }
   };
 
+  const handleNavigateToCategory = (catId) => {
+    navigate('/dashboard');
+    setTimeout(() => {
+      const el = document.getElementById(catId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
+  };
+
   // Check if current user is system owner / central admin (POS is for store cashiers, not the central owner)
   const isSystemOwner = useMemo(() => {
     return ['super_admin', 'admin', 'general_manager'].includes(currentUser?.role) || !currentUser?.branch_id;
@@ -122,21 +140,21 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             isExternalRoute: '/pos'
           } : null,
           {
-            id: 'daily_shift',
-            title: 'العمليات والوردية اليومية',
-            subtitle: 'حركات الكاشير، تقفيل الوردية اليومية، وتسليم العهدة للفرع',
-            icon: <Clock size={20} color="#0284c7" />
-          },
-          {
             id: 'branches_daily',
-            title: 'يومية الفروع المجمعة',
-            subtitle: 'كشف الحساب اليومي الشامل لمبيعات ومصروفات ونقدية كل فرع',
+            title: 'لوحة الـ KPIs',
+            subtitle: 'مؤشرات الأداء الرئيسية والمبيعات اليومية للفروع',
             icon: <FileSpreadsheet size={20} color="#0284c7" />
           },
           {
+            id: 'daily_shift',
+            title: 'مبيعات الفروع المباشرة',
+            subtitle: 'حركات الكاشير والمبيعات المباشرة وتقفيل الورديات',
+            icon: <Clock size={20} color="#0284c7" />
+          },
+          {
             id: 'branch_shifts',
-            title: 'مراقبة فتح/إغلاق الفروع والورديات',
-            subtitle: 'متابعة حية لتواجد الكاشيرية، مواعيد الدخول والخروج، وحالة الفروع',
+            title: 'مراقبة الورديات',
+            subtitle: 'متابعة حية لتواجد الكاشيرية، ومواعيد فتح وإغلاق الفروع',
             icon: <Store size={20} color="#0284c7" />
           }
         ].filter(Boolean)
@@ -151,47 +169,41 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         children: [
           {
             id: 'groups_items',
-            title: 'المجموعات والأصناف',
+            title: 'دليل المنتجات',
             subtitle: 'شجرة التصنيفات، المقاسات، الألوان، وبطاقات المنتجات والباركود',
             icon: <Layers size={20} color="#16a34a" />
           },
           {
             id: 'stock_audit',
-            title: 'الجرد الفعلي وسندات التسوية',
+            title: 'جرد المخزون',
             subtitle: 'الجرد الميداني والمطابقة الفورية، معالجة العجز والزيادة، وسندات التسوية',
             icon: <ClipboardCheck size={20} color="#16a34a" />
           },
           {
             id: 'transfers',
-            title: 'أذونات الصرف والتحويل',
+            title: 'التحويلات بين الفروع',
             subtitle: 'التحويل بين الفروع والمستودعات وسندات استلام البضائع',
             icon: <ArrowLeftRight size={20} color="#16a34a" />
-          },
-          {
-            id: 'ecom_inventory',
-            title: 'مخزون المتجر الإلكتروني',
-            subtitle: 'أرصدة المستودع المخصص للطلبات الرقمية وحجز الكميات',
-            icon: <PackageCheck size={20} color="#16a34a" />
           }
         ]
       },
       {
         id: 'cat_purchases',
         number: '3',
-        title: 'المشتريات والتوريد',
+        title: 'المشتريات والموردين',
         color: '#d97706',
         bgColor: '#fffbeb',
         borderColor: '#fde68a',
         children: [
           {
             id: 'purchases',
-            title: 'فواتير المشتريات والتوريد',
+            title: 'أوامر وفواتير الشراء',
             subtitle: 'تسجيل ومراجعة فواتير الشراء، تكلفة الوحدة، ودفعات الموردين',
             icon: <Receipt size={20} color="#d97706" />
           },
           {
             id: 'suppliers',
-            title: 'الموردين والحسابات',
+            title: 'حسابات الموردين',
             subtitle: 'دليل الموردين، كشوف الحسابات التفصيلية، والأرصدة الدائنة',
             icon: <Truck size={20} color="#d97706" />
           }
@@ -207,7 +219,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         children: [
           {
             id: 'treasury_admin',
-            title: 'الخزينة المركزية والتحويلات',
+            title: 'الخزينة المركزية',
             subtitle: 'حركة السيولة المركزية، التحويلات البنكية، وتصفير الخزائن',
             icon: <Landmark size={20} color="#059669" />
           },
@@ -219,37 +231,15 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
           },
           {
             id: 'admin_journals',
-            title: 'اليوميات الإدارية والرقابة',
+            title: 'اليوميات والرقابة',
             subtitle: 'سجلات التدقيق الإداري، القيود المحاسبية، ودفتر العمليات',
             icon: <BookOpenCheck size={20} color="#059669" />
           }
         ]
       },
       {
-        id: 'cat_ecom',
-        number: '5',
-        title: 'مبيعات وإدارة المتجر الإلكتروني',
-        color: '#6366f1',
-        bgColor: '#eef2ff',
-        borderColor: '#c7d2fe',
-        children: [
-          {
-            id: 'orders',
-            title: 'طلبات المتجر الإلكتروني',
-            subtitle: 'متابعة حالات الطلبات والشحن وبوالص التوصيل والتجهيز',
-            icon: <ShoppingBag size={20} color="#6366f1" />
-          },
-          {
-            id: 'ecom_analytics',
-            title: 'إحصائيات المتجر الإلكتروني',
-            subtitle: 'تحليلات حركة الزوار، المبيعات الرقمية، ومتوسط قيمة السلة',
-            icon: <TrendingUp size={20} color="#6366f1" />
-          }
-        ]
-      },
-      {
         id: 'cat_management',
-        number: '6',
+        number: '5',
         title: 'إدارة النظام والفروع',
         color: '#4f46e5',
         bgColor: '#faf5ff',
@@ -257,7 +247,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         children: [
           {
             id: 'branches',
-            title: 'الفروع والمستودعات',
+            title: 'إدارة الفروع',
             subtitle: 'إدارة الفروع، نقاط البيع، والمستودعات وتعيين الصلاحيات',
             icon: <Store size={20} color="#4f46e5" />
           },
@@ -266,12 +256,18 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             title: 'المستخدمين والصلاحيات',
             subtitle: 'إدارة حسابات المديرين، المشرفين، والبائعين وصلاحيات مدير المخازن',
             icon: <UsersIcon size={20} color="#4f46e5" />
+          },
+          {
+            id: 'loyalty_settings',
+            title: 'إعدادات ومحرك نقاط الولاء',
+            subtitle: 'ضبط قواعد احتساب واستبدال النقاط التلقائية ومعادلات الخصم لنقاط البيع (POS)',
+            icon: <Award size={20} color="#4f46e5" />
           }
         ]
       },
       {
         id: 'cat_analytics',
-        number: '7',
+        number: '6',
         title: 'التقارير والتحليلات المتقدمة',
         color: '#0284c7',
         bgColor: '#f0f9ff',
@@ -279,8 +275,8 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         children: [
           {
             id: 'sales_reports',
-            title: 'تحليلات المبيعات والإيرادات المركزية',
-            subtitle: 'الرسوم البيانية، مقارنة أداء الفروع، وتقييم أداء البائعين',
+            title: 'الرسوم البيانية، مقارنة الفروع، وتقييم أداء البائعين',
+            subtitle: 'تحليلات المبيعات والإيرادات المركزية وتقييم الأداء',
             icon: <BarChart3 size={20} color="#0284c7" />
           }
         ]
@@ -469,7 +465,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
 
       {/* ─── MAIN CONTENT AREA ─── */}
       <Content style={{ width: '100%', maxWidth: 1600, margin: '0 auto', boxSizing: 'border-box', padding: '16px' }}>
-        {/* Breadcrumb Trail when not on home */}
+        {/* Breadcrumb Trail when not on home (Fully Clickable & Interactive) */}
         {activeTab !== 'home' && (
           <div
             style={{
@@ -483,29 +479,140 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
               marginBottom: 16
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {/* 1. Clickable Home Link */}
               <Button
                 type="link"
                 size="small"
                 onClick={() => handleNavigate('home')}
-                style={{ padding: 0, fontWeight: 800, color: '#C8A45C', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                style={{
+                  padding: '2px 8px',
+                  fontWeight: 800,
+                  color: '#C8A45C',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  borderRadius: 6,
+                  backgroundColor: 'rgba(200, 164, 92, 0.08)',
+                  border: '1px solid rgba(200, 164, 92, 0.25)',
+                  height: 28,
+                  cursor: 'pointer'
+                }}
+                title="الرجوع للوحة الأقسام الرئيسية"
               >
                 <Compass size={14} color="#C8A45C" />
-                الرئيسية
+                <span>الرئيسية</span>
               </Button>
+
               {activeMeta && (
                 <>
                   <ChevronLeft size={14} color="#94a3b8" />
-                  <Text type="secondary" style={{ fontSize: 12.5 }}>
-                    {activeMeta.category.title}
-                  </Text>
+
+                  {/* 2. Interactive Category Dropdown & Direct Jump */}
+                  <Dropdown
+                    menu={{
+                      items: activeMeta.category.children.map((child) => ({
+                        key: child.id,
+                        label: (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                            {child.icon}
+                            <span
+                              style={{
+                                fontWeight: child.id === activeTab ? 700 : 500,
+                                color: child.id === activeTab ? '#C8A45C' : '#0F172A'
+                              }}
+                            >
+                              {child.title}
+                            </span>
+                            {child.id === activeTab && (
+                              <Tag color="gold" style={{ fontSize: 10, margin: '0 4px' }}>
+                                الحالي
+                              </Tag>
+                            )}
+                          </div>
+                        ),
+                        onClick: () => {
+                          if (child.isExternalRoute) {
+                            navigate(child.isExternalRoute);
+                          } else {
+                            handleNavigate(child.id);
+                          }
+                        }
+                      }))
+                    }}
+                    trigger={['hover', 'click']}
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => handleNavigateToCategory(activeMeta.category.id)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        color: '#334155',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        borderRadius: 6,
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #CBD5E1',
+                        height: 28,
+                        cursor: 'pointer'
+                      }}
+                      title="انقر للانتقال للقسم في الرئيسية، أو اختر صفحة أخرى من القائمة المنسدلة"
+                    >
+                      <span>{activeMeta.category.title}</span>
+                      <ChevronDown size={12} color="#64748B" />
+                    </Button>
+                  </Dropdown>
+
                   <ChevronLeft size={14} color="#94a3b8" />
-                  <Text strong style={{ fontSize: 13, color: '#0f172a' }}>
-                    {activeMeta.item.title}
-                  </Text>
+
+                  {/* 3. Active Current Page Tag / Button */}
+                  <Tag
+                    color="gold"
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      padding: '3px 10px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      margin: 0,
+                      border: '1px solid #FDE68A',
+                      backgroundColor: '#FFFBEB',
+                      color: '#92400E'
+                    }}
+                    onClick={() => handleNavigate(activeTab)}
+                    title="الصفحة الحالية — انقر لإعادة التحميل"
+                  >
+                    <span>{activeMeta.item.title}</span>
+                  </Tag>
                 </>
               )}
             </div>
+
+            {/* Back to Home Sections Button */}
+            <Button
+              size="small"
+              icon={<ArrowRight size={13} style={{ marginLeft: 4 }} />}
+              onClick={() => handleNavigate('home')}
+              style={{
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#475569',
+                borderColor: '#CBD5E1',
+                height: 28,
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
+            >
+              العودة للوحة الأقسام
+            </Button>
           </div>
         )}
 
@@ -556,7 +663,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             {/* The 6 Authorized Sections Cards */}
             <Row gutter={[20, 20]}>
               {categories.map((cat) => (
-                <Col xs={24} md={12} lg={12} xl={8} key={cat.id}>
+                <Col xs={24} md={12} lg={12} xl={8} key={cat.id} id={cat.id}>
                   <Card
                     style={{
                       height: '100%',
@@ -751,6 +858,13 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         )}
         {activeTab === 'daily_shift' && <DailyShift currentUser={currentUser} />}
         {activeTab === 'branch_shifts' && <BranchShiftMonitor currentUser={currentUser} />}
+        {activeTab === 'customers' && <Customers currentUser={currentUser} />}
+        {(activeTab === 'loyalty_settings' || activeTab === 'loyalty') && (
+          <LoyaltySettings currentUser={currentUser} onNavigate={handleNavigate} />
+        )}
+        {(activeTab === 'store_settings' || activeTab === 'settings' || activeTab === 'storefront') && (
+          <StoreSettings currentUser={currentUser} />
+        )}
       </Content>
     </Layout>
   );

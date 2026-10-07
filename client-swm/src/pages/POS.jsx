@@ -50,6 +50,7 @@ import {
 } from '@ant-design/icons';
 import api from '../api';
 import ThermalReceipt from '../components/ThermalReceipt';
+import CustomerLookup from '../components/CustomerLookup';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -86,6 +87,11 @@ export default function POS({ currentUser }) {
   });
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Customer Loyalty & Points State
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [redeemPoints, setRedeemPoints] = useState(0);
+  const [loyaltySettings, setLoyaltySettings] = useState(null);
 
   // Cart / Invoice Items State
   // Item structure: { key, product_id, variant_id, product_name, product_code, barcode, unit_price, available_qty, quantity, line_total, isManualRow }
@@ -235,6 +241,17 @@ export default function POS({ currentUser }) {
     }
   };
 
+  const fetchLoyaltySettings = async () => {
+    try {
+      const res = await api.get('/api/swm/loyalty/settings');
+      if (res.data?.success) {
+        setLoyaltySettings(res.data.data);
+      }
+    } catch (e) {
+      console.error('Failed to load loyalty settings:', e);
+    }
+  };
+
   useEffect(() => {
     fetchSession().then((session) => {
       const bId = session?.register?.branch_id;
@@ -242,6 +259,7 @@ export default function POS({ currentUser }) {
     });
     fetchCategories();
     fetchSupervisorSettings();
+    fetchLoyaltySettings();
   }, []);
 
   // Strict Keyboard Workflow:
@@ -503,6 +521,8 @@ export default function POS({ currentUser }) {
     setCustomerPhone('');
     setCustomerAddress('');
     setSaleNotes('');
+    setSelectedCustomer(null);
+    setRedeemPoints(0);
   };
 
   // Active items in invoice
@@ -510,9 +530,13 @@ export default function POS({ currentUser }) {
 
   // Financial calculations
   const subtotal = validItems.reduce((sum, item) => sum + item.line_total, 0);
+  const pointVal = loyaltySettings?.loyalty_point_value || 0.5;
+  const pointsDiscountValue = (redeemPoints > 0)
+    ? Math.round(redeemPoints * pointVal * 100) / 100
+    : 0;
   const netTotal = Math.max(
     0,
-    subtotal - parseFloat(invoiceDiscount || 0) + parseFloat(taxAmount || 0)
+    subtotal - parseFloat(invoiceDiscount || 0) - pointsDiscountValue + parseFloat(taxAmount || 0)
   );
 
   // Multi-Payment calculations
@@ -575,6 +599,8 @@ export default function POS({ currentUser }) {
     try {
       const payload = {
         salesperson_id: selectedSalesperson,
+        customer_id: selectedCustomer?.id || undefined,
+        redeem_points: redeemPoints > 0 ? redeemPoints : 0,
         customer_name: customerName.trim() || (invoiceType === 'return' ? 'عميل مرتجع' : 'عميل نقدي'),
         customer_phone: customerPhone.trim() || undefined,
         customer_address: customerAddress.trim() || undefined,
@@ -613,7 +639,12 @@ export default function POS({ currentUser }) {
           ...res.data.data,
           items: res.data.items,
           branch_name: sessionData?.register?.register_name,
-          isReturn: invoiceType === 'return'
+          isReturn: invoiceType === 'return',
+          points_earned: res.data.points_earned,
+          points_redeemed: res.data.points_redeemed,
+          points_discount: res.data.points_discount,
+          customer_points_balance: res.data.customer_points_balance,
+          customer_code: selectedCustomer?.customer_code || res.data.data?.customer_code
         });
         setReceiptModalVisible(true);
         clearCart();
@@ -816,6 +847,26 @@ export default function POS({ currentUser }) {
               }
             }}
           >
+            {/* Customer Loyalty & Points Accrual Engine */}
+            <CustomerLookup
+              loyaltySettings={loyaltySettings}
+              cartTotal={subtotal}
+              selectedCustomer={selectedCustomer}
+              onSelectCustomer={(cust) => {
+                setSelectedCustomer(cust);
+                setCustomerName(cust.full_name);
+                setCustomerPhone(cust.phone);
+              }}
+              onClearCustomer={() => {
+                setSelectedCustomer(null);
+                setCustomerName('');
+                setCustomerPhone('');
+                setRedeemPoints(0);
+              }}
+              redeemPoints={redeemPoints}
+              onChangeRedeemPoints={setRedeemPoints}
+            />
+
             {/* Top Controls: Seller Selection (Branch-specific) & Client Details */}
             <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
               <Col xs={24} md={8}>
@@ -1104,6 +1155,12 @@ export default function POS({ currentUser }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#dc2626' }}>
                     <span>الخصم العام:</span>
                     <span style={{ fontWeight: 600 }}>-{invoiceDiscount.toFixed(2)} ج.م</span>
+                  </div>
+                )}
+                {pointsDiscountValue > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#b45309' }}>
+                    <span>خصم نقاط الولاء ({redeemPoints} نقطة):</span>
+                    <span style={{ fontWeight: 700 }}>-{pointsDiscountValue.toFixed(2)} ج.م</span>
                   </div>
                 )}
                 <Divider style={{ margin: '8px 0' }} />

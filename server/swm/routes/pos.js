@@ -680,6 +680,7 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
   try {
     const branchId = await resolveBranchId(req);
     const {
+      customer_id,
       customer_name = 'Walk-in Customer',
       customer_phone,
       customer_address,
@@ -688,12 +689,20 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
       tax_amount = 0,
       payment_method = 'cash', // 'cash', 'card', 'transfer', 'multi', 'split'
       payment_breakdown = { cash: 0, card: 0, transfer: 0 },
+      redeem_points = 0,
       notes,
       items
     } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Sale items are required' });
+    }
+
+    // Resolve customer ID if phone matches registered customer
+    let effectiveCustomerId = customer_id ? parseInt(customer_id, 10) : null;
+    if (!effectiveCustomerId && customer_phone && customer_phone.trim()) {
+      const [custMatch] = await query(`SELECT id FROM customers WHERE phone = $1 LIMIT 1`, [customer_phone.trim()]);
+      if (custMatch) effectiveCustomerId = custMatch.id;
     }
 
     // Check cash register if cash is part of the sale
@@ -813,10 +822,63 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
         });
       }
 
-      // Calculate final financial totals
+      // Calculate initial financial totals
       const discTotal = parseFloat(discount_amount) || 0;
       const taxTotal = parseFloat(tax_amount) || 0;
-      const finalAmount = Math.max(0, subtotal - discTotal + taxTotal);
+      const basePayableAmount = Math.max(0, subtotal - discTotal + taxTotal);
+
+      // --- Customer Loyalty & Points Engine ---
+      const loyaltySettingsRows = await client.query(
+        `SELECT key, value FROM store_settings WHERE key LIKE 'loyalty_%'`
+      );
+      const loyaltyMap = {};
+      for (const r of loyaltySettingsRows.rows) {
+        loyaltyMap[r.key] = r.value;
+      }
+      const isLoyaltyEnabled = loyaltyMap.loyalty_enabled === 'true';
+      const pointsPerEgp = Math.max(1, parseFloat(loyaltyMap.loyalty_points_per_egp) || 10);
+      const pointValue = Math.max(0.01, parseFloat(loyaltyMap.loyalty_point_value) || 0.50);
+      const minRedeem = Math.max(1, parseInt(loyaltyMap.loyalty_min_redeem, 10) || 100);
+      const maxRedeemPct = Math.min(100, Math.max(1, parseFloat(loyaltyMap.loyalty_max_redeem_pct) || 50));
+
+      let customerRow = null;
+      let pointsEarned = 0;
+      let pointsRedeemed = 0;
+      let pointsDiscount = 0;
+
+      if (effectiveCustomerId && isLoyaltyEnabled) {
+        const custRes = await client.query(
+          `SELECT * FROM customers WHERE id = $1 FOR UPDATE`,
+          [effectiveCustomerId]
+        );
+        if (custRes.rows.length > 0) {
+          customerRow = custRes.rows[0];
+        }
+      }
+
+      // Process points redemption if requested and customer eligible
+      if (customerRow && redeem_points && parseInt(redeem_points, 10) > 0) {
+        const requestedPts = parseInt(redeem_points, 10);
+        const curPoints = parseInt(customerRow.total_points || 0, 10);
+        if (curPoints >= minRedeem) {
+          const maxDiscountAllowed = basePayableAmount * (maxRedeemPct / 100);
+          const maxPointsAllowedByPct = Math.floor(maxDiscountAllowed / pointValue);
+          const actualRedeemPts = Math.min(requestedPts, curPoints, maxPointsAllowedByPct);
+
+          if (actualRedeemPts >= minRedeem) {
+            pointsRedeemed = actualRedeemPts;
+            pointsDiscount = Math.round(actualRedeemPts * pointValue * 100) / 100;
+          }
+        }
+      }
+
+      // Net final amount after standard discounts and loyalty points discount
+      const finalAmount = Math.max(0, Math.round((basePayableAmount - pointsDiscount) * 100) / 100);
+
+      // Points earned on the net amount paid
+      if (customerRow && isLoyaltyEnabled) {
+        pointsEarned = Math.floor(finalAmount / pointsPerEgp);
+      }
 
       // Structure payment breakdown normalized strictly to finalAmount
       let finalBreakdown;
@@ -855,28 +917,33 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
         }
       }
 
-      // 2. Insert into swm_sales_invoices
+      // 2. Insert into swm_sales_invoices with loyalty columns
       const [invoice] = (await client.query(
         `INSERT INTO swm_sales_invoices (
           invoice_number, branch_id, salesperson_id, customer_name,
           customer_phone, customer_address, invoice_date, subtotal, discount_amount,
           tax_amount, final_amount, payment_breakdown, payment_status,
-          notes, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 'paid', $12, 'completed', NOW(), NOW())
+          notes, status, customer_id, points_earned, points_redeemed, points_discount,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, $9, $10, $11, 'paid', $12, 'completed', $13, $14, $15, $16, NOW(), NOW())
         RETURNING *`,
         [
           invNumber,
           branchId,
           effectiveUserId,
-          customer_name || 'Walk-in Customer',
-          customer_phone || null,
+          customerRow ? customerRow.full_name : (customer_name || 'Walk-in Customer'),
+          customerRow ? customerRow.phone : (customer_phone || null),
           customer_address || null,
           subtotal,
           discTotal,
           taxTotal,
           finalAmount,
           JSON.stringify(finalBreakdown),
-          notes || null
+          notes || null,
+          customerRow ? customerRow.id : null,
+          pointsEarned,
+          pointsRedeemed,
+          pointsDiscount
         ]
       )).rows;
 
@@ -951,7 +1018,78 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
         );
       }
 
-      return { invoice, items: savedItems, cashReceived };
+      // 5. Update customer points balance and append ledger entries
+      let finalCustomerBalance = customerRow ? parseInt(customerRow.total_points || 0, 10) : 0;
+      if (customerRow) {
+        const balanceBefore = parseInt(customerRow.total_points || 0, 10);
+        finalCustomerBalance = Math.max(0, balanceBefore - pointsRedeemed + pointsEarned);
+
+        await client.query(
+          `UPDATE customers
+           SET total_points = $1,
+               lifetime_points = lifetime_points + $2,
+               updated_at = NOW()
+           WHERE id = $3`,
+          [finalCustomerBalance, pointsEarned, customerRow.id]
+        );
+
+        // Ledger entry for points redemption
+        if (pointsRedeemed > 0) {
+          const balAfterRedeem = balanceBefore - pointsRedeemed;
+          await client.query(
+            `INSERT INTO points_transactions (
+               customer_id, branch_id, invoice_id, type, points,
+               monetary_value, balance_before, balance_after, notes, created_by, created_at
+             ) VALUES ($1, $2, $3, 'redeem', $4, $5, $6, $7, $8, $9, NOW())`,
+            [
+              customerRow.id,
+              branchId,
+              invoice.id,
+              -pointsRedeemed,
+              pointsDiscount,
+              balanceBefore,
+              balAfterRedeem,
+              `استبدال ${pointsRedeemed} نقطة = خصم ${pointsDiscount} ج.م على فاتورة ${invNumber}`,
+              effectiveUserId
+            ]
+          );
+        }
+
+        // Ledger entry for points accrual
+        if (pointsEarned > 0) {
+          const balBeforeEarn = balanceBefore - pointsRedeemed;
+          await client.query(
+            `INSERT INTO points_transactions (
+               customer_id, branch_id, invoice_id, type, points,
+               monetary_value, balance_before, balance_after, notes, created_by, created_at
+             ) VALUES ($1, $2, $3, 'earn', $4, 0, $5, $6, $7, $8, NOW())`,
+            [
+              customerRow.id,
+              branchId,
+              invoice.id,
+              pointsEarned,
+              balBeforeEarn,
+              finalCustomerBalance,
+              `اكتساب ${pointsEarned} نقطة من فاتورة ${invNumber} بقيمة ${finalAmount} ج.م`,
+              effectiveUserId
+            ]
+          );
+        }
+      }
+
+      return {
+        invoice: {
+          ...invoice,
+          customer_code: customerRow?.customer_code || null,
+          customer_points_balance: finalCustomerBalance
+        },
+        items: savedItems,
+        cashReceived,
+        pointsEarned,
+        pointsRedeemed,
+        pointsDiscount,
+        customerPointsBalance: finalCustomerBalance
+      };
     });
 
     logActivity({
@@ -963,7 +1101,10 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
       newValue: {
         invoice_number: invNumber,
         final_amount: saleResult.invoice.final_amount,
-        items_count: items.length
+        items_count: items.length,
+        points_earned: saleResult.pointsEarned,
+        points_redeemed: saleResult.pointsRedeemed,
+        points_discount: saleResult.pointsDiscount
       },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
@@ -974,6 +1115,10 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
       success: true,
       data: saleResult.invoice,
       items: saleResult.items,
+      points_earned: saleResult.pointsEarned,
+      points_redeemed: saleResult.pointsRedeemed,
+      points_discount: saleResult.pointsDiscount,
+      customer_points_balance: saleResult.customerPointsBalance,
       message: 'Sale completed successfully'
     });
   } catch (err) {
@@ -990,6 +1135,7 @@ router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
   try {
     const branchId = await resolveBranchId(req);
     const {
+      customer_id,
       customer_name = 'عميل مرتجع',
       customer_phone,
       customer_address,
@@ -1002,6 +1148,13 @@ router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'أصناف المرتجع مطلوبة' });
+    }
+
+    // Resolve customer ID if phone matches registered customer
+    let effectiveCustomerId = customer_id ? parseInt(customer_id, 10) : null;
+    if (!effectiveCustomerId && customer_phone && customer_phone.trim()) {
+      const [custMatch] = await query(`SELECT id FROM customers WHERE phone = $1 LIMIT 1`, [customer_phone.trim()]);
+      if (custMatch) effectiveCustomerId = custMatch.id;
     }
 
     const register = await getOrCreateBranchRegister(branchId);
@@ -1107,26 +1260,36 @@ router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
         }
       }
 
-      // Insert return invoice with status 'returned'
+      // Fetch customer details if registered
+      let customerRow = null;
+      if (effectiveCustomerId) {
+        const custRes = await client.query(`SELECT * FROM customers WHERE id = $1 FOR UPDATE`, [effectiveCustomerId]);
+        if (custRes.rows.length > 0) {
+          customerRow = custRes.rows[0];
+        }
+      }
+
+      // Insert return invoice with status 'returned' and customer_id
       const [invoice] = (await client.query(
         `INSERT INTO swm_sales_invoices (
           invoice_number, branch_id, salesperson_id, customer_name,
           customer_phone, customer_address, invoice_date, subtotal, discount_amount,
           tax_amount, final_amount, payment_breakdown, payment_status,
-          notes, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, 0, 0, $8, $9, 'paid', $10, 'returned', NOW(), NOW())
+          notes, status, customer_id, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, 0, 0, $8, $9, 'paid', $10, 'returned', $11, NOW(), NOW())
         RETURNING *`,
         [
           retNumber,
           branchId,
           effectiveUserId,
-          customer_name || 'عميل مرتجع',
-          customer_phone || null,
+          customerRow ? customerRow.full_name : (customer_name || 'عميل مرتجع'),
+          customerRow ? customerRow.phone : (customer_phone || null),
           customer_address || null,
           subtotal,
           finalAmount,
           JSON.stringify(finalBreakdown),
-          notes || 'فاتورة مرتجع مبيعات'
+          notes || 'فاتورة مرتجع مبيعات',
+          customerRow ? customerRow.id : null
         ]
       )).rows;
 
@@ -1233,7 +1396,52 @@ router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
         );
       }
 
-      return { invoice, items: savedItems, cashRefund };
+      // Points reversal logic for loyalty
+      let pointsReversed = 0;
+      if (customerRow) {
+        const loyaltySettingsRows = await client.query(
+          `SELECT key, value FROM store_settings WHERE key LIKE 'loyalty_%'`
+        );
+        const loyaltyMap = {};
+        for (const r of loyaltySettingsRows.rows) loyaltyMap[r.key] = r.value;
+        if (loyaltyMap.loyalty_enabled === 'true') {
+          const pointsPerEgp = Math.max(1, parseFloat(loyaltyMap.loyalty_points_per_egp) || 10);
+          pointsReversed = Math.floor(finalAmount / pointsPerEgp);
+          if (pointsReversed > 0) {
+            const balBefore = parseInt(customerRow.total_points || 0, 10);
+            const balAfter = Math.max(0, balBefore - pointsReversed);
+            const actualDeducted = balBefore - balAfter;
+
+            await client.query(
+              `UPDATE customers
+               SET total_points = $1,
+                   lifetime_points = GREATEST(0, lifetime_points - $2),
+                   updated_at = NOW()
+               WHERE id = $3`,
+              [balAfter, actualDeducted, customerRow.id]
+            );
+
+            await client.query(
+              `INSERT INTO points_transactions (
+                 customer_id, branch_id, invoice_id, type, points,
+                 monetary_value, balance_before, balance_after, notes, created_by, created_at
+               ) VALUES ($1, $2, $3, 'reverse', $4, 0, $5, $6, $7, $8, NOW())`,
+              [
+                customerRow.id,
+                branchId,
+                invoice.id,
+                -actualDeducted,
+                balBefore,
+                balAfter,
+                `عكس ${actualDeducted} نقطة بسبب مرتجع ${retNumber} بقيمة ${finalAmount} ج.م`,
+                effectiveUserId
+              ]
+            );
+          }
+        }
+      }
+
+      return { invoice, items: savedItems, cashRefund, pointsReversed };
     });
 
     logActivity({
@@ -1256,6 +1464,7 @@ router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
       success: true,
       data: returnResult.invoice,
       items: returnResult.items,
+      points_reversed: returnResult.pointsReversed,
       message: 'تم إتمام المرتجع وإعادة الأصناف للمخزون وخصم النقدية بنجاح'
     });
   } catch (err) {
@@ -1509,10 +1718,12 @@ router.get('/invoices/:id', requireAuth, async (req, res) => {
     const [invoice] = await query(
       `SELECT si.*,
               b.branch_name, b.address AS branch_address, b.phone AS branch_phone,
-              u.full_name AS cashier_name
+              u.full_name AS cashier_name,
+              c.customer_code, c.total_points AS customer_points_balance
        FROM swm_sales_invoices si
        LEFT JOIN branches b ON b.id = si.branch_id
        LEFT JOIN users u ON u.id = si.salesperson_id
+       LEFT JOIN customers c ON c.id = si.customer_id
        WHERE si.id = $1`,
       [id]
     );

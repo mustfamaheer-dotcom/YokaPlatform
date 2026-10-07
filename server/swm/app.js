@@ -157,6 +157,9 @@ app.use('/api/swm/branch-shifts-monitor', branchShiftsMonitorRoutes);
 app.use('/api/swm/branch-shifts', branchShiftsMonitorRoutes);
 app.use('/api/branch-shifts-monitor', branchShiftsMonitorRoutes);
 app.use('/api/branch-shifts', branchShiftsMonitorRoutes);
+const loyaltyRoutes = require('./routes/loyalty');
+app.use('/api/swm/loyalty', loyaltyRoutes);
+
 
 // ECP (E-Commerce Platform) Public API Routes
 const ecpCatalogRoutes = require('../ecp/routes/catalog');

@@ -419,6 +419,85 @@ export default function App() {
         element={<RoleRootRedirect currentUser={currentUser} />}
       />
 
+      {/* Customer Loyalty and Store Settings Shortcuts */}
+      <Route
+        path="/customers"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/customers" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/clients"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/customers" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty-settings"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/loyalty_settings" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/loyalty"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/loyalty_settings" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/storefront"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/store_settings" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/store-settings"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/store_settings" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/loyalty_settings" replace />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Root Route Smart Role Redirection */}
       <Route path="/" element={<RoleRootRedirect currentUser={currentUser} />} />
 
