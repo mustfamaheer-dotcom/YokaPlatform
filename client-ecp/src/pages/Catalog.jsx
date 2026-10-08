@@ -385,7 +385,7 @@ export default function Catalog({ onAddToCart }) {
           }
           placement="bottom"
           height="85vh"
-          destroyOnClose={true}
+          destroyOnHidden={true}
           onClose={() => setFilterDrawerVisible(false)}
           open={filterDrawerVisible}
           className="mobile-only"

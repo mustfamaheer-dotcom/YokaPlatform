@@ -436,7 +436,7 @@ export default function Customers({ currentUser }) {
               background: 'linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%)',
               border: '1px solid #BAE6FD'
             }}
-            bodyStyle={{ padding: '16px' }}
+            styles={{ body: { padding: '16px' } }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -460,7 +460,7 @@ export default function Customers({ currentUser }) {
               background: 'linear-gradient(135deg, #FFFDF8 0%, #FEF3C7 100%)',
               border: '1px solid #FDE68A'
             }}
-            bodyStyle={{ padding: '16px' }}
+            styles={{ body: { padding: '16px' } }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -484,7 +484,7 @@ export default function Customers({ currentUser }) {
               background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
               border: '1px solid #A7F3D0'
             }}
-            bodyStyle={{ padding: '16px' }}
+            styles={{ body: { padding: '16px' } }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -508,7 +508,7 @@ export default function Customers({ currentUser }) {
               background: 'linear-gradient(135deg, #FAF5FF 0%, #F3E8FF 100%)',
               border: '1px solid #E9D5FF'
             }}
-            bodyStyle={{ padding: '16px' }}
+            styles={{ body: { padding: '16px' } }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -533,7 +533,7 @@ export default function Customers({ currentUser }) {
           marginBottom: 16,
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}
-        bodyStyle={{ padding: '12px 16px' }}
+        styles={{ body: { padding: '12px 16px' } }}
       >
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <Input
@@ -574,7 +574,7 @@ export default function Customers({ currentUser }) {
           border: '1px solid #E2E8F0',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}
-        bodyStyle={{ padding: '0' }}
+        styles={{ body: { padding: '0' } }}
       >
         <Table
           columns={columns}
@@ -607,7 +607,7 @@ export default function Customers({ currentUser }) {
         width={720}
         open={historyDrawerOpen}
         onClose={() => setHistoryDrawerOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         {selectedCustomer && (
           <div>
@@ -665,7 +665,7 @@ export default function Customers({ currentUser }) {
         open={adjustModalOpen}
         onCancel={() => setAdjustModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={450}
       >
         {selectedCustomer && (
@@ -729,7 +729,7 @@ export default function Customers({ currentUser }) {
         open={createModalOpen}
         onCancel={() => setCreateModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={420}
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreateCustomer}>

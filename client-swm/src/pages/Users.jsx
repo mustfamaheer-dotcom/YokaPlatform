@@ -1232,7 +1232,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
         okText="تأكيد النقل الآن"
         cancelText="إلغاء"
         confirmLoading={transferLoading}
-        destroyOnClose
+        destroyOnHidden
         width={480}
       >
         <div style={{ padding: '8px 0' }}>

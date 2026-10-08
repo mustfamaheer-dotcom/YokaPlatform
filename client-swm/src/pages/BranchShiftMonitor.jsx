@@ -420,7 +420,7 @@ export default function BranchShiftMonitor() {
           marginBottom: 24,
           color: '#F8FAFC'
         }}
-        bodyStyle={{ padding: '20px 24px' }}
+        styles={{ body: { padding: '20px 24px' } }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ maxWidth: 620 }}>

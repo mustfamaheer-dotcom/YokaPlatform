@@ -201,7 +201,7 @@ export default function CustomerLookup({
             background: '#fafafa',
             boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
           }}
-          bodyStyle={{ padding: '8px 12px' }}
+          styles={{ body: { padding: '8px 12px' } }}
         >
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <AutoComplete
@@ -265,7 +265,7 @@ export default function CustomerLookup({
             background: 'linear-gradient(135deg, #FFFDF8 0%, #FDF8EC 100%)',
             boxShadow: '0 2px 6px rgba(200, 164, 92, 0.15)'
           }}
-          bodyStyle={{ padding: '10px 14px' }}
+          styles={{ body: { padding: '10px 14px' } }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <Space align="center">
@@ -385,7 +385,7 @@ export default function CustomerLookup({
         open={registerModalOpen}
         onCancel={() => setRegisterModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={420}
       >
         <Form form={registerForm} layout="vertical" onFinish={handleRegisterSubmit}>

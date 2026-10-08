@@ -178,11 +178,13 @@ export default function Branches() {
                     overflow: 'hidden',
                     transition: 'all 0.3s ease'
                   }}
-                  bodyStyle={{
-                    padding: '24px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: '100%'
+                  styles={{
+                    body: {
+                      padding: '24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      height: '100%'
+                    }
                   }}
                 >
                   {/* Card Header: Icon + Branch Name + City */}

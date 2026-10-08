@@ -58,7 +58,7 @@ import {
   Compass,
   ArrowRight
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -98,6 +98,7 @@ const PAYMENT_COLORS = {
 
 export default function SalesReportsPage({ currentUser: propCurrentUser }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const storedUser = (() => {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch (e) { return {}; }
   })();
@@ -109,6 +110,10 @@ export default function SalesReportsPage({ currentUser: propCurrentUser }) {
     (currentUser?.isMainWarehouse === true || !userBranchId || userBranchId === 1) &&
     currentUser?.branch_type !== 'retail_branch' &&
     currentUser?.branchType !== 'retail_branch'
+  );
+  const isAdmin = Boolean(
+    location.pathname.startsWith('/admin') ||
+    (['admin', 'super_admin', 'warehouse_manager'].includes(currentUser?.role) && !location.pathname.startsWith('/supervisor'))
   );
   const initialBranch = isCentralAdmin ? 'all' : (userBranchId ? String(userBranchId) : '1');
 

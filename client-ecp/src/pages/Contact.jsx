@@ -507,7 +507,7 @@ export default function Contact() {
                     justifyContent: 'space-between',
                     boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
                   }}
-                  bodyStyle={{ padding: 20, display: 'flex', flexDirection: 'column', height: '100%' }}
+                  styles={{ body: { padding: 20, display: 'flex', flexDirection: 'column', height: '100%' } }}
                 >
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>

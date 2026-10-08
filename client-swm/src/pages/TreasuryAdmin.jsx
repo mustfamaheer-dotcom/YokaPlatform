@@ -989,7 +989,7 @@ export default function TreasuryAdmin() {
                   display: 'flex',
                   flexDirection: 'column'
                 }}
-                bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+                styles={{ body: { flex: 1, display: 'flex', flexDirection: 'column' } }}
                 title={
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Space>
@@ -1657,7 +1657,7 @@ export default function TreasuryAdmin() {
         open={ownerModalVisible}
         onCancel={() => setOwnerModalVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 16 }}>
           <Alert
@@ -1883,7 +1883,7 @@ export default function TreasuryAdmin() {
         open={quickWithdrawVisible}
         onCancel={() => setQuickWithdrawVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert
           type="warning"

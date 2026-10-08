@@ -2502,7 +2502,6 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         footer={null}
         width="100vw"
         style={{ top: 0, margin: 0, maxWidth: '100vw', paddingBottom: 0 }}
-        bodyStyle={{ height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' }}
         styles={{ body: { height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' } }}
         destroyOnHidden={false}
       >
@@ -3185,7 +3184,6 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         footer={null}
         width="100vw"
         style={{ top: 0, margin: 0, maxWidth: '100vw', paddingBottom: 0 }}
-        bodyStyle={{ height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' }}
         styles={{ body: { height: 'calc(100vh - 75px)', overflowY: 'auto', padding: '16px 24px' } }}
         destroyOnHidden={false}
       >

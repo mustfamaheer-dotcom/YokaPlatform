@@ -807,7 +807,7 @@ export default function StoreSettings({ currentUser }) {
                     borderColor: isVisibleInStore ? '#CBD5E1' : '#E2E8F0',
                     backgroundColor: isVisibleInStore ? '#FFFFFF' : '#F8FAFC'
                   }}
-                  bodyStyle={{ padding: 14 }}
+                  styles={{ body: { padding: 14 } }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
                     <div>
@@ -1216,7 +1216,7 @@ export default function StoreSettings({ currentUser }) {
           branchForm.resetFields();
         }}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={650}
       >
         <Form
