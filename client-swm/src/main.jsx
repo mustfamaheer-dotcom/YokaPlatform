@@ -28,12 +28,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       theme={{
         token: {
           colorPrimary: '#C8A45C',
-          colorLink: '#C8A45C',
-          colorLinkHover: '#B38E46',
-          colorSuccess: '#16A34A',
+          colorLink: '#8A671D',
+          colorLinkHover: '#6B4E12',
+          colorSuccess: '#059669',
           colorError: '#DC2626',
-          colorWarning: '#F59E0B',
-          colorInfo: '#C8A45C',
+          colorWarning: '#EA580C',
+          colorInfo: '#2563EB',
           fontFamily: 'Cairo, Inter, sans-serif',
           borderRadius: 10,
           borderRadiusLG: 14,

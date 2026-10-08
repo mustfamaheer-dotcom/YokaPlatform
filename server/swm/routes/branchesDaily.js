@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireBranchScope } = require('../../shared/authMiddleware');
 
 /**
  * GET /api/swm/branches-daily
@@ -10,7 +10,7 @@ const { requireAuth, requireRole } = require('../../shared/authMiddleware');
  * - Branch-by-branch comparison summary
  * - Detailed paginated sales invoices list with cashier and customer info
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), requireBranchScope, async (req, res) => {
   try {
     const {
       branch_id,
@@ -72,10 +72,15 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
       pIdx++;
     }
 
+    // Effective branch determination: strictly scoped for non-cross-branch admins
+    const effectiveBranchId = req.isCrossBranchAdmin
+      ? (branch_id && branch_id !== 'all' && branch_id !== '' ? parseInt(branch_id, 10) : null)
+      : parseInt(req.scopedBranchId, 10);
+
     // Branch filter
-    if (branch_id && branch_id !== 'all' && branch_id !== '') {
+    if (effectiveBranchId) {
       invWhere.push(`si.branch_id = $${pIdx}`);
-      invParams.push(parseInt(branch_id, 10));
+      invParams.push(effectiveBranchId);
       pIdx++;
     }
 
@@ -101,9 +106,9 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
     expParams.push(endDateVal);
     epIdx++;
 
-    if (branch_id && branch_id !== 'all' && branch_id !== '') {
+    if (effectiveBranchId) {
       expWhere.push(`e.branch_id = $${epIdx}`);
-      expParams.push(parseInt(branch_id, 10));
+      expParams.push(effectiveBranchId);
       epIdx++;
     }
 

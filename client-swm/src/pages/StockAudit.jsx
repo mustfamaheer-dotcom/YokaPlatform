@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import { Home as HomeIcon, Package, BarChart3, Coins, AlertTriangle } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { printHtmlContent } from '../utils/printUtils';
 import {
@@ -195,7 +195,7 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
 
   // Branch Options List
   const branchOptions = useMemo(() => [
-    { value: 'all', label: '🌐 جميع الفروع والمخازن' },
+    { value: 'all', label: 'جميع الفروع والمخازن' },
     ...branchesList.map((branch) => ({
       value: String(branch.id),
       label: `${branch.branch_name} (${branch.branch_code || branch.id})`
@@ -648,7 +648,7 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             style={{ borderRadius: 12, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#475569' }}>📦 إجمالي الأصناف المسجلة</Text>}
+              title={<Text strong style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}><Package size={15} /> إجمالي الأصناف المسجلة</Text>}
               value={kpi.totalItems}
               suffix="صنف"
               valueStyle={{ color: '#1e293b', fontWeight: 800, fontSize: 24 }}
@@ -665,7 +665,7 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             style={{ borderRadius: 12, backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0' }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#047857' }}>📊 إجمالي عدد القطع المتوفرة</Text>}
+              title={<Text strong style={{ color: '#047857', display: 'flex', alignItems: 'center', gap: 6 }}><BarChart3 size={15} /> إجمالي عدد القطع المتوفرة</Text>}
               value={kpi.totalUnits}
               suffix="قطعة"
               valueStyle={{ color: '#065f46', fontWeight: 800, fontSize: 24 }}
@@ -682,7 +682,7 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             style={{ borderRadius: 12, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#1d4ed8' }}>💰 إجمالي تقييم المخزون بالتكلفة</Text>}
+              title={<Text strong style={{ color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 6 }}><Coins size={15} /> إجمالي تقييم المخزون بالتكلفة</Text>}
               value={kpi.totalStockValue}
               precision={2}
               suffix="ج.م"
@@ -700,7 +700,7 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             style={{ borderRadius: 12, backgroundColor: '#fff7ed', border: '1px solid #fed7aa' }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#c2410c' }}>⚠️ أصناف رصيدها صفري (= 0)</Text>}
+              title={<Text strong style={{ color: '#c2410c', display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={15} /> أصناف رصيدها صفري (= 0)</Text>}
               value={kpi.outOfStockCount}
               suffix="صنف"
               valueStyle={{ color: '#9a3412', fontWeight: 800, fontSize: 24 }}
@@ -1021,7 +1021,7 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 👁️ STOCK ITEM REVIEW & INSPECTION MODAL */}
+      {/* STOCK ITEM REVIEW & INSPECTION MODAL */}
       {/* ========================================================================= */}
       <Modal
         title={

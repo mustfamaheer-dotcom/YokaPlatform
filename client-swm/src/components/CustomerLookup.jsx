@@ -9,6 +9,7 @@ import {
   SearchOutlined,
   GiftOutlined
 } from '@ant-design/icons';
+import { Phone, Trophy } from 'lucide-react';
 import api from '../api';
 import { antMessage as message } from '../utils/antAppBridge';
 
@@ -166,12 +167,12 @@ export default function CustomerLookup({
           <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A' }}>
             {c.full_name}
           </div>
-          <div style={{ fontSize: 11, color: '#64748B' }}>
-            📱 {c.phone} • <span style={{ fontFamily: 'monospace' }}>{c.customer_code}</span>
+          <div style={{ fontSize: 11, color: '#64748B', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Phone size={11} /> <span>{c.phone}</span> • <span style={{ fontFamily: 'monospace' }}>{c.customer_code}</span>
           </div>
         </div>
-        <Tag color="gold" style={{ fontWeight: 800, borderRadius: 6, margin: 0, fontSize: 11 }}>
-          🏆 {c.total_points} نقطة
+        <Tag color="gold" icon={<Trophy size={11} />} style={{ fontWeight: 800, borderRadius: 6, margin: 0, fontSize: 11 }}>
+          {c.total_points} نقطة
         </Tag>
       </div>
     )

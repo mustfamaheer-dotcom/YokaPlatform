@@ -26,7 +26,8 @@ import {
   Wallet,
   ArrowUpRight,
   ArrowDownRight,
-  Filter
+  Filter,
+  CreditCard
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -344,8 +345,8 @@ export default function ComprehensiveSalesCard({ branchId }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text strong style={{ fontSize: 14, color: '#0f172a' }}>
-                  📈 منحنى المبيعات وصافي الإيرادات والمرتجعات اليومية
+                <Text strong style={{ fontSize: 14, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <TrendingUp size={16} /> منحنى المبيعات وصافي الإيرادات والمرتجعات اليومية
                 </Text>
                 <Tag color="blue" style={{ borderRadius: 6, fontWeight: 600 }}>تحديث تلقائي</Tag>
               </div>
@@ -431,8 +432,8 @@ export default function ComprehensiveSalesCard({ branchId }) {
                 flexDirection: 'column'
               }}
             >
-              <Text strong style={{ fontSize: 14, color: '#0f172a', marginBottom: 10 }}>
-                💳 توزيع المحصلات النقدية والبنكية
+              <Text strong style={{ fontSize: 14, color: '#0f172a', marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <CreditCard size={16} /> توزيع المحصلات النقدية والبنكية
               </Text>
 
               {paymentPieData.length > 0 ? (

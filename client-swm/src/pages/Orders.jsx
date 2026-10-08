@@ -820,7 +820,7 @@ export default function Orders({
                 type="primary"
                 icon={<CarOutlined />}
                 onClick={() => handleOpenShipModal(r)}
-                style={{ backgroundColor: '#0284c7' }}
+                className="swm-btn-cobalt"
               >
                 شحن
               </Button>
@@ -834,7 +834,7 @@ export default function Orders({
                 type="primary"
                 icon={<CheckCircleOutlined />}
                 onClick={() => handleUpdateStatus(r.id, 'delivered', 'paid')}
-                style={{ backgroundColor: '#16a34a' }}
+                className="swm-btn-emerald"
               >
                 تم التسليم
               </Button>
@@ -1140,7 +1140,7 @@ export default function Orders({
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={handleOpenAddRate}
-                      style={{ backgroundColor: '#2563eb' }}
+                      className="swm-btn-primary"
                     >
                       إضافة مدينة / منطقة جديدة
                     </Button>
@@ -1180,7 +1180,7 @@ export default function Orders({
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={handleOpenAddCarrier}
-                      style={{ backgroundColor: '#0284c7' }}
+                      className="swm-btn-primary"
                     >
                       إضافة شركة شحن جديدة
                     </Button>
@@ -1220,7 +1220,7 @@ export default function Orders({
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={handleOpenAddPayment}
-                      style={{ backgroundColor: '#9333ea' }}
+                      className="swm-btn-primary"
                     >
                       إضافة طريقة دفع / محفظة جديدة
                     </Button>
@@ -1434,7 +1434,7 @@ export default function Orders({
                       okText="نعم، تم الاستلام"
                       cancelText="إلغاء"
                     >
-                      <Button type="primary" size="small" style={{ backgroundColor: '#059669' }} icon={<CheckCircleOutlined />}>
+                      <Button type="primary" size="small" className="swm-btn-emerald" icon={<CheckCircleOutlined />}>
                         تأكيد استلام التحويل (Mark as Paid)
                       </Button>
                     </Popconfirm>
@@ -1485,7 +1485,7 @@ export default function Orders({
                       setIsDetailModalOpen(false);
                       handleOpenShipModal(selectedOrder);
                     }}
-                    style={{ backgroundColor: '#0284c7' }}
+                    className="swm-btn-cobalt"
                   >
                     تسليم الطلب للشحن (إضافة البوليصة والطرود)
                   </Button>
@@ -1495,7 +1495,7 @@ export default function Orders({
                     type="primary"
                     icon={<CheckCircleOutlined />}
                     onClick={() => handleUpdateStatus(selectedOrder.id, 'delivered', 'paid')}
-                    style={{ backgroundColor: '#16a34a' }}
+                    className="swm-btn-emerald"
                   >
                     تأكيد التسليم والتحصيل
                   </Button>

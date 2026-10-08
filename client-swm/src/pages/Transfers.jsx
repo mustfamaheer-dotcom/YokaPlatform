@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import { Home as HomeIcon, Keyboard, Search, Zap } from 'lucide-react';
 import {
   Card,
   Row,
@@ -813,7 +813,8 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
             size="large"
             icon={<PlusOutlined />}
             onClick={handleOpenCreateModal}
-            style={{ backgroundColor: '#2563eb', fontWeight: 'bold', height: 44, borderRadius: 8 }}
+            className="swm-btn-primary"
+            style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             إنشاء إذن صرف جديد
           </Button>
@@ -920,7 +921,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
       </Card>
 
       {/* ========================================================================= */}
-      {/* 🚀 EXPANSIVE CREATE DISPATCH VOUCHER MODAL (Full Desktop Invoicing Experience) */}
+      {/* EXPANSIVE CREATE DISPATCH VOUCHER MODAL (Full Desktop Invoicing Experience) */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -939,14 +940,14 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
 
             {/* Quick Keyboard Shortcuts Ribbon */}
             <Space size={8} style={{ direction: 'ltr' }}>
-              <Tag color="blue" style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }} onClick={handleAddNewRow}>
-                ⌨️ <strong style={{ color: '#1d4ed8' }}>F11</strong> إضافة سطر جديد
+              <Tag color="blue" icon={<Keyboard size={13} style={{ marginRight: 4 }} />} style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }} onClick={handleAddNewRow}>
+                <strong style={{ color: '#1d4ed8', marginLeft: 4 }}>F11</strong> إضافة سطر جديد
               </Tag>
-              <Tag color="purple" style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }} onClick={() => handleOpenSearchModal()}>
-                🔍 <strong style={{ color: '#6d28d9' }}>F1</strong> بحث عن صنف
+              <Tag color="purple" icon={<Search size={13} style={{ marginRight: 4 }} />} style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }} onClick={() => handleOpenSearchModal()}>
+                <strong style={{ color: '#6d28d9', marginLeft: 4 }}>F1</strong> بحث عن صنف
               </Tag>
-              <Tag color="success" style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, cursor: 'pointer' }} onClick={handleTriggerSubmit}>
-                ⚡ <strong style={{ color: '#15803d' }}>F4</strong> ضرب الفاتورة / ترحيل
+              <Tag color="success" icon={<Zap size={13} style={{ marginRight: 4 }} />} style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }} onClick={handleTriggerSubmit}>
+                <strong style={{ color: '#15803d', marginLeft: 4 }}>F4</strong> ضرب الفاتورة / ترحيل
               </Tag>
             </Space>
           </div>
@@ -1063,7 +1064,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={handleAddNewRow}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                className="swm-btn-cobalt"
               >
                 إضافة سطر جديد [F11]
               </Button>
@@ -1349,7 +1350,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 🔍 LARGE PRODUCT SEARCH & PICKER MODAL (F1) */}
+      {/* LARGE PRODUCT SEARCH & PICKER MODAL (F1) */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -1535,7 +1536,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 👁️ REVIEW & INSPECT TRANSFER MODAL */}
+      {/* REVIEW & INSPECT TRANSFER MODAL */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -1699,7 +1700,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 🖨️ PRINTABLE A4 DISPATCH NOTE MODAL */}
+      {/* PRINTABLE A4 DISPATCH NOTE MODAL */}
       {/* ========================================================================= */}
       <Modal
         open={printModalVisible}

@@ -7,6 +7,7 @@ import {
   HeartFilled,
   CheckOutlined
 } from '@ant-design/icons';
+import { Star } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import styles from './ProductCard.module.css';
 
@@ -229,11 +230,11 @@ export default function ProductCard({ product, onAddToCart }) {
           {/* Rating & Price row */}
           <div className={styles['product-meta-row']}>
             <div className={styles['rating-stars-wrap']} title="تقييم 5 نجوم">
-              <span className={styles['rating-star']}>★</span>
-              <span className={styles['rating-star']}>★</span>
-              <span className={styles['rating-star']}>★</span>
-              <span className={styles['rating-star']}>★</span>
-              <span className={styles['rating-star']}>★</span>
+              <Star size={11} fill="#C8A45C" color="#C8A45C" />
+              <Star size={11} fill="#C8A45C" color="#C8A45C" />
+              <Star size={11} fill="#C8A45C" color="#C8A45C" />
+              <Star size={11} fill="#C8A45C" color="#C8A45C" />
+              <Star size={11} fill="#C8A45C" color="#C8A45C" />
             </div>
             <span className={styles['meta-dot-divider']}>•</span>
             <div className={styles['product-price-row']}>

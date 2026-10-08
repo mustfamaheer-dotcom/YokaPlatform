@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import { Home as HomeIcon, Lightbulb, Folder, Sparkles } from 'lucide-react';
 import {
   Table,
   Button,
@@ -790,7 +790,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
             size="small"
             icon={<EditOutlined />}
             onClick={() => handleOpenEdit(record)}
-            style={{ backgroundColor: '#2563eb' }}
+            className="swm-btn-cobalt"
           >
             تعديل
           </Button>
@@ -836,7 +836,8 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
             size="large"
             icon={<PlusOutlined />}
             onClick={handleOpenCreate}
-            style={{ backgroundColor: '#2563eb', height: 44, fontWeight: 700, borderRadius: 8 }}
+            className="swm-btn-primary"
+            style={{ height: 44, fontWeight: 700, borderRadius: 8 }}
           >
             إضافة منتج جديد
           </Button>
@@ -1067,8 +1068,8 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                 </div>
               </div>
             </Form.Item>
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', color: '#115e59', marginTop: 4 }}>
-              💡 صورة الموديل إلزامية وسيتم توريثها تلقائياً لكافة مقاسات وألوان الصنف المتولدة إذا لم تخصص صورة للون.
+            <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#115e59', marginTop: 4 }}>
+              <Lightbulb size={13} style={{ color: '#0d9488', flexShrink: 0 }} /> صورة الموديل إلزامية وسيتم توريثها تلقائياً لكافة مقاسات وألوان الصنف المتولدة إذا لم تخصص صورة للون.
             </Text>
           </div>
 
@@ -1084,7 +1085,8 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                 placeholder="اختر المجموعة الرئيسية أو أضف مجموعة جديدة بالأسفل..."
                 size="large"
                 showSearch
-                filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
+                optionFilterProp="label"
+                filterOption={(input, opt) => String(opt?.label || opt?.children || '').toLowerCase().includes(input.toLowerCase())}
                 dropdownRender={(menu) => (
                   <>
                     {menu}
@@ -1112,14 +1114,17 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                 )}
               >
                 {categories.map((c) => (
-                  <Option key={c.id} value={c.id}>
-                    📁 {c.category_name}
+                  <Option key={c.id} value={c.id} label={c.category_name}>
+                    <Space size={6} align="middle">
+                      <Folder size={14} style={{ color: '#7c3aed' }} />
+                      <span>{c.category_name}</span>
+                    </Space>
                   </Option>
                 ))}
               </Select>
             </Form.Item>
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', color: '#6d28d9' }}>
-              💡 يمكنك الاختيار من المجموعات الحالية أو كتابة اسم مجموعة جديدة تماماً وإضافتها فورياً من داخل القائمة.
+            <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#6d28d9' }}>
+              <Lightbulb size={13} style={{ color: '#7c3aed', flexShrink: 0 }} /> يمكنك الاختيار من المجموعات الحالية أو كتابة اسم مجموعة جديدة تماماً وإضافتها فورياً من داخل القائمة.
             </Text>
           </div>
 
@@ -1147,7 +1152,9 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                 صنف بسيط (لون ومقاس واحد فقط)
               </Radio.Button>
               <Radio.Button value="multi" style={{ width: '50%', textAlign: 'center', color: '#4f46e5', fontWeight: 600 }}>
-                ✨ صنف متعدد (كذا مقاس وكذا لون - Multi-Variants)
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Sparkles size={14} /> صنف متعدد (كذا مقاس وكذا لون - Multi-Variants)
+                </span>
               </Radio.Button>
             </Radio.Group>
           </div>
@@ -1424,8 +1431,8 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                   {activeColors.filter((c) => colorImages[c]).length} من {activeColors.length} ألوان تم تحديد صورها
                 </Tag>
               </div>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12, color: '#166534' }}>
-                💡 يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
+              <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: '#166534' }}>
+                <Lightbulb size={13} style={{ color: '#16a34a', flexShrink: 0 }} /> يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
               </Text>
 
               <Row gutter={[12, 12]}>
@@ -1658,7 +1665,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
           <div style={{ textAlign: 'left', marginTop: 20 }}>
             <Space>
               <Button onClick={() => setIsModalOpen(false)}>إلغاء</Button>
-              <Button type="primary" htmlType="submit" loading={submitting} style={{ backgroundColor: '#2563eb' }}>
+              <Button type="primary" htmlType="submit" loading={submitting} className="swm-btn-primary">
                 حفظ المنتج وصور الألوان
               </Button>
             </Space>
@@ -1881,7 +1888,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
           <div style={{ textAlign: 'left', marginTop: 24 }}>
             <Space>
               <Button onClick={() => setIsEditModalOpen(false)}>إلغاء</Button>
-              <Button type="primary" htmlType="submit" loading={editSubmitting} style={{ backgroundColor: '#2563eb' }}>
+              <Button type="primary" htmlType="submit" loading={editSubmitting} className="swm-btn-cobalt">
                 حفظ التعديلات والصور
               </Button>
             </Space>
@@ -1890,7 +1897,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 👁️ PRODUCT CARD REVIEW & INSPECTION MODAL */}
+      {/* PRODUCT CARD REVIEW & INSPECTION MODAL */}
       {/* ========================================================================= */}
       <Modal
         title={

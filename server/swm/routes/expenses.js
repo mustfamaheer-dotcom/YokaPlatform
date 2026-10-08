@@ -18,7 +18,7 @@ async function getBranchRegister(branchId) {
  * GET /api/swm/expenses/analytics
  * Comprehensive visual analytics, trend data, and decision-making insights
  */
-router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supervisor']), requireBranchScope, async (req, res) => {
+router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireBranchScope, async (req, res) => {
   try {
     const branchId = req.scopedBranchId;
     const { days = 14 } = req.query;

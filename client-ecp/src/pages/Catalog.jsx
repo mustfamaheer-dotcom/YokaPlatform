@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Row, Col, Card, Select, Slider, Input, Button, Pagination, Spin, Skeleton, Empty, Typography, Space, Tag, Drawer, Grid } from 'antd';
 import { FilterOutlined, SearchOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Zap } from 'lucide-react';
 import api from '../api';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/SEO';
@@ -165,7 +166,7 @@ export default function Catalog({ onAddToCart }) {
           <FilterOutlined style={{ color: '#C8A45C' }} />
           <Text strong>فلاتر البحث والتصفية</Text>
         </Space>
-        <Button type="link" size="small" onClick={handleResetFilters} style={{ color: '#C8A45C' }}>
+        <Button type="link" size="small" onClick={handleResetFilters} style={{ color: '#8A671D', fontWeight: 700 }}>
           إعادة ضبط
         </Button>
       </div>
@@ -249,8 +250,8 @@ export default function Catalog({ onAddToCart }) {
 
       {/* Live Filtering Indicator & Close Drawer for Mobile */}
       <div style={{ marginTop: 24, textAlign: 'center' }}>
-        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8, color: '#C8A45C', fontWeight: 600 }}>
-          ⚡ التحديث فوري ومباشر دون حاجة للضغط
+        <Text type="secondary" style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 8, color: '#C8A45C', fontWeight: 600 }}>
+          <Zap size={13} /> التحديث فوري ومباشر دون حاجة للضغط
         </Text>
         {isMobile && (
           <Button
@@ -359,7 +360,7 @@ export default function Catalog({ onAddToCart }) {
               {f.label}
             </Tag>
           ))}
-          <Button type="link" size="small" onClick={handleResetFilters} style={{ padding: 0, fontSize: 12, color: '#C8A45C', fontWeight: 700 }}>
+          <Button type="link" size="small" onClick={handleResetFilters} style={{ padding: 0, fontSize: 12, color: '#8A671D', fontWeight: 700 }}>
             مسح الكل
           </Button>
         </div>

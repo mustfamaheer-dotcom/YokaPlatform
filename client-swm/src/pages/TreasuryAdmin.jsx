@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import {
+  Home as HomeIcon,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  Building2,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Lightbulb,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ClipboardList,
+  Crown,
+  Users,
+  Package
+} from 'lucide-react';
 import {
   Card, Row, Col, Table, Button, Modal, Tag, Space, Typography,
   message, Statistic, Badge, Tooltip, Popconfirm, Alert, Empty,
@@ -417,9 +433,9 @@ export default function TreasuryAdmin() {
       dataIndex: 'channel',
       key: 'channel',
       render: ch => {
-        if (ch === 'visa') return <Tag color="blue">💳 فيزا</Tag>;
-        if (ch === 'transfer') return <Tag color="purple">📱 تحويل</Tag>;
-        return <Tag color="green">💵 كاش</Tag>;
+        if (ch === 'visa') return <Tag color="blue" icon={<CreditCard size={11} />}>فيزا</Tag>;
+        if (ch === 'transfer') return <Tag color="purple" icon={<Smartphone size={11} />}>تحويل</Tag>;
+        return <Tag color="green" icon={<Banknote size={11} />}>كاش</Tag>;
       }
     },
     {
@@ -483,17 +499,17 @@ export default function TreasuryAdmin() {
         if (b && typeof b === 'object' && !Array.isArray(b)) {
           return (
             <Space size={2} wrap>
-              {b.cash > 0 && <Tag color="green">💵 كاش: {parseFloat(b.cash).toLocaleString()}</Tag>}
-              {b.visa > 0 && <Tag color="blue">💳 فيزا: {parseFloat(b.visa).toLocaleString()}</Tag>}
+              {b.cash > 0 && <Tag color="green" icon={<Banknote size={11} />}>كاش: {parseFloat(b.cash).toLocaleString()}</Tag>}
+              {b.visa > 0 && <Tag color="blue" icon={<CreditCard size={11} />}>فيزا: {parseFloat(b.visa).toLocaleString()}</Tag>}
               {(b.transfers > 0 || b.transfer > 0) && (
-                <Tag color="purple">📱 تحويل: {parseFloat(b.transfers || b.transfer).toLocaleString()}</Tag>
+                <Tag color="purple" icon={<Smartphone size={11} />}>تحويل: {parseFloat(b.transfers || b.transfer).toLocaleString()}</Tag>
               )}
             </Space>
           );
         }
 
         return <Tag color={rec.transfer_method === 'bank_transfer' ? 'blue' : 'geekblue'}>
-          {rec.transfer_method === 'bank_transfer' ? '🏦 بنكي' : '💵 نقدي'}
+          {rec.transfer_method === 'bank_transfer' ? <Space size={4}><Building2 size={12} /><span>بنكي</span></Space> : <Space size={4}><Banknote size={12} /><span>نقدي</span></Space>}
         </Tag>;
       }
     },
@@ -553,7 +569,8 @@ export default function TreasuryAdmin() {
                   type="primary"
                   icon={<CheckCircleOutlined />}
                   loading={confirmingId === record.id}
-                  style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+                  className="swm-btn-emerald"
+                  style={{ borderRadius: 6 }}
                 >
                   تأكيد
                 </Button>
@@ -613,9 +630,9 @@ export default function TreasuryAdmin() {
       dataIndex: 'channel',
       key: 'channel',
       render: ch => {
-        if (ch === 'cash') return <Tag color="green">💵 كاش (نقدي)</Tag>;
-        if (ch === 'visa') return <Tag color="blue">💳 بنكي / فيزا</Tag>;
-        if (ch === 'transfer') return <Tag color="purple">📱 تحويل / محفظة</Tag>;
+        if (ch === 'cash') return <Tag color="green" icon={<Banknote size={11} />}>كاش (نقدي)</Tag>;
+        if (ch === 'visa') return <Tag color="blue" icon={<CreditCard size={11} />}>بنكي / فيزا</Tag>;
+        if (ch === 'transfer') return <Tag color="purple" icon={<Smartphone size={11} />}>تحويل / محفظة</Tag>;
         return <Tag>{ch}</Tag>;
       }
     },
@@ -716,7 +733,8 @@ export default function TreasuryAdmin() {
           <Button
             type="primary"
             icon={<PlusCircleOutlined />}
-            style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', height: 44, borderRadius: 8, fontWeight: 700 }}
+            className="swm-btn-emerald"
+            style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
             onClick={() => openOwnerModal('deposit')}
           >
             إيداع رأس مال / تمويل
@@ -796,7 +814,7 @@ export default function TreasuryAdmin() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
-                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#166534' }}>💵 الخزينة النقدية (الكاش)</Text>
+                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Banknote size={15} /> الخزينة النقدية (الكاش)</Text>
                     <div style={{ color: '#16A34A', fontSize: 22, fontWeight: 900, marginTop: 6, fontFamily: 'monospace' }}>
                       {(kpis?.main_safe?.cash_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 600 }}>ج.م</span>
@@ -830,7 +848,7 @@ export default function TreasuryAdmin() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
-                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#0369A1' }}>💳 الحساب البنكي (الفيزا / البطاقات)</Text>
+                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#0369A1', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CreditCard size={15} /> الحساب البنكي (الفيزا / البطاقات)</Text>
                     <div style={{ color: '#0284C7', fontSize: 22, fontWeight: 900, marginTop: 6, fontFamily: 'monospace' }}>
                       {(kpis?.main_safe?.visa_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 600 }}>ج.م</span>
@@ -864,7 +882,7 @@ export default function TreasuryAdmin() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
-                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#6D28D9' }}>📱 التحويلات والمحافظ (إنستاباي / كاش)</Text>
+                    <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#6D28D9', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Smartphone size={15} /> التحويلات والمحافظ (إنستاباي / كاش)</Text>
                     <div style={{ color: '#8B5CF6', fontSize: 22, fontWeight: 900, marginTop: 6, fontFamily: 'monospace' }}>
                       {(kpis?.main_safe?.transfer_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 600 }}>ج.م</span>
@@ -913,7 +931,7 @@ export default function TreasuryAdmin() {
 
               <Col xs={12} md={4}>
                 <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '8px 12px' }}>
-                  <span style={{ fontSize: 11, color: '#166534', display: 'block', fontWeight: 700 }}>📥 إجمالي رأس المال المودع</span>
+                  <span style={{ fontSize: 11, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}><ArrowDownLeft size={13} /> إجمالي رأس المال المودع</span>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#16A34A', marginTop: 2 }}>
                     + {(ownerData?.summary?.total_deposited || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
                   </div>
@@ -923,7 +941,7 @@ export default function TreasuryAdmin() {
 
               <Col xs={12} md={4}>
                 <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '8px 12px' }}>
-                  <span style={{ fontSize: 11, color: '#991B1B', display: 'block', fontWeight: 700 }}>📤 إجمالي المسحوبات الشخصية</span>
+                  <span style={{ fontSize: 11, color: '#991B1B', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}><ArrowUpRight size={13} /> إجمالي المسحوبات الشخصية</span>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#DC2626', marginTop: 2 }}>
                     - {(ownerData?.summary?.total_withdrawn || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
                   </div>
@@ -937,7 +955,8 @@ export default function TreasuryAdmin() {
                     type="primary"
                     size="middle"
                     icon={<PlusCircleOutlined />}
-                    style={{ backgroundColor: '#16A34A', borderColor: '#16A34A', fontWeight: 700, borderRadius: 8, height: 38 }}
+                    className="swm-btn-emerald"
+                    style={{ fontWeight: 700, borderRadius: 8, height: 38 }}
                     onClick={() => openOwnerModal('deposit')}
                   >
                     إيداع تمويل جديد
@@ -1042,7 +1061,7 @@ export default function TreasuryAdmin() {
                 <div style={{ marginTop: 'auto', background: '#fffbeb', padding: 12, borderRadius: 8, border: '1px solid #fde68a' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <div>
-                      <Text strong style={{ color: '#92400e', fontSize: 13 }}>💡 صرف نثريات أو مصروفات فورية</Text>
+                      <Text strong style={{ color: '#92400e', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Lightbulb size={15} /> صرف نثريات أو مصروفات فورية</Text>
                       <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
                         اختر بنداً من الأعلى أو اضغط للصرف المباشر من الخزينة الرئيسية
                       </Text>
@@ -1050,7 +1069,7 @@ export default function TreasuryAdmin() {
                     <Button
                       type="primary"
                       icon={<MinusCircleOutlined />}
-                      style={{ backgroundColor: '#d97706', borderColor: '#d97706' }}
+                      style={{ backgroundColor: '#EA580C', borderColor: '#EA580C', color: '#FFFFFF', fontWeight: 700 }}
                       onClick={() => {
                         quickWithdrawForm.resetFields();
                         quickWithdrawForm.setFieldsValue({ channel: 'cash' });
@@ -1108,7 +1127,7 @@ export default function TreasuryAdmin() {
                   <Select
                     showSearch
                     allowClear
-                    placeholder="🔍 ابحث عن موظف بالاسم، رقم الهاتف، أو الفرع المعين له..."
+                    placeholder="ابحث عن موظف بالاسم، رقم الهاتف، أو الفرع المعين له..."
                     style={{ width: '100%' }}
                     size="large"
                     value={selectedEmployeeId}
@@ -1337,9 +1356,9 @@ export default function TreasuryAdmin() {
                                 value={payrollChannel}
                                 onChange={(e) => setPayrollChannel(e.target.value)}
                               >
-                                <Radio.Button value="cash">💵 كاش</Radio.Button>
-                                <Radio.Button value="visa">💳 فيزا</Radio.Button>
-                                <Radio.Button value="transfer">📱 تحويل</Radio.Button>
+                                <Radio.Button value="cash"><Space size={4}><Banknote size={13} /><span>كاش</span></Space></Radio.Button>
+                                <Radio.Button value="visa"><Space size={4}><CreditCard size={13} /><span>فيزا</span></Space></Radio.Button>
+                                <Radio.Button value="transfer"><Space size={4}><Smartphone size={13} /><span>تحويل</span></Space></Radio.Button>
                               </Radio.Group>
                               <div style={{ fontSize: 11, marginTop: 4, color: avail >= net ? '#16a34a' : '#dc2626' }}>
                                 المتاح بالخزينة: {avail.toLocaleString()} ج.م
@@ -1387,7 +1406,7 @@ export default function TreasuryAdmin() {
 
                           {!canAfford && net > 0 && (
                             <Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 4, textAlign: 'center' }}>
-                              ⚠️ رصيد الخزينة في هذه القناة ({avail.toLocaleString()} ج.م) لا يكفي لصرف المبلغ المستحق ({net.toLocaleString()} ج.م)
+                              رصيد الخزينة في هذه القناة ({avail.toLocaleString()} ج.م) لا يكفي لصرف المبلغ المستحق ({net.toLocaleString()} ج.م)
                             </Text>
                           )}
                         </div>
@@ -1435,17 +1454,17 @@ export default function TreasuryAdmin() {
                         style={{ width: 170 }}
                         size="small"
                       >
-                        <Option value="pending">⏳ المعلقة فقط</Option>
-                        <Option value="completed">✅ المؤكدة فقط</Option>
-                        <Option value="cancelled">❌ الملغية فقط</Option>
-                        <Option value="all">📋 الكل</Option>
+                        <Option value="pending"><Space size={6}><Clock size={13} style={{ verticalAlign: 'middle' }} /><span>المعلقة فقط</span></Space></Option>
+                        <Option value="completed"><Space size={6}><CheckCircle2 size={13} style={{ verticalAlign: 'middle' }} /><span>المؤكدة فقط</span></Space></Option>
+                        <Option value="cancelled"><Space size={6}><XCircle size={13} style={{ verticalAlign: 'middle' }} /><span>الملغية فقط</span></Space></Option>
+                        <Option value="all"><Space size={6}><ClipboardList size={13} style={{ verticalAlign: 'middle' }} /><span>الكل</span></Space></Option>
                       </Select>
                     }
                   >
                     {transfers.length === 0 ? (
                       <Empty description={
                         statusFilter === 'pending'
-                          ? 'لا توجد طلبات معلقة حالياً 🎉'
+                          ? 'لا توجد طلبات معلقة حالياً'
                           : 'لا توجد طلبات بهذه الحالة'
                       } />
                     ) : (
@@ -1663,17 +1682,17 @@ export default function TreasuryAdmin() {
               <Row gutter={[8, 8]}>
                 <Col span={8}>
                   <Radio.Button value="cash" style={{ width: '100%', textAlign: 'center' }}>
-                    💵 كاش (نقدي)
+                    <Space size={4}><Banknote size={13} /><span>كاش (نقدي)</span></Space>
                   </Radio.Button>
                 </Col>
                 <Col span={8}>
                   <Radio.Button value="visa" style={{ width: '100%', textAlign: 'center' }}>
-                    💳 فيزا / بنك
+                    <Space size={4}><CreditCard size={13} /><span>فيزا / بنك</span></Space>
                   </Radio.Button>
                 </Col>
                 <Col span={8}>
                   <Radio.Button value="transfer" style={{ width: '100%', textAlign: 'center' }}>
-                    📱 تحويل / محفظة
+                    <Space size={4}><Smartphone size={13} /><span>تحويل / محفظة</span></Space>
                   </Radio.Button>
                 </Col>
               </Row>
@@ -1761,7 +1780,7 @@ export default function TreasuryAdmin() {
                 okText="تأكيد" cancelText="إلغاء"
                 onConfirm={() => { handleConfirm(detailRecord.id); setDetailVisible(false); }}
               >
-                <Button type="primary" icon={<CheckCircleOutlined />} style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}>
+                <Button type="primary" icon={<CheckCircleOutlined />} className="swm-btn-emerald">
                   تأكيد الاستلام
                 </Button>
               </Popconfirm>
@@ -1784,7 +1803,7 @@ export default function TreasuryAdmin() {
             <Row gutter={[16, 12]}>
               <Col span={12}><Text type="secondary">الفرع المُرسِل:</Text><br /><Text strong>{detailRecord.from_branch_name}</Text></Col>
               <Col span={12}><Text type="secondary">المبلغ الإجمالي:</Text><br /><Text strong style={{ color: '#16a34a', fontSize: 16 }}>{parseFloat(detailRecord.amount).toFixed(2)} ج.م</Text></Col>
-              <Col span={12}><Text type="secondary">طريقة التحويل:</Text><br /><Tag color="blue">{detailRecord.transfer_method === 'bank_transfer' ? '🏦 بنكي' : '💵 نقدي'}</Tag></Col>
+              <Col span={12}><Text type="secondary">طريقة التحويل:</Text><br /><Tag color="blue">{detailRecord.transfer_method === 'bank_transfer' ? <Space size={4}><Building2 size={12} /><span>بنكي</span></Space> : <Space size={4}><Banknote size={12} /><span>نقدي</span></Space>}</Tag></Col>
               <Col span={12}><Text type="secondary">الحالة:</Text><br /><Tag color={STATUS_MAP[detailRecord.status]?.color}>{STATUS_MAP[detailRecord.status]?.label}</Tag></Col>
               {detailRecord.reference_no && (
                 <Col span={24}><Text type="secondary">رقم المرجع:</Text><br /><Text code>{detailRecord.reference_no}</Text></Col>
@@ -1843,11 +1862,11 @@ export default function TreasuryAdmin() {
               onChange={setNewReasonCategory}
               size="large"
             >
-              <Option value="operational">🏢 تشغيلي وإداري عام</Option>
-              <Option value="utility_bill">💡 فواتير ومرافق وإيجار</Option>
-              <Option value="owner_drawing">👑 مسحوبات شخصية / جاري المالك</Option>
-              <Option value="sales_withdrawal">👥 سلف موظفين وبائعين</Option>
-              <Option value="other">📦 نثرية ومصروفات أخرى</Option>
+              <Option value="operational"><Space size={6}><Building2 size={13} style={{ verticalAlign: 'middle' }} /><span>تشغيلي وإداري عام</span></Space></Option>
+              <Option value="utility_bill"><Space size={6}><Lightbulb size={13} style={{ verticalAlign: 'middle' }} /><span>فواتير ومرافق وإيجار</span></Space></Option>
+              <Option value="owner_drawing"><Space size={6}><Crown size={13} style={{ verticalAlign: 'middle' }} /><span>مسحوبات شخصية / جاري المالك</span></Space></Option>
+              <Option value="sales_withdrawal"><Space size={6}><Users size={13} style={{ verticalAlign: 'middle' }} /><span>سلف موظفين وبائعين</span></Space></Option>
+              <Option value="other"><Space size={6}><Package size={13} style={{ verticalAlign: 'middle' }} /><span>نثرية ومصروفات أخرى</span></Space></Option>
             </Select>
           </div>
         </div>
@@ -1911,17 +1930,17 @@ export default function TreasuryAdmin() {
               <Row gutter={[8, 8]}>
                 <Col span={8}>
                   <Radio.Button value="cash" style={{ width: '100%', textAlign: 'center' }}>
-                    💵 كاش ({getChannelAvailable('cash').toLocaleString()})
+                    <Space size={4}><Banknote size={13} /><span>كاش ({getChannelAvailable('cash').toLocaleString()})</span></Space>
                   </Radio.Button>
                 </Col>
                 <Col span={8}>
                   <Radio.Button value="visa" style={{ width: '100%', textAlign: 'center' }}>
-                    💳 فيزا ({getChannelAvailable('visa').toLocaleString()})
+                    <Space size={4}><CreditCard size={13} /><span>فيزا ({getChannelAvailable('visa').toLocaleString()})</span></Space>
                   </Radio.Button>
                 </Col>
                 <Col span={8}>
                   <Radio.Button value="transfer" style={{ width: '100%', textAlign: 'center' }}>
-                    📱 تحويل ({getChannelAvailable('transfer').toLocaleString()})
+                    <Space size={4}><Smartphone size={13} /><span>تحويل ({getChannelAvailable('transfer').toLocaleString()})</span></Space>
                   </Radio.Button>
                 </Col>
               </Row>
@@ -1968,7 +1987,7 @@ export default function TreasuryAdmin() {
               type="primary"
               htmlType="submit"
               loading={submittingQuickWithdraw}
-              style={{ backgroundColor: '#d97706', borderColor: '#d97706' }}
+              style={{ backgroundColor: '#EA580C', borderColor: '#EA580C', color: '#FFFFFF', fontWeight: 700 }}
             >
               تأكيد الصرف والخصم
             </Button>

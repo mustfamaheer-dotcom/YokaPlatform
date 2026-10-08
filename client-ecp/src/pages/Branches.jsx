@@ -277,17 +277,17 @@ export default function Branches() {
                           type="primary"
                           block
                           icon={<EnvironmentOutlined style={{ fontSize: 16 }} />}
+                          className="btn-cobalt"
                           style={{
                             height: 44,
                             borderRadius: 12,
-                            backgroundColor: '#0F172A',
-                            borderColor: '#0F172A',
                             fontWeight: 800,
-                            fontSize: 13.5,
-                            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.12)'
+                            fontSize: 13.5
                           }}
                         >
-                          عرض الموقع على خرائط جوجل ↗
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            عرض الموقع على خرائط جوجل <ExternalLink size={14} />
+                          </span>
                         </Button>
                       </a>
                     ) : (

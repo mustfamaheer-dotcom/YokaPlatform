@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Calendar, Package, ShoppingCart } from 'lucide-react';
 import {
   Card,
   Row,
@@ -314,7 +315,7 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
               zIndex: 10
             }}
           >
-            <div>📅 {hoveredTrendDay.date}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {hoveredTrendDay.date}</div>
             <div style={{ color: '#a78bfa', fontWeight: 'bold' }}>
               مبيعات المتجر: {hoveredTrendDay.sales.toFixed(2)} ج.م
             </div>
@@ -438,8 +439,8 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
       key: 'branch_name',
       width: 180,
       render: (branchName) => (
-        <Tag color="cyan">
-          📦 {branchName || 'مستودع المتجر الإلكتروني'}
+        <Tag color="cyan" icon={<Package size={11} />}>
+          {branchName || 'مستودع المتجر الإلكتروني'}
         </Tag>
       )
     },
@@ -559,8 +560,8 @@ export default function EcomAnalytics({ currentUser, onNavigate }) {
 
           {activeSection === 'overview' && (
             <>
-              <Tag color="purple" style={{ fontSize: 13, padding: '4px 12px', fontWeight: 600 }}>
-                🛒 مستودع المتجر الإلكتروني (ECP)
+              <Tag color="purple" icon={<ShoppingCart size={12} />} style={{ fontSize: 13, padding: '4px 12px', fontWeight: 600 }}>
+                مستودع المتجر الإلكتروني (ECP)
               </Tag>
 
               <Divider type="vertical" style={{ height: 24 }} />

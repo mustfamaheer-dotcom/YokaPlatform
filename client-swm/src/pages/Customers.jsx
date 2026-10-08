@@ -33,7 +33,7 @@ import {
   ClockCircleOutlined,
   FileTextOutlined
 } from '@ant-design/icons';
-import { Award, Users, Wallet, TrendingUp, Sparkles, ArrowLeft } from 'lucide-react';
+import { Award, Users, Wallet, TrendingUp, Sparkles, ArrowLeft, Trophy } from 'lucide-react';
 import api from '../api';
 import { antMessage as message } from '../utils/antAppBridge';
 
@@ -227,8 +227,8 @@ export default function Customers({ currentUser }) {
         const val = parseInt(points || 0, 10);
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Tag color={val > 0 ? 'orange' : 'default'} style={{ fontWeight: 800, fontSize: 12, margin: 0, borderRadius: 6 }}>
-              🏆 {val} نقطة
+            <Tag color={val > 0 ? 'orange' : 'default'} icon={<Trophy size={11} />} style={{ fontWeight: 800, fontSize: 12, margin: 0, borderRadius: 6 }}>
+              {val} نقطة
             </Tag>
             <span style={{ fontSize: 11, color: '#64748B' }}>
               (≈ {(val * 0.5).toFixed(1)} ج.م)

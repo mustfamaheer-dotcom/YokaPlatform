@@ -14,7 +14,7 @@ import {
   ShopOutlined
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
-import { Zap, Navigation, MapPin } from 'lucide-react';
+import { Zap, Navigation, MapPin, ExternalLink } from 'lucide-react';
 import api from '../api';
 import SEO from '../components/SEO';
 
@@ -486,7 +486,9 @@ export default function Contact() {
                   height: 40
                 }}
               >
-                عرض تفاصيل وخرائط الفروع ↗
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  عرض تفاصيل وخرائط الفروع <ExternalLink size={14} />
+                </span>
               </Button>
             </Link>
           </div>
@@ -559,17 +561,17 @@ export default function Contact() {
                       rel="noopener noreferrer"
                       icon={<Navigation size={15} />}
                       block
+                      className="btn-cobalt"
                       style={{
                         borderRadius: 10,
-                        backgroundColor: '#0F172A',
-                        borderColor: '#0F172A',
-                        color: '#FFFFFF',
                         fontWeight: 700,
                         height: 42,
                         marginTop: 12
                       }}
                     >
-                      فتح اللوكيشن في خرائط جوجل ↗
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        فتح اللوكيشن في خرائط جوجل <ExternalLink size={14} />
+                      </span>
                     </Button>
                   ) : (
                     <Link to="/branches">

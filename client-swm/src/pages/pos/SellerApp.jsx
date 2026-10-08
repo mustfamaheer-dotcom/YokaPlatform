@@ -362,8 +362,8 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
             >
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <span style={{ fontSize: 22, fontWeight: 800, color: '#DFCA95' }}>
-                    مرحباً بك، {currentUser?.fullName || currentUser?.username} 👋
+                  <span style={{ fontSize: 22, fontWeight: 800, color: '#DFCA95', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    مرحباً بك، {currentUser?.fullName || currentUser?.username} <Sparkles size={20} style={{ color: '#DFCA95' }} />
                   </span>
                   <Tag style={{ fontWeight: 700, fontSize: 12, borderRadius: 6, backgroundColor: 'rgba(200, 164, 92, 0.15)', borderColor: '#C8A45C', color: '#DFCA95' }}>
                     بوابة الكاشير والمبيعات السريعة

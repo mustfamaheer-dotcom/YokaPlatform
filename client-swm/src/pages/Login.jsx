@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Input, Button, Typography, Alert, Tabs, Space, Divider, Tag } from 'antd';
+import { Form, Input, Button, Typography, Alert } from 'antd';
 import {
   ShieldCheck,
   Store,
   Lock,
   User,
   Building2,
-  Sparkles,
   Zap,
   ShoppingBag,
   ArrowLeft,
-  CheckCircle2,
-  KeyRound,
-  Layers,
-  Activity
+  Phone,
+  PhoneCall,
+  Headphones
 } from 'lucide-react';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
@@ -102,117 +100,154 @@ export default function Login({ onLoginSuccess }) {
 
         {/* Top Branding */}
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <img
               src={yokaLogo}
               alt="Yoka Store"
               style={{
-                height: 52,
+                height: 54,
                 objectFit: 'contain',
-                filter: 'drop-shadow(0 4px 12px rgba(99, 102, 241, 0.35))'
+                filter: 'drop-shadow(0 4px 14px rgba(200, 164, 92, 0.4))'
               }}
             />
             <div>
-              <Text strong style={{ color: '#ffffff', fontSize: 20, display: 'block', letterSpacing: '-0.5px' }}>
+              <Text strong style={{ color: '#ffffff', fontSize: 21, display: 'block', letterSpacing: '-0.5px' }}>
                 Yoka Enterprise SWM
               </Text>
-              <Text style={{ color: '#94a3b8', fontSize: 12 }}>
+              <Text style={{ color: '#C8A45C', fontSize: 12.5, fontWeight: 600 }}>
                 منظومة إدارة المتاجر والمخازن الذكية
               </Text>
             </div>
           </div>
 
-          <div style={{ marginTop: 18, maxWidth: 480 }}>
-            <Tag color="indigo" style={{ padding: '3px 10px', borderRadius: 20, fontWeight: 600, fontSize: 12, border: 'none', background: 'rgba(99, 102, 241, 0.2)', color: '#c7d2fe', marginBottom: 8 }}>
-              ✨ الإصدار الاحترافي 2026
-            </Tag>
-            <Title level={3} style={{ color: '#ffffff', fontWeight: 800, margin: '6px 0 12px', lineHeight: 1.3, fontSize: 22 }}>
-              تحكم كامل في مبيعات الفروع، المستودعات، والتجارة الإلكترونية في مكان واحد.
+          <div style={{ marginTop: 14, maxWidth: 480 }}>
+            <Title level={3} style={{ color: '#ffffff', fontWeight: 800, margin: '0 0 16px', lineHeight: 1.35, fontSize: 23 }}>
+              تحكم كامل ومباشر في مبيعات الفروع والمستودعات
             </Title>
-            <Paragraph style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.6 }}>
-              نظام سحابي موحد يربط حركة المخزون اللحظية، ونقاط البيع السريعة (POS)، مع بوابات التوريد وإدارة النقدية بحماية تشفير عالية.
-            </Paragraph>
+            
+            {/* Contact & Support Numbers */}
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(200, 164, 92, 0.28)',
+                borderRadius: 14,
+                padding: '14px 18px',
+                backdropFilter: 'blur(8px)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <Headphones size={18} color="#C8A45C" />
+                <Text style={{ color: '#DFCA95', fontSize: 13.5, fontWeight: 700 }}>
+                  أرقام التواصل والدعم الفني:
+                </Text>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                {[
+                  '01017645959',
+                  '01129115112',
+                  '01155000072',
+                  '01095132273'
+                ].map((num) => (
+                  <a
+                    key={num}
+                    href={`tel:${num}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      background: 'rgba(200, 164, 92, 0.12)',
+                      border: '1px solid rgba(200, 164, 92, 0.35)',
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      color: '#DFCA95',
+                      fontSize: 14,
+                      fontWeight: 800,
+                      direction: 'ltr',
+                      textDecoration: 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <PhoneCall size={15} color="#C8A45C" />
+                    <span>{num}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Middle Feature Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 11, margin: '22px 0', position: 'relative', zIndex: 2 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, margin: '22px 0', position: 'relative', zIndex: 2 }}>
           <div className="auth-feature-pill">
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8', flexShrink: 0 }}>
-              <Building2 size={18} />
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(200, 164, 92, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C8A45C', flexShrink: 0 }}>
+              <Building2 size={20} />
             </div>
             <div>
-              <Text strong style={{ color: '#ffffff', fontSize: 13, display: 'block' }}>
+              <Text strong style={{ color: '#ffffff', fontSize: 13.5, display: 'block' }}>
                 مزامنة المخازن والفروع اللحظية
               </Text>
-              <Text style={{ color: '#94a3b8', fontSize: 11 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 11.5 }}>
                 تحويلات بضائع آلية، جرد مجمع، وتسوية دقيقة للعجز والزيادة
               </Text>
             </div>
           </div>
 
           <div className="auth-feature-pill">
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399', flexShrink: 0 }}>
-              <Zap size={18} />
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(200, 164, 92, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C8A45C', flexShrink: 0 }}>
+              <Zap size={20} />
             </div>
             <div>
-              <Text strong style={{ color: '#ffffff', fontSize: 13, display: 'block' }}>
+              <Text strong style={{ color: '#ffffff', fontSize: 13.5, display: 'block' }}>
                 نقاط بيع ذكية POS فائقة السرعة
               </Text>
-              <Text style={{ color: '#94a3b8', fontSize: 11 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 11.5 }}>
                 إصدار فواتير بمسح الباركود، خصومات فورية، وتسليم عهدة الوردية
               </Text>
             </div>
           </div>
 
           <div className="auth-feature-pill">
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(217, 119, 6, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24', flexShrink: 0 }}>
-              <ShoppingBag size={18} />
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(200, 164, 92, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C8A45C', flexShrink: 0 }}>
+              <ShoppingBag size={20} />
             </div>
             <div>
-              <Text strong style={{ color: '#ffffff', fontSize: 13, display: 'block' }}>
+              <Text strong style={{ color: '#ffffff', fontSize: 13.5, display: 'block' }}>
                 تكامل متجر إلكتروني ECP مباشر
               </Text>
-              <Text style={{ color: '#94a3b8', fontSize: 11 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 11.5 }}>
                 متابعة طلبات العملاء وتجهيز الشحنات مباشرة من مستودع الـ E-Com
               </Text>
             </div>
           </div>
-        </div>
-
-        {/* Bottom Uptime / Status */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: 16, position: 'relative', zIndex: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="pulse-dot" />
-            <span style={{ color: '#34d399', fontSize: 12, fontWeight: 500 }}>خادم العمليات المركزي يعمل بكفاءة 100%</span>
-          </div>
-          <Text style={{ color: '#64748b', fontSize: 11 }}>Yoka SWM Cloud v2.4</Text>
         </div>
       </div>
 
       {/* Left Form Panel */}
       <div className="auth-form-panel">
         <div className="auth-card-inner">
-          {/* Header Branding (Clean & High-Contrast for Mobile & Desktop) */}
-          <div style={{ textAlign: 'center', marginBottom: 22 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+          {/* Header Branding (Elevated Brand Monogram & High-Contrast Typography) */}
+          <div className="auth-brand-header">
+            <div className="auth-logo-badge">
               <img
                 src={yokaLogo}
                 alt="Yoka Store"
-                style={{
-                  height: 48,
-                  maxWidth: '100%',
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.08))'
-                }}
+                className="auth-logo-img"
               />
             </div>
-            <Title level={3} style={{ margin: '0 0 4px', fontWeight: 800, color: '#0f172a', fontSize: 21, letterSpacing: '-0.3px' }}>
+            <Title
+              level={3}
+              style={{
+                margin: 0,
+                fontWeight: 800,
+                color: '#0B0F17',
+                fontSize: 24,
+                letterSpacing: '-0.4px',
+                lineHeight: 1.3
+              }}
+            >
               منصة يوكا ستور
             </Title>
-            <Text type="secondary" style={{ fontSize: 13, display: 'block', color: '#64748b' }}>
-              نظام إدارة المتاجر والمخازن المركزية الموحد
-            </Text>
           </div>
 
           {/* Touch-Friendly Portal Segmented Switch */}
@@ -238,10 +273,10 @@ export default function Login({ onLoginSuccess }) {
           {/* Portal Context Banner */}
           <div
             style={{
-              backgroundColor: isAdmin ? '#f5f3ff' : '#ecfdf5',
-              border: `1px solid ${isAdmin ? '#ddd6fe' : '#a7f3d0'}`,
+              backgroundColor: isAdmin ? 'rgba(200, 164, 92, 0.08)' : '#ecfdf5',
+              border: `1px solid ${isAdmin ? 'rgba(200, 164, 92, 0.35)' : '#a7f3d0'}`,
               borderRadius: 12,
-              padding: '10px 12px',
+              padding: '10px 14px',
               marginBottom: 16,
               display: 'flex',
               alignItems: 'center',
@@ -249,15 +284,15 @@ export default function Login({ onLoginSuccess }) {
             }}
           >
             {isAdmin ? (
-              <ShieldCheck size={20} color="#6366f1" style={{ flexShrink: 0 }} />
+              <ShieldCheck size={20} color="#C8A45C" style={{ flexShrink: 0 }} />
             ) : (
               <Store size={20} color="#059669" style={{ flexShrink: 0 }} />
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <Text strong style={{ display: 'block', color: isAdmin ? '#4338ca' : '#065f46', fontSize: 12.5 }}>
+              <Text strong style={{ display: 'block', color: isAdmin ? '#8A6A24' : '#065f46', fontSize: 12.5 }}>
                 {isAdmin ? 'دخول الإدارة العامة والمستودع الرئيسي' : 'دخول الفرع ونقاط البيع (POS)'}
               </Text>
-              <Text style={{ color: isAdmin ? '#6366f1' : '#047857', fontSize: 11.5, display: 'block', lineHeight: 1.4 }}>
+              <Text style={{ color: isAdmin ? '#A68233' : '#047857', fontSize: 11.5, display: 'block', lineHeight: 1.4 }}>
                 {isAdmin
                   ? 'لوحة القيادة، المخازن المركزية، والتقارير المالية والتشغيلية.'
                   : 'مخصص لبائعي ومشرفي الفروع لإصدار الفواتير وتسليم الوردية.'}
@@ -321,7 +356,7 @@ export default function Login({ onLoginSuccess }) {
               />
             </Form.Item>
 
-            <Form.Item style={{ marginTop: 12, marginBottom: 16 }}>
+            <Form.Item style={{ marginTop: 14, marginBottom: 16 }}>
               <Button
                 type="primary"
                 htmlType="submit"
@@ -330,13 +365,14 @@ export default function Login({ onLoginSuccess }) {
                 icon={<ArrowLeft size={18} style={{ marginLeft: 6 }} />}
                 style={{
                   height: 48,
-                  backgroundColor: isAdmin ? '#4f46e5' : '#059669',
-                  borderColor: isAdmin ? '#4f46e5' : '#059669',
+                  backgroundColor: isAdmin ? '#C8A45C' : '#059669',
+                  borderColor: isAdmin ? '#C8A45C' : '#059669',
+                  color: isAdmin ? '#0B0F17' : '#ffffff',
                   fontSize: 15,
-                  fontWeight: 700,
+                  fontWeight: 800,
                   borderRadius: 10,
                   boxShadow: isAdmin
-                    ? '0 4px 14px rgba(79, 70, 229, 0.35)'
+                    ? '0 4px 14px rgba(200, 164, 92, 0.35)'
                     : '0 4px 14px rgba(5, 150, 105, 0.35)',
                   display: 'flex',
                   alignItems: 'center',
@@ -348,25 +384,49 @@ export default function Login({ onLoginSuccess }) {
             </Form.Item>
           </Form>
 
-          {/* Footer Status & Security Badge */}
+          {/* Footer Contacts & Security Badge */}
           <div
             style={{
               textAlign: 'center',
-              paddingTop: 14,
+              paddingTop: 16,
               borderTop: '1px solid #f1f5f9',
               display: 'flex',
               flexDirection: 'column',
-              gap: 4
+              gap: 8
             }}
           >
-            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <span className="pulse-dot" style={{ width: 7, height: 7 }} />
-              <Text style={{ fontSize: 11.5, color: '#10b981', fontWeight: 500 }}>
-                الخادم المركزي وقاعدة البيانات متصلة
-              </Text>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>للتواصل والدعم الفني:</span>
+              {[
+                '01017645959',
+                '01129115112',
+                '01155000072',
+                '01095132273'
+              ].map((num, idx, arr) => (
+                <React.Fragment key={num}>
+                  <a
+                    href={`tel:${num}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      color: '#0B0F17',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      textDecoration: 'none',
+                      direction: 'ltr'
+                    }}
+                  >
+                    <Phone size={12} color="#C8A45C" />
+                    {num}
+                  </a>
+                  {idx < arr.length - 1 && <span style={{ color: '#cbd5e1' }}>•</span>}
+                </React.Fragment>
+              ))}
             </div>
+
             <Text type="secondary" style={{ fontSize: 11, color: '#94a3b8' }}>
-              منصة يوكا ستور © 2026 • اتصال سحابي آمن ومشفر SSL
+              منصة يوكا ستور © 2026
             </Text>
           </div>
         </div>

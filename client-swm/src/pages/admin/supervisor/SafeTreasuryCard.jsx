@@ -30,7 +30,9 @@ import {
   DollarSign,
   Send,
   History,
-  Info
+  Info,
+  Banknote,
+  Smartphone
 } from 'lucide-react';
 import api from '../../../api';
 
@@ -252,7 +254,9 @@ export default function SafeTreasuryCard({ branchId, currentUser }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#166534', fontWeight: 700 }}>💵 نقدية الخزينة المتراكمة (Cash)</span>
+                <span style={{ fontSize: 12, color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Banknote size={15} /> نقدية الخزينة المتراكمة (Cash)
+                </span>
                 <Tag color="success" style={{ margin: 0, fontWeight: 700 }}>متاح للتسليم</Tag>
               </div>
               <div style={{ fontSize: 24, fontWeight: 900, color: '#15803d', margin: '8px 0 4px' }}>
@@ -276,7 +280,9 @@ export default function SafeTreasuryCard({ branchId, currentUser }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#1e40af', fontWeight: 700 }}>💳 تسويات الفيزا البنكية (Visa)</span>
+                <span style={{ fontSize: 12, color: '#1e40af', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <CreditCard size={15} /> تسويات الفيزا البنكية (Visa)
+                </span>
                 <Tag color="processing" style={{ margin: 0, fontWeight: 700 }}>حساب بنكي</Tag>
               </div>
               <div style={{ fontSize: 24, fontWeight: 900, color: '#1d4ed8', margin: '8px 0 4px' }}>
@@ -300,7 +306,9 @@ export default function SafeTreasuryCard({ branchId, currentUser }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#6b21a8', fontWeight: 700 }}>📲 تحويلات المحافظ والإنستاباي</span>
+                <span style={{ fontSize: 12, color: '#6b21a8', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Smartphone size={15} /> تحويلات المحافظ والإنستاباي
+                </span>
                 <Tag color="purple" style={{ margin: 0, fontWeight: 700 }}>إلكتروني</Tag>
               </div>
               <div style={{ fontSize: 24, fontWeight: 900, color: '#7e22ce', margin: '8px 0 4px' }}>

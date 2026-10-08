@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
 import {
   Card,
   Table,
@@ -257,10 +258,11 @@ export default function EcomInventory({ currentUser, onNavigate }) {
                 <Button
                   type="link"
                   size="small"
-                  style={{ padding: 0, fontSize: 11, color: '#2563eb' }}
+                  icon={<Search size={12} />}
+                  style={{ padding: 0, fontSize: 11, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                   onClick={() => handleOpenVariantsModal(r)}
                 >
-                  تفاصيل {r.variant_count} مقاس ولون 🔍
+                  تفاصيل {r.variant_count} مقاس ولون
                 </Button>
               </div>
             )}
@@ -440,8 +442,18 @@ export default function EcomInventory({ currentUser, onNavigate }) {
               onChange={setListingFilter}
             >
               <Option value="all">كافة المعروضات (الكل)</Option>
-              <Option value="true">المعروض بالمتجر فقط 🟢</Option>
-              <Option value="false">المخفي من المتجر فقط ⚪</Option>
+              <Option value="true">
+                <Space size={6} align="middle">
+                  <Badge status="success" />
+                  <span>المعروض بالمتجر فقط</span>
+                </Space>
+              </Option>
+              <Option value="false">
+                <Space size={6} align="middle">
+                  <Badge status="default" />
+                  <span>المخفي من المتجر فقط</span>
+                </Space>
+              </Option>
             </Select>
           </Col>
           <Col xs={12} md={4}>

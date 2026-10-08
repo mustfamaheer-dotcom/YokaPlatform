@@ -845,8 +845,8 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
           </div>
         )}
         {activeTab === 'treasury_admin' && <TreasuryAdmin />}
-        {activeTab === 'branches_daily' && <BranchesDaily />}
-        {activeTab === 'admin_journals' && <AdminJournals />}
+        {activeTab === 'branches_daily' && <BranchesDaily currentUser={currentUser} />}
+        {activeTab === 'admin_journals' && <AdminJournals currentUser={currentUser} />}
         {(activeTab === 'sales_reports' || activeTab === 'retail_analytics') && (
           <SalesReportsPage currentUser={currentUser} />
         )}

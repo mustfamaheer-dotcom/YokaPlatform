@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth, requireRole } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole, requireBranchScope } = require('../../shared/authMiddleware');
 
 /**
  * GET /api/swm/admin-journals
@@ -15,7 +15,7 @@ const { requireAuth, requireRole } = require('../../shared/authMiddleware');
  *    - Operating Expenses: salaries, rent, ads, packaging, etc.
  *    - Net Profit (Actual Gain): Gross Profit - Operating Expenses
  */
-router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), requireBranchScope, async (req, res) => {
   try {
     const {
       branch_id,
@@ -45,7 +45,9 @@ router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_man
       endDateVal = `${y}-${m}-${d}`;
     }
 
-    const branchFilter = branch_id && branch_id !== 'all' ? parseInt(branch_id, 10) : null;
+    const branchFilter = req.isCrossBranchAdmin
+      ? (branch_id && branch_id !== 'all' ? parseInt(branch_id, 10) : null)
+      : parseInt(req.scopedBranchId, 10);
 
     // ==========================================
     // 1. EXPENSES & PAYROLL ANALYSIS

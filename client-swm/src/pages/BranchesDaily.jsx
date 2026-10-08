@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import {
+  Home as HomeIcon,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  Globe,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Gem,
+  Receipt
+} from 'lucide-react';
 import {
   Card,
   Row,
@@ -55,14 +65,28 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-export default function BranchesDaily() {
+export default function BranchesDaily({ currentUser: propCurrentUser }) {
   const navigate = useNavigate();
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch (e) { return {}; }
+  })();
+  const user = propCurrentUser || storedUser;
+  const userBranchId = user?.branch_id || user?.branchId;
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isCentralAdmin = isSuperAdmin || (
+    ['admin', 'warehouse_manager'].includes(user?.role) &&
+    (user?.isMainWarehouse === true || !userBranchId || userBranchId === 1) &&
+    user?.branch_type !== 'retail_branch' &&
+    user?.branchType !== 'retail_branch'
+  );
+  const initialBranch = isCentralAdmin ? 'all' : (userBranchId ? userBranchId : 1);
+
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [branchesList, setBranchesList] = useState([]);
 
   // Filter States
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState(initialBranch);
   const [dateMode, setDateMode] = useState('today'); // 'today' | 'yesterday' | 'range'
   const [singleDate, setSingleDate] = useState(dayjs());
   const selectedDate = singleDate || dayjs();
@@ -202,7 +226,7 @@ export default function BranchesDaily() {
     }
 
     if (!bd || typeof bd !== 'object' || Object.keys(bd).length === 0) {
-      return <Tag color="green">💵 نقداً {parseFloat(total || 0).toLocaleString()} ج.م</Tag>;
+      return <Tag color="green" icon={<Banknote size={12} />}>نقداً {parseFloat(total || 0).toLocaleString()} ج.م</Tag>;
     }
 
     const cash = parseFloat(bd.cash || 0);
@@ -212,22 +236,22 @@ export default function BranchesDaily() {
     const tags = [];
     if (cash > 0) {
       tags.push(
-        <Tag key="c" color="green" style={{ margin: '2px 0' }}>
-          💵 كاش: {cash.toLocaleString()} ج.م
+        <Tag key="c" color="green" icon={<Banknote size={12} />} style={{ margin: '2px 0' }}>
+          كاش: {cash.toLocaleString()} ج.م
         </Tag>
       );
     }
     if (card > 0) {
       tags.push(
-        <Tag key="v" color="blue" style={{ margin: '2px 0' }}>
-          💳 فيزا: {card.toLocaleString()} ج.م
+        <Tag key="v" color="blue" icon={<CreditCard size={12} />} style={{ margin: '2px 0' }}>
+          فيزا: {card.toLocaleString()} ج.م
         </Tag>
       );
     }
     if (transfer > 0) {
       tags.push(
-        <Tag key="t" color="orange" style={{ margin: '2px 0' }}>
-          📱 تحويل: {transfer.toLocaleString()} ج.م
+        <Tag key="t" color="orange" icon={<Smartphone size={12} />} style={{ margin: '2px 0' }}>
+          تحويل: {transfer.toLocaleString()} ج.م
         </Tag>
       );
     }
@@ -510,19 +534,48 @@ export default function BranchesDaily() {
             <Text strong style={{ display: 'block', marginBottom: 6 }}>
               <ShopOutlined /> الفرع المستهدف:
             </Text>
-            <Select
-              style={{ width: '100%' }}
-              value={selectedBranch}
-              onChange={(val) => setSelectedBranch(val)}
-              placeholder="اختر الفرع..."
-            >
-              <Option value="all">🌐 جميع الفروع مجمعة (All Branches)</Option>
-              {branchesList.map((b) => (
-                <Option key={b.id} value={b.id}>
-                  {b.branch_name} ({b.branch_code})
+            {isCentralAdmin ? (
+              <Select
+                style={{ width: '100%' }}
+                value={selectedBranch}
+                onChange={(val) => setSelectedBranch(val)}
+                placeholder="اختر الفرع..."
+              >
+                <Option value="all">
+                  <Space size={6}><Globe size={13} style={{ verticalAlign: 'middle' }} /><span>جميع الفروع مجمعة (All Branches)</span></Space>
                 </Option>
-              ))}
-            </Select>
+                {branchesList.map((b) => (
+                  <Option key={b.id} value={b.id}>
+                    {b.branch_name} ({b.branch_code})
+                  </Option>
+                ))}
+              </Select>
+            ) : (
+              <div
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 8,
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  color: '#1E293B',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+                <span>
+                  {branchesList.find((b) => b.id === Number(selectedBranch))?.branch_name ||
+                    user?.branch_name ||
+                    user?.branchName ||
+                    'فرعك الحالي'}
+                </span>
+                <span style={{ fontSize: 11, color: '#64748B', backgroundColor: '#F1F5F9', padding: '2px 6px', borderRadius: 4 }}>
+                  (نطاق معتمد)
+                </span>
+              </div>
+            )}
           </Col>
 
           {/* Quick Date Selector */}
@@ -582,9 +635,9 @@ export default function BranchesDaily() {
               onChange={(v) => setPaymentFilter(v)}
             >
               <Option value="all">كافة طرق الدفع</Option>
-              <Option value="cash">💵 نقداً (كاش فقط)</Option>
-              <Option value="card">💳 بطاقات / فيزا فقط</Option>
-              <Option value="transfer">📱 تحويلات إلكترونية فقط</Option>
+              <Option value="cash"><Space size={6}><Banknote size={13} style={{ verticalAlign: 'middle' }} /><span>نقداً (كاش فقط)</span></Space></Option>
+              <Option value="card"><Space size={6}><CreditCard size={13} style={{ verticalAlign: 'middle' }} /><span>بطاقات / فيزا فقط</span></Space></Option>
+              <Option value="transfer"><Space size={6}><Smartphone size={13} style={{ verticalAlign: 'middle' }} /><span>تحويلات إلكترونية فقط</span></Space></Option>
             </Select>
           </Col>
         </Row>
@@ -606,7 +659,7 @@ export default function BranchesDaily() {
             styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#047857', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>📥 إجمالي الوارد (المبيعات)</Text>}
+              title={<Text strong style={{ color: '#047857', fontSize: 'clamp(12px, 3.2vw, 14px)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowDownLeft size={16} /> إجمالي الوارد (المبيعات)</Text>}
               value={kpi.totalInflow}
               precision={2}
               suffix="ج.م"
@@ -633,7 +686,7 @@ export default function BranchesDaily() {
             styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#b91c1c', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>📤 إجمالي المنصرف</Text>}
+              title={<Text strong style={{ color: '#b91c1c', fontSize: 'clamp(12px, 3.2vw, 14px)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowUpRight size={16} /> إجمالي المنصرف</Text>}
               value={kpi.totalOutflow}
               precision={2}
               suffix="ج.م"
@@ -660,7 +713,7 @@ export default function BranchesDaily() {
             styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: kpi.netCashflow >= 0 ? '#1d4ed8' : '#be123c', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>💎 الصافي المتبقي</Text>}
+              title={<Text strong style={{ color: kpi.netCashflow >= 0 ? '#1d4ed8' : '#be123c', fontSize: 'clamp(12px, 3.2vw, 14px)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Gem size={16} /> الصافي المتبقي</Text>}
               value={kpi.netCashflow}
               precision={2}
               suffix="ج.م"
@@ -687,7 +740,7 @@ export default function BranchesDaily() {
             styles={{ body: { padding: '12px 14px' } }}
           >
             <Statistic
-              title={<Text strong style={{ color: '#475569', fontSize: 'clamp(12px, 3.2vw, 14px)' }}>🧾 الفواتير والعمليات</Text>}
+              title={<Text strong style={{ color: '#475569', fontSize: 'clamp(12px, 3.2vw, 14px)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Receipt size={16} /> الفواتير والعمليات</Text>}
               value={kpi.invoicesCount}
               suffix="فاتورة"
               prefix={<ShoppingOutlined style={{ color: '#6366f1' }} />}
@@ -722,7 +775,7 @@ export default function BranchesDaily() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong style={{ color: '#166534', fontSize: 14 }}>💵 نقداً (كاش خزانة)</Text>
+                <Text strong style={{ color: '#166534', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Banknote size={16} /> نقداً (كاش خزانة)</Text>
                 <Tag color="green">{paymentBreakdown.cash.count} عملية</Tag>
               </div>
               <div style={{ marginTop: 8, fontSize: 22, fontWeight: 800, color: '#15803d' }}>
@@ -753,7 +806,7 @@ export default function BranchesDaily() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong style={{ color: '#1e40af', fontSize: 14 }}>💳 بطاقات وفيزا (Cards & POS)</Text>
+                <Text strong style={{ color: '#1e40af', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}><CreditCard size={16} /> بطاقات وفيزا (Cards & POS)</Text>
                 <Tag color="blue">{paymentBreakdown.card.count} عملية</Tag>
               </div>
               <div style={{ marginTop: 8, fontSize: 22, fontWeight: 800, color: '#1d4ed8' }}>
@@ -784,7 +837,7 @@ export default function BranchesDaily() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong style={{ color: '#9a3412', fontSize: 14 }}>📱 تحويلات إلكترونية (إنستاباي ومحافظ)</Text>
+                <Text strong style={{ color: '#9a3412', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Smartphone size={16} /> تحويلات إلكترونية (إنستاباي ومحافظ)</Text>
                 <Tag color="orange">{paymentBreakdown.transfer.count} عملية</Tag>
               </div>
               <div style={{ marginTop: 8, fontSize: 22, fontWeight: 800, color: '#c2410c' }}>

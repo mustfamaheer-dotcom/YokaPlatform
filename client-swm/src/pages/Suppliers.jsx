@@ -329,7 +329,8 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
             size="large"
             icon={<PlusOutlined />}
             onClick={handleOpenCreate}
-            style={{ backgroundColor: '#2563eb', fontWeight: 700, height: 44, borderRadius: 8 }}
+            className="swm-btn-primary"
+            style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             إضافة مورد جديد
           </Button>
@@ -449,7 +450,7 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
           <div style={{ textAlign: 'left', marginTop: 20 }}>
             <Space>
               <Button onClick={() => setIsModalOpen(false)}>إلغاء</Button>
-              <Button type="primary" htmlType="submit" style={{ backgroundColor: '#2563eb' }}>
+              <Button type="primary" htmlType="submit" className="swm-btn-primary">
                 {editingSupplier ? 'حفظ التعديلات' : 'إضافة المورد'}
               </Button>
             </Space>
@@ -818,7 +819,7 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
                 type="primary"
                 htmlType="submit"
                 loading={submittingPay}
-                style={{ backgroundColor: '#16a34a' }}
+                className="swm-btn-emerald"
               >
                 تأكيد وتسجيل السداد ({splitTotal.toLocaleString()} ج.م)
               </Button>

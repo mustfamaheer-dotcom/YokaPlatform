@@ -25,7 +25,8 @@ import {
   ClipboardList,
   AlertTriangle,
   Power,
-  Database
+  Database,
+  Sparkles
 } from 'lucide-react';
 import api from '../../api';
 import yokaLogo from '../../assets/yokaStoreTransparent.png';
@@ -352,8 +353,8 @@ export default function SupervisorDashboard({ currentUser, onSwitchToPos, onLogo
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 22, fontWeight: 800 }}>
-                مرحباً بك، {currentUser?.fullName || currentUser?.username} 👋
+              <span style={{ fontSize: 22, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                مرحباً بك، {currentUser?.fullName || currentUser?.username} <Sparkles size={20} style={{ color: '#F59E0B' }} />
               </span>
               <Tag color="cyan" style={{ fontWeight: 700, fontSize: 12, borderRadius: 6 }}>
                 لوحة بطاقات المشرف

@@ -48,6 +48,16 @@ function requireRole(allowedRoles = []) {
       return next();
     }
 
+    // If supervisor role is allowed, accept isSupervisor === true
+    if (allowedRoles.includes('supervisor') && (req.user.role === 'supervisor' || req.user.isSupervisor === true)) {
+      return next();
+    }
+
+    // Main warehouse accounts have administrative privileges
+    if (req.user.isMainWarehouse === true && (allowedRoles.includes('admin') || allowedRoles.includes('supervisor') || allowedRoles.includes('warehouse_manager'))) {
+      return next();
+    }
+
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
@@ -69,43 +79,48 @@ function requireBranchScope(req, res, next) {
     return res.status(401).json({ success: false, message: 'Unauthenticated.' });
   }
 
-  const ADMIN_ROLES = ['super_admin', 'admin', 'warehouse_manager'];
-  if (ADMIN_ROLES.includes(req.user.role)) {
-    // Admin & Warehouse Manager have cross-branch visibility; can optionally filter by query/body branch_id
+  const userBranchId = req.user.branchId || req.user.branch_id;
+  const isSuperAdmin = req.user.role === 'super_admin';
+
+  // Only central system owners or main warehouse headquarters have cross-branch visibility
+  const isCentralAdmin = !isSuperAdmin && (
+    ['admin', 'warehouse_manager'].includes(req.user.role) &&
+    (req.user.isMainWarehouse === true || userBranchId === 1 || !userBranchId) &&
+    req.user.branchType !== 'retail_branch'
+  );
+
+  const hasCrossBranchAccess = isSuperAdmin || isCentralAdmin;
+
+  if (hasCrossBranchAccess) {
+    // Central Admin & Warehouse Manager have cross-branch visibility; can optionally filter by query/body branch_id
     const rawBranch = req.query.branch_id || req.body.branch_id;
     if (rawBranch === 'all' || rawBranch === 'retail' || rawBranch === 'ecom' || rawBranch === 'ecs') {
       req.scopedBranchId = rawBranch;
     } else if (rawBranch) {
       req.scopedBranchId = parseInt(rawBranch, 10);
     } else {
-      req.scopedBranchId = ['super_admin', 'admin'].includes(req.user.role) ? 'all' : (req.user.branchId || 'all');
+      req.scopedBranchId = isSuperAdmin ? 'all' : (userBranchId || 'all');
     }
     req.isCrossBranchAdmin = true;
     return next();
   }
 
-  // Branch staff must have a valid branch assigned
-  if (!req.user.branchId) {
-    return res.status(403).json({
-      success: false,
-      message: 'هذا الحساب غير مرتبط بأي فرع مصرح به.'
-    });
-  }
+  // Branch staff / Branch admin are strictly confined to their assigned branch
+  req.isCrossBranchAdmin = false;
 
   // E-Commerce warehouse users requesting ecom store data
-  if (req.user.branchType === 'ecom_warehouse' || req.user.branchCode === 'BR-ECOM') {
+  if (req.user.branchType === 'ecom_warehouse' || req.user.branchCode === 'BR-ECOM' || userBranchId === 2) {
     const rawBranch = req.query.branch_id || req.body.branch_id;
     if (rawBranch === 'ecom' || rawBranch === 'ecs' || !rawBranch) {
       req.scopedBranchId = 'ecom';
     } else {
-      req.scopedBranchId = req.user.branchId;
+      req.scopedBranchId = userBranchId || 2;
     }
-    req.isCrossBranchAdmin = false;
     return next();
   }
 
-  req.scopedBranchId = req.user.branchId;
-  req.isCrossBranchAdmin = false;
+  // Branch staff and branch admin must be strictly bound to their assigned branch
+  req.scopedBranchId = userBranchId || 1;
   next();
 }
 

@@ -500,16 +500,19 @@ router.post('/refresh', async (req, res) => {
         return res.status(401).json({ success: false, message: 'Branch not found or inactive' });
       }
 
+      const isMain = branch.branch_type === 'main_warehouse';
+      const defaultRole = isMain ? 'admin' : 'branch_account';
       const payload = {
         id: branch.id,
         branchId: branch.id,
         branchName: branch.branch_name,
         branchCode: branch.branch_code,
         branchType: branch.branch_type,
-        role: 'branch_account',
+        role: defaultRole,
         username: branch.login_username || branch.branch_code,
         fullName: branch.branch_name,
         isBranchAccount: true,
+        isMainWarehouse: isMain,
         loginType: 'branch'
       };
 

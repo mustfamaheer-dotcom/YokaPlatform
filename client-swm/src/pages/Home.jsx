@@ -55,7 +55,14 @@ import {
   Zap,
   Building2,
   DollarSign,
-  ArrowRight
+  ArrowRight,
+  ChevronLeft,
+  ShoppingCart,
+  Coffee,
+  Package,
+  Wrench,
+  FileText,
+  Banknote
 } from 'lucide-react';
 import api from '../api';
 import BarcodeImage from '../components/BarcodeImage';
@@ -1026,9 +1033,10 @@ export default function Home({ currentUser, onNavigate }) {
               type="link"
               size="small"
               onClick={() => { setProductModalOpen(false); onNavigate('products'); }}
+              icon={<ChevronLeft size={14} />}
               style={{ color: '#4f46e5', fontWeight: 600, padding: 0 }}
             >
-              فتح الكتالوج الكامل ⬅
+              فتح الكتالوج الكامل
             </Button>
           </div>
         }
@@ -1165,9 +1173,10 @@ export default function Home({ currentUser, onNavigate }) {
               type="link"
               size="small"
               onClick={() => { setBranchModalOpen(false); onNavigate('branches'); }}
+              icon={<ChevronLeft size={14} />}
               style={{ color: '#059669', fontWeight: 600, padding: 0 }}
             >
-              عرض كافة الفروع ⬅
+              عرض كافة الفروع
             </Button>
           </div>
         }
@@ -1197,9 +1206,24 @@ export default function Home({ currentUser, onNavigate }) {
                 initialValue="retail_branch"
               >
                 <Select>
-                  <Option value="retail_branch">🏪 فرع تجزئة (POS & نقدية)</Option>
-                  <Option value="main_warehouse">🏢 مستودع رئيسي (تخزين وتوزيع)</Option>
-                  <Option value="ecom_warehouse">🛒 مستودع المتجر الإلكتروني (ECP)</Option>
+                  <Option value="retail_branch">
+                    <Space size={6} align="middle">
+                      <Store size={14} style={{ color: '#2563eb' }} />
+                      <span>فرع تجزئة (POS & نقدية)</span>
+                    </Space>
+                  </Option>
+                  <Option value="main_warehouse">
+                    <Space size={6} align="middle">
+                      <Building2 size={14} style={{ color: '#d97706' }} />
+                      <span>مستودع رئيسي (تخزين وتوزيع)</span>
+                    </Space>
+                  </Option>
+                  <Option value="ecom_warehouse">
+                    <Space size={6} align="middle">
+                      <ShoppingCart size={14} style={{ color: '#7c3aed' }} />
+                      <span>مستودع المتجر الإلكتروني (ECP)</span>
+                    </Space>
+                  </Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -1269,9 +1293,10 @@ export default function Home({ currentUser, onNavigate }) {
               type="link"
               size="small"
               onClick={() => { setUserModalOpen(false); onNavigate('users'); }}
+              icon={<ChevronLeft size={14} />}
               style={{ color: '#2563eb', fontWeight: 600, padding: 0 }}
             >
-              دليل الموظفين ⬅
+              دليل الموظفين
             </Button>
           </div>
         }
@@ -1375,9 +1400,10 @@ export default function Home({ currentUser, onNavigate }) {
               type="link"
               size="small"
               onClick={() => { setSupplierModalOpen(false); onNavigate('suppliers'); }}
+              icon={<ChevronLeft size={14} />}
               style={{ color: '#d97706', fontWeight: 600, padding: 0 }}
             >
-              قائمة الموردين ⬅
+              قائمة الموردين
             </Button>
           </div>
         }
@@ -1456,9 +1482,10 @@ export default function Home({ currentUser, onNavigate }) {
               type="link"
               size="small"
               onClick={() => { setExpenseModalOpen(false); onNavigate('treasury_admin'); }}
+              icon={<ChevronLeft size={14} />}
               style={{ color: '#db2777', fontWeight: 600, padding: 0 }}
             >
-              إدارة الخزائن ⬅
+              إدارة الخزائن
             </Button>
           </div>
         }
@@ -1478,12 +1505,42 @@ export default function Home({ currentUser, onNavigate }) {
                 initialValue="نثريات وضيافة"
               >
                 <Select>
-                  <Option value="نثريات وضيافة">☕ نثريات وضيافة</Option>
-                  <Option value="مستلزمات تغليف وفواتير">📦 مستلزمات تغليف وفواتير</Option>
-                  <Option value="صيانة وتشغيل">🔧 صيانة وتشغيل</Option>
-                  <Option value="نقل وشحن">🚚 نقل وشحن</Option>
-                  <Option value="كهرباء ومرافق">⚡ كهرباء ومرافق</Option>
-                  <Option value="مصروفات إدارية عامة">📑 مصروفات إدارية عامة</Option>
+                  <Option value="نثريات وضيافة">
+                    <Space size={6} align="middle">
+                      <Coffee size={14} style={{ color: '#b45309' }} />
+                      <span>نثريات وضيافة</span>
+                    </Space>
+                  </Option>
+                  <Option value="مستلزمات تغليف وفواتير">
+                    <Space size={6} align="middle">
+                      <Package size={14} style={{ color: '#2563eb' }} />
+                      <span>مستلزمات تغليف وفواتير</span>
+                    </Space>
+                  </Option>
+                  <Option value="صيانة وتشغيل">
+                    <Space size={6} align="middle">
+                      <Wrench size={14} style={{ color: '#4b5563' }} />
+                      <span>صيانة وتشغيل</span>
+                    </Space>
+                  </Option>
+                  <Option value="نقل وشحن">
+                    <Space size={6} align="middle">
+                      <Truck size={14} style={{ color: '#059669' }} />
+                      <span>نقل وشحن</span>
+                    </Space>
+                  </Option>
+                  <Option value="كهرباء ومرافق">
+                    <Space size={6} align="middle">
+                      <Zap size={14} style={{ color: '#d97706' }} />
+                      <span>كهرباء ومرافق</span>
+                    </Space>
+                  </Option>
+                  <Option value="مصروفات إدارية عامة">
+                    <Space size={6} align="middle">
+                      <FileText size={14} style={{ color: '#7c3aed' }} />
+                      <span>مصروفات إدارية عامة</span>
+                    </Space>
+                  </Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -1505,8 +1562,18 @@ export default function Home({ currentUser, onNavigate }) {
                 initialValue="cash"
               >
                 <Select>
-                  <Option value="cash">💵 نقدياً من الخزينة</Option>
-                  <Option value="bank_transfer">🏦 تحويل بنكي / فودافون كاش</Option>
+                  <Option value="cash">
+                    <Space size={6} align="middle">
+                      <Banknote size={14} style={{ color: '#16a34a' }} />
+                      <span>نقدياً من الخزينة</span>
+                    </Space>
+                  </Option>
+                  <Option value="bank_transfer">
+                    <Space size={6} align="middle">
+                      <Building2 size={14} style={{ color: '#2563eb' }} />
+                      <span>تحويل بنكي / فودافون كاش</span>
+                    </Space>
+                  </Option>
                 </Select>
               </Form.Item>
             </Col>

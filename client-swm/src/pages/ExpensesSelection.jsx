@@ -33,7 +33,8 @@ import {
   User,
   Sparkles,
   RefreshCw,
-  Wallet
+  Wallet,
+  Folder
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import api from '../api';
@@ -290,9 +291,10 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
         return (
           <Tag
             color={isDeposit ? 'green' : 'orange'}
+            icon={isDeposit ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
             style={{ fontWeight: 700, padding: '4px 10px', borderRadius: 8, fontSize: 12 }}
           >
-            {isDeposit ? '🟢 إيداع (مرتجع للدرج)' : '🔴 سحب (سند مصروف)'}
+            {isDeposit ? 'إيداع (مرتجع للدرج)' : 'سحب (سند مصروف)'}
           </Tag>
         );
       }
@@ -303,7 +305,7 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
       width: 180,
       render: (_, row) => {
         const label = row.subcategory || (row.category === 'refunded_expense' ? 'استرداد متبقي مصروف' : (row.category === 'sales_withdrawal' ? 'سلفة / سحب بائع' : 'مصروف عام'));
-        return <span style={{ fontWeight: 600, color: '#1e293b' }}>📁 {label}</span>;
+        return <span style={{ fontWeight: 600, color: '#1e293b', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Folder size={13} style={{ color: '#64748b' }} /> {label}</span>;
       }
     },
     {
@@ -1024,7 +1026,7 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
                   {adminCategories.map((cat) => (
                     <Option key={cat.value} value={cat.value}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span>📁 {cat.label}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Folder size={13} style={{ color: '#64748b' }} /> {cat.label}</span>
                         {cat.isEmployee && (
                           <Tag color="orange" style={{ margin: 0, fontSize: 11, borderRadius: 6, fontWeight: 700 }}>
                             سلفة موظف
@@ -1066,13 +1068,16 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
                       style={{ borderRadius: 10 }}
                       allowClear
                       showSearch
-                      optionFilterProp="children"
+                      optionFilterProp="label"
                     >
-                      {staff.map((u) => (
-                        <Option key={u.id} value={u.id}>
-                          👤 {u.full_name || u.username} {u.role === 'salesperson' ? '— (بائع الفرع)' : `— (${u.role})`}
-                        </Option>
-                      ))}
+                      {staff.map((u) => {
+                        const nameStr = `${u.full_name || u.username} ${u.role === 'salesperson' ? '— (بائع الفرع)' : `— (${u.role})`}`;
+                        return (
+                          <Option key={u.id} value={u.id} label={nameStr}>
+                            <Space size={6}><User size={13} style={{ verticalAlign: 'middle' }} /><span>{nameStr}</span></Space>
+                          </Option>
+                        );
+                      })}
                     </Select>
                   </Form.Item>
                 </div>
@@ -1242,7 +1247,7 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
                   {adminCategories.map((cat) => (
                     <Option key={cat.value} value={cat.value}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span>📁 {cat.label}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Folder size={13} style={{ color: '#64748b' }} /> {cat.label}</span>
                         {cat.isEmployee && (
                           <Tag color="green" style={{ margin: 0, fontSize: 11, borderRadius: 6, fontWeight: 700 }}>
                             سلفة موظف
@@ -1284,13 +1289,16 @@ export default function ExpensesSelection({ onNavigate, currentUser }) {
                       style={{ borderRadius: 10 }}
                       allowClear
                       showSearch
-                      optionFilterProp="children"
+                      optionFilterProp="label"
                     >
-                      {staff.map((u) => (
-                        <Option key={u.id} value={u.id}>
-                          👤 {u.full_name || u.username} {u.role === 'salesperson' ? '— (بائع الفرع)' : `— (${u.role})`}
-                        </Option>
-                      ))}
+                      {staff.map((u) => {
+                        const nameStr = `${u.full_name || u.username} ${u.role === 'salesperson' ? '— (بائع الفرع)' : `— (${u.role})`}`;
+                        return (
+                          <Option key={u.id} value={u.id} label={nameStr}>
+                            <Space size={6}><User size={13} style={{ verticalAlign: 'middle' }} /><span>{nameStr}</span></Space>
+                          </Option>
+                        );
+                      })}
                     </Select>
                   </Form.Item>
                 </div>

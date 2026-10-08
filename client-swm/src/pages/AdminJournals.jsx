@@ -1,6 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import {
+  Home as HomeIcon,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  Globe,
+  ClipboardList,
+  Users,
+  Lightbulb,
+  Package,
+  Scale,
+  Coins,
+  Truck,
+  ArrowDownLeft,
+  Building2,
+  Megaphone,
+  Settings
+} from 'lucide-react';
 import {
   Card,
   Row,
@@ -64,8 +81,22 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-export default function AdminJournals() {
+export default function AdminJournals({ currentUser: propCurrentUser }) {
   const navigate = useNavigate();
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch (e) { return {}; }
+  })();
+  const user = propCurrentUser || storedUser;
+  const userBranchId = user?.branch_id || user?.branchId;
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isCentralAdmin = isSuperAdmin || (
+    ['admin', 'warehouse_manager'].includes(user?.role) &&
+    (user?.isMainWarehouse === true || !userBranchId || userBranchId === 1) &&
+    user?.branch_type !== 'retail_branch' &&
+    user?.branchType !== 'retail_branch'
+  );
+  const initialBranch = isCentralAdmin ? 'all' : (userBranchId ? userBranchId : 1);
+
   const [loading, setLoading] = useState(false);
   const [branchesList, setBranchesList] = useState([]);
 
@@ -79,7 +110,7 @@ export default function AdminJournals() {
   };
 
   // Filters State
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState(initialBranch);
   const [datePreset, setDatePreset] = useState('this_month');
   const [dateRange, setDateRange] = useState([
     dayjs().startOf('month'),
@@ -413,9 +444,9 @@ export default function AdminJournals() {
       key: 'breakdown',
       render: (_, r) => (
         <Space size="small" wrap>
-          <Tag color="gold">💵 كاش: {r.net_cash?.toLocaleString()} ج.م</Tag>
-          <Tag color="blue">💳 فيزا: {r.card_sales?.toLocaleString()} ج.م</Tag>
-          <Tag color="cyan">📱 تحويلات: {r.transfer_sales?.toLocaleString()} ج.م</Tag>
+          <Tag color="gold" icon={<Banknote size={12} />}>كاش: {r.net_cash?.toLocaleString()} ج.م</Tag>
+          <Tag color="blue" icon={<CreditCard size={12} />}>فيزا: {r.card_sales?.toLocaleString()} ج.م</Tag>
+          <Tag color="cyan" icon={<Smartphone size={12} />}>تحويلات: {r.transfer_sales?.toLocaleString()} ج.م</Tag>
         </Space>
       )
     }
@@ -972,18 +1003,47 @@ export default function AdminJournals() {
             <Text strong style={{ display: 'block', marginBottom: 4 }}>
               <ShopOutlined /> نطاق الفرع أو المستودع:
             </Text>
-            <Select
-              style={{ width: '100%' }}
-              value={selectedBranch}
-              onChange={(val) => setSelectedBranch(val)}
-            >
-              <Option value="all">🌐 كافة الفروع والمستودعات</Option>
-              {branchesList.map((b) => (
-                <Option key={b.id} value={b.id}>
-                  {b.branch_name} ({b.branch_code})
+            {isCentralAdmin ? (
+              <Select
+                style={{ width: '100%' }}
+                value={selectedBranch}
+                onChange={(val) => setSelectedBranch(val)}
+              >
+                <Option value="all">
+                  <Space size={6}><Globe size={13} style={{ verticalAlign: 'middle' }} /><span>كافة الفروع والمستودعات</span></Space>
                 </Option>
-              ))}
-            </Select>
+                {branchesList.map((b) => (
+                  <Option key={b.id} value={b.id}>
+                    {b.branch_name} ({b.branch_code})
+                  </Option>
+                ))}
+              </Select>
+            ) : (
+              <div
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 8,
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  color: '#1E293B',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+                <span>
+                  {branchesList.find((b) => b.id === Number(selectedBranch))?.branch_name ||
+                    user?.branch_name ||
+                    user?.branchName ||
+                    'فرعك الحالي'}
+                </span>
+                <span style={{ fontSize: 11, color: '#64748B', backgroundColor: '#F1F5F9', padding: '2px 6px', borderRadius: 4 }}>
+                  (نطاق معتمد)
+                </span>
+              </div>
+            )}
           </Col>
 
           {/* Time Presets Radio Buttons */}
@@ -1597,10 +1657,10 @@ export default function AdminJournals() {
                         onChange={(val) => setExpenseCategoryFilter(val)}
                         size="middle"
                       >
-                        <Option value="all">📋 كافة المصروفات (عرض شامل)</Option>
-                        <Option value="payroll">👥 القبض الخاص لكل موظف بكل فرع (رواتب ومسحوبات)</Option>
-                        <Option value="utility_bill">💡 الفواتير والخدمات (كهرباء، مياه، إيجار، إنترنت)</Option>
-                        <Option value="other">📦 المصاريف الأخرى (تشغيل، إعلانات، تغليف، نثريات)</Option>
+                        <Option value="all"><Space size={6}><ClipboardList size={13} style={{ verticalAlign: 'middle' }} /><span>كافة المصروفات (عرض شامل)</span></Space></Option>
+                        <Option value="payroll"><Space size={6}><Users size={13} style={{ verticalAlign: 'middle' }} /><span>القبض الخاص لكل موظف بكل فرع (رواتب ومسحوبات)</span></Space></Option>
+                        <Option value="utility_bill"><Space size={6}><Lightbulb size={13} style={{ verticalAlign: 'middle' }} /><span>الفواتير والخدمات (كهرباء، مياه، إيجار، إنترنت)</span></Space></Option>
+                        <Option value="other"><Space size={6}><Package size={13} style={{ verticalAlign: 'middle' }} /><span>المصاريف الأخرى (تشغيل، إعلانات، تغليف، نثريات)</span></Space></Option>
                       </Select>
                     </Space>
 
@@ -1714,7 +1774,7 @@ export default function AdminJournals() {
                       <Col xs={24} sm={8}>
                         <Card size="small" style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a' }}>
                           <Statistic
-                            title={<Text strong style={{ color: '#92400e' }}>💵 صافي النقدية (كاش بعد المصاريف)</Text>}
+                            title={<Text strong style={{ color: '#92400e', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Banknote size={16} /> صافي النقدية (كاش بعد المصاريف)</Text>}
                             value={operations.summary?.netCash || 0}
                             precision={2}
                             suffix="ج.م"
@@ -1725,7 +1785,7 @@ export default function AdminJournals() {
                       <Col xs={24} sm={8}>
                         <Card size="small" style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
                           <Statistic
-                            title={<Text strong style={{ color: '#1e40af' }}>💳 مبيعات البطاقات (فيزا / ماستركارد)</Text>}
+                            title={<Text strong style={{ color: '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CreditCard size={16} /> مبيعات البطاقات (فيزا / ماستركارد)</Text>}
                             value={operations.summary?.totalCardSales || 0}
                             precision={2}
                             suffix="ج.م"
@@ -1736,7 +1796,7 @@ export default function AdminJournals() {
                       <Col xs={24} sm={8}>
                         <Card size="small" style={{ backgroundColor: '#ecfeff', border: '1px solid #a5f3fc' }}>
                           <Statistic
-                            title={<Text strong style={{ color: '#155e75' }}>📱 تحويلات إلكترونية (إنستاباي ومحافظ)</Text>}
+                            title={<Text strong style={{ color: '#155e75', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Smartphone size={16} /> تحويلات إلكترونية (إنستاباي ومحافظ)</Text>}
                             value={operations.summary?.totalTransferSales || 0}
                             precision={2}
                             suffix="ج.م"
@@ -1774,7 +1834,7 @@ export default function AdminJournals() {
                     <Col xs={12} sm={8} lg={4}>
                       <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
                         <Statistic
-                          title={<Text style={{ fontSize: 12, color: '#475569' }}>📋 إجمالي العمليات</Text>}
+                          title={<Text style={{ fontSize: 12, color: '#475569', display: 'inline-flex', alignItems: 'center', gap: 4 }}><ClipboardList size={13} /> إجمالي العمليات</Text>}
                           value={operations.summary?.totalAllOperationsCount || operations.allOperations?.length || 0}
                           valueStyle={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}
                         />
@@ -1783,7 +1843,7 @@ export default function AdminJournals() {
                     <Col xs={12} sm={8} lg={4}>
                       <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#faf5ff', border: '1px solid #e9d5ff' }}>
                         <Statistic
-                          title={<Text style={{ fontSize: 12, color: '#7e22ce' }}>⚖️ سندات التسوية</Text>}
+                          title={<Text style={{ fontSize: 12, color: '#7e22ce', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Scale size={13} /> سندات التسوية</Text>}
                           value={operations.stockAdjustments?.length || 0}
                           valueStyle={{ fontSize: 18, fontWeight: 800, color: '#6b21a8' }}
                         />
@@ -1792,7 +1852,7 @@ export default function AdminJournals() {
                     <Col xs={12} sm={8} lg={4}>
                       <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#fffbeb', border: '1px solid #fde68a' }}>
                         <Statistic
-                          title={<Text style={{ fontSize: 12, color: '#b45309' }}>💰 تحويلات الخزنة</Text>}
+                          title={<Text style={{ fontSize: 12, color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Coins size={13} /> تحويلات الخزنة</Text>}
                           value={operations.cashTransfers?.length || 0}
                           valueStyle={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}
                         />
@@ -1801,7 +1861,7 @@ export default function AdminJournals() {
                     <Col xs={12} sm={8} lg={4}>
                       <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#ecfeff', border: '1px solid #a5f3fc' }}>
                         <Statistic
-                          title={<Text style={{ fontSize: 12, color: '#0e7490' }}>💳 سداد الموردين</Text>}
+                          title={<Text style={{ fontSize: 12, color: '#0e7490', display: 'inline-flex', alignItems: 'center', gap: 4 }}><CreditCard size={13} /> سداد الموردين</Text>}
                           value={operations.supplierPayments?.length || 0}
                           valueStyle={{ fontSize: 18, fontWeight: 800, color: '#0891b2' }}
                         />
@@ -1810,7 +1870,7 @@ export default function AdminJournals() {
                     <Col xs={12} sm={8} lg={4}>
                       <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
                         <Statistic
-                          title={<Text style={{ fontSize: 12, color: '#1d4ed8' }}>🚚 أذون الصرف والنقل</Text>}
+                          title={<Text style={{ fontSize: 12, color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Truck size={13} /> أذون الصرف والنقل</Text>}
                           value={operations.transfers?.length || 0}
                           valueStyle={{ fontSize: 18, fontWeight: 800, color: '#2563eb' }}
                         />
@@ -1819,7 +1879,7 @@ export default function AdminJournals() {
                     <Col xs={12} sm={8} lg={4}>
                       <Card size="small" className="stat-metric-card" style={{ borderRadius: 8, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                         <Statistic
-                          title={<Text style={{ fontSize: 12, color: '#15803d' }}>📥 فواتير الشراء</Text>}
+                          title={<Text style={{ fontSize: 12, color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: 4 }}><ArrowDownLeft size={13} /> فواتير الشراء</Text>}
                           value={operations.purchaseInvoices?.length || 0}
                           valueStyle={{ fontSize: 18, fontWeight: 800, color: '#16a34a' }}
                         />
@@ -1842,22 +1902,22 @@ export default function AdminJournals() {
                           style={{ flexWrap: 'wrap' }}
                         >
                           <Radio.Button value="all">
-                            🌐 كافة العمليات ({operations.allOperations?.length || 0})
+                            <Space size={4}><Globe size={13} /><span>كافة العمليات ({operations.allOperations?.length || 0})</span></Space>
                           </Radio.Button>
                           <Radio.Button value="stock_adjustments">
-                            ⚖️ سندات التسوية ({operations.stockAdjustments?.length || 0})
+                            <Space size={4}><Scale size={13} /><span>سندات التسوية ({operations.stockAdjustments?.length || 0})</span></Space>
                           </Radio.Button>
                           <Radio.Button value="cash_transfers">
-                            💰 تحويلات الخزنة ({operations.cashTransfers?.length || 0})
+                            <Space size={4}><Coins size={13} /><span>تحويلات الخزنة ({operations.cashTransfers?.length || 0})</span></Space>
                           </Radio.Button>
                           <Radio.Button value="supplier_payments">
-                            💳 سداد موردين ({operations.supplierPayments?.length || 0})
+                            <Space size={4}><CreditCard size={13} /><span>سداد موردين ({operations.supplierPayments?.length || 0})</span></Space>
                           </Radio.Button>
                           <Radio.Button value="transfers">
-                            🚚 أذون الصرف ({operations.transfers?.length || 0})
+                            <Space size={4}><Truck size={13} /><span>أذون الصرف ({operations.transfers?.length || 0})</span></Space>
                           </Radio.Button>
                           <Radio.Button value="purchases">
-                            📥 فواتير التوريد ({operations.purchaseInvoices?.length || 0})
+                            <Space size={4}><ArrowDownLeft size={13} /><span>فواتير التوريد ({operations.purchaseInvoices?.length || 0})</span></Space>
                           </Radio.Button>
                         </Radio.Group>
                       </div>
@@ -2044,7 +2104,7 @@ export default function AdminJournals() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <span>👥 رواتب العمال ومسحوباتهم:</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Users size={14} style={{ color: '#ea580c' }} /> رواتب العمال ومسحوباتهم:</span>
                                 <strong>{profitability.operatingExpensesBreakdown?.payroll?.toLocaleString() || 0} ج.م</strong>
                               </div>
                               <Progress
@@ -2055,7 +2115,7 @@ export default function AdminJournals() {
 
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <span>🏢 إيجارات المقرات والفروع:</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Building2 size={14} style={{ color: '#d97706' }} /> إيجارات المقرات والفروع:</span>
                                 <strong>{profitability.operatingExpensesBreakdown?.rent?.toLocaleString() || 0} ج.م</strong>
                               </div>
                               <Progress
@@ -2066,7 +2126,7 @@ export default function AdminJournals() {
 
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <span>📢 إعلانات وتسويق:</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Megaphone size={14} style={{ color: '#0284c7' }} /> إعلانات وتسويق:</span>
                                 <strong>{profitability.operatingExpensesBreakdown?.marketing?.toLocaleString() || 0} ج.م</strong>
                               </div>
                               <Progress
@@ -2077,7 +2137,7 @@ export default function AdminJournals() {
 
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <span>📦 تغليف وشحن ونقل:</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Package size={14} style={{ color: '#8b5cf6' }} /> تغليف وشحن ونقل:</span>
                                 <strong>{profitability.operatingExpensesBreakdown?.packaging?.toLocaleString() || 0} ج.م</strong>
                               </div>
                               <Progress
@@ -2088,7 +2148,7 @@ export default function AdminJournals() {
 
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                <span>💡 فواتير وخدمات ونثريات أخرى:</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Lightbulb size={14} style={{ color: '#64748b' }} /> فواتير وخدمات ونثريات أخرى:</span>
                                 <strong>{((profitability.operatingExpensesBreakdown?.utilities || 0) + (profitability.operatingExpensesBreakdown?.other || 0)).toLocaleString()} ج.م</strong>
                               </div>
                               <Progress
@@ -2148,12 +2208,12 @@ export default function AdminJournals() {
             rules={[{ required: true, message: 'يرجى تحديد التصنيف' }]}
           >
             <Select>
-              <Option value="payroll">👥 قبض موظف / سحب بائع / رواتب</Option>
-              <Option value="utility_bill">💡 فواتير (كهرباء، مياه، غاز، إنترنت)</Option>
-              <Option value="rent">🏢 إيجار الفرع أو المقر</Option>
-              <Option value="marketing">📢 إعلانات وتسويق وحملات</Option>
-              <Option value="packaging">📦 تغليف ومواد تعبئة وشحن</Option>
-              <Option value="other">⚙️ مصاريف تشغيلية أخرى ونثريات</Option>
+              <Option value="payroll"><Space size={6}><Users size={13} style={{ verticalAlign: 'middle' }} /><span>قبض موظف / سحب بائع / رواتب</span></Space></Option>
+              <Option value="utility_bill"><Space size={6}><Lightbulb size={13} style={{ verticalAlign: 'middle' }} /><span>فواتير (كهرباء، مياه، غاز، إنترنت)</span></Space></Option>
+              <Option value="rent"><Space size={6}><Building2 size={13} style={{ verticalAlign: 'middle' }} /><span>إيجار الفرع أو المقر</span></Space></Option>
+              <Option value="marketing"><Space size={6}><Megaphone size={13} style={{ verticalAlign: 'middle' }} /><span>إعلانات وتسويق وحملات</span></Space></Option>
+              <Option value="packaging"><Space size={6}><Package size={13} style={{ verticalAlign: 'middle' }} /><span>تغليف ومواد تعبئة وشحن</span></Space></Option>
+              <Option value="other"><Space size={6}><Settings size={13} style={{ verticalAlign: 'middle' }} /><span>مصاريف تشغيلية أخرى ونثريات</span></Space></Option>
             </Select>
           </Form.Item>
 
@@ -2332,7 +2392,7 @@ export default function AdminJournals() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 👁️ OPERATION INSPECTION & REVIEW MODAL */}
+      {/* OPERATION INSPECTION & REVIEW MODAL */}
       {/* ========================================================================= */}
       <Modal
         title={

@@ -624,9 +624,10 @@ export default function Dashboard({ onNavigate }) {
                   type="link"
                   size="small"
                   onClick={() => onNavigate('branches_daily')}
+                  icon={<ArrowLeft size={14} />}
                   style={{ fontWeight: 700, color: '#DFCA95', padding: 0 }}
                 >
-                  عرض اليومية المفصلة ⬅
+                  عرض اليومية المفصلة
                 </Button>
               </div>
             }

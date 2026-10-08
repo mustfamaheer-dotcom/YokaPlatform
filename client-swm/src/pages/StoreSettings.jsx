@@ -878,7 +878,8 @@ export default function StoreSettings({ currentUser }) {
                         style={{ color: '#0284C7', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                       >
                         <EnvironmentOutlined />
-                        <span>معاينة الرابط على الخريطة ↗</span>
+                        <span>معاينة الرابط على الخريطة</span>
+                        <ExternalLink size={12} />
                       </a>
                     </div>
                   )}
@@ -940,15 +941,12 @@ export default function StoreSettings({ currentUser }) {
                   size="large"
                   icon={<SaveOutlined />}
                   loading={saving}
+                  className="swm-btn-primary"
                   style={{
-                    backgroundColor: '#0F172A',
-                    borderColor: '#0F172A',
-                    color: '#FFFFFF',
                     borderRadius: 10,
                     fontWeight: 700,
                     minWidth: 220,
-                    height: 48,
-                    boxShadow: '0 4px 14px rgba(15,23,42,0.25)'
+                    height: 48
                   }}
                 >
                   حفظ وتطبيق التغييرات فوراً
@@ -1188,8 +1186,9 @@ export default function StoreSettings({ currentUser }) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 11 }}>تنعكس الإعدادات فورياً على متجر العملاء.</span>
                       <a href="http://localhost:3000" target="_blank" rel="noopener noreferrer">
-                        <Button size="small" type="link" style={{ padding: 0, fontWeight: 700, color: '#C8A45C', fontSize: 11 }}>
-                          زيارة المتجر ↗
+                        <Button size="small" type="link" style={{ padding: 0, fontWeight: 700, color: '#C8A45C', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span>زيارة المتجر</span>
+                          <ExternalLink size={12} />
                         </Button>
                       </a>
                     </div>
@@ -1320,10 +1319,8 @@ export default function StoreSettings({ currentUser }) {
               htmlType="submit"
               loading={savingBranch}
               icon={<SaveOutlined />}
+              className="swm-btn-cobalt"
               style={{
-                backgroundColor: '#0F172A',
-                borderColor: '#0F172A',
-                color: '#FFFFFF',
                 borderRadius: 8,
                 fontWeight: 700
               }}

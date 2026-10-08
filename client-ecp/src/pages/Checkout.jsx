@@ -622,10 +622,11 @@ export default function Checkout({ cart, onRefreshCart }) {
                             icon={copiedKey ? <CheckOutlined /> : <CopyOutlined />}
                             onClick={() => handleCopyAccount(currentMethod.account_number)}
                             style={{
-                              backgroundColor: copiedKey ? '#16a34a' : '#1C1917',
-                              borderColor: copiedKey ? '#16a34a' : '#1C1917',
-                              color: '#fff',
-                              borderRadius: 6
+                              backgroundColor: copiedKey ? '#059669' : '#2563EB',
+                              borderColor: copiedKey ? '#059669' : '#2563EB',
+                              color: '#ffffff',
+                              borderRadius: 6,
+                              fontWeight: 700
                             }}
                           >
                             {copiedKey ? 'تم النسخ!' : 'نسخ الرقم'}

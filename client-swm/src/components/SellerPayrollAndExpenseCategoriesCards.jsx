@@ -31,6 +31,7 @@ import {
   Layers,
   Clock,
   Plus,
+  Check,
   Trash2,
   Printer,
   FileSpreadsheet,
@@ -42,7 +43,21 @@ import {
   Calendar,
   Search,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  Store,
+  Building2,
+  CheckCircle2,
+  RotateCcw,
+  Landmark,
+  Info,
+  AlertTriangle,
+  Tag as TagIcon,
+  Zap,
+  FileSignature,
+  Lightbulb
 } from 'lucide-react';
 import {
   ReloadOutlined,
@@ -675,9 +690,9 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
       key: 'channel',
       width: 90,
       render: (ch) => {
-        if (ch === 'visa') return <Tag color="blue">💳 فيزا</Tag>;
-        if (ch === 'transfer') return <Tag color="purple">📱 تحويل</Tag>;
-        return <Tag color="green">💵 كاش</Tag>;
+        if (ch === 'visa') return <Tag color="blue" icon={<CreditCard size={12} />}>فيزا</Tag>;
+        if (ch === 'transfer') return <Tag color="purple" icon={<Smartphone size={12} />}>تحويل</Tag>;
+        return <Tag color="green" icon={<Banknote size={12} />}>كاش</Tag>;
       }
     },
     {
@@ -687,9 +702,9 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
       width: 120,
       render: (src) => {
         if (src === 'branch_safe') {
-          return <Tag color="volcano" style={{ fontSize: 11 }}>🏬 خزينة الفرع</Tag>;
+          return <Tag color="volcano" icon={<Store size={12} />} style={{ fontSize: 11 }}>خزينة الفرع</Tag>;
         }
-        return <Tag color="geekblue" style={{ fontSize: 11 }}>🏢 الخزينة الرئيسية</Tag>;
+        return <Tag color="geekblue" icon={<Building2 size={12} />} style={{ fontSize: 11 }}>الخزينة الرئيسية</Tag>;
       }
     },
     {
@@ -857,8 +872,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
           {
             key: 'payroll',
             label: (
-              <span style={{ fontWeight: 700, padding: '0 8px' }}>
-                💵 مسير وصرف رواتب البائعين
+              <span style={{ fontWeight: 700, padding: '0 8px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Banknote size={16} /> مسير وصرف رواتب البائعين
               </span>
             ),
             children: (
@@ -916,7 +931,13 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                         valueStyle={{ color: '#d97706', fontSize: 18, fontWeight: 800 }}
                       />
                       <Text type="secondary" style={{ fontSize: 11 }}>
-                        {kpis.pendingCount === 0 ? '✨ تم صرف الجميع' : `متبقي صرف: ${kpis.pendingCount} موظف`}
+                        {kpis.pendingCount === 0 ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Sparkles size={12} style={{ color: '#d97706' }} /> تم صرف الجميع
+                          </span>
+                        ) : (
+                          `متبقي صرف: ${kpis.pendingCount} موظف`
+                        )}
                       </Text>
                     </Card>
                   </Col>
@@ -968,7 +989,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                       showSearch
                       allowClear
                       optionLabelProp="label"
-                      placeholder="🔍 ابحث بالاسم الكامل أو رقم الهاتف أو الفرع..."
+                      placeholder="ابحث بالاسم الكامل أو رقم الهاتف أو الفرع..."
                       style={{ width: '100%' }}
                       size="large"
                       value={selectedSellerId}
@@ -1016,11 +1037,11 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                   مرتب: {parseFloat(emp.salary || 0).toLocaleString()} ج.م
                                 </Tag>
                                 {isPaid ? (
-                                  <Tag color="success" style={{ fontWeight: 'bold' }}>
-                                    تم الصرف ✅
+                                  <Tag color="success" icon={<CheckCircle2 size={11} />} style={{ fontWeight: 'bold' }}>
+                                    تم الصرف
                                   </Tag>
                                 ) : (
-                                  <Tag color="warning">في الانتظار ⏳</Tag>
+                                  <Tag color="warning" icon={<Clock size={11} />}>في الانتظار</Tag>
                                 )}
                               </Space>
                             </div>
@@ -1035,8 +1056,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                       if (pendingEmployees.length === 0) return null;
                       return (
                         <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                          <Text type="secondary" style={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>
-                            ⚡ موظفون بانتظار الصرف ({pendingEmployees.length}):
+                          <Text type="secondary" style={{ fontSize: 11, fontWeight: 700, color: '#475569', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <Zap size={13} style={{ color: '#d97706' }} /> موظفون بانتظار الصرف ({pendingEmployees.length}):
                           </Text>
                           {pendingEmployees.slice(0, 6).map((emp) => {
                             const isSelected = selectedSellerId === emp.id;
@@ -1044,6 +1065,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                               <Tag
                                 key={emp.id}
                                 color={isSelected ? 'success' : 'geekblue'}
+                                icon={<Clock size={11} />}
                                 style={{
                                   cursor: 'pointer',
                                   borderRadius: 8,
@@ -1061,7 +1083,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                   setBonusReason('');
                                 }}
                               >
-                                ⏳ {emp.full_name} ({emp.branch_name || 'الفرع'})
+                                {emp.full_name} ({emp.branch_name || 'الفرع'})
                               </Tag>
                             );
                           })}
@@ -1086,9 +1108,10 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                           size="small"
                           type="primary"
                           danger
+                          icon={<RotateCcw size={12} />}
                           onClick={() => fetchSellerSummary(selectedSellerId, payrollMonth)}
                         >
-                          إعادة المحاولة 🔄
+                          إعادة المحاولة
                         </Button>
                       }
                       style={{ marginBottom: 14, borderRadius: 10 }}
@@ -1302,8 +1325,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                           >
                             {/* Deduct Source Selection */}
                             <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px dashed #bbf7d0' }}>
-                              <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 6, color: '#166534' }}>
-                                🏛️ من أين سيتم خصم وصرف الراتب نقدياً؟
+                              <Text strong style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 6, color: '#166534' }}>
+                                <Landmark size={15} /> من أين سيتم خصم وصرف الراتب نقدياً؟
                               </Text>
                               <Radio.Group
                                 value={deductSource}
@@ -1312,18 +1335,22 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                 buttonStyle="solid"
                               >
                                 <Radio.Button value="main_treasury">
-                                  🏢 الخزينة الرئيسية {!isWarehouseManager && `(كاش متاح: ${(safeBalances.cash || 0).toLocaleString()} ج.م)`}
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                    <Building2 size={13} /> الخزينة الرئيسية {!isWarehouseManager && `(كاش متاح: ${(safeBalances.cash || 0).toLocaleString()} ج.م)`}
+                                  </span>
                                 </Radio.Button>
                                 <Radio.Button
                                   value="branch_safe"
                                   disabled={!sellerSummary.employee.branch_id}
                                 >
-                                  🏬 خزينة فرع {sellerSummary.employee.branch_name || 'الفرع'} {!isWarehouseManager && `(كاش متاح: ${(branchSafeBalances.cash || 0).toLocaleString()} ج.م)`}
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                    <Store size={13} /> خزينة فرع {sellerSummary.employee.branch_name || 'الفرع'} {!isWarehouseManager && `(كاش متاح: ${(branchSafeBalances.cash || 0).toLocaleString()} ج.م)`}
+                                  </span>
                                 </Radio.Button>
                               </Radio.Group>
                               {!sellerSummary.employee.branch_id && (
-                                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
-                                  ℹ️ هذا الموظف غير مقيد بفرع تجزئة مستقل، لذلك يتم الصرف من الخزينة الرئيسية.
+                                <Text type="secondary" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                  <Info size={12} /> هذا الموظف غير مقيد بفرع تجزئة مستقل، لذلك يتم الصرف من الخزينة الرئيسية.
                                 </Text>
                               )}
                             </div>
@@ -1359,9 +1386,21 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                   value={payrollChannel}
                                   onChange={(e) => setPayrollChannel(e.target.value)}
                                 >
-                                  <Radio.Button value="cash">💵 كاش (نقدية)</Radio.Button>
-                                  <Radio.Button value="visa">💳 فيزا (بطاقة)</Radio.Button>
-                                  <Radio.Button value="transfer">📱 تحويل بنكي</Radio.Button>
+                                  <Radio.Button value="cash">
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                      <Banknote size={13} /> كاش (نقدية)
+                                    </span>
+                                  </Radio.Button>
+                                  <Radio.Button value="visa">
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                      <CreditCard size={13} /> فيزا (بطاقة)
+                                    </span>
+                                  </Radio.Button>
+                                  <Radio.Button value="transfer">
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                      <Smartphone size={13} /> تحويل بنكي
+                                    </span>
+                                  </Radio.Button>
                                 </Radio.Group>
                                 {!isWarehouseManager && (
                                   <div
@@ -1417,8 +1456,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                             </Row>
 
                             {!isWarehouseManager && !canAfford && net > 0 && (
-                              <div style={{ marginTop: 8, textAlign: 'center', color: '#dc2626', fontSize: 12 }}>
-                                ⚠️ رصيد [{sourceLabel}] في هذه القناة ({avail.toLocaleString()} ج.م) لا يكفي لصرف صافي القبض ({net.toLocaleString()} ج.م). يرجى اختيار الخزينة الأخرى أو تغذية الرصيد.
+                              <div style={{ marginTop: 8, textAlign: 'center', color: '#dc2626', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                <AlertTriangle size={14} /> رصيد [{sourceLabel}] في هذه القناة ({avail.toLocaleString()} ج.م) لا يكفي لصرف صافي القبض ({net.toLocaleString()} ج.م). يرجى اختيار الخزينة الأخرى أو تغذية الرصيد.
                               </div>
                             )}
                           </div>
@@ -1471,8 +1510,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
           {
             key: 'categories',
             label: (
-              <span style={{ fontWeight: 700, padding: '0 8px' }}>
-                🏷️ تصنيفات وبنود المصروفات
+              <span style={{ fontWeight: 700, padding: '0 8px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <TagIcon size={16} /> تصنيفات وبنود المصروفات
               </span>
             ),
             children: (
@@ -1524,8 +1563,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                       <Divider style={{ margin: '14px 0', borderColor: '#fde68a' }} />
 
                       <div style={{ marginBottom: 8 }}>
-                        <Text strong style={{ fontSize: 12, color: '#92400e' }}>
-                          ⚡ بنود شائعة مقترحة (انقر للإضافة السريعة):
+                        <Text strong style={{ fontSize: 12, color: '#92400e', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Zap size={13} style={{ color: '#d97706' }} /> بنود شائعة مقترحة (انقر للإضافة السريعة):
                         </Text>
                       </div>
 
@@ -1536,6 +1575,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                             <Tag
                               key={preset}
                               color={exists ? 'default' : 'orange'}
+                              icon={exists ? <Check size={10} /> : <Plus size={10} />}
                               style={{
                                 cursor: exists ? 'not-allowed' : 'pointer',
                                 padding: '4px 8px',
@@ -1546,7 +1586,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                 if (!exists) handleAddCategory(preset);
                               }}
                             >
-                              {preset} {exists ? '✓' : '+'}
+                              {preset}
                             </Tag>
                           );
                         })}
@@ -1613,6 +1653,7 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                   e.preventDefault();
                                   handleDeleteCategory(cat);
                                 }}
+                                icon={<TagIcon size={12} />}
                                 style={{
                                   fontSize: 13,
                                   padding: '6px 12px',
@@ -1626,15 +1667,15 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                                   gap: 6
                                 }}
                               >
-                                🏷️ {cat}
+                                {cat}
                               </Tag>
                             ))}
                           </Space>
                         )}
                       </div>
 
-                      <div style={{ marginTop: 12, fontSize: 11, color: '#64748b' }}>
-                        💡 أي تصنيف يتم اعتماده هنا يظهر فوراً في قوائم الاختيار لدى كافة الكاشيرات بالـ POS عند تسجيل أي مصروف نثري أو سحب تشغيلي.
+                      <div style={{ marginTop: 12, fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Lightbulb size={13} /> أي تصنيف يتم اعتماده هنا يظهر فوراً في قوائم الاختيار لدى كافة الكاشيرات بالـ POS عند تسجيل أي مصروف نثري أو سحب تشغيلي.
                       </div>
                     </Card>
                   </Col>
@@ -1747,8 +1788,8 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
                   <td><strong>الفرع التابع له:</strong> {selectedPayoutForReceipt.branch_name || 'الفرع الرئيسي'}</td>
                 </tr>
                 <tr>
-                  <td><strong>قناة وطريقة الصرف:</strong> {selectedPayoutForReceipt.channel === 'cash' ? '💵 كاش نقدية' : selectedPayoutForReceipt.channel === 'visa' ? '💳 فيزا / بطاقة' : '📱 تحويل بنكي'}</td>
-                  <td><strong>جهة الخصم والصرف:</strong> {selectedPayoutForReceipt.deduct_source === 'branch_safe' ? `🏬 خزينة فرع (${selectedPayoutForReceipt.branch_name || 'الفرع'})` : '🏢 الخزينة الرئيسية'}</td>
+                  <td><strong>قناة وطريقة الصرف:</strong> {selectedPayoutForReceipt.channel === 'cash' ? 'كاش نقدية' : selectedPayoutForReceipt.channel === 'visa' ? 'فيزا / بطاقة' : 'تحويل بنكي'}</td>
+                  <td><strong>جهة الخصم والصرف:</strong> {selectedPayoutForReceipt.deduct_source === 'branch_safe' ? `خزينة فرع (${selectedPayoutForReceipt.branch_name || 'الفرع'})` : 'الخزينة الرئيسية'}</td>
                 </tr>
                 <tr>
                   <td><strong>معتمد الصرف:</strong> {selectedPayoutForReceipt.paid_by_name || 'الإدارة المالية'}</td>
@@ -1802,8 +1843,11 @@ export default function SellerPayrollAndExpenseCategoriesCards({ currentUser }) 
               </div>
             </div>
 
-            <div className="declaration">
-              ✍️ <strong>إقرار الاستلام:</strong> أقر أنا الموظف الموضح اسمي أعلاه باستلامي كامل صافي الراتب المستحق لي عن شهر ({selectedPayoutForReceipt.payout_month}) دون أي تأخير، وتسوية كافة السلف والمستحقات المذكورة.
+            <div className="declaration" style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+              <FileSignature size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <strong>إقرار الاستلام:</strong> أقر أنا الموظف الموضح اسمي أعلاه باستلامي كامل صافي الراتب المستحق لي عن شهر ({selectedPayoutForReceipt.payout_month}) دون أي تأخير، وتسوية كافة السلف والمستحقات المذكورة.
+              </div>
             </div>
 
             <div className="signatures">

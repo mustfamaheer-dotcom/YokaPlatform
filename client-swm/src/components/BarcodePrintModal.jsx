@@ -23,6 +23,7 @@ import {
   TagsOutlined,
   EyeOutlined
 } from '@ant-design/icons';
+import { Lightbulb } from 'lucide-react';
 import BarcodeImage from './BarcodeImage';
 import { printHtmlContent } from '../utils/printUtils';
 
@@ -373,8 +374,8 @@ export default function BarcodePrintModal({
               عدد التركيبات: {printList.length} | عدد القطع الإجمالي: {totalStickersToPrint} قطعة
             </Text>
           </Space>
-          <Text type="secondary" style={{ fontSize: 11, color: '#16a34a' }}>
-            💡 يتم تعيين عدد الملصقات تلقائياً بناءً على عدد القطع المشتراة في الفاتورة.
+          <Text type="secondary" style={{ fontSize: 11, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Lightbulb size={12} /> يتم تعيين عدد الملصقات تلقائياً بناءً على عدد القطع المشتراة في الفاتورة.
           </Text>
         </div>
 

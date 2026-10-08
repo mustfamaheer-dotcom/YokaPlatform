@@ -35,10 +35,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         theme={{
           token: {
             colorPrimary: '#C8A45C',
-            colorLink: '#C8A45C',
-            colorLinkHover: '#A68942',
-            colorSuccess: '#2D7A3A',
-            colorError: '#C62828',
+            colorLink: '#8A671D',
+            colorLinkHover: '#6B4E12',
+            colorSuccess: '#059669',
+            colorInfo: '#2563EB',
+            colorWarning: '#EA580C',
+            colorError: '#DC2626',
             fontFamily: 'Cairo, sans-serif',
             borderRadius: 8,
             colorBgContainer: '#FFFFFF',
@@ -50,9 +52,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           components: {
             Button: {
               colorPrimary: '#C8A45C',
-              colorPrimaryHover: '#A68942',
-              colorPrimaryActive: '#8A7035',
-              primaryColor: '#FFFFFF',
+              colorPrimaryHover: '#DFCA95',
+              colorPrimaryActive: '#B38E46',
+              primaryColor: '#0B0F17',
+              fontWeight: 700,
             },
             Input: {
               activeBorderColor: '#C8A45C',

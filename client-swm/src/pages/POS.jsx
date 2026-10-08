@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Banknote, CreditCard, Smartphone, Check, AlertTriangle } from 'lucide-react';
 import {
   Row,
   Col,
@@ -755,8 +756,8 @@ export default function POS({ currentUser }) {
           />
 
           {invoiceType === 'return' && (
-            <Tag color="error" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
-              ⚠️ وضع المرتجع: استرجاع للمخزون ورد النقدية
+            <Tag color="error" icon={<AlertTriangle size={12} />} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
+              وضع المرتجع: استرجاع للمخزون ورد النقدية
             </Tag>
           )}
         </div>
@@ -927,14 +928,16 @@ export default function POS({ currentUser }) {
                         type="primary"
                         icon={<PlusOutlined />}
                         onClick={handleStep1AddEmptyRow}
-                        style={{ backgroundColor: '#7c3aed', borderRadius: 6, fontWeight: 700 }}
+                        className="swm-btn-cobalt"
+                        style={{ borderRadius: 6, fontWeight: 700 }}
                       >
                         سطر (F11)
                       </Button>
                       <Button
                         icon={<SearchOutlined />}
                         onClick={handleStep2OpenSearchModal}
-                        style={{ borderColor: '#2563eb', color: '#2563eb', borderRadius: 6, fontWeight: 700 }}
+                        className="swm-btn-cobalt-outline"
+                        style={{ borderRadius: 6, fontWeight: 700 }}
                       >
                         بحث (F1)
                       </Button>
@@ -1063,10 +1066,10 @@ export default function POS({ currentUser }) {
                       <td colSpan={8} style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
                         <div style={{ fontSize: 15, marginBottom: 8 }}>لا توجد أصناف في الفاتورة حالياً</div>
                         <Space size="middle">
-                          <Button type="primary" icon={<PlusOutlined />} onClick={handleStep1AddEmptyRow} style={{ backgroundColor: '#7c3aed' }}>
+                          <Button type="primary" icon={<PlusOutlined />} onClick={handleStep1AddEmptyRow} className="swm-btn-cobalt" style={{ borderRadius: 6, fontWeight: 700 }}>
                             إضافة سطر فارغ (F11)
                           </Button>
-                          <Button icon={<SearchOutlined />} onClick={handleStep2OpenSearchModal} style={{ borderColor: '#2563eb', color: '#2563eb' }}>
+                          <Button icon={<SearchOutlined />} onClick={handleStep2OpenSearchModal} className="swm-btn-cobalt-outline" style={{ borderRadius: 6, fontWeight: 700 }}>
                             فتح بحث المجاميع (F1)
                           </Button>
                         </Space>
@@ -1193,7 +1196,9 @@ export default function POS({ currentUser }) {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div>
-                    <Text style={{ fontSize: 11, color: '#16a34a', display: 'block', marginBottom: 2 }}>💵 نقدًا (كاش):</Text>
+                    <Text style={{ fontSize: 11, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <Banknote size={12} /> نقدًا (كاش):
+                    </Text>
                     <InputNumber
                       size="middle"
                       min={0}
@@ -1206,7 +1211,9 @@ export default function POS({ currentUser }) {
 
                   <Row gutter={8}>
                     <Col span={12}>
-                      <Text style={{ fontSize: 11, color: '#2563eb', display: 'block', marginBottom: 2 }}>💳 فيزا / بطاقة:</Text>
+                      <Text style={{ fontSize: 11, color: '#2563eb', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                        <CreditCard size={12} /> فيزا / بطاقة:
+                      </Text>
                       <InputNumber
                         size="middle"
                         min={0}
@@ -1217,7 +1224,9 @@ export default function POS({ currentUser }) {
                       />
                     </Col>
                     <Col span={12}>
-                      <Text style={{ fontSize: 11, color: '#9333ea', display: 'block', marginBottom: 2 }}>📱 تحويل / محفظة:</Text>
+                      <Text style={{ fontSize: 11, color: '#9333ea', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                        <Smartphone size={12} /> تحويل / محفظة:
+                      </Text>
                       <InputNumber
                         size="middle"
                         min={0}
@@ -1247,7 +1256,9 @@ export default function POS({ currentUser }) {
                   ) : isOverpaid ? (
                     <span style={{ color: '#dc2626', fontWeight: 'bold' }}>زيادة غير مقبولة</span>
                   ) : (
-                    <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ مسدد بالكامل</span>
+                    <span style={{ color: '#16a34a', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Check size={14} /> مسدد بالكامل
+                    </span>
                   )}
                 </div>
               </div>
@@ -1268,13 +1279,14 @@ export default function POS({ currentUser }) {
                       ? '#94a3b8'
                       : invoiceType === 'return'
                       ? '#dc2626'
-                      : '#16a34a',
+                      : '#059669',
                   borderColor:
                     validItems.length === 0 || remainingDue > 0 || isOverpaid
                       ? '#94a3b8'
                       : invoiceType === 'return'
                       ? '#dc2626'
-                      : '#16a34a',
+                      : '#059669',
+                  color: '#FFFFFF',
                   fontWeight: 'bold',
                   fontSize: 16,
                   height: 48,
@@ -1452,7 +1464,8 @@ export default function POS({ currentUser }) {
                         size="small"
                         type="primary"
                         icon={<CheckOutlined />}
-                        style={{ backgroundColor: '#16a34a', borderRadius: 6 }}
+                        className="swm-btn-emerald"
+                        style={{ borderRadius: 6 }}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelectProductFromModal(r);
@@ -1513,7 +1526,7 @@ export default function POS({ currentUser }) {
                 type="primary"
                 loading={savingSettings}
                 onClick={() => handleSaveSupervisorSettings(supervisorSettings)}
-                style={{ backgroundColor: '#2563eb' }}
+                className="swm-btn-cobalt"
               >
                 حفظ الإعدادات
               </Button>
@@ -1561,7 +1574,7 @@ export default function POS({ currentUser }) {
           <div style={{ textAlign: 'left' }}>
             <Space>
               <Button onClick={() => setOpenModalVisible(false)}>إلغاء</Button>
-              <Button type="primary" htmlType="submit" style={{ backgroundColor: '#16a34a' }}>
+              <Button type="primary" htmlType="submit" className="swm-btn-emerald">
                 تأكيد فتح الوردية
               </Button>
             </Space>
@@ -1597,7 +1610,7 @@ export default function POS({ currentUser }) {
           <div style={{ textAlign: 'left' }}>
             <Space>
               <Button onClick={() => setCloseModalVisible(false)}>إلغاء</Button>
-              <Button danger type="primary" htmlType="submit">
+              <Button danger type="primary" htmlType="submit" className="swm-btn-danger">
                 تأكيد إغلاق الوردية
               </Button>
             </Space>

@@ -16,26 +16,18 @@
 
 ### Color Palette
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#059669` | `--color-primary` |
-| On Primary | `#000000` | `--color-on-primary` |
-| Secondary | `#10B981` | `--color-secondary` |
-| On Secondary | `#0F172A` | `--color-on-secondary` |
-| Accent/CTA | `#EA580C` | `--color-accent` |
-| On Accent/CTA | `#000000` | `--color-on-accent` |
-| Background | `#ECFDF5` | `--color-background` |
-| Foreground | `#064E3B` | `--color-foreground` |
-| Card | `#FFFFFF` | `--color-card` |
-| Card Foreground | `#064E3B` | `--color-card-foreground` |
-| Muted | `#E8F1F3` | `--color-muted` |
-| Muted Foreground | `#475569` | `--color-muted-foreground` |
-| Border | `#A7F3D0` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| On Destructive | `#FFFFFF` | `--color-on-destructive` |
-| Ring | `#059669` | `--color-ring` |
+| Role | Hex | CSS Variable | Text/Contrast |
+|------|-----|--------------|---------------|
+| Brand Primary | `#C8A45C` | `--color-admin-primary` | `#0B0F17` (8.5:1 AAA) |
+| Strategic Accent 1 (Cobalt) | `#2563EB` | `--color-cobalt` | `#FFFFFF` (5.2:1 AA) |
+| Strategic Accent 2 (Emerald) | `#059669` | `--color-pos-sale` | `#FFFFFF` (4.6:1 AA) |
+| Destructive (Crimson) | `#DC2626` | `--color-danger` | `#FFFFFF` (4.6:1 AA) |
+| Background | `#F8FAFC` | `--bg-color` | `#0F172A` |
+| Card Surface | `#FFFFFF` | `--card-bg` | `#0F172A` |
+| Border | `#E2E8F0` | `--border-color` | N/A |
+| Accessible Gold Link | `#8A671D` | `--color-link` | On white (4.6:1 AA) |
 
-**Color Notes:** Success green + urgency orange [Accent adjusted from #F97316]
+**Color Notes:** Luxury Imperial Gold + Operations Electric Cobalt + Commerce Mint Emerald.
 
 ### Typography
 

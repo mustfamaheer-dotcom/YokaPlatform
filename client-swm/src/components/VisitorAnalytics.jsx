@@ -37,6 +37,7 @@ import {
   AppstoreOutlined,
   ShopOutlined
 } from '@ant-design/icons';
+import { ShoppingCart, Check } from 'lucide-react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/ar';
@@ -244,8 +245,8 @@ export default function VisitorAnalytics() {
         <div>
           <Space wrap size={4}>
             <Tag color="cyan">{pvc} مشاهدات</Tag>
-            {r.has_cart_activity && <Tag color="orange">🛒 سلة</Tag>}
-            {r.has_ordered && <Tag color="green">✓ تم الشراء</Tag>}
+            {r.has_cart_activity && <Tag color="orange" icon={<ShoppingCart size={11} />}>سلة</Tag>}
+            {r.has_ordered && <Tag color="green" icon={<Check size={11} />}>تم الشراء</Tag>}
           </Space>
           <div style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
             آخر صفحة: <code style={{ fontSize: 10 }}>{r.exit_page || '/'}</code>

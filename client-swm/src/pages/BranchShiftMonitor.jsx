@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import {
   Card,
   Row,
@@ -740,8 +741,9 @@ export default function BranchShiftMonitor() {
                                     </span>
                                   </div>
                                 ) : (
-                                  <div style={{ fontSize: 11.5, color: '#16A34A', fontWeight: 700, backgroundColor: '#ECFDF5', padding: '6px 10px', borderRadius: 6, border: '1px solid #A7F3D0', textAlign: 'center' }}>
-                                    ✓ متصل بالنظام وجاهز للعمليات
+                                  <div style={{ fontSize: 11.5, color: '#16A34A', fontWeight: 700, backgroundColor: '#ECFDF5', padding: '6px 10px', borderRadius: 6, border: '1px solid #A7F3D0', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                    <Check size={13} />
+                                    <span>متصل بالنظام وجاهز للعمليات</span>
                                   </div>
                                 )}
                               </div>

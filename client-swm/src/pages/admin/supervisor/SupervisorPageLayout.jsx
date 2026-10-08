@@ -7,7 +7,9 @@ import {
   Lock,
   LogOut,
   Building,
-  LayoutGrid
+  LayoutGrid,
+  Home,
+  LayoutDashboard
 } from 'lucide-react';
 import api from '../../../api';
 import yokaLogo from '../../../assets/yokaStoreTransparent.png';
@@ -86,33 +88,57 @@ export default function SupervisorPageLayout({
         }}
       >
         {/* Left: Back to Hub Button & Page Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Button
-            icon={<ArrowRight size={17} style={{ marginLeft: 6 }} />}
-            onClick={() => {
-              if (['admin', 'super_admin'].includes(currentUser?.role)) {
-                navigate('/dashboard');
-              } else if (currentUser?.role === 'salesperson') {
-                navigate('/pos');
-              } else {
-                navigate('/supervisor-dashboard');
-              }
-            }}
-            style={{
-              borderRadius: 8,
-              fontWeight: 700,
-              fontSize: 13,
-              borderColor: '#cbd5e1',
-              display: 'inline-flex',
-              alignItems: 'center'
-            }}
-          >
-            {['admin', 'super_admin'].includes(currentUser?.role)
-              ? 'العودة للوحة المدير'
-              : currentUser?.role === 'salesperson'
-              ? 'العودة لنقاط البيع (POS)'
-              : 'لوحة بطاقات المشرف'}
-          </Button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Space size="small" wrap>
+            <Button
+              icon={<Home size={15} style={{ marginLeft: 4 }} />}
+              onClick={() => navigate('/')}
+              style={{
+                borderRadius: 8,
+                fontWeight: 700,
+                fontSize: 12.5,
+                borderColor: '#cbd5e1',
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
+            >
+              الرئيسية
+            </Button>
+
+            <Button
+              icon={<LayoutDashboard size={15} style={{ marginLeft: 4 }} />}
+              onClick={() => navigate('/dashboard')}
+              style={{
+                borderRadius: 8,
+                fontWeight: 700,
+                fontSize: 12.5,
+                background: '#0B0F17',
+                color: '#DFCA95',
+                borderColor: 'rgba(200, 164, 92, 0.4)',
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
+            >
+              لوحة الإدارة
+            </Button>
+
+            <Button
+              icon={<ArrowRight size={15} style={{ marginLeft: 4 }} />}
+              onClick={() => navigate('/supervisor-dashboard')}
+              style={{
+                borderRadius: 8,
+                fontWeight: 700,
+                fontSize: 12.5,
+                background: '#EEF2FF',
+                color: '#4338CA',
+                borderColor: '#C7D2FE',
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
+            >
+              لوحة المشرف
+            </Button>
+          </Space>
 
           <div style={{ width: 1, height: 24, background: '#cbd5e1' }} />
 

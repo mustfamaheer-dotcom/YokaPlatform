@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Building2, Banknote, CreditCard, Smartphone } from 'lucide-react';
 import {
   Card,
   Row,
@@ -43,18 +44,31 @@ import yokaLogo from '../assets/yokaStoreTransparent.png';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function DailyShift({ currentUser }) {
+export default function DailyShift({ currentUser: propCurrentUser }) {
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch (e) { return {}; }
+  })();
+  const currentUser = propCurrentUser || storedUser;
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [staff, setStaff] = useState([]);
   const [branchesList, setBranchesList] = useState([]);
+  const userBranchId = currentUser?.branch_id || currentUser?.branchId;
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isCentralAdmin = isSuperAdmin || (
+    ['admin', 'warehouse_manager'].includes(currentUser?.role) &&
+    (currentUser?.isMainWarehouse === true || !userBranchId || userBranchId === 1) &&
+    currentUser?.branch_type !== 'retail_branch' &&
+    currentUser?.branchType !== 'retail_branch'
+  );
+
   const [selectedBranch, setSelectedBranch] = useState(
-    currentUser?.branch_id || currentUser?.branchId ? String(currentUser?.branch_id || currentUser?.branchId) : 'all'
+    isCentralAdmin ? (userBranchId ? String(userBranchId) : 'all') : String(userBranchId || 1)
   );
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [selectedSalesperson, setSelectedSalesperson] = useState(null);
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || !currentUser?.branch_id;
+  const isAdmin = isCentralAdmin;
 
   // Table Filter: 'all' | 'sale' | 'return' | 'expense'
   const [txFilterType, setTxFilterType] = useState('all');
@@ -361,7 +375,9 @@ export default function DailyShift({ currentUser }) {
               }}
               style={{ width: 180 }}
             >
-              <Option value="all">🏢 جميع الفروع (إجمالي)</Option>
+              <Option value="all">
+                <Space size={6}><Building2 size={13} style={{ verticalAlign: 'middle' }} /><span>جميع الفروع (إجمالي)</span></Space>
+              </Option>
               {branchesList.map((b) => (
                 <Option key={b.id} value={String(b.id)}>
                   {b.branch_name}
@@ -562,7 +578,7 @@ export default function DailyShift({ currentUser }) {
                   }}
                 >
                   <Statistic
-                    title={<span style={{ color: '#166534', fontWeight: 700 }}>💵 صافي الكاش (Net Cash)</span>}
+                    title={<span style={{ color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Banknote size={15} /> صافي الكاش (Net Cash)</span>}
                     value={netCash}
                     precision={2}
                     suffix="ج.م"
@@ -587,7 +603,7 @@ export default function DailyShift({ currentUser }) {
                   }}
                 >
                   <Statistic
-                    title={<span style={{ color: '#1e40af', fontWeight: 700 }}>💳 صافي الفيزا (Net Visa / Card)</span>}
+                    title={<span style={{ color: '#1e40af', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}><CreditCard size={15} /> صافي الفيزا (Net Visa / Card)</span>}
                     value={netCard}
                     precision={2}
                     suffix="ج.م"
@@ -612,7 +628,7 @@ export default function DailyShift({ currentUser }) {
                   }}
                 >
                   <Statistic
-                    title={<span style={{ color: '#6b21a8', fontWeight: 700 }}>📱 صافي التحويلات (Net Bank Transfers)</span>}
+                    title={<span style={{ color: '#6b21a8', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Smartphone size={15} /> صافي التحويلات (Net Bank Transfers)</span>}
                     value={netTransfer}
                     precision={2}
                     suffix="ج.م"

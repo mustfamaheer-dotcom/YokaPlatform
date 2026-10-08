@@ -21,7 +21,7 @@ const handleSalesDashboard = async (req, res) => {
   try {
     const { branch_id, period = 'month', startDate, endDate } = req.query;
     const scopedBranch = req.scopedBranchId;
-    const branchFilter = (scopedBranch && scopedBranch !== 'all') ? scopedBranch : branch_id;
+    const branchFilter = req.isCrossBranchAdmin ? (branch_id || 'all') : String(scopedBranch);
 
     // Date range calculation
     let startD, endD;
@@ -62,10 +62,15 @@ const handleSalesDashboard = async (req, res) => {
     // Branch condition
     let branchCondition = '';
     let expenseBranchCondition = '';
-    if (branchFilter && branchFilter !== 'all') {
+    if (branchFilter === 'retail') {
+      branchCondition = `AND si.branch_id IN (SELECT id FROM branches WHERE branch_type = 'retail_branch')`;
+      expenseBranchCondition = `AND e.branch_id IN (SELECT id FROM branches WHERE branch_type = 'retail_branch')`;
+    } else if (branchFilter && branchFilter !== 'all') {
       const bId = parseInt(branchFilter, 10);
-      branchCondition = `AND si.branch_id = ${bId}`;
-      expenseBranchCondition = `AND e.branch_id = ${bId}`;
+      if (!isNaN(bId)) {
+        branchCondition = `AND si.branch_id = ${bId}`;
+        expenseBranchCondition = `AND e.branch_id = ${bId}`;
+      }
     }
 
     // 1. Fetch Sales Invoices (Completed)
@@ -328,11 +333,11 @@ const handleSalesDashboard = async (req, res) => {
     const netProfitMargin = netSales > 0 ? ((netProfit / netSales) * 100) : 0;
 
     // Advanced Financial Breakdown:
-    // Net Revenue = Gross Sales - Returns - Expenses
-    const netRevenue = grossSales - grossReturns - netExpenses;
-    const netCash = salesCash - returnCash - netExpenses;
-    const netVisa = salesVisa - returnVisa;
-    const netTransfer = salesTransfer - returnTransfer;
+    // Net Revenue = Gross Sales - Returns (Total sales revenue earned after customer returns)
+    const netRevenue = Math.max(0, grossSales - grossReturns);
+    const netCash = Math.max(0, salesCash - returnCash);
+    const netVisa = Math.max(0, salesVisa - returnVisa);
+    const netTransfer = Math.max(0, salesTransfer - returnTransfer);
 
     // Convert trends map to sorted array
     const salesTrends = Object.values(trendsMap).sort((a, b) => a.date.localeCompare(b.date));
@@ -438,28 +443,17 @@ const handleSalesDashboard = async (req, res) => {
   }
 };
 
-// Route and aliases for sales dashboard and reports (Manager / Admin / Supervisor only)
-const requireManagerialRole = requireRole(['super_admin', 'admin', 'supervisor']);
-router.get('/sales-dashboard', requireManagerialRole, requireBranchScope, handleSalesDashboard);
-router.get('/dashboard', requireManagerialRole, requireBranchScope, handleSalesDashboard);
-router.get('/reports/sales', requireManagerialRole, requireBranchScope, handleSalesDashboard);
-router.get('/sales', requireManagerialRole, requireBranchScope, handleSalesDashboard);
+// Route and aliases for sales dashboard and reports
+router.get('/sales-dashboard', requireBranchScope, handleSalesDashboard);
+router.get('/dashboard', requireBranchScope, handleSalesDashboard);
+router.get('/reports/sales', requireBranchScope, handleSalesDashboard);
+router.get('/sales', requireBranchScope, handleSalesDashboard);
 
 /**
  * Access guard for /overview:
- * Allows super_admin, admin, supervisor, or any staff assigned to an E-Commerce warehouse.
+ * Scoped by requireBranchScope for branch isolation.
  */
-const allowAnalyticsOverview = (req, res, next) => {
-  const isEcom = req.user && (req.user.branchType === 'ecom_warehouse' || req.user.branchCode === 'BR-ECOM');
-  const isPrivileged = ['super_admin', 'admin', 'supervisor'].includes(req.user?.role);
-  if (!isPrivileged && !isEcom) {
-    return res.status(403).json({
-      success: false,
-      message: 'Forbidden: requires supervisor/admin role or E-Commerce warehouse access.'
-    });
-  }
-  next();
-};
+const allowAnalyticsOverview = (req, res, next) => next();
 
 /**
  * GET /api/swm/analytics/overview
@@ -497,7 +491,7 @@ router.get('/overview', allowAnalyticsOverview, requireBranchScope, async (req, 
 
     // Branch scoping condition:
     // Support 'all', 'retail' (all retail stores), 'ecom' / 'ecs' / '2' (ecom store), or specific branch ID
-    const branchFilter = req.query.branch_id || req.scopedBranchId || 'all';
+    const branchFilter = req.isCrossBranchAdmin ? (req.query.branch_id || req.scopedBranchId || 'all') : String(req.scopedBranchId);
 
     let ecpBranchCondition = '';
     let posBranchCondition = '';

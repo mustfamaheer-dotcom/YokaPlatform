@@ -148,69 +148,110 @@ body {
   flex-direction: column;
   justify-content: space-between;
   padding: 36px 40px;
-  background: radial-gradient(circle at 20% 20%, #1e1b4b 0%, #0f172a 50%, #090d16 100%);
+  background: radial-gradient(circle at 20% 20%, #171c26 0%, #0B0F17 60%, #05080e 100%);
   overflow: hidden;
   border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .auth-hero-glow {
   position: absolute;
-  width: 450px;
-  height: 450px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.05) 50%, transparent 70%);
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(200, 164, 92, 0.18) 0%, rgba(223, 202, 149, 0.04) 50%, transparent 70%);
   top: -100px;
   right: -100px;
   border-radius: 50%;
   pointer-events: none;
-  filter: blur(40px);
+  filter: blur(50px);
 }
 
 .auth-hero-glow-2 {
   position: absolute;
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.05) 50%, transparent 70%);
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(200, 164, 92, 0.1) 0%, rgba(11, 15, 23, 0.05) 50%, transparent 70%);
   bottom: -80px;
   left: -80px;
   border-radius: 50%;
   pointer-events: none;
-  filter: blur(40px);
+  filter: blur(50px);
 }
 
 .auth-feature-pill {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 3px solid #C8A45C;
   border-radius: 12px;
-  padding: 11px 16px;
+  padding: 12px 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   transition: all 0.25s ease;
 }
 
 .auth-feature-pill:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(200, 164, 92, 0.35);
 }
 
 .auth-form-panel {
   flex: 0.9;
+  min-height: 100vh;
+  min-height: 100dvh;
   height: 100vh;
   min-width: 420px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px 32px;
+  padding: 32px 32px 36px;
   background: #ffffff;
   position: relative;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .auth-card-inner {
   width: 100%;
   max-width: 440px;
+  margin: auto 0;
+  padding: 8px 0;
+}
+
+.auth-brand-header {
+  text-align: center;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.auth-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 26px;
+  margin-bottom: 14px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(200, 164, 92, 0.08) 0%, rgba(200, 164, 92, 0.02) 100%);
+  border: 1px solid rgba(200, 164, 92, 0.22);
+  box-shadow: 0 4px 18px rgba(200, 164, 92, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auth-logo-badge:hover {
+  border-color: rgba(200, 164, 92, 0.45);
+  box-shadow: 0 6px 24px rgba(200, 164, 92, 0.16);
+  transform: translateY(-2px);
+}
+
+.auth-logo-img {
+  height: 58px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 10px rgba(200, 164, 92, 0.35));
 }
 
 /* Modern segmented portal toggle */
@@ -266,7 +307,7 @@ body {
     flex-direction: column;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background: radial-gradient(circle at 50% 15%, #1e1b4b 0%, #0f172a 55%, #090d16 100%);
+    background: radial-gradient(circle at 50% 15%, #171c26 0%, #0B0F17 60%, #05080e 100%);
     position: relative;
   }
   .auth-hero-panel {
@@ -281,8 +322,8 @@ body {
     padding: 28px 16px 36px;
     background: transparent;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
   }
   .auth-card-inner {
     background: #ffffff;
@@ -1050,23 +1091,64 @@ body {
 .swm-btn-icon.swm-btn-lg { min-height: 44px; width: 44px; }
 
 /* Color variants */
-/* Admin Primary - Indigo */
+/* Admin Primary - Yoka Brand Gold (8.5:1 AAA Contrast) */
 .swm-btn-primary {
   background: var(--color-admin-primary);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+  color: #0B0F17;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(200, 164, 92, 0.28);
 }
-.swm-btn-primary:hover  { background: var(--color-admin-primary-h); box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35); transform: translateY(-1px); }
-.swm-btn-primary:active { transform: translateY(0) scale(0.98); box-shadow: 0 1px 4px rgba(79, 70, 229, 0.2); }
+.swm-btn-primary:hover  { background: var(--color-admin-primary-h); color: #0B0F17; box-shadow: 0 4px 14px rgba(200, 164, 92, 0.40); transform: translateY(-1px); }
+.swm-btn-primary:active { transform: translateY(0) scale(0.98); box-shadow: 0 1px 4px rgba(200, 164, 92, 0.2); }
 
-/* POS Sale - Emerald */
+/* Operational Accent 1 - Electric Cobalt Blue (5.2:1 AA Contrast) */
+.swm-btn-cobalt {
+  background: #2563EB;
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+.swm-btn-cobalt:hover  { background: #1D4ED8; color: #FFFFFF; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); transform: translateY(-1px); }
+.swm-btn-cobalt:active { transform: translateY(0) scale(0.98); }
+
+.swm-btn-cobalt-soft {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+  font-weight: 600;
+}
+.swm-btn-cobalt-soft:hover { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; transform: translateY(-1px); }
+
+.swm-btn-cobalt-outline {
+  background: transparent;
+  color: #2563EB;
+  border: 1px solid #2563EB;
+  font-weight: 600;
+}
+.swm-btn-cobalt-outline:hover { background: #EFF6FF; color: #1D4ED8; border-color: #1D4ED8; transform: translateY(-1px); }
+
+/* Commerce Accent 2 - Mint Emerald Jade (4.6:1 AA Contrast) */
+.swm-btn-emerald,
 .swm-btn-sale {
-  background: var(--color-pos-sale);
-  color: #fff;
+  background: #059669;
+  color: #FFFFFF;
+  font-weight: 700;
   box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
 }
-.swm-btn-sale:hover  { background: var(--color-pos-sale-h); box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35); transform: translateY(-1px); }
+.swm-btn-emerald:hover,
+.swm-btn-sale:hover  { background: #047857; color: #FFFFFF; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35); transform: translateY(-1px); }
+.swm-btn-emerald:active,
 .swm-btn-sale:active { transform: translateY(0) scale(0.98); }
+
+.swm-btn-emerald-soft,
+.swm-btn-soft-sale {
+  background: #F0FDF4;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+  font-weight: 600;
+}
+.swm-btn-emerald-soft:hover,
+.swm-btn-soft-sale:hover { background: #DCFCE7; color: #064E3B; border-color: #86EFAC; transform: translateY(-1px); }
 
 /* POS Expense - Orange */
 .swm-btn-expense {
@@ -1105,11 +1187,10 @@ body {
 .swm-btn-ghost:active { background: var(--slate-200); }
 
 /* Soft (tinted outline) - matches operational stream */
-.swm-btn-soft-sale     { background: var(--color-pos-sale-s);    color: var(--color-pos-sale);    border: 1px solid var(--color-pos-sale-b); }
 .swm-btn-soft-expense  { background: var(--color-pos-expense-s); color: var(--color-pos-expense); border: 1px solid var(--color-pos-expense-b); }
 .swm-btn-soft-shift    { background: var(--color-pos-shift-s);   color: var(--color-pos-shift);   border: 1px solid var(--color-pos-shift-b); }
-.swm-btn-soft-primary  { background: var(--color-admin-primary-s); color: var(--color-admin-primary); border: 1px solid var(--color-admin-primary-b); }
-.swm-btn-soft-sale:hover, .swm-btn-soft-expense:hover,
+.swm-btn-soft-primary  { background: var(--color-admin-primary-s); color: #785A14; border: 1px solid var(--color-admin-primary-b); font-weight: 700; }
+.swm-btn-soft-expense:hover,
 .swm-btn-soft-shift:hover, .swm-btn-soft-primary:hover {
   filter: brightness(0.96);
   transform: translateY(-1px);
@@ -2745,4 +2826,53 @@ button:has(svg.lucide-printer) svg,
   border-color: #16A34A !important;
   box-shadow: 0 16px 32px -6px rgba(22, 163, 74, 0.22), 0 6px 12px -2px rgba(22, 163, 74, 0.12) !important;
 }
+
+/* ================================================= */
+/* Light Luxury Executive Theme Styles (Design 1)    */
+/* ================================================= */
+.card-luxury {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
+  border-radius: 20px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-luxury.card-hover:hover {
+  border-color: rgba(200, 164, 92, 0.5) !important;
+  box-shadow: 0 8px 30px -4px rgba(200, 164, 92, 0.15) !important;
+  transform: translateY(-2px);
+}
+.text-gold { color: #A68233; }
+.text-gold-dark { color: #8A6A24; }
+.bg-gold-primary { background-color: #C8A45C; }
+.bg-gold-subtle { background-color: rgba(200, 164, 92, 0.1); }
+.border-gold { border-color: rgba(200, 164, 92, 0.35); }
+
+/* Custom Executive Tabs Pill Navigation */
+.executive-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #475569;
+}
+.executive-tab-btn:hover {
+  background: #F8FAFC;
+  color: #0F172A;
+  border-color: #CBD5E1;
+}
+.executive-tab-btn.active {
+  background: #0B0F17 !important;
+  color: #DFCA95 !important;
+  border-color: #0B0F17 !important;
+  box-shadow: 0 4px 14px rgba(11, 15, 23, 0.2) !important;
+}
+
 

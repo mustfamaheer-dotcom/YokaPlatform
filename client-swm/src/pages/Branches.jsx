@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import { Home as HomeIcon, ExternalLink } from 'lucide-react';
 import { Table, Button, Modal, Form, Input, Select, Tag, Space, Typography, App, Card, Popconfirm, Divider, Tooltip, Alert, Switch, InputNumber, Row, Col } from 'antd';
 import { PlusOutlined, ShopOutlined, ReloadOutlined, EditOutlined, UserOutlined, KeyOutlined, LockOutlined, EyeOutlined, InfoCircleOutlined, EnvironmentOutlined, CompassOutlined, GlobalOutlined } from '@ant-design/icons';
 import api from '../api';
@@ -277,8 +277,9 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
           </Text>
           {record.google_maps_url ? (
             <a href={record.google_maps_url} target="_blank" rel="noopener noreferrer">
-              <Button size="small" type="link" icon={<EnvironmentOutlined />} style={{ padding: 0, height: 'auto', fontSize: 11, color: '#C8A45C', fontWeight: 700 }}>
-                خرائط جوجل ↗
+              <Button size="small" type="link" icon={<EnvironmentOutlined />} style={{ padding: 0, height: 'auto', fontSize: 11, color: '#C8A45C', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span>خرائط جوجل</span>
+                <ExternalLink size={12} />
               </Button>
             </a>
           ) : (

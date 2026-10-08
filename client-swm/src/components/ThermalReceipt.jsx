@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Typography, Space } from 'antd';
 import { PrinterOutlined, CloseOutlined, FilePdfOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Trophy } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { printHtmlContent } from '../utils/printUtils';
 
@@ -299,8 +300,8 @@ export default function ThermalReceipt({ invoice, onClose }) {
             border: '1px dashed #C8A45C',
             textAlign: 'center'
           }}>
-            <div style={{ fontWeight: 800, color: '#92400e', marginBottom: 2 }}>
-              🏆 برنامج ولاء العملاء (Yoka Points)
+            <div style={{ fontWeight: 800, color: '#92400e', marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <Trophy size={11} style={{ color: '#b45309' }} /> برنامج ولاء العملاء (Yoka Points)
             </div>
             {invoice.customer_code && (
               <div style={{ color: '#475569', fontSize: '9px' }}>

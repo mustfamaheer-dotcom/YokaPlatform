@@ -531,7 +531,7 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
               okText="نعم، اعتماد"
               cancelText="إلغاء"
             >
-              <Button size="small" type="primary" style={{ backgroundColor: '#16a34a' }}>
+              <Button size="small" type="primary" className="swm-btn-emerald" style={{ borderRadius: 6 }}>
                 اعتماد
               </Button>
             </Popconfirm>
@@ -684,7 +684,8 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
             size="large"
             icon={<PlusOutlined />}
             onClick={handleOpenCreateDrawer}
-            style={{ backgroundColor: '#4f46e5', fontWeight: 'bold', height: 44, borderRadius: 8 }}
+            className="swm-btn-primary"
+            style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             إنشاء سند تسوية جديد
           </Button>
@@ -791,7 +792,7 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
                 type="primary"
                 onClick={() => handleSubmitVoucher('draft')}
                 loading={createSubmitting}
-                style={{ backgroundColor: '#4f46e5' }}
+                className="swm-btn-cobalt-soft"
               >
                 حفظ مسودة السند للإدارة
               </Button>
@@ -808,7 +809,7 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
                   type="primary"
                   onClick={() => handleSubmitVoucher('approved')}
                   loading={createSubmitting}
-                  style={{ backgroundColor: '#16a34a' }}
+                  className="swm-btn-emerald"
                 >
                   اعتماد وتنفيذ التسوية فوراً بالمخزون
                 </Button>
@@ -990,7 +991,7 @@ export default function StockAdjustments({ currentUser, autoOpenCreate, onResetA
                     icon={<CheckCircleOutlined />}
                     onClick={() => handleLoadBranchItems(true)}
                     loading={loadingBranchItems}
-                    style={{ backgroundColor: '#16a34a' }}
+                    className="swm-btn-cobalt"
                   >
                     إضافة الأصناف المتاح منها رصيد (&gt; 0)
                   </Button>

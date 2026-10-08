@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { Card, Checkbox, InputNumber, Row, Col, Typography, Tag, Space, Divider, Button, Alert } from 'antd';
 import {
   DollarCircleOutlined,
@@ -249,8 +250,12 @@ export default function SplitPayment({
         {targetAmount > 0 && (
           <div>
             <Text type="secondary" style={{ fontSize: 12 }}>المتبقي آجل / مستحق: </Text>
-            <Tag color={diff === 0 ? 'green' : diff > 0 ? 'orange' : 'red'} style={{ fontSize: 13, padding: '2px 8px' }}>
-              {diff === 0 ? 'مسدد بالكامل ✓' : `${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م ${diff > 0 ? 'آجل' : 'زيادة'}`}
+            <Tag
+              color={diff === 0 ? 'green' : diff > 0 ? 'orange' : 'red'}
+              icon={diff === 0 ? <Check size={12} /> : null}
+              style={{ fontSize: 13, padding: '2px 8px' }}
+            >
+              {diff === 0 ? 'مسدد بالكامل' : `${Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م ${diff > 0 ? 'آجل' : 'زيادة'}`}
             </Tag>
           </div>
         )}

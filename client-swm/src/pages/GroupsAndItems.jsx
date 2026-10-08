@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import { Home as HomeIcon, Sparkles, X, Folder, Lightbulb } from 'lucide-react';
 import {
   Table,
   Button,
@@ -1080,8 +1080,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
         return (
           <Space size="small" direction="vertical" style={{ width: '100%' }}>
             {isMultiple && (
-              <Tag color="purple" style={{ fontWeight: 600, fontSize: 11, margin: 0 }}>
-                ✨ صنف متعدد ({record.variant_count || rawColors.length || 'خيارات متعددة'})
+              <Tag color="purple" icon={<Sparkles size={11} />} style={{ fontWeight: 600, fontSize: 11, margin: 0 }}>
+                صنف متعدد ({record.variant_count || rawColors.length || 'خيارات متعددة'})
               </Tag>
             )}
             <Space size={4} wrap>
@@ -1150,7 +1150,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
             size="small"
             icon={<EditOutlined />}
             onClick={() => handleOpenEditItem(record)}
-            style={{ backgroundColor: '#2563eb' }}
+            className="swm-btn-cobalt"
           >
             تعديل
           </Button>
@@ -1204,7 +1204,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
               size="large"
               icon={<PlusOutlined />}
               onClick={handleOpenCreateGroup}
-              style={{ backgroundColor: '#4f46e5', borderColor: '#4f46e5', fontWeight: 700, height: 44, borderRadius: 8 }}
+              className="swm-btn-primary"
+              style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
             >
               إضافة مجموعة رئيسية جديدة
             </Button>
@@ -1216,7 +1217,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                 size="large"
                 icon={<PlusOutlined />}
                 onClick={() => handleOpenCreateAttr('size')}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', fontWeight: 700, height: 44, borderRadius: 8 }}
+                className="swm-btn-cobalt"
+                style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
               >
                 إضافة مقاس جديد
               </Button>
@@ -1225,7 +1227,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                 size="large"
                 icon={<PlusOutlined />}
                 onClick={() => handleOpenCreateAttr('color')}
-                style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: 700, height: 44, borderRadius: 8 }}
+                className="swm-btn-cobalt"
+                style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
               >
                 إضافة لون جديد
               </Button>
@@ -1237,7 +1240,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
               size="large"
               icon={<PlusOutlined />}
               onClick={handleOpenCreateItem}
-              style={{ backgroundColor: '#059669', borderColor: '#059669', fontWeight: 700, height: 44, borderRadius: 8 }}
+              className="swm-btn-primary"
+              style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
             >
               إضافة صنف جديد وربطه بالمجموعة والصفات
             </Button>
@@ -1467,9 +1471,10 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                         <Button
                           type="link"
                           onClick={() => setSelectedCategoryFilter(undefined)}
+                          icon={<X size={12} />}
                           style={{ padding: 0 }}
                         >
-                          إلغاء فلتر المجموعة ✕
+                          إلغاء فلتر المجموعة
                         </Button>
                       )}
                     </Col>
@@ -1698,7 +1703,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                 placeholder="اختر المجموعة الرئيسية أو أضف مجموعة جديدة بالأسفل..."
                 size="large"
                 showSearch
-                filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
+                optionFilterProp="label"
+                filterOption={(input, opt) => String(opt?.label || opt?.children || '').toLowerCase().includes(input.toLowerCase())}
                 dropdownRender={(menu) => (
                   <>
                     {menu}
@@ -1726,14 +1732,17 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                 )}
               >
                 {categories.map(c => (
-                  <Option key={c.id} value={c.id}>
-                    📁 {c.category_name} {c.parent_name ? `(تابع لـ: ${c.parent_name})` : ''}
+                  <Option key={c.id} value={c.id} label={`${c.category_name} ${c.parent_name ? `(تابع لـ: ${c.parent_name})` : ''}`}>
+                    <Space size={6} align="middle">
+                      <Folder size={14} style={{ color: '#7c3aed' }} />
+                      <span>{c.category_name} {c.parent_name ? `(تابع لـ: ${c.parent_name})` : ''}</span>
+                    </Space>
                   </Option>
                 ))}
               </Select>
             </Form.Item>
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', color: '#6d28d9' }}>
-              💡 يمكنك الاختيار من المجموعات الحالية أو كتابة اسم مجموعة جديدة تماماً وإضافتها فورياً من داخل القائمة.
+            <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#6d28d9' }}>
+              <Lightbulb size={13} style={{ color: '#7c3aed', flexShrink: 0 }} /> يمكنك الاختيار من المجموعات الحالية أو كتابة اسم مجموعة جديدة تماماً وإضافتها فورياً من داخل القائمة.
             </Text>
           </div>
 
@@ -2095,8 +2104,8 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
                   {activeColors.filter(c => colorImages[c]).length} من {activeColors.length} ألوان تم تحديد صورها
                 </Tag>
               </div>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12, color: '#166534' }}>
-                💡 يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
+              <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: '#166534' }}>
+                <Lightbulb size={13} style={{ color: '#16a34a', flexShrink: 0 }} /> يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
               </Text>
 
               <Row gutter={[12, 12]}>
@@ -2297,7 +2306,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 👁️ PRODUCT CARD REVIEW & INSPECTION MODAL */}
+      {/* PRODUCT CARD REVIEW & INSPECTION MODAL */}
       {/* ========================================================================= */}
       <Modal
         title={

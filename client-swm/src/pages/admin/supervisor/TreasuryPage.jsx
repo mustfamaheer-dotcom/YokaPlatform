@@ -28,7 +28,9 @@ import {
   CreditCard,
   ArrowRightLeft,
   Info,
-  RotateCcw
+  RotateCcw,
+  Banknote,
+  Smartphone
 } from 'lucide-react';
 import SupervisorPageLayout from './SupervisorPageLayout';
 import api from '../../../api';
@@ -220,7 +222,9 @@ export default function TreasuryPage({ currentUser }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#166534', fontWeight: 700 }}>💵 النقدية المتراكمة بالخزينة</span>
+                <span style={{ fontSize: 12, color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Banknote size={15} /> النقدية المتراكمة بالخزينة
+                </span>
                 <Tag color="success" style={{ margin: 0, fontWeight: 700 }}>قابلة للتسليم</Tag>
               </div>
               <div style={{ fontSize: 26, fontWeight: 900, color: '#15803d', margin: '8px 0 4px' }}>
@@ -244,7 +248,9 @@ export default function TreasuryPage({ currentUser }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#1e40af', fontWeight: 700 }}>💳 تسويات الفيزا البنكية</span>
+                <span style={{ fontSize: 12, color: '#1e40af', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <CreditCard size={15} /> تسويات الفيزا البنكية
+                </span>
                 <Tag color="processing" style={{ margin: 0, fontWeight: 700 }}>حساب بنكي</Tag>
               </div>
               <div style={{ fontSize: 26, fontWeight: 900, color: '#1d4ed8', margin: '8px 0 4px' }}>
@@ -268,7 +274,9 @@ export default function TreasuryPage({ currentUser }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#6b21a8', fontWeight: 700 }}>📲 تحويلات إنستاباي والمحافظ</span>
+                <span style={{ fontSize: 12, color: '#6b21a8', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Smartphone size={15} /> تحويلات إنستاباي والمحافظ
+                </span>
                 <Tag color="purple" style={{ margin: 0, fontWeight: 700 }}>محافظ رقمية</Tag>
               </div>
               <div style={{ fontSize: 26, fontWeight: 900, color: '#7e22ce', margin: '8px 0 4px' }}>
@@ -379,18 +387,18 @@ export default function TreasuryPage({ currentUser }) {
                       {pb && (pb.cash > 0 || pb.visa > 0 || pb.transfers > 0) && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                           {pb.cash > 0 && (
-                            <Tag color="green" style={{ fontSize: 11, margin: 0 }}>
-                              💵 كاش: {parseFloat(pb.cash).toLocaleString()}
+                            <Tag color="green" icon={<Banknote size={11} />} style={{ fontSize: 11, margin: 0 }}>
+                              كاش: {parseFloat(pb.cash).toLocaleString()}
                             </Tag>
                           )}
                           {pb.visa > 0 && (
-                            <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>
-                              💳 فيزا: {parseFloat(pb.visa).toLocaleString()}
+                            <Tag color="blue" icon={<CreditCard size={11} />} style={{ fontSize: 11, margin: 0 }}>
+                              فيزا: {parseFloat(pb.visa).toLocaleString()}
                             </Tag>
                           )}
                           {pb.transfers > 0 && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>
-                              📲 تحويل: {parseFloat(pb.transfers).toLocaleString()}
+                            <Tag color="purple" icon={<Smartphone size={11} />} style={{ fontSize: 11, margin: 0 }}>
+                              تحويل: {parseFloat(pb.transfers).toLocaleString()}
                             </Tag>
                           )}
                         </div>
@@ -484,7 +492,9 @@ export default function TreasuryPage({ currentUser }) {
           <Row gutter={[12, 8]}>
             <Col span={8}>
               <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 10px' }}>
-                <span style={{ fontSize: 11, color: '#166534', fontWeight: 600, display: 'block' }}>💵 كاش متراكم:</span>
+                <span style={{ fontSize: 11, color: '#166534', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Banknote size={12} /> كاش متراكم:
+                </span>
                 <span style={{ fontSize: 14, fontWeight: 800, color: '#15803d' }}>
                   {cashAvailable.toLocaleString()} ج.م
                 </span>
@@ -492,7 +502,9 @@ export default function TreasuryPage({ currentUser }) {
             </Col>
             <Col span={8}>
               <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 10px' }}>
-                <span style={{ fontSize: 11, color: '#1e40af', fontWeight: 600, display: 'block' }}>💳 فيزا بنكية:</span>
+                <span style={{ fontSize: 11, color: '#1e40af', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <CreditCard size={12} /> فيزا بنكية:
+                </span>
                 <span style={{ fontSize: 14, fontWeight: 800, color: '#1d4ed8' }}>
                   {visaAvailable.toLocaleString()} ج.م
                 </span>
@@ -500,7 +512,9 @@ export default function TreasuryPage({ currentUser }) {
             </Col>
             <Col span={8}>
               <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 10px' }}>
-                <span style={{ fontSize: 11, color: '#6b21a8', fontWeight: 600, display: 'block' }}>📲 تحويلات ومحافظ:</span>
+                <span style={{ fontSize: 11, color: '#6b21a8', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Smartphone size={12} /> تحويلات ومحافظ:
+                </span>
                 <span style={{ fontSize: 14, fontWeight: 800, color: '#7e22ce' }}>
                   {transferAvailable.toLocaleString()} ج.م
                 </span>
@@ -545,8 +559,8 @@ export default function TreasuryPage({ currentUser }) {
               <Form.Item
                 name="cash_amount"
                 label={
-                  <span style={{ fontWeight: 700, color: '#166534' }}>
-                    تسليم النقدية (كاش) 💵
+                  <span style={{ fontWeight: 700, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Banknote size={14} /> تسليم النقدية (كاش)
                   </span>
                 }
                 extra={<span style={{ fontSize: 11, color: '#64748b' }}>الحد الأقصى: {cashAvailable.toLocaleString()} ج.م</span>}
@@ -580,8 +594,8 @@ export default function TreasuryPage({ currentUser }) {
               <Form.Item
                 name="visa_amount"
                 label={
-                  <span style={{ fontWeight: 700, color: '#1e40af' }}>
-                    تسليم الفيزا البنكية 💳
+                  <span style={{ fontWeight: 700, color: '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <CreditCard size={14} /> تسليم الفيزا البنكية
                   </span>
                 }
                 extra={<span style={{ fontSize: 11, color: '#64748b' }}>الحد الأقصى: {visaAvailable.toLocaleString()} ج.م</span>}
@@ -615,8 +629,8 @@ export default function TreasuryPage({ currentUser }) {
               <Form.Item
                 name="transfer_amount"
                 label={
-                  <span style={{ fontWeight: 700, color: '#6b21a8' }}>
-                    تسليم التحويلات والمحافظ 📲
+                  <span style={{ fontWeight: 700, color: '#6b21a8', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <Smartphone size={14} /> تسليم التحويلات والمحافظ
                   </span>
                 }
                 extra={<span style={{ fontSize: 11, color: '#64748b' }}>الحد الأقصى: {transferAvailable.toLocaleString()} ج.م</span>}

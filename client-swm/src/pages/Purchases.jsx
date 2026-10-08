@@ -1,6 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import {
+  Home as HomeIcon,
+  Keyboard,
+  Search,
+  Zap,
+  Building2,
+  Package,
+  Hash,
+  Coins,
+  Folder,
+  Lightbulb,
+  Sparkles,
+  Plus
+} from 'lucide-react';
 import {
   Table,
   Button,
@@ -1552,7 +1565,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 </p>
               </div>
             ),
-            okText: '🖨️ نعم، طباعة ملصقات الباركود',
+            okText: 'نعم، طباعة ملصقات الباركود',
             cancelText: 'لاحقاً',
             okButtonProps: { style: { backgroundColor: '#0d9488', borderColor: '#0d9488' } },
             onOk: () => {
@@ -2289,7 +2302,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleOpenCreateDrawer}
-            style={{ backgroundColor: '#2563eb', height: 44, borderRadius: 8, fontWeight: 700 }}
+            className="swm-btn-primary"
+            style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
           >
             فاتورة مشتريات جديدة
           </Button>
@@ -2471,14 +2485,14 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
             {/* Keyboard shortcuts ribbon */}
             <Space size={8} style={{ direction: 'ltr' }}>
-              <Tag color="blue" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleAddItem}>
-                ⌨️ <strong style={{ color: '#1d4ed8' }}>F11</strong> إضافة صنف جديد
+              <Tag color="blue" icon={<Keyboard size={13} />} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleAddItem}>
+                <strong style={{ color: '#1d4ed8' }}>F11</strong> إضافة صنف جديد
               </Tag>
-              <Tag color="purple" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={() => handleOpenF1SearchModal('invoice')}>
-                🔍 <strong style={{ color: '#6d28d9' }}>F1</strong> بحث عن صنف
+              <Tag color="purple" icon={<Search size={13} />} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={() => handleOpenF1SearchModal('invoice')}>
+                <strong style={{ color: '#6d28d9' }}>F1</strong> بحث عن صنف
               </Tag>
-              <Tag color="success" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleCreateInvoice}>
-                ⚡ <strong style={{ color: '#15803d' }}>F4</strong> اعتماد الفاتورة
+              <Tag color="success" icon={<Zap size={13} />} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleCreateInvoice}>
+                <strong style={{ color: '#15803d' }}>F4</strong> اعتماد الفاتورة
               </Tag>
             </Space>
           </div>
@@ -2538,11 +2552,11 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
                       return main ? (
                         <Option key={main.id} value={main.id}>
-                          🏢 {main.branch_name} (المستودع الرئيسي المعتمد فقط)
+                          <Space size={6}><Building2 size={13} style={{ verticalAlign: 'middle' }} /><span>{main.branch_name} (المستودع الرئيسي المعتمد فقط)</span></Space>
                         </Option>
                       ) : (
                         <Option value={defaultBranchId || 1}>
-                          🏢 الفرع الرئيسي (المستودع الرئيسي المعتمد فقط)
+                          <Space size={6}><Building2 size={13} style={{ verticalAlign: 'middle' }} /><span>الفرع الرئيسي (المستودع الرئيسي المعتمد فقط)</span></Space>
                         </Option>
                       );
                     })()}
@@ -2574,8 +2588,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
           {/* Items Section Header & Action Buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>
-              📦 أصناف الفاتورة وأسعار التكلفة والبيع (Invoice Items & Master Prices Sync)
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Package size={15} /> أصناف الفاتورة وأسعار التكلفة والبيع (Invoice Items & Master Prices Sync)
             </div>
             <Space wrap>
               <Button
@@ -2591,7 +2605,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 onClick={() => handleOpenF1SearchModal('invoice')}
                 style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 700, borderRadius: 6 }}
               >
-                🔍 بحث سريع عن الأصناف [F1]
+                بحث سريع عن الأصناف [F1]
               </Button>
               <Tooltip title="تحديث ومزامنة الأصناف من قاعدة البيانات">
                 <Button
@@ -2703,7 +2717,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                       borderRadius: 8
                     }}
                   >
-                    🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                    بحث واختيار من الأصناف والمجاميع [F1]
                   </Button>
                 </div>
               </Card>
@@ -2727,7 +2741,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={handleAddItem}
-                      style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', fontWeight: 700, borderRadius: 6 }}
+                      className="swm-btn-cobalt"
+                      style={{ fontWeight: 700, borderRadius: 6 }}
                     >
                       + إضافة سطر صنف جديد [F11]
                     </Button>
@@ -2736,7 +2751,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                       onClick={() => handleOpenF1SearchModal('invoice')}
                       style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 700, borderRadius: 6 }}
                     >
-                      🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                      بحث واختيار من الأصناف والمجاميع [F1]
                     </Button>
                   </Space>
                   <Space size={8}>
@@ -2953,14 +2968,14 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               gap: 12
             }}>
               <Space size="large" wrap>
-                <Text strong style={{ color: '#065f46', fontSize: 13.5 }}>
-                  📦 إجمالي الأصناف بالفاتورة: {items.filter(i => !i.isManualRow && i.product_id).length} منتج
+                <Text strong style={{ color: '#065f46', fontSize: 13.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Package size={14} /> إجمالي الأصناف بالفاتورة: {items.filter(i => !i.isManualRow && i.product_id).length} منتج
                 </Text>
-                <Text strong style={{ color: '#065f46', fontSize: 13.5 }}>
-                  🔢 إجمالي عدد القطع المشتراة: {calculateTotalPieces()} قطعة
+                <Text strong style={{ color: '#065f46', fontSize: 13.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Hash size={14} /> إجمالي عدد القطع المشتراة: {calculateTotalPieces()} قطعة
                 </Text>
-                <Text strong style={{ color: '#065f46', fontSize: 15 }}>
-                  💰 إجمالي بضاعة المشتريات: {calculateSubtotal().toLocaleString()} ج.م
+                <Text strong style={{ color: '#065f46', fontSize: 15, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Coins size={15} /> إجمالي بضاعة المشتريات: {calculateSubtotal().toLocaleString()} ج.م
                 </Text>
               </Space>
 
@@ -2970,7 +2985,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 style={{ color: '#0f766e', borderColor: '#0f766e', background: '#ffffff', fontWeight: 700 }}
                 disabled={!items.some(it => !it.isManualRow && it.product_id && it.quantity > 0)}
               >
-                🖨️ طباعة ملصقات الباركود للبضاعة
+                طباعة ملصقات الباركود للبضاعة
               </Button>
             </div>
           )}
@@ -3107,7 +3122,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               style={{ color: '#0f766e', borderColor: '#0f766e', height: 42, fontWeight: 600 }}
               disabled={!items.some(it => !it.isManualRow && it.product_id && it.quantity > 0)}
             >
-              🖨️ طباعة باركود البضاعة
+              طباعة باركود البضاعة
             </Button>
             <Button
               size="large"
@@ -3153,14 +3168,14 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
             {/* Keyboard shortcuts ribbon */}
             <Space size={8} style={{ direction: 'ltr' }}>
-              <Tag color="blue" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleAddStandaloneItem}>
-                ⌨️ <strong style={{ color: '#1d4ed8' }}>F11</strong> إضافة صنف مرتجع
+              <Tag color="blue" icon={<Keyboard size={13} />} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleAddStandaloneItem}>
+                <strong style={{ color: '#1d4ed8' }}>F11</strong> إضافة صنف مرتجع
               </Tag>
-              <Tag color="purple" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={() => handleOpenF1SearchModal('return')}>
-                🔍 <strong style={{ color: '#6d28d9' }}>F1</strong> بحث عن صنف
+              <Tag color="purple" icon={<Search size={13} />} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={() => handleOpenF1SearchModal('return')}>
+                <strong style={{ color: '#6d28d9' }}>F1</strong> بحث عن صنف
               </Tag>
-              <Tag color="error" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleSubmitStandaloneReturn}>
-                ⚡ <strong style={{ color: '#b91c1c' }}>F4</strong> اعتماد المرتجع
+              <Tag color="error" icon={<Zap size={13} />} style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }} onClick={handleSubmitStandaloneReturn}>
+                <strong style={{ color: '#b91c1c' }}>F4</strong> اعتماد المرتجع
               </Tag>
             </Space>
           </div>
@@ -3220,11 +3235,11 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
                       return main ? (
                         <Option key={main.id} value={main.id}>
-                          🏢 {main.branch_name} (المستودع الرئيسي المعتمد فقط)
+                          <Space size={6}><Building2 size={13} style={{ verticalAlign: 'middle' }} /><span>{main.branch_name} (المستودع الرئيسي المعتمد فقط)</span></Space>
                         </Option>
                       ) : (
                         <Option value={defaultBranchId || 1}>
-                          🏢 الفرع الرئيسي (المستودع الرئيسي المعتمد فقط)
+                          <Space size={6}><Building2 size={13} style={{ verticalAlign: 'middle' }} /><span>الفرع الرئيسي (المستودع الرئيسي المعتمد فقط)</span></Space>
                         </Option>
                       );
                     })()}
@@ -3246,8 +3261,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
           {/* Return Items Section Header & Action Buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ fontWeight: 800, fontSize: 14, color: '#991b1b' }}>
-              📦 الأصناف المراد إرجاعها للمورد (Return Items Grid)
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#991b1b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Package size={15} /> الأصناف المراد إرجاعها للمورد (Return Items Grid)
             </div>
             <Space wrap>
               <Button
@@ -3264,7 +3279,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 onClick={() => handleOpenF1SearchModal('return')}
                 style={{ borderColor: '#dc2626', color: '#dc2626', background: '#fff', fontWeight: 700, borderRadius: 6 }}
               >
-                🔍 بحث سريع عن الأصناف [F1]
+                بحث سريع عن الأصناف [F1]
               </Button>
               <Tooltip title="تحديث ومزامنة الأصناف من قاعدة البيانات">
                 <Button
@@ -3375,7 +3390,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                       borderRadius: 8
                     }}
                   >
-                    🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                    بحث واختيار من الأصناف والمجاميع [F1]
                   </Button>
                 </div>
               </Card>
@@ -3409,7 +3424,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                       onClick={() => handleOpenF1SearchModal('return')}
                       style={{ borderColor: '#7c3aed', color: '#7c3aed', background: '#f5f3ff', fontWeight: 700, borderRadius: 6 }}
                     >
-                      🔍 بحث واختيار من الأصناف والمجاميع [F1]
+                      بحث واختيار من الأصناف والمجاميع [F1]
                     </Button>
                   </Space>
                   <Space size={8}>
@@ -4593,7 +4608,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                               quickVariantForm.setFieldsValue({ color: quickNewColorInput.trim() });
                               setQuickNewColorInput('');
                             }}
-                            style={{ backgroundColor: '#7c3aed' }}
+                            className="swm-btn-cobalt"
                           >
                             إضافة
                           </Button>
@@ -4658,7 +4673,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                             quickVariantForm.setFieldsValue({ size: quickNewSizeInput.trim() });
                             setQuickNewSizeInput('');
                           }}
-                          style={{ backgroundColor: '#0284c7' }}
+                          className="swm-btn-cobalt"
                         >
                           إضافة
                         </Button>
@@ -4852,7 +4867,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             <Select
               placeholder="اختر المجموعة أو أنشئ مجموعة جديدة فوراً بالأسفل..."
               showSearch
-              filterOption={(input, opt) => (opt?.children || '').toLowerCase().includes(input.toLowerCase())}
+              optionFilterProp="label"
+              filterOption={(input, opt) => (String(opt?.label || opt?.children || '')).toLowerCase().includes(input.toLowerCase())}
               dropdownRender={(menu) => (
                 <>
                   {menu}
@@ -4879,7 +4895,9 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               )}
             >
               {categoriesList.map(c => (
-                <Option key={c.id} value={c.id}>📁 {c.category_name}</Option>
+                <Option key={c.id} value={c.id} label={c.category_name}>
+                  <Space size={6}><Folder size={13} style={{ verticalAlign: 'middle', color: '#64748b' }} /><span>{c.category_name}</span></Space>
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -5184,8 +5202,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                   {activeMasterColors.filter(c => masterColorImages[c]).length} من {activeMasterColors.length} ألوان تم تحديد صورها
                 </Tag>
               </div>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12, color: '#166534' }}>
-                💡 يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
+              <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: '#166534' }}>
+                <Lightbulb size={13} style={{ color: '#16a34a', flexShrink: 0 }} /> يمكنك رفع صورة خاصة لكل لون من جهازك أو لصق رابط مباشر للصورة. ستظهر الصورة تلقائياً في المتجر والكتالوج عند اختيار اللون.
               </Text>
 
               <Row gutter={[12, 12]}>
@@ -5306,7 +5324,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* 🔍 POS-STYLE PRODUCT SEARCH & PICKER MODAL (F1)                           */}
+      {/* POS-STYLE PRODUCT SEARCH & PICKER MODAL (F1)                              */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -5328,7 +5346,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             <Space size="middle">
               <Button
                 type="primary"
-                icon={<PlusOutlined />}
+                icon={<Sparkles size={14} />}
                 onClick={() => handleOpenMasterCreate(f1TargetItemKey)}
                 style={{
                   backgroundColor: '#059669',
@@ -5338,7 +5356,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                   boxShadow: '0 2px 8px rgba(5,150,105,0.25)'
                 }}
               >
-                ✨ إضافة صنف جديد للمنظومة
+                إضافة صنف جديد للمنظومة
               </Button>
               <Tag color="purple" style={{ fontSize: 12 }}>
                 اضغط <strong>[Enter]</strong> أو انقر نقراً مزدوجاً على الصنف لاختياره فوراً
@@ -5468,7 +5486,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                           <Space size={4} style={{ marginTop: 2 }}>
                             {r.color && <Tag color="geekblue" style={{ fontSize: 10 }}>اللون: {r.color}</Tag>}
                             {r.size && <Tag color="purple" style={{ fontSize: 10 }}>المقاس: {r.size}</Tag>}
-                            {r.category_name && <Tag color="cyan" style={{ fontSize: 10 }}>📁 {r.category_name}</Tag>}
+                            {r.category_name && <Tag color="cyan" icon={<Folder size={10} />} style={{ fontSize: 10 }}>{r.category_name}</Tag>}
                           </Space>
                         </div>
                       );
@@ -5517,7 +5535,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                           size="small"
                           type="primary"
                           icon={<CheckOutlined />}
-                          style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', borderRadius: 6, fontWeight: 600 }}
+                          className="swm-btn-emerald"
+                          style={{ borderRadius: 6, fontWeight: 600 }}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleSelectProductFromF1Modal(r);
@@ -5546,8 +5565,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
 
             {/* Footer inside F1 modal */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                💡 تلميح: انقر نقراً مزدوجاً (Double Click) على أي سطر لاختيار الصنف فوراً، أو اضغط زر [كل المقاسات] لإدراج كافة المتغيرات.
+              <Text type="secondary" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Lightbulb size={13} style={{ color: '#d97706', flexShrink: 0 }} /> تلميح: انقر نقراً مزدوجاً (Double Click) على أي سطر لاختيار الصنف فوراً، أو اضغط زر [كل المقاسات] لإدراج كافة المتغيرات.
               </Text>
               <Button onClick={() => setF1ModalOpen(false)}>
                 إغلاق [Esc]

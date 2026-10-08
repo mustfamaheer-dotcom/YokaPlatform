@@ -36,7 +36,12 @@ import {
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Building2,
+  MapPin,
+  Banknote,
+  Smartphone,
+  Check
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import api from '../../api';
@@ -45,9 +50,20 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-export default function AdminSalesDashboard({ currentUser, onNavigate, initialTab }) {
-  const isBranchScoped = Boolean(currentUser && currentUser.role !== 'super_admin' && currentUser.role !== 'admin');
+export default function AdminSalesDashboard({ currentUser: propCurrentUser, onNavigate, initialTab }) {
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch (e) { return {}; }
+  })();
+  const currentUser = propCurrentUser || storedUser;
   const userBranchId = currentUser?.branch_id || currentUser?.branchId || 1;
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isCentralAdmin = isSuperAdmin || (
+    ['admin', 'warehouse_manager'].includes(currentUser?.role) &&
+    (currentUser?.isMainWarehouse === true || !currentUser?.branch_id || currentUser?.branch_id === 1) &&
+    currentUser?.branch_type !== 'retail_branch' &&
+    currentUser?.branchType !== 'retail_branch'
+  );
+  const isBranchScoped = !isCentralAdmin;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -246,10 +262,16 @@ export default function AdminSalesDashboard({ currentUser, onNavigate, initialTa
               style={{ minWidth: 170 }}
               size="middle"
             >
-              <Option value="all">🏢 جميع الفروع والمستودعات</Option>
+              <Option value="all">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Building2 size={13} /> جميع الفروع والمستودعات
+                </span>
+              </Option>
               {branchesList.map((b) => (
                 <Option key={b.id} value={b.id}>
-                  📍 {b.branch_name}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <MapPin size={13} /> {b.branch_name}
+                  </span>
                 </Option>
               ))}
             </Select>
@@ -522,8 +544,8 @@ export default function AdminSalesDashboard({ currentUser, onNavigate, initialTa
                 </Text>
               </div>
 
-              <Tag color="green" style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, fontWeight: 700 }}>
-                ✓ مطابقة محاسبية 100%
+              <Tag color="green" icon={<Check size={12} />} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, fontWeight: 700 }}>
+                مطابقة محاسبية 100%
               </Tag>
             </div>
 
@@ -567,7 +589,9 @@ export default function AdminSalesDashboard({ currentUser, onNavigate, initialTa
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#166534' }}>💵 صافي النقدية (Net Cash)</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Banknote size={15} /> صافي النقدية (Net Cash)
+                    </span>
                     <Tag color="green" style={{ margin: 0, fontWeight: 600 }}>الدرج</Tag>
                   </div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#15803d' }}>
@@ -591,7 +615,9 @@ export default function AdminSalesDashboard({ currentUser, onNavigate, initialTa
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>💳 صافي الفيزا (Net Visa)</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <CreditCard size={15} /> صافي الفيزا (Net Visa)
+                    </span>
                     <Tag color="blue" style={{ margin: 0, fontWeight: 600 }}>بطاقات بنكية</Tag>
                   </div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#1d4ed8' }}>
@@ -615,7 +641,9 @@ export default function AdminSalesDashboard({ currentUser, onNavigate, initialTa
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#6b21a8' }}>📱 صافي التحويلات (Net Transfer)</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#6b21a8', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <Smartphone size={15} /> صافي التحويلات (Net Transfer)
+                    </span>
                     <Tag color="purple" style={{ margin: 0, fontWeight: 600 }}>محافظ وإنستاباي</Tag>
                   </div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#7e22ce' }}>

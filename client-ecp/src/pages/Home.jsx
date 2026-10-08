@@ -22,7 +22,7 @@ import {
 import api from '../api';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/SEO';
-import { Sparkles, Star, ShieldCheck, Users } from 'lucide-react';
+import { Sparkles, Star, ShieldCheck, Users, ExternalLink, Lightbulb } from 'lucide-react';
 import heroBagImg from '../assets/hero-bag.png';
 
 const { Title, Text } = Typography;
@@ -414,7 +414,8 @@ export default function Home({ onAddToCart }) {
               <Button 
                 type="primary" 
                 onClick={() => setSelectedCategoryFilter('all')}
-                style={{ backgroundColor: '#0F172A', borderRadius: 8, fontWeight: 700 }}
+                className="btn-brand-primary"
+                style={{ borderRadius: 8, fontWeight: 700 }}
               >
                 عرض جميع المنتجات
               </Button>
@@ -778,14 +779,12 @@ export default function Home({ onAddToCart }) {
                             type="primary"
                             block
                             icon={<EnvironmentOutlined style={{ fontSize: 15 }} />}
+                            className="btn-cobalt"
                             style={{
                               height: 44,
                               borderRadius: 12,
-                              backgroundColor: '#0F172A',
-                              borderColor: '#0F172A',
                               fontWeight: 800,
                               fontSize: 13.5,
-                              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.12)',
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -793,7 +792,7 @@ export default function Home({ onAddToCart }) {
                             }}
                           >
                             <span>عرض الموقع على خرائط جوجل</span>
-                            <span style={{ fontSize: 12 }}>↗</span>
+                            <ExternalLink size={14} />
                           </Button>
                         </a>
                       ) : (
@@ -849,7 +848,10 @@ export default function Home({ onAddToCart }) {
                       color: '#94A3B8'
                     }}
                   >
-                    <span>💡 يمكنك السحب يميناً أو يساراً للتنقل بين الفروع</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <Lightbulb size={13} style={{ color: '#C8A45C' }} />
+                      <span>يمكنك السحب يميناً أو يساراً للتنقل بين الفروع</span>
+                    </span>
                     <span style={{ fontWeight: 700, color: '#C8A45C' }}>
                       اسحب للتالي ←
                     </span>

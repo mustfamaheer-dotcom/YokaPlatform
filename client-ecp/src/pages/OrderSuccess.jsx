@@ -158,7 +158,7 @@ export default function OrderSuccess() {
               حفظ الفاتورة ك صورة
             </Button>
             <Link to="/" key="home">
-              <Button type="primary" size="large" icon={<HomeOutlined />} style={{ backgroundColor: '#0F172A', color: '#FFFFFF', borderRadius: 8, fontWeight: 700, border: 'none', height: 44 }}>
+              <Button type="primary" size="large" icon={<HomeOutlined />} className="btn-brand-primary" style={{ borderRadius: 8, height: 44 }}>
                 العودة للرئيسية
               </Button>
             </Link>

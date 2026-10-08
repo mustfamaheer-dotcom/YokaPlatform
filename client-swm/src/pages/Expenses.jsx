@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Folder, User } from 'lucide-react';
 import {
   Card,
   Row,
@@ -358,7 +359,8 @@ export default function Expenses({ currentUser, onNavigate, tabExtra, onResetTab
               form.resetFields();
               setModalVisible(true);
             }}
-            style={{ backgroundColor: '#2563eb', fontWeight: 'bold' }}
+            className="swm-btn-primary"
+            style={{ fontWeight: 'bold' }}
           >
             تسجيل مصروف جديد
           </Button>
@@ -538,7 +540,7 @@ export default function Expenses({ currentUser, onNavigate, tabExtra, onResetTab
             <Select size="large" placeholder="اختر بند المصروف من الإعدادات المعتمدة">
               {adminRecipients.map((cat) => (
                 <Option key={cat} value={cat}>
-                  📁 {cat}
+                  <Space size={6}><Folder size={13} style={{ verticalAlign: 'middle' }} /><span>{cat}</span></Space>
                 </Option>
               ))}
             </Select>
@@ -554,7 +556,7 @@ export default function Expenses({ currentUser, onNavigate, tabExtra, onResetTab
               <Select placeholder="اختر البائع المستلم" size="large">
                 {staff.map((u) => (
                   <Option key={u.id} value={u.id}>
-                    👤 {u.full_name || u.username} ({u.role === 'supervisor' ? 'مشرف فرع' : 'بائع / كاشير'})
+                    <Space size={6}><User size={13} style={{ verticalAlign: 'middle' }} /><span>{u.full_name || u.username} ({u.role === 'supervisor' ? 'مشرف فرع' : 'بائع / كاشير'})</span></Space>
                   </Option>
                 ))}
               </Select>

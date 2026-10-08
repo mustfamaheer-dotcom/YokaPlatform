@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon } from 'lucide-react';
+import { Home as HomeIcon, Sparkles, Lock, Building2, ShoppingCart, Store, Lightbulb } from 'lucide-react';
 import {
   Table,
   Button,
@@ -145,7 +145,7 @@ function WarehousePermissionsEditor({ permissions, onChange, loading = false }) 
           </Text>
         </Space>
         <Space size="small">
-          <Button size="small" type="primary" onClick={() => setAll(true)} style={{ backgroundColor: '#16a34a', fontSize: 11 }}>
+          <Button size="small" type="primary" onClick={() => setAll(true)} className="swm-btn-emerald" style={{ fontSize: 11 }}>
             تفعيل الكل
           </Button>
           <Button size="small" danger onClick={() => setAll(false)} style={{ fontSize: 11 }}>
@@ -567,8 +567,8 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
                   {record.full_name || record.username}
                 </Text>
                 {record.id === newlyCreatedId && (
-                  <Tag color="success" style={{ margin: 0, fontSize: 10, lineHeight: '18px', padding: '0 4px', fontWeight: 'bold' }}>
-                    جديد ✨
+                  <Tag color="success" icon={<Sparkles size={10} />} style={{ margin: 0, fontSize: 10, lineHeight: '18px', padding: '0 4px', fontWeight: 'bold' }}>
+                    جديد
                   </Tag>
                 )}
               </Space>
@@ -665,8 +665,8 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
               </Text>
             ) : (
               <Tooltip title="كلمة المرور مشفرة بالنظام. لتحديثها اضغط على تعديل في الإجراءات">
-                <Tag color="default" style={{ fontStyle: 'italic', fontSize: 10, margin: 0 }}>
-                  مشفرة 🔒
+                <Tag color="default" icon={<Lock size={10} />} style={{ fontStyle: 'italic', fontSize: 10, margin: 0 }}>
+                  مشفرة
                 </Tag>
               </Tooltip>
             )}
@@ -780,7 +780,8 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
                 createForm.resetFields();
                 setIsCreateModalOpen(true);
               }}
-              style={{ backgroundColor: '#4f46e5', fontWeight: 700, height: 44, borderRadius: 8 }}
+              className="swm-btn-primary"
+              style={{ height: 44, borderRadius: 8, fontWeight: 700 }}
             >
               إضافة موظف جديد
             </Button>
@@ -854,7 +855,10 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
           >
             <Radio.Button value="all" style={{ borderRadius: 6 }}>
-              🏢 كل الفروع ({branchCounts.all || 0})
+              <Space size={4} align="middle">
+                <Building2 size={13} />
+                <span>كل الفروع ({branchCounts.all || 0})</span>
+              </Space>
             </Radio.Button>
             {branches.map((b) => (
               <Radio.Button key={b.id} value={b.id} style={{ borderRadius: 6 }}>
@@ -1009,15 +1013,15 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             if (!b) return null;
             if (b.branch_type === 'ecom_warehouse' || b.branch_code === 'BR-ECOM') {
               return (
-                <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#7e22ce' }}>
-                  🛒 <strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها.
+                <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#7e22ce', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ShoppingCart size={14} style={{ flexShrink: 0 }} /> <span><strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها.</span>
                 </div>
               );
             }
             if (b.branch_type === 'retail_branch') {
               return (
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#15803d' }}>
-                  🏪 <strong>فرع تجزئة:</strong> هذا الموظف سيعمل في كاشير نقطة البيع (POS) ونظام الورديات النقدية للفرع.
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#15803d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Store size={14} style={{ flexShrink: 0 }} /> <span><strong>فرع تجزئة:</strong> هذا الموظف سيعمل في كاشير نقطة البيع (POS) ونظام الورديات النقدية للفرع.</span>
                 </div>
               );
             }
@@ -1089,7 +1093,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
           <div style={{ textAlign: 'left', marginTop: 20 }}>
             <Space>
               <Button onClick={() => setIsCreateModalOpen(false)}>إلغاء</Button>
-              <Button type="primary" htmlType="submit" style={{ backgroundColor: '#4f46e5' }}>
+              <Button type="primary" htmlType="submit" className="swm-btn-primary">
                 حفظ بيانات الموظف
               </Button>
             </Space>
@@ -1142,15 +1146,15 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             if (!b) return null;
             if (b.branch_type === 'ecom_warehouse' || b.branch_code === 'BR-ECOM') {
               return (
-                <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#7e22ce' }}>
-                  🛒 <strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها (بدون شاشة كاشير POS).
+                <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#7e22ce', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ShoppingCart size={14} style={{ flexShrink: 0 }} /> <span><strong>مستودع المتجر الإلكتروني:</strong> هذا الموظف سيعمل في بوابة إدارة وتجهيز طلبات الأونلاين ومخزونها وإحصائياتها (بدون شاشة كاشير POS).</span>
                 </div>
               );
             }
             if (b.branch_type === 'retail_branch') {
               return (
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#15803d' }}>
-                  🏪 <strong>فرع تجزئة:</strong> هذا الموظف سيعمل في كاشير نقطة البيع (POS) ونظام الورديات النقدية للفرع.
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '8px 12px', borderRadius: 6, marginBottom: 14, fontSize: 12, color: '#15803d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Store size={14} style={{ flexShrink: 0 }} /> <span><strong>فرع تجزئة:</strong> هذا الموظف سيعمل في كاشير نقطة البيع (POS) ونظام الورديات النقدية للفرع.</span>
                 </div>
               );
             }
@@ -1203,7 +1207,7 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
               >
                 إلغاء
               </Button>
-              <Button type="primary" htmlType="submit" style={{ backgroundColor: '#4f46e5' }}>
+              <Button type="primary" htmlType="submit" className="swm-btn-cobalt">
                 حفظ التعديلات
               </Button>
             </Space>
@@ -1274,8 +1278,8 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
             ))}
           </Select>
 
-          <div style={{ marginTop: 12, padding: '8px 12px', background: '#eff6ff', borderRadius: 6, fontSize: 12, color: '#1e40af' }}>
-            💡 سيتم تحويل ارتباط الموظف فوراً بالفرع الجديد ليتمكن من تسجيل الدخول لكاشير وورديات الفرع الجديد مباشرة دون أي تعطيل.
+          <div style={{ marginTop: 12, padding: '8px 12px', background: '#eff6ff', borderRadius: 6, fontSize: 12, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Lightbulb size={13} style={{ color: '#2563eb', flexShrink: 0 }} /> <span>سيتم تحويل ارتباط الموظف فوراً بالفرع الجديد ليتمكن من تسجيل الدخول لكاشير وورديات الفرع الجديد مباشرة دون أي تعطيل.</span>
           </div>
         </div>
       </Modal>
