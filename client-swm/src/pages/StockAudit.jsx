@@ -24,7 +24,8 @@ import {
   Spin,
   Alert,
   Tabs,
-  Radio
+  Radio,
+  Form
 } from 'antd';
 import {
   FileSearchOutlined,
@@ -42,7 +43,8 @@ import {
   StopOutlined,
   BarsOutlined,
   InfoCircleOutlined,
-  EyeOutlined
+  EyeOutlined,
+  EditOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../api';
@@ -68,6 +70,115 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
   const handleViewItemReview = (item) => {
     setReviewedItem(item);
     setReviewModalVisible(true);
+  };
+
+  // Product Edit & Pricing Modal State (Direct Stock Audit Pricing Management)
+  const [editProductModalVisible, setEditProductModalVisible] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [editingProductBranches, setEditingProductBranches] = useState([]);
+  const [productEditSubmitting, setProductEditSubmitting] = useState(false);
+  const [productEditForm] = Form.useForm();
+  const watchedSellingPrice = Form.useWatch('selling_price', productEditForm);
+  const watchedCostPrice = Form.useWatch('cost_price', productEditForm);
+
+  // View Mode: 'grouped' (Consolidated single row per product) vs 'detailed' (breakdown per branch)
+  const [viewMode, setViewMode] = useState('grouped');
+
+  const handleOpenEditProduct = (item) => {
+    setEditingProduct(item);
+
+    // Compute multi-branch breakdown for this product
+    const matching = items.filter(it => it.product_id === item.product_id);
+    const branchMap = new Map();
+    matching.forEach(it => {
+      const bId = String(it.branch_id || 'main');
+      const existing = branchMap.get(bId) || {
+        branch_id: it.branch_id,
+        branch_name: it.branch_name || currentBranchObj?.branch_name || 'المستودع الرئيسي',
+        qty: 0
+      };
+      existing.qty += parseInt(it.system_qty || 0, 10);
+      branchMap.set(bId, existing);
+    });
+    setEditingProductBranches(Array.from(branchMap.values()));
+
+    productEditForm.setFieldsValue({
+      product_name: item.product_name,
+      barcode: item.barcode || '',
+      brand: item.brand || '',
+      selling_price: item.selling_price !== undefined ? parseFloat(item.selling_price) : 0,
+      cost_price: item.cost_price !== undefined ? parseFloat(item.cost_price) : 0,
+      wholesale_price: item.wholesale_price ? parseFloat(item.wholesale_price) : undefined,
+      sale_price: item.sale_price ? parseFloat(item.sale_price) : undefined,
+      reason: ''
+    });
+    setEditProductModalVisible(true);
+  };
+
+  const handleSaveProductEdit = async () => {
+    try {
+      const values = await productEditForm.validateFields();
+      if (!editingProduct) return;
+      setProductEditSubmitting(true);
+
+      const payload = {
+        product_name: values.product_name,
+        barcode: values.barcode,
+        brand: values.brand,
+        selling_price: values.selling_price,
+        cost_price: values.cost_price,
+        wholesale_price: values.wholesale_price,
+        sale_price: values.sale_price,
+        reason: values.reason
+      };
+
+      const res = await api.patch(`/api/swm/products/${editingProduct.product_id}/price`, payload);
+      if (res.data?.success) {
+        message.success(res.data.message || 'تم تحديث واعتماد سعر وبيانات الصنف بنجاح');
+        setEditProductModalVisible(false);
+
+        // Optimistically update items state while preserving all modified physical inventory count rows
+        setItems(prevItems =>
+          prevItems.map(it => {
+            if (it.product_id === editingProduct.product_id) {
+              const newCost = values.cost_price !== undefined ? values.cost_price : it.cost_price;
+              const newSelling = values.selling_price !== undefined ? values.selling_price : it.selling_price;
+              const sysQty = parseInt(it.system_qty || 0, 10);
+              return {
+                ...it,
+                product_name: values.product_name || it.product_name,
+                barcode: values.barcode !== undefined ? values.barcode : it.barcode,
+                brand: values.brand !== undefined ? values.brand : it.brand,
+                cost_price: newCost,
+                selling_price: newSelling,
+                wholesale_price: values.wholesale_price,
+                sale_price: values.sale_price,
+                stock_value: sysQty * parseFloat(newCost || 0)
+              };
+            }
+            return it;
+          })
+        );
+
+        if (reviewedItem && reviewedItem.product_id === editingProduct.product_id) {
+          setReviewedItem(prev => ({
+            ...prev,
+            product_name: values.product_name || prev.product_name,
+            barcode: values.barcode !== undefined ? values.barcode : prev.barcode,
+            brand: values.brand !== undefined ? values.brand : prev.brand,
+            cost_price: values.cost_price,
+            selling_price: values.selling_price,
+            wholesale_price: values.wholesale_price,
+            sale_price: values.sale_price
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update product from stock audit:', err);
+      message.error(err.response?.data?.message || 'فشل في تحديث بيانات وسعر الصنف');
+    } finally {
+      setProductEditSubmitting(false);
+    }
   };
 
   const [kpi, setKpi] = useState({
@@ -331,6 +442,57 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
   // Selected Branch Object
   const currentBranchObj = branchesList.find(b => b.id === parseInt(selectedBranch, 10));
 
+  // Consolidated Multi-Branch Mode
+  const isConsolidatedMode = selectedBranch === 'all' && viewMode === 'grouped';
+
+  const displayedItems = useMemo(() => {
+    if (!isConsolidatedMode) {
+      return items;
+    }
+
+    const map = new Map();
+    items.forEach(it => {
+      const groupKey = `${it.product_id}-${it.variant_id || 'base'}`;
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          ...it,
+          groupKey,
+          isGroupedRow: true,
+          total_system_qty: parseInt(it.system_qty || 0, 10),
+          total_stock_value: parseFloat(it.stock_value || (parseInt(it.system_qty || 0, 10) * parseFloat(it.cost_price || 0))),
+          branchBreakdown: [
+            {
+              branch_id: it.branch_id,
+              branch_name: it.branch_name || 'المستودع الرئيسي',
+              system_qty: parseInt(it.system_qty || 0, 10),
+              cost_price: it.cost_price,
+              record: it
+            }
+          ]
+        });
+      } else {
+        const existing = map.get(groupKey);
+        const q = parseInt(it.system_qty || 0, 10);
+        existing.total_system_qty += q;
+        existing.total_stock_value += parseFloat(it.stock_value || (q * parseFloat(it.cost_price || 0)));
+        existing.branchBreakdown.push({
+          branch_id: it.branch_id,
+          branch_name: it.branch_name || 'المستودع الرئيسي',
+          system_qty: q,
+          cost_price: it.cost_price,
+          record: it
+        });
+      }
+    });
+
+    return Array.from(map.values()).map(g => ({
+      ...g,
+      system_qty: g.total_system_qty,
+      stock_value: g.total_stock_value,
+      branchCount: g.branchBreakdown.length
+    }));
+  }, [items, isConsolidatedMode]);
+
   // Table Columns Definition
   const columns = [
     {
@@ -378,20 +540,71 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
     {
       title: 'الفرع / المستودع',
       key: 'branch',
-      width: 150,
-      render: (_, r) => (
-        <Tag color="purple" style={{ fontWeight: 600 }}>
-          <ShopOutlined /> {r.branch_name || currentBranchObj?.branch_name || 'المستودع الرئيسي'}
-        </Tag>
-      )
+      width: 160,
+      render: (_, r) => {
+        if (r.isGroupedRow) {
+          const breakdown = r.branchBreakdown || [];
+          return (
+            <Tooltip
+              title={
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>توزيع الرصيد عبر الفروع:</div>
+                  {breakdown.map((b, i) => (
+                    <div key={i} style={{ fontSize: 12 }}>
+                      • {b.branch_name}: <strong>{b.system_qty} قطعة</strong>
+                    </div>
+                  ))}
+                </div>
+              }
+            >
+              <Tag color="purple" style={{ fontWeight: 700, cursor: 'pointer', padding: '2px 8px' }}>
+                <ShopOutlined /> متوفر في {r.branchCount || 1} فروع
+              </Tag>
+            </Tooltip>
+          );
+        }
+
+        return (
+          <Tag color="purple" style={{ fontWeight: 600 }}>
+            <ShopOutlined /> {r.branch_name || currentBranchObj?.branch_name || 'المستودع الرئيسي'}
+          </Tag>
+        );
+      }
     },
     {
-      title: 'سعر التكلفة',
-      dataIndex: 'cost_price',
-      key: 'cost_price',
-      width: 120,
-      align: 'right',
-      render: (c) => `${parseFloat(c || 0).toLocaleString()} ج.م`
+      title: 'التسعير والهامش',
+      key: 'pricing',
+      width: 170,
+      render: (_, r) => {
+        const sell = parseFloat(r.selling_price || 0);
+        const cost = parseFloat(r.cost_price || 0);
+        const profit = sell - cost;
+        const marginPct = sell > 0 ? ((profit / sell) * 100).toFixed(1) : 0;
+        return (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary" style={{ fontSize: 11 }}>البيع:</Text>
+              <Text strong style={{ color: '#2563eb', fontSize: 13 }}>
+                {sell > 0 ? `${sell.toLocaleString()} ج.م` : '—'}
+              </Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary" style={{ fontSize: 11 }}>التكلفة:</Text>
+              <Text style={{ color: '#0f172a', fontSize: 12 }}>
+                {cost > 0 ? `${cost.toLocaleString()} ج.م` : '—'}
+              </Text>
+            </div>
+            {sell > 0 && cost > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                <span style={{ fontSize: 11, color: '#8A6A24' }}>الهامش:</span>
+                <Tag color={profit >= 0 ? 'gold' : 'error'} style={{ margin: 0, fontSize: 10, padding: '0 4px', lineHeight: '18px', fontWeight: 600 }}>
+                  {profit >= 0 ? `+${marginPct}%` : `${marginPct}%`}
+                </Tag>
+              </div>
+            )}
+          </Space>
+        );
+      }
     },
     {
       title: 'الرصيد الدفتري (النظام)',
@@ -421,9 +634,35 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
     {
       title: 'الرصيد الفعلي (المحصى)',
       key: 'actual_count_input',
-      width: 140,
+      width: 150,
       align: 'center',
       render: (_, r) => {
+        if (r.isGroupedRow) {
+          const breakdown = r.branchBreakdown || [];
+          const modifiedBranches = breakdown.filter(b => {
+            const rowKey = `${b.record.product_id}-${b.record.variant_id || 'base'}-${b.record.branch_id || selectedBranch}`;
+            return modifiedRows[rowKey] !== undefined;
+          });
+
+          if (modifiedBranches.length > 0) {
+            const totalActual = modifiedBranches.reduce((sum, b) => {
+              const rowKey = `${b.record.product_id}-${b.record.variant_id || 'base'}-${b.record.branch_id || selectedBranch}`;
+              return sum + (modifiedRows[rowKey]?.actual_qty || 0);
+            }, 0);
+            return (
+              <Tag color="blue" style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px' }}>
+                المحصى: {totalActual} ({modifiedBranches.length}/{r.branchCount} فروع)
+              </Tag>
+            );
+          }
+
+          return (
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              افتح السطر لتسجيل كل فرع
+            </Text>
+          );
+        }
+
         const rowKey = `${r.product_id}-${r.variant_id || 'base'}-${r.branch_id || selectedBranch}`;
         const item = modifiedRows[rowKey];
         const currentVal = item !== undefined ? item.actual_qty : undefined;
@@ -450,6 +689,60 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
       width: 140,
       align: 'center',
       render: (_, r) => {
+        if (r.isGroupedRow) {
+          const breakdown = r.branchBreakdown || [];
+          const modifiedBranches = breakdown.filter(b => {
+            const rowKey = `${b.record.product_id}-${b.record.variant_id || 'base'}-${b.record.branch_id || selectedBranch}`;
+            return modifiedRows[rowKey] !== undefined;
+          });
+
+          if (modifiedBranches.length === 0) {
+            return <span style={{ color: '#9ca3af' }}>—</span>;
+          }
+
+          const totalVariance = modifiedBranches.reduce((sum, b) => {
+            const rowKey = `${b.record.product_id}-${b.record.variant_id || 'base'}-${b.record.branch_id || selectedBranch}`;
+            return sum + (modifiedRows[rowKey]?.variance || 0);
+          }, 0);
+
+          if (totalVariance < 0) {
+            return (
+              <span
+                style={{
+                  color: '#ef4444',
+                  fontWeight: 700,
+                  backgroundColor: '#fef2f2',
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #fecaca'
+                }}
+              >
+                عجز ({totalVariance})
+              </span>
+            );
+          } else if (totalVariance > 0) {
+            return (
+              <span
+                style={{
+                  color: '#22c55e',
+                  fontWeight: 700,
+                  backgroundColor: '#f0fdf4',
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  border: '1px solid #bbf7d0'
+                }}
+              >
+                زيادة (+{totalVariance})
+              </span>
+            );
+          }
+          return (
+            <span style={{ color: '#6b7280', fontWeight: 600, backgroundColor: '#f3f4f6', padding: '3px 8px', borderRadius: 6 }}>
+              متطابق (0)
+            </span>
+          );
+        }
+
         const rowKey = `${r.product_id}-${r.variant_id || 'base'}-${r.branch_id || selectedBranch}`;
         const item = modifiedRows[rowKey];
 
@@ -513,19 +806,36 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
       }
     },
     {
-      title: 'معاينة',
+      title: 'إجراءات',
       key: 'actions',
-      width: 70,
+      width: 140,
       align: 'center',
       render: (_, r) => (
-        <Tooltip title="معاينة وتدقيق بطاقة الصنف">
-          <Button
-            type="text"
-            size="middle"
-            icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 16 }} />}
-            onClick={() => handleViewItemReview(r)}
-          />
-        </Tooltip>
+        <Space size="small">
+          <Tooltip title="معاينة وتدقيق بطاقة الصنف">
+            <Button
+              type="text"
+              size="small"
+              icon={<EyeOutlined style={{ color: '#4f46e5', fontSize: 16 }} />}
+              onClick={() => handleViewItemReview(r)}
+            />
+          </Tooltip>
+          <Tooltip title="تعديل الصنف وتحديث الأسعار المباشرة">
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEditProduct(r)}
+              style={{
+                borderColor: '#C8A45C',
+                color: '#8A6A24',
+                backgroundColor: '#FFFDF9',
+                fontWeight: 600
+              }}
+            >
+              تعديل / السعر
+            </Button>
+          </Tooltip>
+        </Space>
       )
     }
   ];
@@ -725,6 +1035,32 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
           }}
           size="large"
           style={{ marginBottom: 12 }}
+          tabBarExtraContent={
+            selectedBranch === 'all' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 6 }}>
+                <Text strong style={{ fontSize: 12, color: '#64748b' }}>طريقة العرض:</Text>
+                <Radio.Group
+                  value={viewMode}
+                  onChange={(e) => setViewMode(e.target.value)}
+                  size="small"
+                  buttonStyle="solid"
+                >
+                  <Radio.Button value="grouped">
+                    <Space size={4}>
+                      <AppstoreOutlined />
+                      <span>عرض مجمع للأصناف (صنف واحد)</span>
+                    </Space>
+                  </Radio.Button>
+                  <Radio.Button value="detailed">
+                    <Space size={4}>
+                      <BarsOutlined />
+                      <span>تفصيلي حسب الفروع</span>
+                    </Space>
+                  </Radio.Button>
+                </Radio.Group>
+              </div>
+            ) : null
+          }
           items={[
             {
               key: 'in_stock',
@@ -826,12 +1162,94 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
         )}
 
         <Table
-          dataSource={items}
+          dataSource={displayedItems}
           columns={columns}
-          rowKey={(r) => `${r.product_id}-${r.variant_id || 'base'}-${r.branch_id || '0'}`}
+          rowKey={(r) => r.isGroupedRow ? r.groupKey : `${r.product_id}-${r.variant_id || 'base'}-${r.branch_id || '0'}`}
           loading={loading}
           pagination={false}
           size="middle"
+          expandable={isConsolidatedMode ? {
+            expandedRowRender: (record) => (
+              <div style={{ margin: '6px 12px', background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text strong style={{ color: '#1e293b', fontSize: 13 }}>
+                    تفاصيل أرصدة الصنف والجرد الفعلي عبر الفروع والمستودعات:
+                  </Text>
+                  <Tag color="purple">
+                    إجمالي الرصيد الدفتري: {record.system_qty} قطعة موزعة على {record.branchCount} فروع
+                  </Tag>
+                </div>
+                <Table
+                  size="small"
+                  pagination={false}
+                  dataSource={record.branchBreakdown || []}
+                  rowKey={(b) => `${b.record.product_id}-${b.record.variant_id || 'base'}-${b.record.branch_id}`}
+                  columns={[
+                    {
+                      title: 'الفرع / المخزن',
+                      dataIndex: 'branch_name',
+                      key: 'branch_name',
+                      render: (name) => <Tag color="geekblue"><ShopOutlined /> {name}</Tag>
+                    },
+                    {
+                      title: 'الرصيد الدفتري للنظام',
+                      dataIndex: 'system_qty',
+                      key: 'system_qty',
+                      align: 'center',
+                      render: (q) => <strong>{q} قطعة</strong>
+                    },
+                    {
+                      title: 'سعر التكلفة',
+                      key: 'cost',
+                      align: 'right',
+                      render: (_, b) => `${parseFloat(b.cost_price || record.cost_price || 0).toLocaleString()} ج.م`
+                    },
+                    {
+                      title: 'القيمة التقديرية',
+                      key: 'val',
+                      align: 'right',
+                      render: (_, b) => `${(parseInt(b.system_qty || 0, 10) * parseFloat(b.cost_price || record.cost_price || 0)).toLocaleString()} ج.م`
+                    },
+                    {
+                      title: 'الرصيد الفعلي (المحصى)',
+                      key: 'actual',
+                      align: 'center',
+                      width: 140,
+                      render: (_, b) => {
+                        const rowKey = `${b.record.product_id}-${b.record.variant_id || 'base'}-${b.record.branch_id || selectedBranch}`;
+                        const item = modifiedRows[rowKey];
+                        const currentVal = item !== undefined ? item.actual_qty : undefined;
+                        return (
+                          <InputNumber
+                            min={0}
+                            placeholder="الفعلي..."
+                            value={currentVal}
+                            onChange={(val) => handleActualQtyChange(b.record, val)}
+                            style={{ width: '100%', borderRadius: 6 }}
+                          />
+                        );
+                      }
+                    },
+                    {
+                      title: 'الفارق',
+                      key: 'variance',
+                      align: 'center',
+                      render: (_, b) => {
+                        const rowKey = `${b.record.product_id}-${b.record.variant_id || 'base'}-${b.record.branch_id || selectedBranch}`;
+                        const item = modifiedRows[rowKey];
+                        if (!item) return <span style={{ color: '#9ca3af' }}>—</span>;
+                        const v = item.variance;
+                        if (v < 0) return <Tag color="error">عجز ({v})</Tag>;
+                        if (v > 0) return <Tag color="success">زيادة (+{v})</Tag>;
+                        return <Tag color="default">مطابق (0)</Tag>;
+                      }
+                    }
+                  ]}
+                />
+              </div>
+            ),
+            rowExpandable: (record) => Boolean(record.isGroupedRow && record.branchBreakdown && record.branchBreakdown.length > 0)
+          } : undefined}
         />
       </Card>
 
@@ -1034,7 +1452,25 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
         }
         open={reviewModalVisible}
         onCancel={() => setReviewModalVisible(false)}
-        footer={<Button type="primary" onClick={() => setReviewModalVisible(false)}>إغلاق [Esc]</Button>}
+        footer={
+          <Space>
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => {
+                const it = reviewedItem;
+                setReviewModalVisible(false);
+                handleOpenEditProduct(it);
+              }}
+              style={{ backgroundColor: '#8A6A24', borderColor: '#8A6A24', fontWeight: 600 }}
+            >
+              تعديل بيانات وأسعار الصنف
+            </Button>
+            <Button onClick={() => setReviewModalVisible(false)}>
+              إغلاق [Esc]
+            </Button>
+          </Space>
+        }
         width={680}
         destroyOnHidden
       >
@@ -1125,6 +1561,281 @@ export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
             </Card>
           </div>
         )}
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* DIRECT PRODUCT & PRICING EDIT MODAL FOR STOCK AUDIT */}
+      {/* ========================================================================= */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              backgroundColor: '#FEF3C7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#B45309'
+            }}>
+              <DollarOutlined style={{ fontSize: 20 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 'bold', color: '#0F172A' }}>
+                تعديل واعتماد تسعير وبيانات الصنف بالجرد
+              </div>
+              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 'normal' }}>
+                {editingProduct?.product_name} ({editingProduct?.variant_sku || editingProduct?.product_code})
+              </div>
+            </div>
+          </div>
+        }
+        open={editProductModalVisible}
+        onCancel={() => setEditProductModalVisible(false)}
+        onOk={handleSaveProductEdit}
+        okText="اعتماد وحفظ السعر والبيانات"
+        cancelText="إلغاء"
+        confirmLoading={productEditSubmitting}
+        okButtonProps={{
+          style: { backgroundColor: '#8A6A24', borderColor: '#8A6A24', fontWeight: 600, height: 38 }
+        }}
+        width={620}
+        destroyOnHidden
+      >
+        <div style={{ marginTop: 12 }}>
+          <Alert
+            type="info"
+            showIcon
+            message="تحديث فوري لأسعار الصنف وتقييم المخزون"
+            description="يتم اعتماد التعديلات هنا فورياً على مستوى النظام (نقاط بيع الفروع، المتجر الإلكتروني، وتقييم رصيد المخزن الحالي دون التأثير على الجرد الفعلي المحصى)."
+            style={{ marginBottom: 12, border: '1px solid #bfdbfe', backgroundColor: '#eff6ff' }}
+          />
+
+          {/* Multi-Branch Stock & Unified Pricing Notice */}
+          <div style={{
+            backgroundColor: '#f0fdf4',
+            border: '1.5px solid #86efac',
+            borderRadius: 8,
+            padding: '12px 14px',
+            marginBottom: 16
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Space align="middle">
+                <ShopOutlined style={{ color: '#16a34a', fontSize: 16 }} />
+                <Text strong style={{ color: '#15803d', fontSize: 13 }}>
+                  نطاق تطبيق السعر: توحيد مركزي لجميع المخازن والفروع
+                </Text>
+              </Space>
+              <Tag color="green" style={{ fontWeight: 700 }}>
+                {editingProductBranches.length > 0 ? `متواجد في ${editingProductBranches.length} فروع` : 'المخزن الرئيسي'}
+              </Tag>
+            </div>
+
+            <div style={{ fontSize: 12, color: '#166534', marginBottom: 8, lineHeight: 1.6 }}>
+              تعديل السعر هنا هو <strong>تعديل مركزي شامل</strong> يُعتمد فورياً وبنقرة واحدة لجميع المخازن ونقاط بيع الفروع والمتجر الإلكتروني، دون الحاجة لتكرار التعديل لكل فرع على حدة.
+            </div>
+
+            {editingProductBranches.length > 0 && (
+              <div style={{ background: '#ffffff', borderRadius: 6, padding: '8px 10px', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>توزيع رصيد الصنف الحالي عبر الفروع:</div>
+                <Space size={[6, 6]} wrap>
+                  {editingProductBranches.map((b, idx) => (
+                    <Tag key={idx} color="geekblue" style={{ fontSize: 12, padding: '2px 8px' }}>
+                      <strong>{b.branch_name}:</strong> {b.qty} قطعة
+                    </Tag>
+                  ))}
+                </Space>
+              </div>
+            )}
+          </div>
+
+          <Form form={productEditForm} layout="vertical">
+            <Row gutter={16}>
+              <Col span={14}>
+                <Form.Item
+                  name="product_name"
+                  label={<Text strong style={{ color: '#0F172A' }}>اسم الصنف الأساسي (Product Name):</Text>}
+                  rules={[{ required: true, message: 'يرجى إدخال اسم الصنف' }]}
+                >
+                  <Input placeholder="اسم الصنف..." size="large" />
+                </Form.Item>
+              </Col>
+              <Col span={10}>
+                <Form.Item
+                  name="brand"
+                  label={<Text style={{ color: '#475569' }}>الماركة / Brand:</Text>}
+                >
+                  <Input placeholder="Yoka Store" size="large" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item
+                  name="barcode"
+                  label={<Text style={{ color: '#475569' }}>الباركود الدولي (Barcode):</Text>}
+                >
+                  <Input prefix={<BarcodeOutlined />} placeholder="622XXXXXXXXXX" size="middle" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Divider style={{ margin: '8px 0 16px', borderColor: '#f1f5f9' }} />
+
+            <div style={{ backgroundColor: '#fffdf5', border: '1px solid #fde68a', padding: '12px 14px', borderRadius: 8, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <Space align="middle">
+                  <DollarOutlined style={{ color: '#b45309', fontSize: 16 }} />
+                  <Text strong style={{ color: '#92400e', fontSize: 13 }}>
+                    تسعير الصنف الموحد (Pricing Details):
+                  </Text>
+                </Space>
+                <Tag color="gold" style={{ fontWeight: 600 }}>يُعتمد لجميع الفروع والكاشير</Tag>
+              </div>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="selling_price"
+                    label={<Text strong style={{ color: '#0F172A' }}>سعر البيع للقطاعي (ج.م) *</Text>}
+                    rules={[{ required: true, message: 'يرجى إدخال سعر البيع' }]}
+                  >
+                    <InputNumber
+                      min={0}
+                      step={1}
+                      precision={2}
+                      size="large"
+                      style={{ width: '100%' }}
+                      addonAfter="ج.م"
+                      placeholder="0.00"
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col span={12}>
+                  <Form.Item
+                    name="cost_price"
+                    label={<Text strong style={{ color: '#475569' }}>سعر التكلفة الأساسي (ج.م) *</Text>}
+                    rules={[{ required: true, message: 'يرجى إدخال سعر التكلفة' }]}
+                  >
+                    <InputNumber
+                      min={0}
+                      step={1}
+                      precision={2}
+                      size="large"
+                      style={{ width: '100%' }}
+                      addonAfter="ج.م"
+                      placeholder="0.00"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="wholesale_price"
+                    label={<Text style={{ color: '#475569' }}>سعر الجملة (ج.م) (اختياري)</Text>}
+                  >
+                    <InputNumber
+                      min={0}
+                      step={1}
+                      precision={2}
+                      style={{ width: '100%' }}
+                      addonAfter="ج.م"
+                      placeholder="0.00"
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col span={12}>
+                  <Form.Item
+                    name="sale_price"
+                    label={<Text style={{ color: '#b91c1c' }}>سعر التخفيض / العرض (اختياري)</Text>}
+                  >
+                    <InputNumber
+                      min={0}
+                      step={1}
+                      precision={2}
+                      style={{ width: '100%' }}
+                      addonAfter="ج.م"
+                      placeholder="0.00"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Dynamic Live Profit Margin & Stock Impact */}
+            {(() => {
+              const liveSelling = Number(watchedSellingPrice ?? editingProduct?.selling_price ?? 0);
+              const liveCost = Number(watchedCostPrice ?? editingProduct?.cost_price ?? 0);
+              const liveProfit = liveSelling - liveCost;
+              const liveMargin = liveSelling > 0 ? ((liveProfit / liveSelling) * 100).toFixed(1) : 0;
+              const isLoss = liveProfit < 0;
+              const totalUnits = editingProductBranches.length > 0
+                ? editingProductBranches.reduce((sum, b) => sum + b.qty, 0)
+                : parseInt(editingProduct?.system_qty || 0, 10);
+              const newTotalStockVal = totalUnits * liveCost;
+
+              return (
+                <div style={{
+                  backgroundColor: isLoss ? '#fef2f2' : '#f0fdf4',
+                  border: `1.5px solid ${isLoss ? '#f87171' : '#86efac'}`,
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  marginBottom: 16
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: isLoss ? '#991b1b' : '#166534', fontWeight: 600 }}>
+                        {isLoss ? 'تحذير: هامش ربح سلبي!' : 'حساب هامش الربح اللحظي:'}
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 'bold', color: isLoss ? '#dc2626' : '#15803d', marginTop: 2 }}>
+                        صافي الربح: {liveProfit.toLocaleString()} ج.م للقطعة
+                      </div>
+                    </div>
+                    <Tag
+                      color={isLoss ? 'error' : 'success'}
+                      style={{ fontSize: 14, padding: '4px 10px', borderRadius: 6, fontWeight: 'bold' }}
+                    >
+                      {liveProfit >= 0 ? `+${liveMargin}%` : `${liveMargin}%`}
+                    </Tag>
+                  </div>
+
+                  {totalUnits > 0 && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span style={{ color: '#475569' }}>
+                        إجمالي تقييم رصيد الصنف بكافة الفروع ({totalUnits} قطعة):
+                      </span>
+                      <strong style={{ color: '#0f766e' }}>
+                        {newTotalStockVal.toLocaleString()} ج.م
+                      </strong>
+                    </div>
+                  )}
+
+                  {isLoss && (
+                    <Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+                      سعر البيع الحالي أقل من سعر التكلفة، مما يؤدي لخسارة مالية عند البيع.
+                    </Text>
+                  )}
+                </div>
+              );
+            })()}
+
+            <Form.Item
+              name="reason"
+              label={<Text style={{ color: '#475569' }}>سبب تعديل السعر والبيانات (سجل التدقيق):</Text>}
+            >
+              <Input.TextArea
+                rows={2}
+                placeholder="مثال: تعديل بعد حصر الجرد الفعلي، تصحيح سعر التكلفة من فاتورة الشراء، مراجعة دورية..."
+              />
+            </Form.Item>
+          </Form>
+        </div>
       </Modal>
     </div>
   );

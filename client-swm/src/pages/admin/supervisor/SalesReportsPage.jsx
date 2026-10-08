@@ -96,7 +96,7 @@ const PAYMENT_COLORS = {
   transfer: '#8b5cf6'
 };
 
-export default function SalesReportsPage({ currentUser: propCurrentUser }) {
+export default function SalesReportsPage({ currentUser: propCurrentUser, isAdmin: propIsAdmin }) {
   const navigate = useNavigate();
   const location = useLocation();
   const storedUser = (() => {
@@ -111,10 +111,12 @@ export default function SalesReportsPage({ currentUser: propCurrentUser }) {
     currentUser?.branch_type !== 'retail_branch' &&
     currentUser?.branchType !== 'retail_branch'
   );
-  const isAdmin = Boolean(
-    location.pathname.startsWith('/admin') ||
-    (['admin', 'super_admin', 'warehouse_manager'].includes(currentUser?.role) && !location.pathname.startsWith('/supervisor'))
-  );
+  const isAdmin = typeof propIsAdmin === 'boolean'
+    ? propIsAdmin
+    : Boolean(
+        location.pathname.startsWith('/admin') ||
+        (['admin', 'super_admin', 'warehouse_manager'].includes(currentUser?.role) && !location.pathname.startsWith('/supervisor'))
+      );
   const initialBranch = isCentralAdmin ? 'all' : (userBranchId ? String(userBranchId) : '1');
 
   const [selectedBranch, setSelectedBranch] = useState(initialBranch);

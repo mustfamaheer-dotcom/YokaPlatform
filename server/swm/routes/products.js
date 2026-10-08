@@ -897,6 +897,87 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
 });
 
 /**
+ * PATCH /api/swm/products/:id/price
+ * Dedicated, audited endpoint for updating product selling/cost/wholesale/sale prices
+ */
+router.patch('/:id/price', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { selling_price, cost_price, wholesale_price, sale_price, reason } = req.body;
+
+    const [old] = await query(`SELECT * FROM products WHERE id = $1`, [id]);
+    if (!old) {
+      return res.status(404).json({ success: false, message: 'الصنف غير موجود' });
+    }
+
+    const newSelling = selling_price !== undefined ? parseFloat(selling_price) : parseFloat(old.selling_price);
+    const newCost = cost_price !== undefined ? parseFloat(cost_price) : parseFloat(old.cost_price || 0);
+    const newWholesale = wholesale_price !== undefined ? (wholesale_price ? parseFloat(wholesale_price) : null) : old.wholesale_price;
+    const newSale = sale_price !== undefined ? (sale_price ? parseFloat(sale_price) : null) : old.sale_price;
+
+    if (isNaN(newSelling) || newSelling <= 0) {
+      return res.status(400).json({ success: false, message: 'سعر البيع يجب أن يكون رقماً أكبر من صفر' });
+    }
+    if (isNaN(newCost) || newCost < 0) {
+      return res.status(400).json({ success: false, message: 'سعر التكلفة لا يمكن أن يكون سالباً' });
+    }
+
+    const [updated] = await query(
+      `UPDATE products SET
+        selling_price = $1,
+        cost_price = $2,
+        wholesale_price = $3,
+        sale_price = $4,
+        updated_at = NOW()
+       WHERE id = $5
+       RETURNING *`,
+      [newSelling, newCost, newWholesale, newSale, id]
+    );
+
+    // Audit activity log
+    logActivity({
+      userId: req.user.id,
+      branchId: req.user.branchId,
+      actionType: 'UPDATE_PRICE',
+      entityType: 'products',
+      entityId: id,
+      oldValue: {
+        selling_price: old.selling_price,
+        cost_price: old.cost_price,
+        wholesale_price: old.wholesale_price,
+        sale_price: old.sale_price
+      },
+      newValue: {
+        selling_price: newSelling,
+        cost_price: newCost,
+        wholesale_price: newWholesale,
+        sale_price: newSale
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: reason || `تم تعديل سعر الصنف (${old.product_name || id}) إلى ${newSelling} ج.م`
+    });
+
+    // Invalidate Redis caches
+    try {
+      const redis = require('../../shared/redis');
+      await redis.del(`ecp:seo:product:${old.slug}`);
+      const catalogKeys = await redis.keys('ecp:catalog:*');
+      if (catalogKeys.length > 0) await redis.del(catalogKeys);
+    } catch (e) {}
+
+    return res.json({
+      success: true,
+      message: 'تم تحديث واعتماد سعر الصنف بنجاح',
+      data: updated
+    });
+  } catch (err) {
+    console.error('Update price error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * POST /api/swm/products/:id/variants
  * Add a new variant (color, size, etc.) to an existing product
  */

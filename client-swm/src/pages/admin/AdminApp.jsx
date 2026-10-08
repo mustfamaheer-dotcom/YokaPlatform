@@ -848,7 +848,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         {activeTab === 'branches_daily' && <BranchesDaily currentUser={currentUser} />}
         {activeTab === 'admin_journals' && <AdminJournals currentUser={currentUser} />}
         {(activeTab === 'sales_reports' || activeTab === 'retail_analytics') && (
-          <SalesReportsPage currentUser={currentUser} />
+          <SalesReportsPage currentUser={currentUser} isAdmin={true} />
         )}
         {activeTab === 'ecom_analytics' && (
           <EcomAnalytics currentUser={currentUser} onNavigate={handleNavigate} />

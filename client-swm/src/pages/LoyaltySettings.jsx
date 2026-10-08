@@ -49,7 +49,18 @@ export default function LoyaltySettings({ currentUser, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const isAdmin = ['super_admin', 'admin'].includes(currentUser?.role);
+  const storedUser = (() => {
+    try {
+      const u = localStorage.getItem('user');
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const effectiveUser = currentUser || storedUser;
+  const isAdmin = effectiveUser?.role
+    ? ['super_admin', 'admin'].includes(effectiveUser.role)
+    : true;
 
   // Stats from backend API (snake_case)
   const [stats, setStats] = useState({
@@ -278,7 +289,7 @@ export default function LoyaltySettings({ currentUser, onNavigate }) {
         </Space>
       </div>
 
-      {!isAdmin && (
+      {!isAdmin && effectiveUser?.role && (
         <Alert
           type="info"
           showIcon
@@ -562,15 +573,16 @@ export default function LoyaltySettings({ currentUser, onNavigate }) {
                   loading={saving}
                   disabled={!isAdmin}
                   style={{
-                    backgroundColor: isAdmin ? '#0F172A' : '#94A3B8',
-                    borderColor: isAdmin ? '#0F172A' : '#94A3B8',
+                    backgroundColor: isAdmin ? '#059669' : '#94A3B8',
+                    borderColor: isAdmin ? '#059669' : '#94A3B8',
                     borderRadius: 8,
                     fontWeight: 700,
-                    height: 40,
-                    padding: '0 24px'
+                    height: 42,
+                    padding: '0 28px',
+                    boxShadow: isAdmin ? '0 2px 6px rgba(5, 150, 105, 0.2)' : 'none'
                   }}
                 >
-                  حفظ وتطبيق القواعد
+                  حفظ وتعديل القواعد
                 </Button>
               </div>
             </Form>

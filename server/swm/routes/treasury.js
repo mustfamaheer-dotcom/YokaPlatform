@@ -53,6 +53,7 @@ async function initTreasuryAuxTables() {
       );
 
       ALTER TABLE payroll_payouts ADD COLUMN IF NOT EXISTS deduct_source VARCHAR(50) DEFAULT 'main_treasury';
+      ALTER TABLE treasury_transactions ALTER COLUMN register_id DROP NOT NULL;
     `);
 
     // Seed default withdrawal reasons if none exist
@@ -1005,27 +1006,219 @@ router.post('/owner-transaction', requireAuth, requireRole(['super_admin', 'admi
 });
 
 // ────────────────────────────────────────────────────
+//  POST /api/swm/treasury/channel-transfer
+//  Transfer funds between internal treasury channels (cash, visa, transfer)
+// ────────────────────────────────────────────────────
+router.post('/channel-transfer', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { from_channel, to_channel, amount, notes } = req.body;
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'يرجى إدخال مبلغ صحيح للتحويل' });
+    }
+    const validChannels = ['cash', 'visa', 'transfer'];
+    if (!validChannels.includes(from_channel) || !validChannels.includes(to_channel)) {
+      return res.status(400).json({ success: false, message: 'قناة مالية غير صحيحة' });
+    }
+    if (from_channel === to_channel) {
+      return res.status(400).json({ success: false, message: 'لا يمكن التحويل لنفس القناة المالية' });
+    }
+
+    const channelNames = {
+      cash: 'الخزينة النقدية (كاش)',
+      visa: 'الحساب البنكي (فيزا)',
+      transfer: 'التحويلات والمحافظ (إنستاباي / كاش)'
+    };
+
+    const result = await transaction(async (client) => {
+      const { mainBranch, reg } = await getMainWarehouseSafe(client);
+
+      const { rows: [safe] } = await client.query(
+        `SELECT * FROM branch_safes WHERE branch_id = $1 FOR UPDATE`,
+        [mainBranch.id]
+      );
+      if (!safe) throw new Error('خزينة الفرع الرئيسي غير موجودة');
+
+      const fromCol = `${from_channel}_balance`;
+      const toCol = `${to_channel}_balance`;
+      const currentFromBal = parseFloat(safe[fromCol] || 0);
+      const currentToBal = parseFloat(safe[toCol] || 0);
+
+      if (parsedAmount > currentFromBal + 0.01) {
+        throw new Error(`الرصيد المتاح في ${channelNames[from_channel]} (${currentFromBal.toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م) لا يكفي لإتمام التحويل`);
+      }
+
+      const newFromBal = Math.round((currentFromBal - parsedAmount) * 100) / 100;
+      const newToBal = Math.round((currentToBal + parsedAmount) * 100) / 100;
+
+      await client.query(
+        `UPDATE branch_safes SET ${fromCol} = $1, ${toCol} = $2, updated_at = NOW() WHERE id = $3`,
+        [newFromBal, newToBal, safe.id]
+      );
+
+      const prevTotal = parseFloat(safe.cash_balance || 0) + parseFloat(safe.visa_balance || 0) + parseFloat(safe.transfer_balance || 0);
+      const entryNum = `XFER-CHAN-${Date.now().toString().slice(-8)}`;
+      const transferNotes = `تحويل داخلي بين القنوات: من [${channelNames[from_channel]}] إلى [${channelNames[to_channel]}]${notes ? ` - البيان: ${notes.trim()}` : ''}`;
+
+      const { rows: [txRecord] } = await client.query(
+        `INSERT INTO treasury_transactions (
+           entry_number, branch_id, register_id, safe_id,
+           source_account, destination_account, payment_method, amount,
+           previous_safe_balance, new_safe_balance, created_by, notes, created_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, 'channel_transfer', $7, $8, $9, $10, $11, NOW())
+         RETURNING *`,
+        [
+          entryNum,
+          mainBranch.id,
+          reg?.id || null,
+          safe.id,
+          `main_safe_${from_channel}`,
+          `main_safe_${to_channel}`,
+          parsedAmount,
+          prevTotal,
+          prevTotal,
+          req.user.id,
+          transferNotes
+        ]
+      );
+
+      return { txRecord, newFromBal, newToBal };
+    });
+
+    logActivity({
+      userId: req.user.id,
+      branchId: req.user.branchId || 1,
+      actionType: 'CHANNEL_TRANSFER',
+      entityType: 'treasury_transactions',
+      entityId: result.txRecord.id,
+      newValue: { from_channel, to_channel, amount: parsedAmount, notes },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `تحويل داخلي من ${from_channel} إلى ${to_channel} بمبلغ ${parsedAmount} ج.م`
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result.txRecord,
+      message: `تم تحويل مبلغ ${parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م بنجاح من ${channelNames[from_channel]} إلى ${channelNames[to_channel]}`
+    });
+  } catch (err) {
+    console.error('Channel transfer error:', err);
+    return res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// ────────────────────────────────────────────────────
 //  GET /api/swm/treasury/main-safe-ledger
-//  Returns audit trail of movements in the main warehouse safe
+//  Returns audit trail of movements in the main warehouse safe with filters & search
 // ────────────────────────────────────────────────────
 router.get('/main-safe-ledger', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
   try {
     const { mainBranch } = await getMainWarehouseSafe();
-    const rows = await query(`
+    const { search, type, channel, start_date, end_date, limit = 200 } = req.query;
+
+    let sql = `
       SELECT tt.*, u.full_name AS created_by_name, u.username AS created_by_username
       FROM treasury_transactions tt
       LEFT JOIN users u ON u.id = tt.created_by
-      WHERE tt.branch_id = $1 OR tt.destination_account = 'main_warehouse_safe' OR tt.source_account = 'main_warehouse_safe'
-      ORDER BY tt.created_at DESC
-      LIMIT 100
-    `, [mainBranch.id]);
+      WHERE (tt.branch_id = ? OR tt.destination_account = 'main_warehouse_safe' OR tt.source_account = 'main_warehouse_safe' OR tt.payment_method = 'channel_transfer')
+    `;
+    const params = [mainBranch.id];
 
+    if (search && search.trim()) {
+      sql += ` AND (tt.entry_number ILIKE ? OR tt.notes ILIKE ? OR u.full_name ILIKE ? OR u.username ILIKE ?)`;
+      const term = `%${search.trim()}%`;
+      params.push(term, term, term, term);
+    }
+
+    if (type === 'inflow') {
+      sql += ` AND (tt.destination_account = 'main_warehouse_safe' AND tt.payment_method != 'channel_transfer')`;
+    } else if (type === 'outflow') {
+      sql += ` AND (tt.destination_account != 'main_warehouse_safe' AND tt.payment_method != 'channel_transfer')`;
+    } else if (type === 'transfer') {
+      sql += ` AND (tt.payment_method = 'channel_transfer' OR tt.source_account LIKE 'main_safe_%')`;
+    }
+
+    if (channel && channel !== 'all') {
+      sql += ` AND (tt.payment_method = ? OR tt.notes ILIKE ? OR tt.source_account ILIKE ? OR tt.destination_account ILIKE ?)`;
+      params.push(channel, `%${channel}%`, `%${channel}%`, `%${channel}%`);
+    }
+
+    if (start_date && end_date) {
+      sql += ` AND DATE(tt.created_at) >= ? AND DATE(tt.created_at) <= ?`;
+      params.push(start_date, end_date);
+    }
+
+    sql += ` ORDER BY tt.created_at DESC LIMIT ?`;
+    params.push(parseInt(limit, 10) || 200);
+
+    const rows = await query(sql, params);
     return res.json({
       success: true,
       data: rows
     });
   } catch (err) {
     console.error('Main safe ledger error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ────────────────────────────────────────────────────
+//  GET /api/swm/treasury/analytics
+//  Visual analytics: channel distribution, expense category breakdown & daily trends
+// ────────────────────────────────────────────────────
+router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { safe } = await getMainWarehouseSafe();
+
+    // 1. Channel Distribution
+    const cash = parseFloat(safe.cash_balance || 0);
+    const visa = parseFloat(safe.visa_balance || 0);
+    const transfer = parseFloat(safe.transfer_balance || 0);
+    const total = Math.max(0, cash + visa + transfer);
+
+    const channelDist = [
+      { name: 'كاش (نقدي)', key: 'cash', value: cash, percent: total > 0 ? Math.round((cash / total) * 100) : 0, color: '#16a34a' },
+      { name: 'حساب بنكي / فيزا', key: 'visa', value: visa, percent: total > 0 ? Math.round((visa / total) * 100) : 0, color: '#0284c7' },
+      { name: 'محافظ / تحويلات', key: 'transfer', value: transfer, percent: total > 0 ? Math.round((transfer / total) * 100) : 0, color: '#8b5cf6' }
+    ];
+
+    // 2. Expense Category breakdown (last 30 days)
+    const expenseRows = await query(`
+      SELECT 
+        COALESCE(category, 'other') AS category,
+        COALESCE(subcategory, category, 'مصروفات أخرى') AS subcategory,
+        COUNT(*) AS tx_count,
+        SUM(amount) AS total_amount
+      FROM expenses
+      WHERE status = 'approved' AND expense_date >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY category, subcategory
+      ORDER BY total_amount DESC
+      LIMIT 10
+    `);
+
+    // 3. Daily Cash Flow Trend (last 14 days)
+    const dailyTrend = await query(`
+      SELECT 
+        TO_CHAR(tt.created_at, 'YYYY-MM-DD') AS day,
+        COALESCE(SUM(CASE WHEN tt.destination_account = 'main_warehouse_safe' AND tt.payment_method != 'channel_transfer' THEN tt.amount ELSE 0 END), 0) AS inflows,
+        COALESCE(SUM(CASE WHEN tt.destination_account != 'main_warehouse_safe' AND tt.payment_method != 'channel_transfer' THEN tt.amount ELSE 0 END), 0) AS outflows
+      FROM treasury_transactions tt
+      WHERE tt.created_at >= CURRENT_DATE - INTERVAL '14 days'
+      GROUP BY TO_CHAR(tt.created_at, 'YYYY-MM-DD')
+      ORDER BY day ASC
+    `);
+
+    return res.json({
+      success: true,
+      data: {
+        channelDistribution: channelDist,
+        expenseBreakdown: expenseRows || [],
+        dailyTrend: dailyTrend || []
+      }
+    });
+  } catch (err) {
+    console.error('Treasury analytics error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -1515,7 +1708,7 @@ router.post('/pay-salary', requireAuth, requireRole(['super_admin', 'admin', 'su
  */
 router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
   try {
-    const { month, start_date, end_date, limit = 50 } = req.query;
+    const { month, start_date, end_date, limit = 100 } = req.query;
     let sql = `
       SELECT pp.*, b.branch_name, b.branch_code, u.full_name AS paid_by_name
       FROM payroll_payouts pp
@@ -1525,13 +1718,14 @@ router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin',
     `;
     const params = [];
     if (start_date && end_date) {
-      sql += ` AND DATE(pp.paid_at) >= ${params.length + 1} AND DATE(pp.paid_at) <= ${params.length + 2}`;
+      sql += ` AND DATE(pp.paid_at) >= ? AND DATE(pp.paid_at) <= ?`;
       params.push(start_date, end_date);
     } else if (month && month !== 'all') {
-      sql += ` AND pp.payout_month = ${params.length + 1}`;
+      sql += ` AND pp.payout_month = ?`;
       params.push(month);
     }
-    sql += ` ORDER BY pp.paid_at DESC LIMIT ${parseInt(limit, 10)}`;
+    sql += ` ORDER BY pp.paid_at DESC LIMIT ?`;
+    params.push(parseInt(limit, 10) || 100);
 
     const rows = await query(sql, params);
     return res.json({ success: true, data: rows });
@@ -1541,5 +1735,218 @@ router.get('/payroll-history', requireAuth, requireRole(['super_admin', 'admin',
   }
 });
 
+// ────────────────────────────────────────────────────
+//  BULK PAYROLL PREVIEW & BULK PAYOUT
+// ────────────────────────────────────────────────────
+
+/**
+ * GET /api/swm/treasury/bulk-payroll-preview
+ * Returns list of all active employees with computed base salary, advances taken,
+ * and already paid status for the given month.
+ */
+router.get('/bulk-payroll-preview', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
+  try {
+    const { month } = req.query;
+    const now = new Date();
+    const targetMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const [yearStr, monthStr] = targetMonth.split('-');
+    const startDate = `${yearStr}-${monthStr}-01`;
+    const endOfMonthDate = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0).getDate();
+    const endDate = `${yearStr}-${monthStr}-${String(endOfMonthDate).padStart(2, '0')}`;
+
+    const employees = await query(`
+      SELECT u.id, u.username, u.full_name, u.phone, u.role, u.branch_id,
+             COALESCE(u.salary, 0) AS base_salary,
+             b.branch_name, b.branch_code
+      FROM users u
+      LEFT JOIN branches b ON b.id = u.branch_id
+      WHERE u.status = 'active'
+      ORDER BY b.branch_name NULLS LAST, u.full_name ASC
+    `);
+
+    // Fetch advances taken this month
+    const advances = await query(`
+      SELECT e.recorded_by, e.description, e.amount
+      FROM expenses e
+      WHERE e.status = 'approved'
+        AND DATE(e.expense_date) >= $1 AND DATE(e.expense_date) <= $2
+        AND COALESCE(e.subcategory, '') != 'salary_payout'
+    `, [startDate, endDate]);
+
+    // Fetch previous payouts for this month
+    const payouts = await query(`
+      SELECT pp.employee_id, pp.net_salary, pp.paid_at
+      FROM payroll_payouts pp
+      WHERE pp.payout_month = $1
+    `, [targetMonth]);
+
+    const advancesMap = {};
+    for (const a of advances) {
+      if (a.recorded_by) {
+        advancesMap[a.recorded_by] = (advancesMap[a.recorded_by] || 0) + parseFloat(a.amount || 0);
+      }
+    }
+
+    const paidMap = {};
+    for (const p of payouts) {
+      paidMap[p.employee_id] = p;
+    }
+
+    const list = employees.map(emp => {
+      const baseSalary = parseFloat(emp.base_salary || 0);
+      const advancesTotal = advancesMap[emp.id] || 0;
+      const alreadyPaid = !!paidMap[emp.id];
+      const netSalary = Math.max(0, Math.round((baseSalary - advancesTotal) * 100) / 100);
+      return {
+        employee_id: emp.id,
+        username: emp.username,
+        full_name: emp.full_name,
+        branch_id: emp.branch_id,
+        branch_name: emp.branch_name || 'الفرع الرئيسي',
+        role: emp.role,
+        base_salary: baseSalary,
+        advances_total: Math.round(advancesTotal * 100) / 100,
+        already_paid: alreadyPaid,
+        net_salary: netSalary
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        payout_month: targetMonth,
+        employees: list
+      }
+    });
+  } catch (err) {
+    console.error('Bulk payroll preview error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/swm/treasury/bulk-pay-salary
+ * Disburses salaries for multiple selected employees in a single atomic transaction
+ */
+router.post('/bulk-pay-salary', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireWarehousePermission('payroll'), async (req, res) => {
+  try {
+    const { payout_month, channel = 'cash', employees = [] } = req.body;
+    if (!Array.isArray(employees) || employees.length === 0) {
+      return res.status(400).json({ success: false, message: 'يرجى تحديد موظف واحد على الأقل للصرف' });
+    }
+
+    const normChannel = ['cash', 'visa', 'transfer'].includes(channel) ? channel : 'cash';
+    const month = payout_month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+    let totalDisbursed = 0;
+    const validatedList = [];
+
+    for (const item of employees) {
+      const empId = parseInt(item.employee_id, 10);
+      const net = parseFloat(item.net_salary || 0);
+      if (empId && net > 0) {
+        totalDisbursed += net;
+        validatedList.push({
+          employee_id: empId,
+          base_salary: parseFloat(item.base_salary || 0),
+          advances_deducted: parseFloat(item.advances_deducted || 0),
+          deductions: parseFloat(item.deductions || 0),
+          deduction_reason: item.deduction_reason || null,
+          bonus: parseFloat(item.bonus || 0),
+          bonus_reason: item.bonus_reason || null,
+          net_salary: net,
+          employee_name: item.employee_name || 'موظف',
+          branch_id: item.branch_id || null,
+          notes: item.notes || null
+        });
+      }
+    }
+
+    totalDisbursed = Math.round(totalDisbursed * 100) / 100;
+    if (totalDisbursed <= 0 || validatedList.length === 0) {
+      return res.status(400).json({ success: false, message: 'لا يوجد صافي رواتب مستحقة للصرف للموظفين المحددين' });
+    }
+
+    const result = await transaction(async (client) => {
+      const { mainBranch } = await getMainWarehouseSafe(client);
+
+      // 1. Deduct total amount from Main Treasury
+      await deductFromMainTreasury(client, {
+        amount: totalDisbursed,
+        paymentMethod: normChannel,
+        paymentBreakdown: { [normChannel]: totalDisbursed },
+        destinationAccount: 'bulk_payroll_payout',
+        reason: `صرف مسير رواتب مجمع لشهر ${month} لعدد (${validatedList.length}) موظف`,
+        refNumber: `BULK-PAY-${Date.now().toString().slice(-6)}`,
+        userId: req.user.id
+      });
+
+      // 2. Insert records for each employee
+      for (const emp of validatedList) {
+        const expRef = `EXP-PAY-${Date.now().toString().slice(-6)}-${emp.employee_id}`;
+        const desc = `صرف راتب شهر ${month} - الموظف: ${emp.employee_name} [أساسي: ${emp.base_salary} - سلف: ${emp.advances_deducted} - خصم: ${emp.deductions} + حوافز: ${emp.bonus}]`;
+
+        const { rows: [expenseRec] } = await client.query(
+          `INSERT INTO expenses (
+             expense_ref, branch_id, category, subcategory, amount,
+             description, expense_date, recorded_by, status, created_at, updated_at
+           ) VALUES ($1, $2, 'payroll', 'salary_payout', $3, $4, CURRENT_DATE, $5, 'approved', NOW(), NOW())
+           RETURNING *`,
+          [expRef, emp.branch_id || mainBranch.id, emp.net_salary, desc, req.user.id]
+        );
+
+        await client.query(
+          `INSERT INTO payroll_payouts (
+             employee_id, employee_name, branch_id, payout_month,
+             base_salary, advances_deducted, deductions, deduction_reason,
+             bonus, bonus_reason, net_salary, channel, paid_by, notes, expense_id, deduct_source, paid_at
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'main_treasury', NOW())`,
+          [
+            emp.employee_id,
+            emp.employee_name,
+            emp.branch_id,
+            month,
+            emp.base_salary,
+            emp.advances_deducted,
+            emp.deductions,
+            emp.deduction_reason,
+            emp.bonus,
+            emp.bonus_reason,
+            emp.net_salary,
+            normChannel,
+            req.user.id,
+            emp.notes,
+            expenseRec.id
+          ]
+        );
+      }
+
+      return { count: validatedList.length, total: totalDisbursed };
+    });
+
+    logActivity({
+      userId: req.user.id,
+      branchId: req.user.branchId || 1,
+      actionType: 'BULK_PAYROLL_PAYOUT',
+      entityType: 'payroll_payouts',
+      entityId: 0,
+      newValue: { month, count: result.count, total: result.total, channel: normChannel },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      notes: `صرف مسير رواتب مجمع لشهر ${month} لعدد ${result.count} موظف بإجمالي ${result.total} ج.م عبر ${normChannel}`
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      message: `تم صرف مسير الرواتب بنجاح لعدد (${result.count}) موظف بإجمالي مبلغ ${result.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} ج.م من الخزينة`
+    });
+  } catch (err) {
+    console.error('Bulk payroll error:', err);
+    return res.status(400).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
+
 

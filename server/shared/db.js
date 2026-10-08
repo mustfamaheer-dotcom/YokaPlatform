@@ -41,16 +41,35 @@ if (dbClient === 'pg') {
   });
 
   /**
-   * Execute query on PostgreSQL
+   * Execute query on PostgreSQL with automatic retry on dead idle connections
    */
   async function query(sql, params = []) {
-    const client = await pool.connect();
-    try {
-      const normalized = normalizeSql(sql, 'pg');
-      const result = await client.query(normalized, params);
-      return result.rows;
-    } finally {
-      client.release();
+    let client = null;
+    let attempts = 0;
+    while (attempts < 2) {
+      attempts++;
+      try {
+        client = await pool.connect();
+        const normalized = normalizeSql(sql, 'pg');
+        const result = await client.query(normalized, params);
+        client.release();
+        return result.rows;
+      } catch (err) {
+        if (client) {
+          try { client.release(err); } catch (_) {}
+          client = null;
+        }
+        const isConnError = err.code === 'ECONNRESET' || 
+          err.code === '57P01' || 
+          err.message?.includes('ECONNRESET') || 
+          err.message?.includes('Connection terminated');
+
+        if (attempts < 2 && isConnError) {
+          console.warn('⚠️ [PostgreSQL Pool]: Stale connection reset, retrying query with fresh client...');
+          continue;
+        }
+        throw err;
+      }
     }
   }
 
@@ -59,6 +78,7 @@ if (dbClient === 'pg') {
    */
   async function transaction(callback) {
     const client = await pool.connect();
+    let clientError = null;
     try {
       await client.query('BEGIN');
       // Wrap client query to support normalized SQL
@@ -69,10 +89,11 @@ if (dbClient === 'pg') {
       await client.query('COMMIT');
       return result;
     } catch (err) {
-      await client.query('ROLLBACK');
+      clientError = err;
+      try { await client.query('ROLLBACK'); } catch (_) {}
       throw err;
     } finally {
-      client.release();
+      client.release(clientError);
     }
   }
 

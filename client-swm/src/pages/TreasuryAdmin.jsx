@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Home as HomeIcon,
@@ -21,7 +21,7 @@ import {
   Card, Row, Col, Table, Button, Modal, Tag, Space, Typography,
   message, Statistic, Badge, Tooltip, Popconfirm, Alert, Empty,
   Spin, Divider, Select, Tabs, Form, InputNumber, Input, Radio,
-  DatePicker
+  DatePicker, Checkbox, Progress
 } from 'antd';
 import {
   BankOutlined, CheckCircleOutlined, CloseCircleOutlined,
@@ -31,13 +31,41 @@ import {
   MobileOutlined, CrownOutlined, PlusCircleOutlined, MinusCircleOutlined,
   HistoryOutlined, SwapOutlined, SearchOutlined, UserOutlined,
   PayCircleOutlined, FileTextOutlined, InfoCircleOutlined, PlusOutlined,
-  CalendarOutlined
+  CalendarOutlined, FileExcelOutlined, DownloadOutlined, PieChartOutlined,
+  BarChartOutlined, FilterOutlined, CheckSquareOutlined
 } from '@ant-design/icons';
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as RechartsTooltip,
+  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid
+} from 'recharts';
 import dayjs from 'dayjs';
 import api from '../api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
+
+// Clean English / Western numerals and money formatting helpers
+const fmtNum = (v, digits = 2) => {
+  const n = parseFloat(v) || 0;
+  return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+};
+
+const fmtMoney = (v) => `${fmtNum(v, 2)} ج.م`;
+
+const fmtDate = (d) => {
+  if (!d) return '—';
+  return dayjs(d).format('YYYY-MM-DD HH:mm');
+};
 
 const STATUS_MAP = {
   pending:   { label: 'في الانتظار',  color: 'orange', icon: <ClockCircleOutlined /> },
@@ -53,6 +81,21 @@ const REASON_CATEGORY_MAP = {
   other: { label: 'نثرية ومصروفات أخرى', color: 'default' }
 };
 
+// Translates raw database expense keys into clear, professional Arabic labels
+const getExpenseArabicLabel = (subcat, cat) => {
+  const s = String(subcat || cat || '').toLowerCase();
+  if (s.includes('salary') || s.includes('payroll') || s.includes('راتب') || s.includes('رواتب')) return 'رواتب ومسيرات الموظفين';
+  if (s.includes('sales_withdrawal') || s.includes('بائعين') || s.includes('سلف')) return 'سلف ومسحوبات بائعين الفرع';
+  if (s.includes('marketing') || s.includes('تسويق') || s.includes('دعاية') || s.includes('إعلان')) return 'دعاية وتسويق وإعلانات';
+  if (s.includes('electricity') || s.includes('كهرباء')) return 'فواتير كهرباء ومياه';
+  if (s.includes('نظافة') || s.includes('مهمات') || s.includes('أدوات')) return 'أدوات ومهمات ونظافة';
+  if (s.includes('utility') || s.includes('مرافق') || s.includes('إيجار')) return 'فواتير ومرافق وتشغيل';
+  if (s.includes('إدارية') || s.includes('operational') || s.includes('تشغيل')) return 'مصاريف إدارية ونثرية';
+  if (s.includes('owner') || s.includes('مالك') || s.includes('شخصية')) return 'مسحوبات جاري المالك';
+  if (s.includes('refund') || s.includes('مسترد')) return 'تسويات ومصروفات مستردة';
+  return subcat || cat || 'مصروفات تشغيلية أخرى';
+};
+
 export default function TreasuryAdmin() {
   const navigate = useNavigate();
   const [kpis, setKpis]                         = useState(null);
@@ -65,6 +108,75 @@ export default function TreasuryAdmin() {
   const [cancellingId, setCancellingId]         = useState(null);
   const [detailRecord, setDetailRecord]         = useState(null);
   const [detailVisible, setDetailVisible]       = useState(false);
+
+  // Internal Channel Transfer State
+  const [channelTransferVisible, setChannelTransferVisible]         = useState(false);
+  const [channelTransferForm]                                       = Form.useForm();
+  const [submittingChannelTransfer, setSubmittingChannelTransfer]   = useState(false);
+  const transferFromChannel = Form.useWatch('from_channel', channelTransferForm) || 'cash';
+
+  // Ledger Filter & Excel Export State
+  const [ledgerSearch, setLedgerSearch]             = useState('');
+  const [ledgerType, setLedgerType]                 = useState('all');
+  const [ledgerChannel, setLedgerChannel]           = useState('all');
+  const [ledgerDateRange, setLedgerDateRange]       = useState(null);
+  const [ledgerLoading, setLedgerLoading]           = useState(false);
+
+  // Analytics & Visual Charts State
+  const [analyticsData, setAnalyticsData]           = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics]     = useState(false);
+
+  // Ranked Expense Breakdown with Clean Arabic Labels for Option 2 Horizontal Chart
+  const rankedExpenses = useMemo(() => {
+    if (!analyticsData?.expenseBreakdown || analyticsData.expenseBreakdown.length === 0) return [];
+    const map = {};
+    for (const item of analyticsData.expenseBreakdown) {
+      const amt = parseFloat(item.total_amount || 0);
+      const count = parseInt(item.tx_count || 1, 10);
+      const label = getExpenseArabicLabel(item.subcategory, item.category);
+      if (!map[label]) {
+        map[label] = { name: label, amount: 0, count: 0 };
+      }
+      map[label].amount += amt;
+      map[label].count += count;
+    }
+    const total = Object.values(map).reduce((s, x) => s + x.amount, 0);
+    const palette = [
+      { fill: '#ea580c', tagColor: 'volcano' },
+      { fill: '#0284c7', tagColor: 'blue' },
+      { fill: '#8b5cf6', tagColor: 'purple' },
+      { fill: '#16a34a', tagColor: 'green' },
+      { fill: '#d97706', tagColor: 'gold' },
+      { fill: '#0d9488', tagColor: 'cyan' },
+      { fill: '#64748b', tagColor: 'default' }
+    ];
+
+    return Object.values(map)
+      .sort((a, b) => b.amount - a.amount)
+      .map((item, idx) => {
+        const pct = total > 0 ? (item.amount / total) * 100 : 0;
+        const theme = palette[idx % palette.length];
+        return {
+          ...item,
+          percent: pct,
+          percentFormatted: pct >= 1 ? pct.toFixed(1) : '< 1',
+          theme
+        };
+      });
+  }, [analyticsData?.expenseBreakdown]);
+
+  const totalExpenseBreakdown = useMemo(() => {
+    return rankedExpenses.reduce((sum, item) => sum + item.amount, 0);
+  }, [rankedExpenses]);
+
+  // Bulk Payroll State
+  const [bulkPayrollVisible, setBulkPayrollVisible] = useState(false);
+  const [bulkMonth, setBulkMonth]                   = useState(dayjs().format('YYYY-MM'));
+  const [bulkChannel, setBulkChannel]               = useState('cash');
+  const [bulkEmployees, setBulkEmployees]           = useState([]);
+  const [selectedEmpKeys, setSelectedEmpKeys]       = useState([]);
+  const [loadingBulkPreview, setLoadingBulkPreview] = useState(false);
+  const [submittingBulkPayroll, setSubmittingBulkPayroll] = useState(false);
 
   // Owner Transaction Modals
   const [ownerModalVisible, setOwnerModalVisible] = useState(false);
@@ -105,24 +217,192 @@ export default function TreasuryAdmin() {
   const [payrollHistory, setPayrollHistory]           = useState([]);
   const [loadingPayrollHistory, setLoadingPayrollHistory] = useState(false);
 
+  // Available balance for currently selected channel in modal
+  const getChannelAvailable = (ch) => {
+    if (!kpis?.main_safe) return 0;
+    if (ch === 'cash') return parseFloat(kpis.main_safe.cash_balance || 0);
+    if (ch === 'visa') return parseFloat(kpis.main_safe.visa_balance || 0);
+    if (ch === 'transfer') return parseFloat(kpis.main_safe.transfer_balance || 0);
+    return 0;
+  };
+
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [kpiRes, trfRes, ownerRes, ledgerRes] = await Promise.all([
+      const [kpiRes, trfRes, ownerRes] = await Promise.all([
         api.get('/api/swm/treasury/kpis'),
         api.get('/api/swm/treasury/transfers', { params: { status: statusFilter, limit: 100 } }),
-        api.get('/api/swm/treasury/owner-account'),
-        api.get('/api/swm/treasury/main-safe-ledger')
+        api.get('/api/swm/treasury/owner-account')
       ]);
 
       if (kpiRes.data.success) setKpis(kpiRes.data.data);
       if (trfRes.data.success) setTransfers(trfRes.data.data || []);
       if (ownerRes.data.success) setOwnerData(ownerRes.data.data);
-      if (ledgerRes.data.success) setHqLedger(ledgerRes.data.data || []);
+      fetchHqLedger();
+      fetchAnalytics();
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في تحميل بيانات الخزينة');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchHqLedger = async () => {
+    setLedgerLoading(true);
+    try {
+      const params = { limit: 300 };
+      if (ledgerSearch && ledgerSearch.trim()) params.search = ledgerSearch.trim();
+      if (ledgerType && ledgerType !== 'all') params.type = ledgerType;
+      if (ledgerChannel && ledgerChannel !== 'all') params.channel = ledgerChannel;
+      if (ledgerDateRange && ledgerDateRange[0] && ledgerDateRange[1]) {
+        params.start_date = ledgerDateRange[0].format('YYYY-MM-DD');
+        params.end_date = ledgerDateRange[1].format('YYYY-MM-DD');
+      }
+      const res = await api.get('/api/swm/treasury/main-safe-ledger', { params });
+      if (res.data.success) {
+        setHqLedger(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Ledger fetch error:', err);
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
+  const exportLedgerToExcel = () => {
+    if (!hqLedger || hqLedger.length === 0) {
+      message.warning('لا توجد بيانات متاحة للتصدير');
+      return;
+    }
+    const headers = ['رقم القيد', 'التاريخ والوقت', 'البيان والملاحظات', 'المبلغ (ج.م)', 'النوع', 'الرصيد السابق', 'الرصيد بعد الحركة', 'المنفذ'];
+    const rows = hqLedger.map(rec => {
+      const isTransfer = rec.payment_method === 'channel_transfer';
+      const isOutflow = !isTransfer && rec.destination_account && rec.destination_account !== 'main_warehouse_safe';
+      const typeLabel = isTransfer ? 'تحويل بين القنوات' : (isOutflow ? 'منصرف (-)' : 'وارد (+)');
+      return [
+        `"${rec.entry_number || ''}"`,
+        `"${rec.created_at ? dayjs(rec.created_at).format('YYYY-MM-DD HH:mm') : ''}"`,
+        `"${(rec.notes || '').replace(/"/g, '""')}"`,
+        `"${parseFloat(rec.amount || 0).toFixed(2)}"`,
+        `"${typeLabel}"`,
+        `"${parseFloat(rec.previous_safe_balance || 0).toFixed(2)}"`,
+        `"${parseFloat(rec.new_safe_balance || 0).toFixed(2)}"`,
+        `"${rec.created_by_name || rec.created_by_username || 'المدير'}"`
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `سجل_الخزينة_المركزية_${dayjs().format('YYYY-MM-DD')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    message.success('تم تصدير سجل الخزينة إلى Excel بنجاح');
+  };
+
+  const fetchAnalytics = async () => {
+    setLoadingAnalytics(true);
+    try {
+      const res = await api.get('/api/swm/treasury/analytics');
+      if (res.data.success) {
+        setAnalyticsData(res.data.data);
+      }
+    } catch (err) {
+      console.error('Analytics fetch error:', err);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
+  const handleChannelTransferSubmit = async (values) => {
+    setSubmittingChannelTransfer(true);
+    try {
+      const res = await api.post('/api/swm/treasury/channel-transfer', values);
+      if (res.data.success) {
+        message.success(res.data.message || 'تم التحويل الداخلي بنجاح');
+        setChannelTransferVisible(false);
+        channelTransferForm.resetFields();
+        fetchAll();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في إتمام التحويل الداخلي');
+    } finally {
+      setSubmittingChannelTransfer(false);
+    }
+  };
+
+  const fetchBulkPreview = async (monthVal) => {
+    setLoadingBulkPreview(true);
+    try {
+      const target = monthVal || bulkMonth;
+      const res = await api.get('/api/swm/treasury/bulk-payroll-preview', { params: { month: target } });
+      if (res.data.success) {
+        const emps = res.data.data.employees || [];
+        const enriched = emps.map(e => ({
+          ...e,
+          key: e.employee_id,
+          deductions: 0,
+          deduction_reason: '',
+          bonus: 0,
+          bonus_reason: '',
+          calcNet: e.net_salary
+        }));
+        setBulkEmployees(enriched);
+        const unpaidKeys = enriched.filter(e => !e.already_paid && e.calcNet > 0).map(e => e.employee_id);
+        setSelectedEmpKeys(unpaidKeys);
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في تحميل مسير الرواتب المجمع');
+    } finally {
+      setLoadingBulkPreview(false);
+    }
+  };
+
+  const handleBulkPaySubmit = async () => {
+    const chosen = bulkEmployees.filter(e => selectedEmpKeys.includes(e.employee_id));
+    if (chosen.length === 0) {
+      message.warning('يرجى تحديد موظف واحد على الأقل للصرف');
+      return;
+    }
+    const totalNet = Math.round(chosen.reduce((sum, e) => sum + (e.calcNet || 0), 0) * 100) / 100;
+    const avail = getChannelAvailable(bulkChannel);
+    if (totalNet > avail + 0.01) {
+      message.error(`رصيد القناة المختارة (${fmtMoney(avail)}) لا يكفي لصرف إجمالي المسير (${fmtMoney(totalNet)})`);
+      return;
+    }
+
+    setSubmittingBulkPayroll(true);
+    try {
+      const payload = {
+        payout_month: bulkMonth,
+        channel: bulkChannel,
+        employees: chosen.map(e => ({
+          employee_id: e.employee_id,
+          base_salary: e.base_salary,
+          advances_deducted: e.advances_total,
+          deductions: e.deductions || 0,
+          deduction_reason: e.deduction_reason || '',
+          bonus: e.bonus || 0,
+          bonus_reason: e.bonus_reason || '',
+          net_salary: e.calcNet,
+          employee_name: e.full_name,
+          branch_id: e.branch_id
+        }))
+      };
+      const res = await api.post('/api/swm/treasury/bulk-pay-salary', payload);
+      if (res.data.success) {
+        message.success(res.data.message || 'تم صرف مسير الرواتب المجمع بنجاح');
+        setBulkPayrollVisible(false);
+        fetchAll();
+        fetchPayrollHistory();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في صرف مسير الرواتب المجمع');
+    } finally {
+      setSubmittingBulkPayroll(false);
     }
   };
 
@@ -246,15 +526,6 @@ export default function TreasuryAdmin() {
   };
 
   const pendingCount = transfers.filter(t => t.status === 'pending').length;
-
-  // Available balance for currently selected channel in modal
-  const getChannelAvailable = (ch) => {
-    if (!kpis?.main_safe) return 0;
-    if (ch === 'cash') return parseFloat(kpis.main_safe.cash_balance || 0);
-    if (ch === 'visa') return parseFloat(kpis.main_safe.visa_balance || 0);
-    if (ch === 'transfer') return parseFloat(kpis.main_safe.transfer_balance || 0);
-    return 0;
-  };
 
   const handleAddReason = async () => {
     if (!newReasonTitle.trim()) {
@@ -392,20 +663,20 @@ export default function TreasuryAdmin() {
       title: 'الراتب الأساسي',
       dataIndex: 'base_salary',
       key: 'base_salary',
-      render: v => `${parseFloat(v).toLocaleString()} ج.م`
+      render: v => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(v)}</span>
     },
     {
       title: 'سلف مستقطعة',
       dataIndex: 'advances_deducted',
       key: 'advances_deducted',
-      render: v => parseFloat(v) > 0 ? <Text type="danger">-{parseFloat(v).toLocaleString()} ج.م</Text> : '—'
+      render: v => parseFloat(v) > 0 ? <Text type="danger" style={{ fontVariantNumeric: 'tabular-nums' }}>-{fmtMoney(v)}</Text> : '—'
     },
     {
       title: 'الخصومات',
       key: 'deductions',
       render: (_, rec) => parseFloat(rec.deductions) > 0 ? (
         <Tooltip title={rec.deduction_reason || 'بدون سبب مدخل'}>
-          <Text type="danger">-{parseFloat(rec.deductions).toLocaleString()} ج.م</Text>
+          <Text type="danger" style={{ fontVariantNumeric: 'tabular-nums' }}>-{fmtMoney(rec.deductions)}</Text>
         </Tooltip>
       ) : '—'
     },
@@ -414,7 +685,7 @@ export default function TreasuryAdmin() {
       key: 'bonus',
       render: (_, rec) => parseFloat(rec.bonus) > 0 ? (
         <Tooltip title={rec.bonus_reason || 'حافز إضافي'}>
-          <Text style={{ color: '#16a34a' }}>+{parseFloat(rec.bonus).toLocaleString()} ج.م</Text>
+          <Text style={{ color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>+{fmtMoney(rec.bonus)}</Text>
         </Tooltip>
       ) : '—'
     },
@@ -423,8 +694,8 @@ export default function TreasuryAdmin() {
       dataIndex: 'net_salary',
       key: 'net_salary',
       render: v => (
-        <Text strong style={{ color: '#16a34a', fontSize: 14 }}>
-          {parseFloat(v).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+        <Text strong style={{ color: '#16a34a', fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+          {fmtMoney(v)}
         </Text>
       )
     },
@@ -448,7 +719,7 @@ export default function TreasuryAdmin() {
       title: 'تاريخ الصرف',
       dataIndex: 'paid_at',
       key: 'paid_at',
-      render: d => d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+      render: d => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDate(d)}</span>
     }
   ];
 
@@ -478,8 +749,8 @@ export default function TreasuryAdmin() {
       key: 'amount',
       sorter: (a, b) => parseFloat(a.amount) - parseFloat(b.amount),
       render: v => (
-        <Text strong style={{ color: '#16a34a', fontSize: 15 }}>
-          {parseFloat(v).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+        <Text strong style={{ color: '#16a34a', fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>
+          {fmtMoney(v)}
         </Text>
       )
     },
@@ -499,10 +770,10 @@ export default function TreasuryAdmin() {
         if (b && typeof b === 'object' && !Array.isArray(b)) {
           return (
             <Space size={2} wrap>
-              {b.cash > 0 && <Tag color="green" icon={<Banknote size={11} />}>كاش: {parseFloat(b.cash).toLocaleString()}</Tag>}
-              {b.visa > 0 && <Tag color="blue" icon={<CreditCard size={11} />}>فيزا: {parseFloat(b.visa).toLocaleString()}</Tag>}
+              {b.cash > 0 && <Tag color="green" icon={<Banknote size={11} />}>كاش: {fmtNum(b.cash, 0)}</Tag>}
+              {b.visa > 0 && <Tag color="blue" icon={<CreditCard size={11} />}>فيزا: {fmtNum(b.visa, 0)}</Tag>}
               {(b.transfers > 0 || b.transfer > 0) && (
-                <Tag color="purple" icon={<Smartphone size={11} />}>تحويل: {parseFloat(b.transfers || b.transfer).toLocaleString()}</Tag>
+                <Tag color="purple" icon={<Smartphone size={11} />}>تحويل: {fmtNum(b.transfers || b.transfer, 0)}</Tag>
               )}
             </Space>
           );
@@ -531,7 +802,7 @@ export default function TreasuryAdmin() {
       key: 'requested_at',
       sorter: (a, b) => new Date(b.requested_at) - new Date(a.requested_at),
       defaultSortOrder: 'descend',
-      render: d => d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+      render: d => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDate(d)}</span>
     },
     {
       title: 'الحالة',
@@ -558,7 +829,7 @@ export default function TreasuryAdmin() {
           {record.status === 'pending' && (
             <>
               <Popconfirm
-                title={`تأكيد استلام ${parseFloat(record.amount).toFixed(2)} ج.م من ${record.from_branch_name}؟`}
+                title={`تأكيد استلام ${fmtMoney(record.amount)} من ${record.from_branch_name}؟`}
                 okText="تأكيد الاستلام"
                 cancelText="إلغاء"
                 okType="primary"
@@ -605,7 +876,7 @@ export default function TreasuryAdmin() {
       title: 'التاريخ',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: d => d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+      render: d => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDate(d)}</span>
     },
     {
       title: 'نوع الحركة',
@@ -620,8 +891,8 @@ export default function TreasuryAdmin() {
       dataIndex: 'amount',
       key: 'amount',
       render: (v, rec) => (
-        <Text strong style={{ color: rec.transaction_type === 'deposit' ? '#16a34a' : '#dc2626', fontSize: 14 }}>
-          {rec.transaction_type === 'deposit' ? '+' : '-'} {parseFloat(v).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+        <Text strong style={{ color: rec.transaction_type === 'deposit' ? '#16a34a' : '#dc2626', fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+          {rec.transaction_type === 'deposit' ? '+' : '-'} {fmtMoney(v)}
         </Text>
       )
     },
@@ -659,10 +930,23 @@ export default function TreasuryAdmin() {
       render: v => <Text code style={{ fontSize: 11 }}>{v}</Text>
     },
     {
-      title: 'التاريخ',
+      title: 'التاريخ والوقت',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: d => d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+      render: d => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDate(d)}</span>
+    },
+    {
+      title: 'نوع الحركة',
+      key: 'tx_type',
+      render: (_, rec) => {
+        if (rec.payment_method === 'channel_transfer') {
+          return <Tag color="purple" icon={<SwapOutlined />}>تحويل قنوات</Tag>;
+        }
+        const isOutflow = rec.destination_account && rec.destination_account !== 'main_warehouse_safe';
+        return isOutflow 
+          ? <Tag color="error" icon={<ArrowUpOutlined />}>منصرف (-)</Tag>
+          : <Tag color="success" icon={<ArrowDownOutlined />}>وارد (+)</Tag>;
+      }
     },
     {
       title: 'الحركة والبيان',
@@ -675,10 +959,13 @@ export default function TreasuryAdmin() {
       dataIndex: 'amount',
       key: 'amount',
       render: (v, rec) => {
-        const isOutflow = rec.destination_account && rec.destination_account !== 'main_warehouse_safe';
+        const isTransfer = rec.payment_method === 'channel_transfer';
+        const isOutflow = !isTransfer && rec.destination_account && rec.destination_account !== 'main_warehouse_safe';
+        const color = isTransfer ? '#7c3aed' : (isOutflow ? '#dc2626' : '#16a34a');
+        const prefix = isTransfer ? '⇄ ' : (isOutflow ? '- ' : '+ ');
         return (
-          <Text strong style={{ color: isOutflow ? '#dc2626' : '#16a34a', fontSize: 14 }}>
-            {isOutflow ? '-' : '+'} {parseFloat(v).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+          <Text strong style={{ color, fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+            {prefix}{fmtMoney(v)}
           </Text>
         );
       }
@@ -687,15 +974,15 @@ export default function TreasuryAdmin() {
       title: 'الرصيد السابق',
       dataIndex: 'previous_safe_balance',
       key: 'previous_safe_balance',
-      render: v => v !== null && v !== undefined ? `${parseFloat(v).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م` : '—'
+      render: v => v !== null && v !== undefined ? <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(v)}</span> : '—'
     },
     {
       title: 'الرصيد بعد الحركة',
       dataIndex: 'new_safe_balance',
       key: 'new_safe_balance',
       render: v => v !== null && v !== undefined ? (
-        <Text strong style={{ color: '#4f46e5' }}>
-          {parseFloat(v).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+        <Text strong style={{ color: '#4f46e5', fontVariantNumeric: 'tabular-nums' }}>
+          {fmtMoney(v)}
         </Text>
       ) : '—'
     },
@@ -747,6 +1034,18 @@ export default function TreasuryAdmin() {
           >
             مسحوبات صاحب الحساب
           </Button>
+          <Button
+            type="default"
+            icon={<SwapOutlined style={{ color: '#4f46e5' }} />}
+            style={{ height: 44, borderRadius: 8, fontWeight: 700, borderColor: '#818cf8', color: '#4338ca', backgroundColor: '#eef2ff' }}
+            onClick={() => {
+              channelTransferForm.resetFields();
+              channelTransferForm.setFieldsValue({ from_channel: 'cash', to_channel: 'visa' });
+              setChannelTransferVisible(true);
+            }}
+          >
+            تحويل بين القنوات
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={fetchAll} loading={loading} style={{ height: 44, borderRadius: 8 }}>
             تحديث
           </Button>
@@ -781,8 +1080,8 @@ export default function TreasuryAdmin() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#0F766E' }}>إجمالي رصيد الخزينة المركزية</Text>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: '#0F766E', marginTop: 6, fontFamily: 'monospace' }}>
-                      {(kpis?.main_safe?.total_balance ?? (kpis?.main_register_balance || 0)).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                    <div style={{ fontSize: 24, fontWeight: 900, color: '#0F766E', marginTop: 6, fontVariantNumeric: 'tabular-nums', fontFamily: 'Inter, -apple-system, monospace' }}>
+                      {fmtNum(kpis?.main_safe?.total_balance ?? (kpis?.main_register_balance || 0), 2)}
                       <span style={{ fontSize: 14, marginRight: 6, fontWeight: 600 }}>ج.م</span>
                     </div>
                   </div>
@@ -815,8 +1114,8 @@ export default function TreasuryAdmin() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
                     <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Banknote size={15} /> الخزينة النقدية (الكاش)</Text>
-                    <div style={{ color: '#16A34A', fontSize: 22, fontWeight: 900, marginTop: 6, fontFamily: 'monospace' }}>
-                      {(kpis?.main_safe?.cash_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                    <div style={{ color: '#16A34A', fontSize: 22, fontWeight: 900, marginTop: 6, fontVariantNumeric: 'tabular-nums', fontFamily: 'Inter, -apple-system, monospace' }}>
+                      {fmtNum(kpis?.main_safe?.cash_balance || 0, 2)}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 600 }}>ج.م</span>
                     </div>
                   </div>
@@ -849,8 +1148,8 @@ export default function TreasuryAdmin() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
                     <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#0369A1', display: 'inline-flex', alignItems: 'center', gap: 6 }}><CreditCard size={15} /> الحساب البنكي (الفيزا / البطاقات)</Text>
-                    <div style={{ color: '#0284C7', fontSize: 22, fontWeight: 900, marginTop: 6, fontFamily: 'monospace' }}>
-                      {(kpis?.main_safe?.visa_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                    <div style={{ color: '#0284C7', fontSize: 22, fontWeight: 900, marginTop: 6, fontVariantNumeric: 'tabular-nums', fontFamily: 'Inter, -apple-system, monospace' }}>
+                      {fmtNum(kpis?.main_safe?.visa_balance || 0, 2)}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 600 }}>ج.م</span>
                     </div>
                   </div>
@@ -883,8 +1182,8 @@ export default function TreasuryAdmin() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
                     <Text type="secondary" style={{ fontSize: 12.5, fontWeight: 700, color: '#6D28D9', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Smartphone size={15} /> التحويلات والمحافظ (إنستاباي / كاش)</Text>
-                    <div style={{ color: '#8B5CF6', fontSize: 22, fontWeight: 900, marginTop: 6, fontFamily: 'monospace' }}>
-                      {(kpis?.main_safe?.transfer_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })}
+                    <div style={{ color: '#8B5CF6', fontSize: 22, fontWeight: 900, marginTop: 6, fontVariantNumeric: 'tabular-nums', fontFamily: 'Inter, -apple-system, monospace' }}>
+                      {fmtNum(kpis?.main_safe?.transfer_balance || 0, 2)}
                       <span style={{ fontSize: 13, marginRight: 6, fontWeight: 600 }}>ج.م</span>
                     </div>
                   </div>
@@ -919,8 +1218,8 @@ export default function TreasuryAdmin() {
                   </div>
                   <div>
                     <div style={{ fontSize: 13.5, color: '#0F172A', fontWeight: 800 }}>حساب فلوس صاحب المنشأة (جاري المالك)</div>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: '#D97706', marginTop: 2, fontFamily: 'monospace' }}>
-                      {(ownerData?.summary?.current_balance || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} <span style={{ fontSize: 14, fontWeight: 600 }}>ج.م</span>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: '#D97706', marginTop: 2, fontVariantNumeric: 'tabular-nums', fontFamily: 'Inter, -apple-system, monospace' }}>
+                      {fmtNum(ownerData?.summary?.current_balance || 0, 2)} <span style={{ fontSize: 14, fontWeight: 600 }}>ج.م</span>
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>
                       صافي المستحقات ورأس المال (الإيداعات - المسحوبات)
@@ -932,20 +1231,20 @@ export default function TreasuryAdmin() {
               <Col xs={12} md={4}>
                 <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '8px 12px' }}>
                   <span style={{ fontSize: 11, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}><ArrowDownLeft size={13} /> إجمالي رأس المال المودع</span>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#16A34A', marginTop: 2 }}>
-                    + {(ownerData?.summary?.total_deposited || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#16A34A', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                    + {fmtMoney(ownerData?.summary?.total_deposited || 0)}
                   </div>
-                  <span style={{ fontSize: 10.5, color: '#64748B' }}>{ownerData?.summary?.deposit_count || 0} حركة إيداع</span>
+                  <span style={{ fontSize: 10.5, color: '#64748B', fontVariantNumeric: 'tabular-nums' }}>{fmtNum(ownerData?.summary?.deposit_count || 0, 0)} حركة إيداع</span>
                 </div>
               </Col>
 
               <Col xs={12} md={4}>
                 <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '8px 12px' }}>
                   <span style={{ fontSize: 11, color: '#991B1B', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}><ArrowUpRight size={13} /> إجمالي المسحوبات الشخصية</span>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#DC2626', marginTop: 2 }}>
-                    - {(ownerData?.summary?.total_withdrawn || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#DC2626', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                    - {fmtMoney(ownerData?.summary?.total_withdrawn || 0)}
                   </div>
-                  <span style={{ fontSize: 10.5, color: '#64748B' }}>{ownerData?.summary?.withdrawal_count || 0} حركة سحب</span>
+                  <span style={{ fontSize: 10.5, color: '#64748B', fontVariantNumeric: 'tabular-nums' }}>{fmtNum(ownerData?.summary?.withdrawal_count || 0, 0)} حركة سحب</span>
                 </div>
               </Col>
 
@@ -1099,7 +1398,7 @@ export default function TreasuryAdmin() {
                       <UserOutlined style={{ color: '#2563eb' }} />
                       <Text strong style={{ fontSize: 15 }}>صرف وقبض رواتب الموظفين (مسير الرواتب)</Text>
                     </Space>
-                    <Space size={6}>
+                    <Space size={8} wrap>
                       <Text type="secondary" style={{ fontSize: 11 }}>الشهر المستحق:</Text>
                       <DatePicker
                         picker="month"
@@ -1118,6 +1417,20 @@ export default function TreasuryAdmin() {
                         }}
                         style={{ width: 115 }}
                       />
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<TeamOutlined />}
+                        className="swm-btn-emerald"
+                        style={{ borderRadius: 6, fontWeight: 700 }}
+                        onClick={() => {
+                          setBulkMonth(payrollMonth);
+                          fetchBulkPreview(payrollMonth);
+                          setBulkPayrollVisible(true);
+                        }}
+                      >
+                        صرف مسير مجمع
+                      </Button>
                     </Space>
                   </div>
                 }
@@ -1228,7 +1541,7 @@ export default function TreasuryAdmin() {
                         type="warning"
                         showIcon
                         message={`تنبيه: تم صرف راتب شهر (${payrollMonth}) لهذا الموظف مسبقاً!`}
-                        description={`آخر صرفية كانت بتاريخ: ${new Date(employeeSummary.previous_payouts[0]?.paid_at).toLocaleString('ar-EG')}`}
+                        description={`آخر صرفية كانت بتاريخ: ${fmtDate(employeeSummary.previous_payouts[0]?.paid_at)}`}
                         style={{ marginBottom: 12, borderRadius: 8 }}
                       />
                     )}
@@ -1239,8 +1552,8 @@ export default function TreasuryAdmin() {
                       <Col xs={12} sm={6}>
                         <div style={{ padding: '8px 10px', background: '#f1f5f9', borderRadius: 8, border: '1px solid #e2e8f0', textAlign: 'center' }}>
                           <Text type="secondary" style={{ fontSize: 11 }}>المرتب الأساسي</Text>
-                          <div style={{ fontSize: 15, fontWeight: 'bold', color: '#1e293b', marginTop: 2 }}>
-                            {parseFloat(employeeSummary.base_salary || 0).toLocaleString()} ج.م
+                          <div style={{ fontSize: 15, fontWeight: 'bold', color: '#1e293b', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                            {fmtMoney(employeeSummary.base_salary || 0)}
                           </div>
                         </div>
                       </Col>
@@ -1249,8 +1562,8 @@ export default function TreasuryAdmin() {
                       <Col xs={12} sm={6}>
                         <div style={{ padding: '8px 10px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca', textAlign: 'center' }}>
                           <Text type="secondary" style={{ fontSize: 11 }}>سلف ومصاريف الشهر</Text>
-                          <div style={{ fontSize: 15, fontWeight: 'bold', color: '#dc2626', marginTop: 2 }}>
-                            - {parseFloat(employeeSummary.advances_total || 0).toLocaleString()} ج.م
+                          <div style={{ fontSize: 15, fontWeight: 'bold', color: '#dc2626', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                            - {fmtMoney(employeeSummary.advances_total || 0)}
                           </div>
                           {employeeSummary.advances_list?.length > 0 && (
                             <Button
@@ -1259,7 +1572,7 @@ export default function TreasuryAdmin() {
                               style={{ padding: 0, height: 'auto', fontSize: 10, color: '#dc2626' }}
                               onClick={() => setAdvancesModalVisible(true)}
                             >
-                              ({employeeSummary.advances_list.length} حركة - عرض)
+                              ({fmtNum(employeeSummary.advances_list.length, 0)} حركة - عرض)
                             </Button>
                           )}
                         </div>
@@ -1338,11 +1651,11 @@ export default function TreasuryAdmin() {
                           }}>
                             <div>
                               <Text strong style={{ fontSize: 13, color: '#166534' }}>الصافي المستحق للصرف:</Text>
-                              <div style={{ fontSize: 22, fontWeight: 'bold', color: '#15803d' }}>
-                                {net > 0 ? net.toLocaleString('ar-EG', { minimumFractionDigits: 2 }) : 0} ج.م
+                              <div style={{ fontSize: 22, fontWeight: 'bold', color: '#15803d', fontVariantNumeric: 'tabular-nums', fontFamily: 'Inter, -apple-system, monospace' }}>
+                                {net > 0 ? fmtMoney(net) : fmtMoney(0)}
                               </div>
-                              <Text type="secondary" style={{ fontSize: 10 }}>
-                                [أساسي {baseSal.toLocaleString()} - سلف {adv.toLocaleString()} - خصم {ded.toLocaleString()} + حوافز {bns.toLocaleString()}]
+                              <Text type="secondary" style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>
+                                [أساسي {fmtMoney(baseSal)} - سلف {fmtMoney(adv)} - خصم {fmtMoney(ded)} + حوافز {fmtMoney(bns)}]
                               </Text>
                             </div>
 
@@ -1360,8 +1673,8 @@ export default function TreasuryAdmin() {
                                 <Radio.Button value="visa"><Space size={4}><CreditCard size={13} /><span>فيزا</span></Space></Radio.Button>
                                 <Radio.Button value="transfer"><Space size={4}><Smartphone size={13} /><span>تحويل</span></Space></Radio.Button>
                               </Radio.Group>
-                              <div style={{ fontSize: 11, marginTop: 4, color: avail >= net ? '#16a34a' : '#dc2626' }}>
-                                المتاح بالخزينة: {avail.toLocaleString()} ج.م
+                              <div style={{ fontSize: 11, marginTop: 4, color: avail >= net ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>
+                                المتاح بالخزينة: {fmtMoney(avail)}
                               </div>
                             </div>
                           </div>
@@ -1378,7 +1691,7 @@ export default function TreasuryAdmin() {
                             </Col>
                             <Col xs={24} sm={10}>
                               <Popconfirm
-                                title={`تأكيد صرف راتب ${employeeSummary.employee.full_name} لشهر ${payrollMonth} بمبلغ ${net.toLocaleString()} ج.م؟`}
+                                title={`تأكيد صرف راتب ${employeeSummary.employee.full_name} لشهر ${payrollMonth} بمبلغ ${fmtMoney(net)}؟`}
                                 description="سيتم خصم المبلغ من الخزينة المركزية وقيده باليومية الإدارية فوراً."
                                 okText="تأكيد الصرف"
                                 cancelText="إلغاء"
@@ -1435,6 +1748,156 @@ export default function TreasuryAdmin() {
             defaultActiveKey="transfers"
             type="card"
             items={[
+              {
+                key: 'analytics',
+                label: (
+                  <Space>
+                    <PieChartOutlined style={{ color: '#0284c7' }} />
+                    <span>التحليلات والرسوم البيانية (Analytics)</span>
+                  </Space>
+                ),
+                children: (
+                  <Card style={{ borderRadius: 10 }}>
+                    {loadingAnalytics ? (
+                      <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+                    ) : (
+                      <Row gutter={[16, 16]}>
+                        {/* Option 2: Horizontal Ranked Bar Chart: Expenses by Category */}
+                        <Col xs={24} lg={12}>
+                          <Card
+                            size="small"
+                            title={
+                              <Space>
+                                <BarChartOutlined style={{ color: '#ea580c' }} />
+                                <Text strong>توزيع المصروفات حسب البند (آخر 30 يوماً)</Text>
+                              </Space>
+                            }
+                            extra={
+                              totalExpenseBreakdown > 0 ? (
+                                <Tag color="volcano" style={{ fontWeight: 800, fontSize: 12, padding: '2px 8px', borderRadius: 6, fontVariantNumeric: 'tabular-nums' }}>
+                                  الإجمالي: {fmtMoney(totalExpenseBreakdown)}
+                                </Tag>
+                              ) : null
+                            }
+                            style={{ borderRadius: 8, height: '100%', display: 'flex', flexDirection: 'column' }}
+                            styles={{ body: { flex: 1, padding: '14px 16px', overflowY: 'auto', maxHeight: 310 } }}
+                          >
+                            {(!rankedExpenses || rankedExpenses.length === 0) ? (
+                              <Empty description="لا توجد مصروفات مسجلة خلال آخر 30 يوماً" />
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {rankedExpenses.map((item, idx) => (
+                                  <div
+                                    key={`exp-${idx}`}
+                                    style={{
+                                      padding: '8px 12px',
+                                      borderRadius: 8,
+                                      background: '#f8fafc',
+                                      border: '1px solid #e2e8f0',
+                                      transition: 'all 0.2s ease'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                                      <Space size={6} wrap>
+                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.theme.fill }} />
+                                        <Text strong style={{ fontSize: 13, color: '#1e293b' }}>
+                                          {item.name}
+                                        </Text>
+                                        <Tag style={{ fontSize: 11, padding: '0 6px', borderRadius: 4, background: '#f1f5f9', color: '#64748b', border: 'none', fontVariantNumeric: 'tabular-nums' }}>
+                                          {fmtNum(item.count, 0)} {item.count === 1 ? 'حركة' : 'حركات'}
+                                        </Tag>
+                                      </Space>
+                                      <Space size={8}>
+                                        <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
+                                          {fmtMoney(item.amount)}
+                                        </span>
+                                        <Tag color={item.theme.tagColor} style={{ fontWeight: 700, fontSize: 11.5, minWidth: 46, textAlign: 'center', fontVariantNumeric: 'tabular-nums', margin: 0 }}>
+                                          {item.percentFormatted}%
+                                        </Tag>
+                                      </Space>
+                                    </div>
+                                    <Progress
+                                      percent={Math.max(item.percent, 0.8)}
+                                      strokeColor={item.theme.fill}
+                                      trailColor="#e2e8f0"
+                                      showInfo={false}
+                                      size="small"
+                                      style={{ margin: 0 }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </Card>
+                        </Col>
+
+                        {/* Bar Chart: Daily Inflow vs Outflow */}
+                        <Col xs={24} lg={12}>
+                          <Card
+                            size="small"
+                            title={<Space><BarChartOutlined style={{ color: '#16a34a' }} /><Text strong>حركة التدفق النقدي اليومي (الوارد والمنصرف)</Text></Space>}
+                            style={{ borderRadius: 8, height: '100%' }}
+                          >
+                            {(!analyticsData?.dailyTrend || analyticsData.dailyTrend.length === 0) ? (
+                              <Empty description="لا توجد حركات مسجلة خلال الفترة" />
+                            ) : (
+                              <div style={{ width: '100%', height: 280 }}>
+                                <ResponsiveContainer>
+                                  <BarChart data={analyticsData.dailyTrend} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                                    <RechartsTooltip formatter={(val) => fmtMoney(val)} />
+                                    <Legend wrapperStyle={{ paddingTop: 8 }} />
+                                    <Bar dataKey="inflows" name="الوارد (+)" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="outflows" name="المنصرف (-)" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            )}
+                          </Card>
+                        </Col>
+
+                        {/* Channel Liquidity Progress Distribution */}
+                        <Col xs={24}>
+                          <Card size="small" title={<Text strong>توزيع السيولة الحية حسب القنوات</Text>} style={{ borderRadius: 8 }}>
+                            {/* Visual Multi-Segment Distribution Bar */}
+                            <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', marginBottom: 14, background: '#e2e8f0' }}>
+                              {analyticsData?.channelDistribution?.map(c => (
+                                <div
+                                  key={c.key}
+                                  style={{
+                                    width: `${c.percent}%`,
+                                    background: c.color,
+                                    transition: 'width 0.4s ease'
+                                  }}
+                                  title={`${c.name}: ${c.percent}% (${fmtMoney(c.value)})`}
+                                />
+                              ))}
+                            </div>
+
+                            <Row gutter={[16, 12]}>
+                              {analyticsData?.channelDistribution?.map(c => (
+                                <Col xs={24} sm={8} key={c.key}>
+                                  <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <Text strong style={{ color: c.color }}>{c.name}</Text>
+                                      <Tag color={c.key === 'cash' ? 'green' : c.key === 'visa' ? 'blue' : 'purple'}>{c.percent}%</Tag>
+                                    </div>
+                                    <div style={{ fontSize: 18, fontWeight: 'bold', color: c.color, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+                                      {fmtMoney(c.value)}
+                                    </div>
+                                  </div>
+                                </Col>
+                              ))}
+                            </Row>
+                          </Card>
+                        </Col>
+                      </Row>
+                    )}
+                  </Card>
+                )
+              },
               {
                 key: 'transfers',
                 label: (
@@ -1519,21 +1982,104 @@ export default function TreasuryAdmin() {
                 ),
                 children: (
                   <Card style={{ borderRadius: 10 }}>
-                    <div style={{ marginBottom: 12 }}>
-                      <Text type="secondary">
-                        سجل رقابي لكافة التدفقات النقدية الداخلة (تحويلات الفروع، مرتجعات المشتريات، إيداعات المالك) والخارجة (سداد الموردين، فواتير المشتريات، مسحوبات المالك)
-                      </Text>
+                    {/* Search & Filter Bar with Excel Export */}
+                    <div style={{
+                      padding: '12px 14px',
+                      background: '#f8fafc',
+                      borderRadius: 8,
+                      border: '1px solid #e2e8f0',
+                      marginBottom: 16,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Space size={8} wrap>
+                        <Input
+                          placeholder="بحث برقم القيد أو البيان أو المسؤول..."
+                          prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                          value={ledgerSearch}
+                          onChange={(e) => setLedgerSearch(e.target.value)}
+                          onPressEnter={fetchHqLedger}
+                          style={{ width: 230 }}
+                          allowClear
+                        />
+                        <Select
+                          value={ledgerType}
+                          onChange={(val) => { setLedgerType(val); }}
+                          style={{ width: 150 }}
+                        >
+                          <Option value="all">كل الحركات</Option>
+                          <Option value="inflow">واردات للخزينة (+)</Option>
+                          <Option value="outflow">منصرفات وخارج (-)</Option>
+                          <Option value="transfer">تحويل بين القنوات (⇄)</Option>
+                        </Select>
+                        <Select
+                          value={ledgerChannel}
+                          onChange={(val) => { setLedgerChannel(val); }}
+                          style={{ width: 140 }}
+                        >
+                          <Option value="all">جميع القنوات</Option>
+                          <Option value="cash">كاش (نقدي)</Option>
+                          <Option value="visa">بنكي / فيزا</Option>
+                          <Option value="transfer">تحويل / محفظة</Option>
+                        </Select>
+                        <RangePicker
+                          value={ledgerDateRange}
+                          onChange={(val) => setLedgerDateRange(val)}
+                          format="YYYY-MM-DD"
+                          placeholder={['من تاريخ', 'إلى تاريخ']}
+                          style={{ width: 220 }}
+                        />
+                        <Button
+                          type="primary"
+                          icon={<FilterOutlined />}
+                          onClick={fetchHqLedger}
+                          loading={ledgerLoading}
+                        >
+                          تصفية
+                        </Button>
+                        {(ledgerSearch || ledgerType !== 'all' || ledgerChannel !== 'all' || ledgerDateRange) && (
+                          <Button
+                            onClick={() => {
+                              setLedgerSearch('');
+                              setLedgerType('all');
+                              setLedgerChannel('all');
+                              setLedgerDateRange(null);
+                              api.get('/api/swm/treasury/main-safe-ledger', { params: { limit: 300 } }).then(res => {
+                                if (res.data.success) setHqLedger(res.data.data || []);
+                              });
+                            }}
+                          >
+                            إلغاء الفلاتر
+                          </Button>
+                        )}
+                      </Space>
+
+                      <Space>
+                        <Button
+                          type="primary"
+                          icon={<FileExcelOutlined />}
+                          style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', fontWeight: 700 }}
+                          onClick={exportLedgerToExcel}
+                        >
+                          تصدير إلى Excel
+                        </Button>
+                      </Space>
                     </div>
+
                     {hqLedger.length === 0 ? (
-                      <Empty description="لا توجد قيود مسجلة بالخزينة المركزية" />
+                      <Empty description="لا توجد قيود مسجلة مطابقة للفلاتر بالخزينة المركزية" />
                     ) : (
                       <Table
                         className="swm-separated-table"
                         dataSource={hqLedger}
                         columns={hqLedgerColumns}
                         rowKey="id"
+                        loading={ledgerLoading}
                         size="middle"
-                        scroll={{ x: 900 }}
+                        scroll={{ x: 950 }}
                         pagination={{ pageSize: 20 }}
                       />
                     )}
@@ -1551,13 +2097,29 @@ export default function TreasuryAdmin() {
                 ),
                 children: (
                   <Card style={{ borderRadius: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                       <Text type="secondary">
                         سجل معتمد لكافة أذونات صرف الرواتب المصروفة من الخزينة المركزية والمقيدة باليومية الإدارية
                       </Text>
-                      <Button size="small" icon={<ReloadOutlined />} onClick={fetchPayrollHistory} loading={loadingPayrollHistory}>
-                        تحديث
-                      </Button>
+                      <Space>
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<TeamOutlined />}
+                          className="swm-btn-emerald"
+                          style={{ fontWeight: 700 }}
+                          onClick={() => {
+                            setBulkMonth(payrollMonth);
+                            fetchBulkPreview(payrollMonth);
+                            setBulkPayrollVisible(true);
+                          }}
+                        >
+                          صرف مسير الرواتب المجمع
+                        </Button>
+                        <Button size="small" icon={<ReloadOutlined />} onClick={fetchPayrollHistory} loading={loadingPayrollHistory}>
+                          تحديث
+                        </Button>
+                      </Space>
                     </div>
                     {payrollHistory.length === 0 ? (
                       <Empty description="لا توجد أذونات صرف رواتب مسجلة حتى الآن" />
@@ -1604,16 +2166,16 @@ export default function TreasuryAdmin() {
                             <Col span={12}>
                               <Text type="secondary" style={{ fontSize: 11 }}>رصيد الخزنة</Text>
                               <div>
-                                <Text strong style={{ color: '#4f46e5', fontSize: 14 }}>
-                                  {parseFloat(branch.current_balance || 0).toLocaleString()} ج.م
+                                <Text strong style={{ color: '#4f46e5', fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+                                  {fmtMoney(branch.current_balance || 0)}
                                 </Text>
                               </div>
                             </Col>
                             <Col span={12}>
                               <Text type="secondary" style={{ fontSize: 11 }}>إجمالي ما أرسله</Text>
                               <div>
-                                <Text strong style={{ color: '#16a34a', fontSize: 14 }}>
-                                  {parseFloat(branch.total_sent || 0).toLocaleString()} ج.م
+                                <Text strong style={{ color: '#16a34a', fontSize: 14, fontVariantNumeric: 'tabular-nums' }}>
+                                  {fmtMoney(branch.total_sent || 0)}
                                 </Text>
                               </div>
                             </Col>
@@ -1624,7 +2186,7 @@ export default function TreasuryAdmin() {
                               {branch.register_status === 'open' ? 'مفتوح' : 'مغلق'}
                             </Tag>
                             {branch.pending_count > 0 && (
-                              <Tag color="orange" style={{ fontSize: 11 }}>{branch.pending_count} طلب معلق</Tag>
+                              <Tag color="orange" style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(branch.pending_count, 0)} طلب معلق</Tag>
                             )}
                           </Space>
                         </Card>
@@ -1703,8 +2265,8 @@ export default function TreasuryAdmin() {
           {ownerTxType === 'withdrawal' && (
             <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>الرصيد المتاح حالياً في هذه القناة:</Text>
-              <div style={{ fontSize: 16, fontWeight: 'bold', color: getChannelAvailable(selectedChannel) > 0 ? '#16a34a' : '#dc2626' }}>
-                {getChannelAvailable(selectedChannel).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+              <div style={{ fontSize: 16, fontWeight: 'bold', color: getChannelAvailable(selectedChannel) > 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>
+                {fmtMoney(getChannelAvailable(selectedChannel))}
               </div>
             </div>
           )}
@@ -1720,7 +2282,7 @@ export default function TreasuryAdmin() {
                   if (ownerTxType === 'withdrawal') {
                     const avail = getChannelAvailable(selectedChannel);
                     if (val > avail + 0.01) {
-                      return Promise.reject(`المبلغ يتجاوز الرصيد المتاح في هذه القناة (${avail.toLocaleString()} ج.م)`);
+                      return Promise.reject(`المبلغ يتجاوز الرصيد المتاح في هذه القناة (${fmtMoney(avail)})`);
                     }
                   }
                   return Promise.resolve();
@@ -1761,6 +2323,349 @@ export default function TreasuryAdmin() {
         </Form>
       </Modal>
 
+      {/* Internal Channel Transfer Modal (تحويل بين القنوات) */}
+      <Modal
+        title={
+          <Space>
+            <SwapOutlined style={{ color: '#4f46e5', fontSize: 18 }} />
+            <span style={{ fontWeight: 'bold' }}>تحويل أموال بين القنوات المالية للخزينة</span>
+          </Space>
+        }
+        open={channelTransferVisible}
+        onCancel={() => setChannelTransferVisible(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="التحويل الداخلي يتيح نقل السيولة بين الكاش والبنك والمحافظ دون التأثير على إجمالي رصيد الخزينة."
+          style={{ marginBottom: 16, borderRadius: 8 }}
+        />
+
+        <Form
+          form={channelTransferForm}
+          layout="vertical"
+          onFinish={handleChannelTransferSubmit}
+          initialValues={{ from_channel: 'cash', to_channel: 'visa' }}
+        >
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item
+                name="from_channel"
+                label="تحويل من قناة (المصدر):"
+                rules={[{ required: true, message: 'اختر القناة المصدر' }]}
+              >
+                <Select size="middle">
+                  <Option value="cash">كاش ({fmtMoney(getChannelAvailable('cash'))})</Option>
+                  <Option value="visa">بنكي / فيزا ({fmtMoney(getChannelAvailable('visa'))})</Option>
+                  <Option value="transfer">محفظة / تحويل ({fmtMoney(getChannelAvailable('transfer'))})</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="to_channel"
+                label="تحويل إلى قناة (الهدف):"
+                rules={[
+                  { required: true, message: 'اختر القناة الهدف' },
+                  ({ getFieldValue }) => ({
+                    validator(_, val) {
+                      if (val && val === getFieldValue('from_channel')) {
+                        return Promise.reject('لا يمكن التحويل إلى نفس القناة');
+                      }
+                      return Promise.resolve();
+                    }
+                  })
+                ]}
+              >
+                <Select size="middle">
+                  <Option value="cash">كاش (نقدي)</Option>
+                  <Option value="visa">حساب بنكي / فيزا</Option>
+                  <Option value="transfer">محفظة / إنستاباي</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>الرصيد المتاح بالقناة المحول منها:</Text>
+            <div style={{ fontSize: 16, fontWeight: 'bold', color: getChannelAvailable(transferFromChannel) > 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>
+              {fmtMoney(getChannelAvailable(transferFromChannel))}
+            </div>
+          </div>
+
+          <Form.Item
+            name="amount"
+            label="المبلغ المراد تحويله"
+            rules={[
+              { required: true, message: 'يرجى إدخال المبلغ' },
+              {
+                validator: (_, val) => {
+                  if (!val || val <= 0) return Promise.reject('المبلغ يجب أن يكون أكبر من صفر');
+                  const avail = getChannelAvailable(transferFromChannel);
+                  if (val > avail + 0.01) {
+                    return Promise.reject(`المبلغ يتجاوز الرصيد المتاح (${fmtMoney(avail)})`);
+                  }
+                  return Promise.resolve();
+                }
+              }
+            ]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              size="large"
+              placeholder="0.00"
+              precision={2}
+              addonAfter="ج.م"
+            />
+          </Form.Item>
+
+          <Form.Item name="notes" label="البيان / سبب التحويل (اختياري)">
+            <Input.TextArea
+              rows={2}
+              placeholder="مثال: توريد نقدية من الخزينة إلى الحساب البنكي..."
+            />
+          </Form.Item>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button onClick={() => setChannelTransferVisible(false)}>إلغاء</Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submittingChannelTransfer}
+              style={{ backgroundColor: '#4f46e5', borderColor: '#4f46e5', fontWeight: 700 }}
+            >
+              تأكيد التحويل
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* Bulk Payroll Payout Modal (صرف مسير الرواتب المجمع) */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingLeft: 24, flexWrap: 'wrap', gap: 8 }}>
+            <Space>
+              <TeamOutlined style={{ color: '#16a34a', fontSize: 20 }} />
+              <span style={{ fontWeight: 'bold' }}>صرف مسير الرواتب المجمع - شهر {bulkMonth}</span>
+            </Space>
+            <Space size={8}>
+              <Text type="secondary" style={{ fontSize: 12 }}>اختر الشهر:</Text>
+              <DatePicker
+                picker="month"
+                size="small"
+                value={dayjs(bulkMonth, 'YYYY-MM')}
+                format="YYYY-MM"
+                allowClear={false}
+                onChange={(d) => {
+                  if (d) {
+                    const m = d.format('YYYY-MM');
+                    setBulkMonth(m);
+                    fetchBulkPreview(m);
+                  }
+                }}
+                style={{ width: 110 }}
+              />
+            </Space>
+          </div>
+        }
+        open={bulkPayrollVisible}
+        onCancel={() => setBulkPayrollVisible(false)}
+        width={960}
+        footer={null}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 14 }}>
+          {/* Channel selector & summary */}
+          <div style={{
+            background: '#f8fafc',
+            padding: '12px 16px',
+            borderRadius: 8,
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12
+          }}>
+            <div>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>قناة الصرف من الخزينة:</Text>
+              <Radio.Group
+                value={bulkChannel}
+                onChange={(e) => setBulkChannel(e.target.value)}
+              >
+                <Radio.Button value="cash"><Space size={4}><Banknote size={13} /><span>كاش ({fmtMoney(getChannelAvailable('cash'))})</span></Space></Radio.Button>
+                <Radio.Button value="visa"><Space size={4}><CreditCard size={13} /><span>فيزا ({fmtMoney(getChannelAvailable('visa'))})</span></Space></Radio.Button>
+                <Radio.Button value="transfer"><Space size={4}><Smartphone size={13} /><span>تحويل ({fmtMoney(getChannelAvailable('transfer'))})</span></Space></Radio.Button>
+              </Radio.Group>
+            </div>
+
+            {(() => {
+              const selectedEmps = bulkEmployees.filter(e => selectedEmpKeys.includes(e.employee_id));
+              const totalNet = selectedEmps.reduce((sum, e) => sum + (e.calcNet || 0), 0);
+              const avail = getChannelAvailable(bulkChannel);
+              const canAfford = totalNet > 0 && totalNet <= avail;
+              return (
+                <div style={{ textAlign: 'left' }}>
+                  <Text type="secondary" style={{ fontSize: 11 }}>المحدد: {fmtNum(selectedEmps.length, 0)} موظف | إجمالي المطلوب:</Text>
+                  <div style={{ fontSize: 20, fontWeight: 'bold', color: canAfford ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>
+                    {fmtMoney(totalNet)}
+                  </div>
+                  {!canAfford && totalNet > 0 && (
+                    <Text type="danger" style={{ fontSize: 11 }}>الرصيد المتاح بالقناة ({fmtMoney(avail)}) لا يكفي!</Text>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        <Table
+          dataSource={bulkEmployees}
+          rowKey="employee_id"
+          size="small"
+          loading={loadingBulkPreview}
+          pagination={false}
+          scroll={{ y: 320 }}
+          rowSelection={{
+            selectedRowKeys: selectedEmpKeys,
+            onChange: (keys) => setSelectedEmpKeys(keys),
+            getCheckboxProps: (record) => ({
+              disabled: record.already_paid || record.calcNet <= 0
+            })
+          }}
+          columns={[
+            {
+              title: 'الموظف والفرع',
+              key: 'employee',
+              render: (_, rec) => (
+                <div>
+                  <Text strong>{rec.full_name}</Text>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>{rec.branch_name}</div>
+                  {rec.already_paid && <Tag color="orange" style={{ fontSize: 10, marginTop: 2 }}>تم الصرف مسبقاً</Tag>}
+                </div>
+              )
+            },
+            {
+              title: 'الأساسي',
+              dataIndex: 'base_salary',
+              key: 'base_salary',
+              render: v => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(v)}</span>
+            },
+            {
+              title: 'السلف المستقطعة',
+              dataIndex: 'advances_total',
+              key: 'advances_total',
+              render: v => parseFloat(v) > 0 ? <Text type="danger" style={{ fontVariantNumeric: 'tabular-nums' }}>-{fmtMoney(v)}</Text> : '—'
+            },
+            {
+              title: 'خصم إضافي',
+              key: 'deductions',
+              width: 100,
+              render: (_, rec) => (
+                <InputNumber
+                  size="small"
+                  min={0}
+                  value={rec.deductions}
+                  onChange={(val) => {
+                    const ded = val || 0;
+                    setBulkEmployees(prev => prev.map(e => {
+                      if (e.employee_id === rec.employee_id) {
+                        const newNet = Math.max(0, Math.round((e.base_salary - e.advances_total - ded + (e.bonus || 0)) * 100) / 100);
+                        return { ...e, deductions: ded, calcNet: newNet };
+                      }
+                      return e;
+                    }));
+                  }}
+                  style={{ width: '100%' }}
+                  disabled={rec.already_paid}
+                />
+              )
+            },
+            {
+              title: 'حافز إضافي',
+              key: 'bonus',
+              width: 100,
+              render: (_, rec) => (
+                <InputNumber
+                  size="small"
+                  min={0}
+                  value={rec.bonus}
+                  onChange={(val) => {
+                    const bns = val || 0;
+                    setBulkEmployees(prev => prev.map(e => {
+                      if (e.employee_id === rec.employee_id) {
+                        const newNet = Math.max(0, Math.round((e.base_salary - e.advances_total - (e.deductions || 0) + bns) * 100) / 100);
+                        return { ...e, bonus: bns, calcNet: newNet };
+                      }
+                      return e;
+                    }));
+                  }}
+                  style={{ width: '100%' }}
+                  disabled={rec.already_paid}
+                />
+              )
+            },
+            {
+              title: 'صافي الراتب المستحق',
+              key: 'calcNet',
+              render: (_, rec) => (
+                <Text strong style={{ color: rec.calcNet > 0 ? '#16a34a' : '#94a3b8', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+                  {fmtMoney(rec.calcNet)}
+                </Text>
+              )
+            }
+          ]}
+        />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+          <Space>
+            <Button
+              size="small"
+              onClick={() => {
+                const unpaid = bulkEmployees.filter(e => !e.already_paid && e.calcNet > 0).map(e => e.employee_id);
+                setSelectedEmpKeys(unpaid);
+              }}
+            >
+              تحديد غير المصروف ({fmtNum(bulkEmployees.filter(e => !e.already_paid && e.calcNet > 0).length, 0)})
+            </Button>
+            <Button size="small" onClick={() => setSelectedEmpKeys([])}>إلغاء التحديد</Button>
+          </Space>
+
+          <Space>
+            <Button onClick={() => setBulkPayrollVisible(false)}>إلغاء</Button>
+            {(() => {
+              const selectedEmps = bulkEmployees.filter(e => selectedEmpKeys.includes(e.employee_id));
+              const totalNet = selectedEmps.reduce((sum, e) => sum + (e.calcNet || 0), 0);
+              const avail = getChannelAvailable(bulkChannel);
+              const canAfford = totalNet > 0 && totalNet <= avail && selectedEmps.length > 0;
+              return (
+                <Popconfirm
+                  title={`تأكيد صرف رواتب (${fmtNum(selectedEmps.length, 0)}) موظف بإجمالي مبلغ (${fmtMoney(totalNet)})؟`}
+                  description="سيتم خصم المبلغ بالكامل من الخزينة وقيده باليومية الإدارية فوراً."
+                  okText="تأكيد الصرف المجمع"
+                  cancelText="تراجع"
+                  okType="primary"
+                  onConfirm={handleBulkPaySubmit}
+                  disabled={!canAfford || submittingBulkPayroll}
+                >
+                  <Button
+                    type="primary"
+                    loading={submittingBulkPayroll}
+                    disabled={!canAfford}
+                    className="swm-btn-emerald"
+                    style={{ fontWeight: 700 }}
+                  >
+                    تأكيد صرف الرواتب المحددة ({fmtMoney(totalNet)})
+                  </Button>
+                </Popconfirm>
+              );
+            })()}
+          </Space>
+        </div>
+      </Modal>
+
       {/* Transfer Detail Modal */}
       <Modal
         title={
@@ -1776,7 +2681,7 @@ export default function TreasuryAdmin() {
           detailRecord?.status === 'pending' ? (
             <Space>
               <Popconfirm
-                title={`تأكيد استلام ${parseFloat(detailRecord?.amount || 0).toFixed(2)} ج.م؟`}
+                title={`تأكيد استلام ${fmtMoney(detailRecord?.amount || 0)}؟`}
                 okText="تأكيد" cancelText="إلغاء"
                 onConfirm={() => { handleConfirm(detailRecord.id); setDetailVisible(false); }}
               >
@@ -1802,19 +2707,19 @@ export default function TreasuryAdmin() {
           <div style={{ lineHeight: 2 }}>
             <Row gutter={[16, 12]}>
               <Col span={12}><Text type="secondary">الفرع المُرسِل:</Text><br /><Text strong>{detailRecord.from_branch_name}</Text></Col>
-              <Col span={12}><Text type="secondary">المبلغ الإجمالي:</Text><br /><Text strong style={{ color: '#16a34a', fontSize: 16 }}>{parseFloat(detailRecord.amount).toFixed(2)} ج.م</Text></Col>
+              <Col span={12}><Text type="secondary">المبلغ الإجمالي:</Text><br /><Text strong style={{ color: '#16a34a', fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(detailRecord.amount)}</Text></Col>
               <Col span={12}><Text type="secondary">طريقة التحويل:</Text><br /><Tag color="blue">{detailRecord.transfer_method === 'bank_transfer' ? <Space size={4}><Building2 size={12} /><span>بنكي</span></Space> : <Space size={4}><Banknote size={12} /><span>نقدي</span></Space>}</Tag></Col>
               <Col span={12}><Text type="secondary">الحالة:</Text><br /><Tag color={STATUS_MAP[detailRecord.status]?.color}>{STATUS_MAP[detailRecord.status]?.label}</Tag></Col>
               {detailRecord.reference_no && (
                 <Col span={24}><Text type="secondary">رقم المرجع:</Text><br /><Text code>{detailRecord.reference_no}</Text></Col>
               )}
               <Col span={12}><Text type="secondary">طُلب بواسطة:</Text><br /><Text>{detailRecord.requested_by_name || detailRecord.requested_by_username}</Text></Col>
-              <Col span={12}><Text type="secondary">تاريخ الطلب:</Text><br /><Text>{new Date(detailRecord.requested_at).toLocaleString('ar-EG')}</Text></Col>
+              <Col span={12}><Text type="secondary">تاريخ الطلب:</Text><br /><Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDate(detailRecord.requested_at)}</Text></Col>
               {detailRecord.confirmed_by_name && (
                 <Col span={12}><Text type="secondary">أُكد بواسطة:</Text><br /><Text>{detailRecord.confirmed_by_name}</Text></Col>
               )}
               {detailRecord.confirmed_at && (
-                <Col span={12}><Text type="secondary">تاريخ التأكيد:</Text><br /><Text>{new Date(detailRecord.confirmed_at).toLocaleString('ar-EG')}</Text></Col>
+                <Col span={12}><Text type="secondary">تاريخ التأكيد:</Text><br /><Text style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDate(detailRecord.confirmed_at)}</Text></Col>
               )}
               {detailRecord.notes && (
                 <Col span={24}><Text type="secondary">الملاحظات وتفاصيل القنوات:</Text><br /><Text>{detailRecord.notes}</Text></Col>
@@ -1930,17 +2835,17 @@ export default function TreasuryAdmin() {
               <Row gutter={[8, 8]}>
                 <Col span={8}>
                   <Radio.Button value="cash" style={{ width: '100%', textAlign: 'center' }}>
-                    <Space size={4}><Banknote size={13} /><span>كاش ({getChannelAvailable('cash').toLocaleString()})</span></Space>
+                    <Space size={4}><Banknote size={13} /><span>كاش ({fmtMoney(getChannelAvailable('cash'))})</span></Space>
                   </Radio.Button>
                 </Col>
                 <Col span={8}>
                   <Radio.Button value="visa" style={{ width: '100%', textAlign: 'center' }}>
-                    <Space size={4}><CreditCard size={13} /><span>فيزا ({getChannelAvailable('visa').toLocaleString()})</span></Space>
+                    <Space size={4}><CreditCard size={13} /><span>فيزا ({fmtMoney(getChannelAvailable('visa'))})</span></Space>
                   </Radio.Button>
                 </Col>
                 <Col span={8}>
                   <Radio.Button value="transfer" style={{ width: '100%', textAlign: 'center' }}>
-                    <Space size={4}><Smartphone size={13} /><span>تحويل ({getChannelAvailable('transfer').toLocaleString()})</span></Space>
+                    <Space size={4}><Smartphone size={13} /><span>تحويل ({fmtMoney(getChannelAvailable('transfer'))})</span></Space>
                   </Radio.Button>
                 </Col>
               </Row>
@@ -1957,7 +2862,7 @@ export default function TreasuryAdmin() {
                   if (!val || val <= 0) return Promise.reject('المبلغ يجب أن يكون أكبر من صفر');
                   const avail = getChannelAvailable(selectedQuickChannel);
                   if (val > avail + 0.01) {
-                    return Promise.reject(`المبلغ يتجاوز الرصيد المتاح بالقناة (${avail.toLocaleString()} ج.م)`);
+                    return Promise.reject(`المبلغ يتجاوز الرصيد المتاح بالقناة (${fmtMoney(avail)})`);
                   }
                   return Promise.resolve();
                 }
@@ -2011,7 +2916,7 @@ export default function TreasuryAdmin() {
         <div style={{ marginBottom: 12 }}>
           <Alert
             type="info"
-            message={`إجمالي السلف والمصاريف المستقطعة لشهر ${payrollMonth}: ${parseFloat(employeeSummary?.advances_total || 0).toLocaleString()} ج.م`}
+            message={`إجمالي السلف والمصاريف المستقطعة لشهر ${payrollMonth}: ${fmtMoney(employeeSummary?.advances_total || 0)}`}
           />
         </div>
         <Table
@@ -2024,13 +2929,13 @@ export default function TreasuryAdmin() {
               title: 'التاريخ',
               dataIndex: 'expense_date',
               key: 'expense_date',
-              render: d => d ? new Date(d).toLocaleDateString('ar-EG') : '—'
+              render: d => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDate(d)}</span>
             },
             {
               title: 'المبلغ',
               dataIndex: 'amount',
               key: 'amount',
-              render: v => <Text strong style={{ color: '#dc2626' }}>{parseFloat(v).toLocaleString()} ج.م</Text>
+              render: v => <Text strong style={{ color: '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(v)}</Text>
             },
             {
               title: 'البند',

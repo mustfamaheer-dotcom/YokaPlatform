@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon, Sparkles, X, Folder, Lightbulb } from 'lucide-react';
+import { Home as HomeIcon, Sparkles, X, Folder, Lightbulb, DollarSign } from 'lucide-react';
 import {
   Table,
   Button,
@@ -182,6 +182,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
   const activeColors = isMultiVariant
     ? selectedMultiColors
     : (watchedItemColor ? [watchedItemColor] : []);
+
 
   // ==========================================
   // FETCHING DATA
@@ -552,7 +553,11 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       brand: 'Yoka Store',
       material: '',
       color: colors[0]?.name || 'أسود',
-      size: sizes[0]?.name || 'L'
+      size: sizes[0]?.name || 'L',
+      cost_price: 0,
+      selling_price: 0,
+      wholesale_price: 0,
+      sale_price: undefined
     });
     setIsItemModalOpen(true);
   };
@@ -628,6 +633,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       cost_price: parseFloat(fullProduct.cost_price) || 0,
       selling_price: parseFloat(fullProduct.selling_price) || 0,
       wholesale_price: parseFloat(fullProduct.wholesale_price) || 0,
+      sale_price: fullProduct.sale_price ? parseFloat(fullProduct.sale_price) : undefined,
       status: fullProduct.status || 'active',
       is_ecom_listed: Boolean(fullProduct.is_ecom_listed),
       featured_image: fullProduct.featured_image || ''
@@ -686,11 +692,12 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       }
 
       const payload = {
-        cost_price: editingItem ? (parseFloat(editingItem.cost_price) || 0) : 0,
-        selling_price: editingItem ? (parseFloat(editingItem.selling_price) || 0) : 0,
-        wholesale_price: editingItem ? (parseFloat(editingItem.wholesale_price) || 0) : 0,
-        is_ecom_listed: editingItem ? Boolean(editingItem.is_ecom_listed) : false,
         ...values,
+        cost_price: values.cost_price !== undefined ? parseFloat(values.cost_price) : (editingItem ? (parseFloat(editingItem.cost_price) || 0) : 0),
+        selling_price: values.selling_price !== undefined ? parseFloat(values.selling_price) : (editingItem ? (parseFloat(editingItem.selling_price) || 0) : 0),
+        wholesale_price: values.wholesale_price !== undefined ? (values.wholesale_price ? parseFloat(values.wholesale_price) : null) : (editingItem ? (parseFloat(editingItem.wholesale_price) || null) : null),
+        sale_price: values.sale_price !== undefined ? (values.sale_price ? parseFloat(values.sale_price) : null) : (editingItem ? (parseFloat(editingItem.sale_price) || null) : null),
+        is_ecom_listed: editingItem ? Boolean(editingItem.is_ecom_listed) : false,
         featured_image: defaultFeatured,
         color_images: colorImages,
         variants: variantsPayload
@@ -1746,6 +1753,87 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
             </Text>
           </div>
 
+          {/* 3.5. Item Pricing Section (تسعير الصنف) */}
+          <div style={{ backgroundColor: '#fffdf5', border: '1px solid #fde68a', padding: '14px 16px', borderRadius: 8, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Space align="middle">
+                <DollarOutlined style={{ color: '#b45309', fontSize: 16 }} />
+                <Text strong style={{ color: '#92400e', fontSize: 14 }}>
+                  تسعير الصنف الموحد (Pricing Details):
+                </Text>
+              </Space>
+              <Tag color="gold" style={{ fontWeight: 600 }}>يُعتمد تلقائياً لجميع الفروع والمتجر</Tag>
+            </div>
+
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={6}>
+                <Form.Item
+                  name="selling_price"
+                  label={<Text strong style={{ color: '#0F172A' }}>سعر البيع للقطاعي (ج.م) *</Text>}
+                  rules={[{ required: true, message: 'يرجى إدخال سعر البيع' }]}
+                >
+                  <InputNumber
+                    min={0}
+                    step={1}
+                    precision={2}
+                    placeholder="0.00"
+                    style={{ width: '100%' }}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} sm={12} md={6}>
+                <Form.Item
+                  name="cost_price"
+                  label={<Text strong style={{ color: '#475569' }}>سعر التكلفة الأساسي (ج.م) *</Text>}
+                  rules={[{ required: true, message: 'يرجى إدخال سعر التكلفة' }]}
+                >
+                  <InputNumber
+                    min={0}
+                    step={1}
+                    precision={2}
+                    placeholder="0.00"
+                    style={{ width: '100%' }}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} sm={12} md={6}>
+                <Form.Item
+                  name="wholesale_price"
+                  label={<Text style={{ color: '#475569' }}>سعر الجملة (اختياري)</Text>}
+                >
+                  <InputNumber
+                    min={0}
+                    step={1}
+                    precision={2}
+                    placeholder="0.00"
+                    style={{ width: '100%' }}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} sm={12} md={6}>
+                <Form.Item
+                  name="sale_price"
+                  label={<Text style={{ color: '#b91c1c' }}>سعر التخفيض/العرض (اختياري)</Text>}
+                >
+                  <InputNumber
+                    min={0}
+                    step={1}
+                    precision={2}
+                    placeholder="0.00"
+                    style={{ width: '100%' }}
+                    size="large"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
+
           {/* 4. Variant Mode Selection: Single Item vs Multi-variant */}
           <div style={{ marginBottom: 16, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -2409,6 +2497,7 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
           </div>
         )}
       </Modal>
+
     </div>
   );
 }
