@@ -101,17 +101,28 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
   const isMobile = windowWidth < 768;
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
-  // Extract route after /dashboard
+  const validTabs = useMemo(() => new Set([
+    'home', 'hub', 'dashboard', 'kpis_dashboard', 'orders', 'purchases', 'suppliers',
+    'products', 'groups_items', 'stock_audit', 'stock_adjustments', 'transfers',
+    'branches', 'users', 'payroll_expenses', 'treasury_admin', 'branches_daily',
+    'admin_journals', 'sales_reports', 'retail_analytics', 'ecom_analytics',
+    'ecom_inventory', 'daily_shift', 'branch_shifts', 'customers',
+    'loyalty_settings', 'loyalty', 'store_settings', 'settings', 'storefront'
+  ]), []);
+
+  // Extract route after /dashboard or /swm-admin/dashboard safely
   const pathParts = useMemo(() => {
-    const raw = location.pathname.replace(/^\/dashboard\/?/, '');
+    const raw = location.pathname.replace(/^(\/swm-admin)?(\/dashboard)?\/?/, '');
     return raw ? raw.split('/').filter(Boolean) : [];
   }, [location.pathname]);
 
   const activeTab = useMemo(() => {
     if (pathParts.length === 0) return 'home';
-    if (pathParts[0] === 'hub') return 'home';
-    return pathParts[0];
-  }, [pathParts]);
+    const first = pathParts[0];
+    if (first === 'hub') return 'home';
+    if (!validTabs.has(first)) return 'home';
+    return first;
+  }, [pathParts, validTabs]);
 
   const handleNavigate = (tab, extra = null) => {
     setTabExtra(extra);

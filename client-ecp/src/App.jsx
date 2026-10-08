@@ -150,7 +150,21 @@ export default function App() {
   };
 
   if (location.pathname.startsWith('/swm-admin')) {
-    return null;
+    if (typeof window !== 'undefined') {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          for (const r of regs) r.unregister();
+          window.location.reload();
+        });
+      } else {
+        window.location.reload();
+      }
+    }
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </div>
+    );
   }
 
   return (

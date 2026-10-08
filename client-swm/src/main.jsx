@@ -7,15 +7,24 @@ import App from './App';
 import { AntdAppBridge } from './utils/antAppBridge';
 import './index.css';
 
-// Ensure no rogue Service Worker controls /swm-admin
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const reg of registrations) {
-      if (reg.scope && reg.scope.includes('/swm-admin')) {
+// Ensure no rogue Service Worker or stale workbox cache controls /swm-admin
+if (typeof window !== 'undefined') {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
         reg.unregister();
       }
-    }
-  }).catch(() => {});
+    }).catch(() => {});
+  }
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      for (const name of names) {
+        if (name.includes('html-cache') || name.includes('workbox')) {
+          caches.delete(name);
+        }
+      }
+    }).catch(() => {});
+  }
 }
 
 const basename = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');

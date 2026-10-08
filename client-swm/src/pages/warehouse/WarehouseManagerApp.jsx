@@ -107,16 +107,24 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
     return () => { isMounted = false; };
   }, [currentUser?.id]);
 
-  // Extract route after /warehouse-manager
+  const validTabs = useMemo(() => new Set([
+    'home', 'groups_items', 'stock_audit', 'purchases', 'suppliers',
+    'inventory_counts', 'stock_adjustments', 'transfers', 'alerts',
+    'analytics', 'system_backup', 'permissions'
+  ]), []);
+
+  // Extract route after /warehouse-manager or /swm-admin/warehouse-manager safely
   const pathParts = useMemo(() => {
-    const raw = location.pathname.replace(/^\/warehouse-manager\/?/, '');
+    const raw = location.pathname.replace(/^(\/swm-admin)?(\/warehouse-manager)?\/?/, '');
     return raw ? raw.split('/').filter(Boolean) : [];
   }, [location.pathname]);
 
   const activeTab = useMemo(() => {
     if (pathParts.length === 0) return 'home';
-    return pathParts[0];
-  }, [pathParts]);
+    const first = pathParts[0];
+    if (!validTabs.has(first)) return 'home';
+    return first;
+  }, [pathParts, validTabs]);
 
   const handleNavigate = (tab, extra = null) => {
     setTabExtra(extra);

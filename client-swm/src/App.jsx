@@ -266,6 +266,21 @@ export default function App() {
         }
       />
       <Route
+        path="/supervisor-dashboard/*"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['supervisor', 'admin', 'super_admin']}
+          >
+            <SupervisorDashboard
+              currentUser={currentUser}
+              onSwitchToPos={() => navigate('/pos')}
+              onLogout={handleLogout}
+            />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/supervisor"
         element={<Navigate to="/supervisor-dashboard" replace />}
       />
@@ -393,6 +408,21 @@ export default function App() {
       />
 
       {/* Main Admin Dashboard & Executive Portal Route (admin, super_admin) */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <AdminApp
+              currentUser={currentUser}
+              onSwitchToPos={() => navigate('/pos')}
+              onLogout={handleLogout}
+            />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard/*"
         element={

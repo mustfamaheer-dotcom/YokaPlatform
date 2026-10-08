@@ -7,14 +7,23 @@ import App from './App';
 import { registerSW } from 'virtual:pwa-register';
 
 // Self-healing check: If a stale service worker incorrectly served ECP on /swm-admin,
-// unregister all service workers immediately and force a hard reload from the network.
+// unregister all service workers immediately, purge caches, and force a hard reload from the network.
 if (typeof window !== 'undefined' && window.location.pathname.startsWith('/swm-admin')) {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       for (const reg of registrations) {
         reg.unregister();
       }
-      window.location.replace('/swm-admin/');
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          for (const name of names) {
+            caches.delete(name);
+          }
+          window.location.replace('/swm-admin/');
+        });
+      } else {
+        window.location.replace('/swm-admin/');
+      }
     });
   } else {
     window.location.replace('/swm-admin/');
