@@ -35,8 +35,8 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      defaultSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "http://localhost:*", "http://127.0.0.1:*"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
@@ -49,10 +49,13 @@ app.use(helmet({
         "https://yokastore.runasp.net",
         "http://yokastore.runasp.net",
         "ws:",
-        "wss:"
+        "wss:",
+        "http://localhost:*",
+        "http://127.0.0.1:*"
       ],
       manifestSrc: ["'self'"],
-      frameSrc: ["'self'"],
+      frameSrc: ["'self'", "*"],
+      frameAncestors: ["*"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: null
     }

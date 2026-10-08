@@ -45,6 +45,16 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
   const [supervisorModalOpen, setSupervisorModalOpen] = useState(false);
   const [exitBackupModalOpen, setExitBackupModalOpen] = useState(false);
   const [stockAlertsCount, setStockAlertsCount] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   useEffect(() => {
     setActiveUser(currentUser);
@@ -187,63 +197,67 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', direction: 'rtl', display: 'flex', flexDirection: 'column' }}>
-      {/* 1. Header: Simply displays the store name and the current logged-in branch */}
+      {/* 1. Header (Responsive on Mobile, Tablet & Desktop) */}
       <header
+        className="swm-top-header"
         style={{
           background: '#ffffff',
           borderBottom: '1px solid #e2e8f0',
-          padding: '0 24px',
-          height: 64,
+          padding: isMobile ? '0 10px' : isTablet ? '0 14px' : '0 24px',
+          height: isMobile ? 56 : isTablet ? 60 : 64,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          transition: 'all 0.2s ease'
         }}
       >
         {/* Right side: Store Name & Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src={yokaLogo} alt="Yoka Store" style={{ height: 34, objectFit: 'contain' }} />
-          <div>
-            <span style={{ fontWeight: 800, fontSize: 16, color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
-              يوكا ستور (Yoka Store)
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, minWidth: 0 }}>
+          <img src={yokaLogo} alt="Yoka Store" style={{ height: isMobile ? 28 : isTablet ? 32 : 34, objectFit: 'contain', flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <span style={{ fontWeight: 800, fontSize: isMobile ? 14 : 16, color: '#0f172a', display: 'block', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+              يوكا ستور
             </span>
-            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
-              نظام نقاط البيع السحابي
-            </span>
+            {!isMobile && (
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                نظام نقاط البيع السحابي
+              </span>
+            )}
           </div>
         </div>
 
         {/* Left side: Current Logged-in Branch, Supervisor Toggle, and Cashier Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, flexShrink: 0 }}>
           {/* Current Logged-in Branch */}
           <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 4,
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
-              padding: '6px 14px',
+              padding: isMobile ? '4px 8px' : '6px 14px',
               borderRadius: 8
             }}
           >
-            <MapPin size={15} color="#0284c7" />
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-              الفرع: {branchName}
+            <MapPin size={isMobile ? 13 : 15} color="#0284c7" />
+            <span style={{ fontSize: isMobile ? 11.5 : 13, fontWeight: 700, color: '#0f172a' }}>
+              {isMobile ? branchName : `الفرع: ${branchName}`}
             </span>
           </div>
 
           {/* Reinstate Supervisor Unlock Button & Status Indicator */}
           {isSupervisor ? (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Tag
                 color="gold"
                 style={{
-                  fontSize: 12,
-                  padding: '4px 10px',
+                  fontSize: isMobile ? 10.5 : 12,
+                  padding: isMobile ? '2px 6px' : '4px 10px',
                   fontWeight: 700,
                   borderRadius: 8,
                   border: '1px solid #fcd34d',
@@ -251,11 +265,12 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
                   color: '#b45309',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 5
+                  gap: 4,
+                  margin: 0
                 }}
               >
-                <Crown size={14} color="#d97706" />
-                <span>وضع المشرف مفعّل</span>
+                <Crown size={12} color="#d97706" />
+                <span>{isMobile ? 'مشرف' : 'وضع المشرف مفعّل'}</span>
               </Tag>
 
               {onSwitchToAdmin && (
@@ -268,12 +283,12 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
                     backgroundColor: '#4f46e5',
                     borderColor: '#4f46e5',
                     borderRadius: 6,
-                    fontSize: 12,
+                    fontSize: isMobile ? 11 : 12,
                     fontWeight: 600,
-                    height: 32
+                    height: isMobile ? 30 : 32
                   }}
                 >
-                  لوحة الإدارة
+                  {isMobile ? 'إدارة' : 'لوحة الإدارة'}
                 </Button>
               )}
             </div>
@@ -283,55 +298,54 @@ export default function SellerApp({ currentUser, onSwitchToAdmin, onLogout, onSu
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
+                gap: 5,
                 background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
                 border: '1.5px solid #f59e0b',
                 color: '#b45309',
                 borderRadius: 8,
                 fontWeight: 700,
-                fontSize: 13,
-                height: 34,
-                padding: '0 14px',
+                fontSize: isMobile ? 11.5 : 13,
+                height: isMobile ? 32 : 34,
+                padding: isMobile ? '0 8px' : '0 14px',
                 boxShadow: '0 2px 6px rgba(245, 158, 11, 0.15)',
-                cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#fef3c7';
-                e.currentTarget.style.borderColor = '#d97706';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(217, 119, 6, 0.28)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                e.currentTarget.style.borderColor = '#f59e0b';
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(245, 158, 11, 0.15)';
+                cursor: 'pointer'
               }}
               title="دخول المشرف لفك قيود البائع وتفعيل الصلاحيات الإشرافية"
             >
-              <Lock size={15} color="#d97706" />
-              <span>دخول المشرف (Unlock)</span>
+              <Lock size={13} color="#d97706" />
+              <span>{isMobile ? 'المشرف' : 'دخول المشرف (Unlock)'}</span>
             </Button>
           )}
 
           {/* User info and Logout */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>
-              {currentUser?.fullName || currentUser?.username}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!isMobile && (
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>
+                {currentUser?.fullName || currentUser?.username}
+              </span>
+            )}
             <Button
               type="text"
               danger
               icon={<LogOut size={16} />}
               onClick={onLogout}
               title="تسجيل الخروج"
-              style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 6px' }}
+              style={{
+                width: 34,
+                height: 34,
+                padding: 0,
+                borderRadius: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             />
           </div>
         </div>
       </header>
 
       {/* 2. Main Workspace */}
-      <main style={{ flex: 1, padding: '16px 20px 32px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+      <main style={{ flex: 1, padding: isMobile ? '10px 8px 32px' : '16px 20px 32px', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         {/* VIEW A: Pure Navigation Hub (Centralized Grid containing 6 Large Clickable Navigation Cards) */}
         {sellerTab === 'dashboard' && (
           <div

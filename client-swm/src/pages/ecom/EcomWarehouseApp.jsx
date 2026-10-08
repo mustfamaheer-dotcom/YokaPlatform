@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Menu, Button, Space, Typography, Tag, Avatar, Card, Badge, Tooltip, Row, Col } from 'antd';
+import { Layout, Menu, Button, Space, Typography, Tag, Avatar, Card, Badge, Tooltip, Row, Col, Drawer } from 'antd';
 import {
   PackageCheck,
   LogOut,
@@ -13,7 +13,9 @@ import {
   Wallet,
   Store,
   TrendingUp,
-  ArrowRight
+  ArrowRight,
+  Menu as MenuIcon,
+  Home
 } from 'lucide-react';
 import api from '../../api';
 import yokaLogo from '../../assets/yokaStoreTransparent.png';
@@ -28,6 +30,7 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('hub');
   const [unlockModalVisible, setUnlockModalVisible] = useState(false);
+  const [mobileDrawerVisible, setMobileDrawerVisible] = useState(false);
 
   const isSupervisor = currentUser?.role === 'supervisor' || currentUser?.isSupervisor === true || ['admin', 'super_admin'].includes(currentUser?.role);
 
@@ -43,6 +46,16 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
   };
 
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   const fetchPendingOrdersCount = async () => {
     try {
@@ -168,8 +181,8 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
       <Header
         style={{
           background: '#0f172a',
-          padding: '0 20px',
-          height: 64,
+          padding: isMobile ? '0 12px' : '0 20px',
+          height: isMobile ? 56 : (isTablet ? 60 : 64),
           lineHeight: 'normal',
           display: 'flex',
           alignItems: 'center',
@@ -182,24 +195,24 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
         }}
       >
         {/* Brand & Warehouse Identity */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 14 }}>
           <img
             src={yokaLogo}
             alt="Yoka Store"
-            style={{ height: 38, objectFit: 'contain' }}
+            style={{ height: isMobile ? 32 : 38, objectFit: 'contain' }}
           />
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, lineHeight: 1 }}>
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: isMobile ? 14 : 16 }}>
                 يوكا ستور
               </span>
               <Tag
                 color="purple"
                 style={{
                   fontWeight: 700,
-                  fontSize: 12,
+                  fontSize: isMobile ? 10 : 12,
                   borderRadius: 6,
-                  padding: '2px 8px',
+                  padding: isMobile ? '1px 6px' : '2px 8px',
                   border: 'none',
                   background: 'rgba(147, 51, 234, 0.25)',
                   color: '#c084fc',
@@ -207,28 +220,50 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
                   lineHeight: 'normal'
                 }}
               >
-                مستودع المتجر الإلكتروني (E-Com Warehouse)
+                {isMobile ? 'مستودع أونلاين' : 'مستودع المتجر الإلكتروني (E-Com Warehouse)'}
               </Tag>
-              <Tag
-                color="cyan"
-                style={{
-                  fontSize: 11,
-                  borderRadius: 4,
-                  margin: 0,
-                  lineHeight: 'normal'
-                }}
-              >
-                {currentUser?.branchCode || 'BR-ECOM'}
-              </Tag>
+              {!isMobile && (
+                <Tag
+                  color="cyan"
+                  style={{
+                    fontSize: 11,
+                    borderRadius: 4,
+                    margin: 0,
+                    lineHeight: 'normal'
+                  }}
+                >
+                  {currentUser?.branchCode || 'BR-ECOM'}
+                </Tag>
+              )}
             </div>
-            <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4, lineHeight: 1.2 }}>
-              مركز تجهيز وتعبئة وشحن طلبات الأونلاين وإدارة المعروضات
-            </div>
+            {!isMobile && (
+              <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4, lineHeight: 1.2 }}>
+                مركز تجهيز وتعبئة وشحن طلبات الأونلاين وإدارة المعروضات
+              </div>
+            )}
           </div>
+
+          {/* Direct Home Button with Home Icon */}
+          <Button
+            type="primary"
+            icon={<Home size={isMobile ? 13 : 15} style={{ marginLeft: 3 }} />}
+            onClick={() => setActiveTab('hub')}
+            style={{
+              backgroundColor: activeTab === 'hub' ? '#9333ea' : 'rgba(255,255,255,0.12)',
+              borderColor: activeTab === 'hub' ? '#9333ea' : 'rgba(255,255,255,0.25)',
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: isMobile ? 11 : 12,
+              height: isMobile ? 30 : 32,
+              padding: isMobile ? '0 8px' : undefined
+            }}
+          >
+            الرئيسية
+          </Button>
         </div>
 
         {/* User Info & Supervisor Switch & Logout */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12 }}>
           {['admin', 'super_admin'].includes(currentUser?.role) && (
             <Button
               size="small"
@@ -239,21 +274,22 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
                 color: '#fff',
                 background: 'rgba(255,255,255,0.12)',
                 borderColor: 'rgba(255,255,255,0.25)',
-                fontSize: 12
+                fontSize: isMobile ? 11 : 12,
+                padding: isMobile ? '0 8px' : undefined
               }}
             >
-              العودة للإدارة المركزية
+              {isMobile ? 'الإدارة' : 'العودة للإدارة المركزية'}
             </Button>
           )}
 
           {/* Supervisor Status Indicator */}
           {isSupervisor ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Tag
                 color="gold"
                 style={{
-                  fontSize: 12,
-                  padding: '4px 10px',
+                  fontSize: isMobile ? 11 : 12,
+                  padding: isMobile ? '2px 6px' : '4px 10px',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -262,17 +298,18 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
                   lineHeight: 'normal'
                 }}
               >
-                <Crown size={14} style={{ marginLeft: 4, color: '#d97706' }} /> وضع المشرف مفعّل
+                <Crown size={13} style={{ marginLeft: 3, color: '#d97706' }} />
+                {!isMobile ? ' وضع المشرف مفعّل' : 'مشرف'}
               </Tag>
               {currentUser?.isElevated && (
                 <Button
                   size="small"
                   danger
-                  icon={<Lock size={12} style={{ marginLeft: 4 }} />}
+                  icon={<Lock size={12} style={{ marginLeft: isMobile ? 0 : 4 }} />}
                   onClick={handleLockToStaff}
-                  style={{ borderRadius: 6, fontSize: 11 }}
+                  style={{ borderRadius: 6, fontSize: 11, padding: isMobile ? '0 6px' : undefined }}
                 >
-                  قفل المشرف
+                  {!isMobile && 'قفل المشرف'}
                 </Button>
               )}
             </div>
@@ -280,66 +317,144 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
             <Button
               size="small"
               type="primary"
-              icon={<Crown size={13} style={{ marginLeft: 4 }} />}
+              icon={<Crown size={13} style={{ marginLeft: isMobile ? 0 : 4 }} />}
               onClick={() => setUnlockModalVisible(true)}
               style={{
                 backgroundColor: '#d97706',
                 borderColor: '#d97706',
                 borderRadius: 6,
                 fontWeight: 600,
-                fontSize: 12
+                fontSize: isMobile ? 11 : 12,
+                padding: isMobile ? '0 8px' : undefined
               }}
             >
-              دخول المشرف (Unlock)
+              {isMobile ? 'مشرف' : 'دخول المشرف (Unlock)'}
             </Button>
           )}
 
-          {/* User Profile */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 12px',
-              background: 'rgba(255,255,255,0.06)',
-              borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.08)'
-            }}
-          >
-            <Avatar
-              style={{ backgroundColor: '#9333ea', flexShrink: 0 }}
-              icon={<Boxes size={18} />}
-            />
-            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
-              <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>
-                {currentUser?.fullName || currentUser?.username}
-              </span>
-              <span style={{ color: '#cbd5e1', fontSize: 10, lineHeight: 1.2, marginTop: 2 }}>
-                {isSupervisor ? 'مشرف مستودع وتجهيز' : 'مسؤول تجهيز وشحن أونلاين'}
-              </span>
+          {/* User Profile (Desktop) */}
+          {!isMobile && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                background: 'rgba(255,255,255,0.06)',
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.08)'
+              }}
+            >
+              <Avatar
+                style={{ backgroundColor: '#9333ea', flexShrink: 0 }}
+                icon={<Boxes size={18} />}
+              />
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
+                <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>
+                  {currentUser?.fullName || currentUser?.username}
+                </span>
+                <span style={{ color: '#cbd5e1', fontSize: 10, lineHeight: 1.2, marginTop: 2 }}>
+                  {isSupervisor ? 'مشرف مستودع وتجهيز' : 'مسؤول تجهيز وشحن أونلاين'}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Logout */}
           <Button
             type="text"
             danger
-            icon={<LogOut size={16} style={{ marginLeft: 4 }} />}
+            icon={<LogOut size={16} style={{ marginLeft: isMobile ? 0 : 4 }} />}
             onClick={onLogout}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               color: '#f87171',
-              fontWeight: 500
+              fontWeight: 500,
+              padding: isMobile ? '4px 6px' : undefined
             }}
           >
-            خروج
+            {!isMobile && 'خروج'}
           </Button>
         </div>
       </Header>
 
+      {/* Mobile Drawer */}
+      <Drawer
+        title="قائمة مستودع الأونلاين"
+        placement="right"
+        onClose={() => setMobileDrawerVisible(false)}
+        open={mobileDrawerVisible}
+        width={Math.min(320, windowWidth)}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* User info card */}
+          <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Avatar style={{ backgroundColor: '#9333ea' }} icon={<Boxes size={20} />} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{currentUser?.fullName || currentUser?.username}</div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>{isSupervisor ? 'مشرف مستودع وتجهيز' : 'مسؤول تجهيز وشحن أونلاين'}</div>
+              <Tag color="cyan" style={{ marginTop: 4, fontSize: 10 }}>{currentUser?.branchCode || 'BR-ECOM'}</Tag>
+            </div>
+          </div>
+
+          {/* Navigation Links */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>أقسام المستودع</div>
+            <Button
+              type={activeTab === 'hub' ? 'primary' : 'default'}
+              block
+              icon={<Home size={16} style={{ marginLeft: 6 }} />}
+              onClick={() => { setActiveTab('hub'); setMobileDrawerVisible(false); }}
+              style={{ textAlign: 'right', display: 'flex', alignItems: 'center' }}
+            >
+              الرئيسية (لوحة الخدمات)
+            </Button>
+            {navigationCards.map((c) => (
+              <Button
+                key={c.key}
+                type={activeTab === c.key ? 'primary' : 'text'}
+                block
+                icon={React.cloneElement(c.icon, { size: 16, style: { marginLeft: 6 } })}
+                onClick={() => { setActiveTab(c.key); setMobileDrawerVisible(false); }}
+                style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}
+              >
+                <span>{c.title}</span>
+                {c.badge && (
+                  <Tag color={c.badgeColor} style={{ marginRight: 'auto', marginInlineEnd: 0, fontSize: 10 }}>
+                    {c.badge}
+                  </Tag>
+                )}
+              </Button>
+            ))}
+          </div>
+
+          {/* Central Admin shortcut */}
+          {['admin', 'super_admin'].includes(currentUser?.role) && (
+            <Button
+              block
+              onClick={() => { navigate('/dashboard'); setMobileDrawerVisible(false); }}
+              style={{ marginTop: 8 }}
+            >
+              العودة للإدارة المركزية
+            </Button>
+          )}
+
+          {/* Logout */}
+          <Button
+            danger
+            block
+            icon={<LogOut size={16} style={{ marginLeft: 6 }} />}
+            onClick={onLogout}
+            style={{ marginTop: 8 }}
+          >
+            تسجيل الخروج
+          </Button>
+        </div>
+      </Drawer>
+
       {/* Main Workspace Content Area */}
-      <Content style={{ padding: '24px 24px 40px', minHeight: 'calc(100vh - 64px)' }}>
+      <Content style={{ padding: isMobile ? '14px 10px 32px' : '24px 24px 40px', minHeight: 'calc(100vh - 64px)' }}>
         {activeTab === 'hub' ? (
           <div style={{ maxWidth: 1200, margin: '0 auto', paddingTop: 8 }}>
             {/* Hub Header */}
@@ -468,42 +583,45 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
             {/* Top Back Navigation Bar */}
             <div
               style={{
-                marginBottom: 20,
+                marginBottom: isMobile ? 14 : 20,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 10,
                 background: '#fff',
-                padding: '14px 20px',
+                padding: isMobile ? '10px 12px' : '14px 20px',
                 borderRadius: 12,
                 border: '1px solid #e2e8f0',
                 boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14, flexWrap: 'wrap' }}>
                 <Button
                   type="primary"
-                  icon={<ArrowRight size={16} style={{ marginLeft: 6 }} />}
+                  icon={<Home size={15} style={{ marginLeft: isMobile ? 2 : 6 }} />}
                   onClick={() => setActiveTab('hub')}
                   style={{
                     backgroundColor: '#0f172a',
                     borderColor: '#0f172a',
                     borderRadius: 8,
                     fontWeight: 700,
-                    height: 38,
+                    height: isMobile ? 34 : 38,
                     display: 'inline-flex',
                     alignItems: 'center',
-                    fontSize: 13
+                    fontSize: isMobile ? 12 : 13,
+                    padding: isMobile ? '0 10px' : undefined
                   }}
                 >
                   الرجوع للرئيسية
                 </Button>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {currentCard && (
                     <div
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: isMobile ? 30 : 36,
+                        height: isMobile ? 30 : 36,
                         borderRadius: 8,
                         background: `${currentCard.accentColor}18`,
                         display: 'flex',
@@ -511,35 +629,39 @@ export default function EcomWarehouseApp({ currentUser, onLogout, onSupervisorUn
                         justifyContent: 'center'
                       }}
                     >
-                      {React.cloneElement(currentCard.icon, { size: 20, color: currentCard.accentColor })}
+                      {React.cloneElement(currentCard.icon, { size: isMobile ? 16 : 20, color: currentCard.accentColor })}
                     </div>
                   )}
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Text strong style={{ fontSize: 16, color: '#0f172a' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Text strong style={{ fontSize: isMobile ? 14 : 16, color: '#0f172a' }}>
                         {currentCard?.title}
                       </Text>
                       {currentCard?.badge && (
-                        <Tag color={currentCard.badgeColor} style={{ margin: 0, borderRadius: 4 }}>
+                        <Tag color={currentCard.badgeColor} style={{ margin: 0, borderRadius: 4, fontSize: isMobile ? 10 : 12 }}>
                           {currentCard.badge}
                         </Tag>
                       )}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: 12 }}>
-                      {currentCard?.subtitle}
-                    </div>
+                    {!isMobile && (
+                      <div style={{ color: '#64748b', fontSize: 12 }}>
+                        {currentCard?.subtitle}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div>
-                <Button
-                  onClick={() => setActiveTab('hub')}
-                  style={{ borderRadius: 8, fontSize: 12, fontWeight: 600 }}
-                >
-                  لوحة الأقسام (Hub)
-                </Button>
-              </div>
+              {!isMobile && (
+                <div>
+                  <Button
+                    onClick={() => setActiveTab('hub')}
+                    style={{ borderRadius: 8, fontSize: 12, fontWeight: 600 }}
+                  >
+                    لوحة الأقسام (Hub)
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Page Section Content */}

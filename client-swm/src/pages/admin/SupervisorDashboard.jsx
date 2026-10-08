@@ -26,7 +26,8 @@ import {
   AlertTriangle,
   Power,
   Database,
-  Sparkles
+  Sparkles,
+  Home
 } from 'lucide-react';
 import api from '../../api';
 import yokaLogo from '../../assets/yokaStoreTransparent.png';
@@ -37,6 +38,16 @@ const { Title, Text, Paragraph } = Typography;
 export default function SupervisorDashboard({ currentUser, onSwitchToPos, onLogout }) {
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   const branchId = currentUser?.branch_id || currentUser?.branchId || 1;
   const branchName = currentUser?.branch_name || currentUser?.branchName || 'الفرع الرئيسي';
@@ -197,82 +208,110 @@ export default function SupervisorDashboard({ currentUser, onSwitchToPos, onLogo
         flexDirection: 'column'
       }}
     >
-      {/* ─── 1. TOP HEADER & NAVIGATION BAR ───────────────────────────── */}
+      {/* ─── 1. TOP HEADER & NAVIGATION BAR (Responsive on Mobile & Tablet) ─── */}
       <header
+        className="swm-top-header"
         style={{
           background: '#ffffff',
           borderBottom: '1px solid #e2e8f0',
-          padding: '0 24px',
-          height: 64,
+          padding: isMobile ? '0 10px' : isTablet ? '0 14px' : '0 24px',
+          height: isMobile ? 56 : isTablet ? 60 : 64,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          transition: 'all 0.2s ease'
         }}
       >
         {/* Left: Branding & Branch Scoping */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 14, minWidth: 0 }}>
           <img
             src={yokaLogo}
             alt="Yoka Store"
             style={{
-              height: 38,
-              objectFit: 'contain'
+              height: isMobile ? 28 : isTablet ? 32 : 38,
+              objectFit: 'contain',
+              flexShrink: 0
             }}
           />
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 900, color: '#0f172a' }}>
-                لوحة تحكم مشرف الفرع
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: isMobile ? 13.5 : 16, fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                لوحة المشرف
               </span>
               <Tag
                 color="indigo"
                 style={{
                   fontWeight: 700,
-                  fontSize: 11,
+                  fontSize: isMobile ? 10 : 11,
                   borderRadius: 6,
                   margin: 0,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 4
+                  gap: 3,
+                  padding: isMobile ? '1px 5px' : '2px 7px'
                 }}
               >
-                <Building size={12} />
-                {branchName} (ID: {branchId})
+                <Building size={11} />
+                {branchName}
               </Tag>
             </div>
-            <span style={{ fontSize: 11, color: '#64748b' }}>
-              Yoka Enterprise SWM - إدارة الفروع الذكية
-            </span>
+            {!isMobile && (
+              <span style={{ fontSize: 11, color: '#64748b' }}>
+                Yoka Enterprise SWM - إدارة الفروع الذكية
+              </span>
+            )}
           </div>
         </div>
 
         {/* Right: Operational Actions & Session Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Quick Return to POS Terminal */}
-          <Space size="small">
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, flexShrink: 0 }}>
+          {/* Direct Home Navigation for Central Admins */}
+          {['admin', 'super_admin'].includes(currentUser?.role) && (
             <Button
-              type="primary"
-              icon={<ScanLine size={16} style={{ marginLeft: 6 }} />}
-              onClick={handleReturnToPos}
+              icon={<Home size={15} style={{ marginLeft: isMobile ? 0 : 4 }} />}
+              onClick={() => navigate('/dashboard')}
               style={{
-                backgroundColor: '#059669',
-                borderColor: '#059669',
                 borderRadius: 8,
                 fontWeight: 700,
-                fontSize: 13,
-                height: 38,
-                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                fontSize: 12,
+                height: isMobile ? 34 : 38,
+                padding: isMobile ? '0 10px' : '0 12px',
                 display: 'inline-flex',
                 alignItems: 'center'
               }}
+              title="العودة للإدارة المركزية"
             >
-              العودة للكاشير (POS)
+              {isMobile ? 'الرئيسية' : 'الرئيسية'}
             </Button>
+          )}
 
+          {/* Quick Return to POS Terminal */}
+          <Button
+            type="primary"
+            icon={<ScanLine size={15} style={{ marginLeft: isMobile ? 0 : 6 }} />}
+            onClick={handleReturnToPos}
+            style={{
+              backgroundColor: '#059669',
+              borderColor: '#059669',
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 12,
+              height: isMobile ? 34 : 38,
+              padding: isMobile ? '0 10px' : '0 14px',
+              boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}
+            title="العودة لنظام الكاشير (POS)"
+          >
+            {isMobile ? 'POS' : 'العودة للكاشير (POS)'}
+          </Button>
+
+          {!isMobile && (
             <Button
               danger
               icon={<Lock size={15} style={{ marginLeft: 6 }} />}
@@ -287,28 +326,30 @@ export default function SupervisorDashboard({ currentUser, onSwitchToPos, onLogo
               }}
               title="قفل وضع المشرف والعودة لحساب كاشير آمن"
             >
-              قفل المشرف (عودة للبائع)
+              {isTablet ? 'قفل' : 'قفل المشرف'}
             </Button>
-          </Space>
+          )}
 
           {/* Supervisor Identity Profile */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: '#f1f5f9',
-              padding: '4px 10px',
-              borderRadius: 8
-            }}
-          >
-            <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', display: 'block' }}>
-                {currentUser?.fullName || currentUser?.username}
-              </span>
-              <span style={{ fontSize: 10, color: '#64748b' }}>مشرف الفرع المعتمد</span>
+          {!isMobile && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: '#f1f5f9',
+                padding: '4px 10px',
+                borderRadius: 8
+              }}
+            >
+              <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', display: 'block' }}>
+                  {currentUser?.fullName || currentUser?.username}
+                </span>
+                <span style={{ fontSize: 10, color: '#64748b' }}>مشرف الفرع المعتمد</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Logout */}
           <Button
@@ -317,10 +358,16 @@ export default function SupervisorDashboard({ currentUser, onSwitchToPos, onLogo
             icon={<LogOut size={16} />}
             onClick={onLogout}
             title="تسجيل الخروج النهائي"
-            style={{ padding: '4px 8px' }}
-          >
-            خروج
-          </Button>
+            style={{
+              width: 34,
+              height: 34,
+              padding: 0,
+              borderRadius: 8,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          />
         </div>
       </header>
 
@@ -328,7 +375,7 @@ export default function SupervisorDashboard({ currentUser, onSwitchToPos, onLogo
       <main
         style={{
           flex: 1,
-          padding: '32px 28px 48px',
+          padding: isMobile ? '16px 12px 36px' : isTablet ? '20px 16px 40px' : '32px 28px 48px',
           maxWidth: 1280,
           margin: '0 auto',
           width: '100%',

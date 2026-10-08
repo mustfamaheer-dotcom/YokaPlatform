@@ -13,12 +13,15 @@ import {
   Alert,
   Spin,
   Badge,
-  Result
+  Result,
+  Drawer,
+  Dropdown
 } from 'antd';
 import {
   Compass,
   ArrowRight,
   ChevronLeft,
+  ChevronDown,
   LogOut,
   ShieldCheck,
   MapPin,
@@ -33,7 +36,10 @@ import {
   ArrowLeftRight,
   ScanLine,
   Lock,
-  Sparkles
+  Sparkles,
+  Menu,
+  X,
+  Home
 } from 'lucide-react';
 import ScrollToTopTabs from '../../components/ScrollToTopTabs';
 import api from '../../api';
@@ -59,6 +65,17 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
   const [permissions, setPermissions] = useState(currentUser?.wmPermissions || null);
   const [loadingPerms, setLoadingPerms] = useState(!currentUser?.wmPermissions);
   const [tabExtra, setTabExtra] = useState(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   // Sync latest permissions from API
   useEffect(() => {
@@ -256,7 +273,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
     <Layout style={{ minHeight: '100vh', direction: 'rtl', backgroundColor: '#F8FAFC' }}>
       <ScrollToTopTabs activeTab={activeTab} />
 
-      {/* TOP HEADER */}
+      {/* TOP HEADER (Responsive on Mobile, Tablet & Desktop) */}
       <Header
         className="swm-top-header"
         style={{
@@ -266,41 +283,46 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
           top: 0,
           zIndex: 100,
           boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-          padding: '0 20px',
+          height: isMobile ? 56 : isTablet ? 60 : 64,
+          padding: isMobile ? '0 10px' : isTablet ? '0 14px' : '0 20px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          transition: 'all 0.2s ease'
         }}
       >
         {/* Right Section: Brand & Navigation Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, minWidth: 0 }}>
           <div
             onClick={() => handleNavigate('home')}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}
           >
-            <img src={yokaLogo} alt="Yoka Store" style={{ height: 34, objectFit: 'contain' }} />
+            <img src={yokaLogo} alt="Yoka Store" style={{ height: isMobile ? 28 : isTablet ? 32 : 34, objectFit: 'contain' }} />
             <div style={{ textAlign: 'right', lineHeight: 1.2 }}>
-              <span style={{ color: '#0F172A', fontSize: 14, fontWeight: 800, display: 'block' }}>
+              <span style={{ color: '#0F172A', fontSize: isMobile ? 13.5 : 14, fontWeight: 800, display: 'block' }}>
                 يوكا ستور
               </span>
-              <span style={{ color: '#7e22ce', fontSize: 11, fontWeight: 700 }}>
-                بوابة مدير المخازن
-              </span>
+              {!isMobile && (
+                <span style={{ color: '#7e22ce', fontSize: isTablet ? 10.5 : 11, fontWeight: 700 }}>
+                  بوابة مدير المخازن
+                </span>
+              )}
             </div>
           </div>
 
-          <div style={{ height: 24, width: 1, backgroundColor: '#E2E8F0', margin: '0 4px' }} />
+          <div style={{ height: 24, width: 1, backgroundColor: '#E2E8F0', margin: '0 2px' }} />
 
-          {/* Navigation Hub Button */}
+          {/* Navigation Hub Button with Home Icon - Visible on All Screens */}
           <Button
             type={activeTab === 'home' ? 'primary' : 'default'}
-            icon={<Compass size={16} style={{ marginLeft: 4 }} />}
+            icon={<Home size={isMobile ? 14 : 16} style={{ marginLeft: 3 }} />}
             onClick={() => handleNavigate('home')}
             style={{
               borderRadius: 8,
               fontWeight: 700,
-              fontSize: 12.5,
-              height: 36,
+              fontSize: isMobile ? 12 : 12.5,
+              height: isMobile ? 32 : 36,
+              padding: isMobile ? '0 10px' : undefined,
               display: 'inline-flex',
               alignItems: 'center',
               backgroundColor: activeTab === 'home' ? '#7e22ce' : '#FFFFFF',
@@ -308,62 +330,250 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
               color: activeTab === 'home' ? '#FFFFFF' : '#0F172A'
             }}
           >
-            الرئيسية (لوحة الأقسام)
+            {isMobile ? 'الرئيسية' : (isTablet ? 'الرئيسية' : 'الرئيسية (لوحة الأقسام)')}
           </Button>
 
-          <Tag
-            style={{
-              fontSize: 12,
-              padding: '3px 8px',
-              fontWeight: 700,
-              borderRadius: 8,
-              backgroundColor: '#FAF5FF',
-              color: '#7E22CE',
-              border: '1px solid #E9D5FF',
-              margin: 0
-            }}
-          >
-            <MapPin size={12} style={{ marginLeft: 4, display: 'inline' }} />
-            {currentUser?.branchName || 'الإدارة المركزية والمخازن'}
-          </Tag>
+          {!isMobile && (
+            <Tag
+              style={{
+                fontSize: isTablet ? 11 : 12,
+                padding: isTablet ? '2px 6px' : '3px 8px',
+                fontWeight: 700,
+                borderRadius: 8,
+                backgroundColor: '#FAF5FF',
+                color: '#7E22CE',
+                border: '1px solid #E9D5FF',
+                margin: 0
+              }}
+            >
+              <MapPin size={12} style={{ marginLeft: 4, display: 'inline' }} />
+              {currentUser?.branchName || 'الإدارة المركزية والمخازن'}
+            </Tag>
+          )}
         </div>
 
         {/* Left Section: User info & logout */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Avatar
-              style={{ backgroundColor: '#7e22ce', border: '1px solid #6b21a8' }}
-              icon={<ShieldCheck size={18} />}
-            />
-            <div style={{ lineHeight: 1.2, textAlign: 'right' }}>
-              <Text strong style={{ display: 'block', fontSize: 13, color: '#0F172A' }}>
-                {currentUser?.fullName || currentUser?.username}
-              </Text>
-              <Tag color="purple" style={{ fontSize: 10, margin: 0, padding: '0 4px', borderRadius: 4 }}>
-                مدير المخازن
-              </Tag>
-            </div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, flexShrink: 0 }}>
+          {isMobile ? (
+            /* Mobile Quick Action Buttons */
+            <>
+              <Avatar
+                size={32}
+                style={{ backgroundColor: '#7e22ce', border: '1px solid #6b21a8' }}
+                icon={<ShieldCheck size={16} />}
+              />
 
-          <div style={{ height: 28, width: 1, backgroundColor: '#E2E8F0', margin: '0 4px' }} />
+              <Button
+                type="text"
+                danger
+                icon={<LogOut size={16} />}
+                onClick={onLogout}
+                style={{
+                  width: 32,
+                  height: 32,
+                  padding: 0,
+                  borderRadius: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="خروج"
+              />
+            </>
+          ) : (
+            /* Desktop / Tablet User Block */
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Avatar
+                  style={{ backgroundColor: '#7e22ce', border: '1px solid #6b21a8' }}
+                  icon={<ShieldCheck size={18} />}
+                />
+                <div style={{ lineHeight: 1.2, textAlign: 'right' }}>
+                  <Text strong style={{ display: 'block', fontSize: 13, color: '#0F172A' }}>
+                    {currentUser?.fullName || currentUser?.username}
+                  </Text>
+                  <Tag color="purple" style={{ fontSize: 10, margin: 0, padding: '0 4px', borderRadius: 4 }}>
+                    مدير المخازن
+                  </Tag>
+                </div>
+              </div>
 
-          <Button
-            type="text"
-            danger
-            icon={<LogOut size={16} style={{ marginLeft: 4 }} />}
-            onClick={onLogout}
-            style={{ fontWeight: 700, fontSize: 13, borderRadius: 8 }}
-          >
-            خروج
-          </Button>
+              <div style={{ height: 28, width: 1, backgroundColor: '#E2E8F0', margin: '0 4px' }} />
+
+              <Button
+                type="text"
+                danger
+                icon={<LogOut size={16} style={{ marginLeft: 4 }} />}
+                onClick={onLogout}
+                style={{ fontWeight: 700, fontSize: 13, borderRadius: 8 }}
+              >
+                خروج
+              </Button>
+            </>
+          )}
         </div>
       </Header>
 
+      {/* MOBILE NAVIGATION DRAWER */}
+      <Drawer
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src={yokaLogo} alt="Yoka Store" style={{ height: 26, objectFit: 'contain' }} />
+            <span style={{ fontWeight: 800, fontSize: 15, color: '#0F172A' }}>بوابة مدير المخازن</span>
+          </div>
+        }
+        placement="right"
+        width={Math.min(320, typeof window !== 'undefined' ? window.innerWidth * 0.88 : 320)}
+        open={mobileDrawerOpen}
+        onClose={() => setMobileDrawerOpen(false)}
+        styles={{ body: { padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 } }}
+      >
+        {/* User Card */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
+            padding: '14px 16px',
+            borderRadius: 12,
+            border: '1.5px solid #A855F7',
+            color: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <Avatar
+              size={40}
+              style={{ backgroundColor: '#7e22ce', border: '1.5px solid #A855F7' }}
+              icon={<ShieldCheck size={22} />}
+            />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser?.fullName || currentUser?.username}
+              </div>
+              <Tag color="purple" style={{ fontSize: 10.5, margin: '2px 0 0', borderRadius: 4 }}>
+                مدير المخازن المعتمد
+              </Tag>
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: 11.5,
+              color: '#DDD6FE',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              borderTop: '1px solid rgba(168, 85, 247, 0.25)',
+              paddingTop: 8
+            }}
+          >
+            <MapPin size={12} color="#DDD6FE" />
+            <span>{currentUser?.branchName || 'الإدارة المركزية والمخازن'}</span>
+          </div>
+        </div>
+
+        {/* Primary Shortcuts */}
+        <Button
+          type="primary"
+          icon={<Home size={16} style={{ marginLeft: 6 }} />}
+          onClick={() => {
+            handleNavigate('home');
+            setMobileDrawerOpen(false);
+          }}
+          style={{
+            height: 42,
+            borderRadius: 8,
+            fontWeight: 800,
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: activeTab === 'home' ? '#7e22ce' : '#FFFFFF',
+            borderColor: activeTab === 'home' ? '#7e22ce' : '#CBD5E1',
+            color: activeTab === 'home' ? '#FFFFFF' : '#0F172A'
+          }}
+        >
+          الرئيسية (لوحة الأقسام)
+        </Button>
+
+        {/* Categories Fast Jump */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#64748B', marginBottom: 8, padding: '0 4px' }}>
+            أقسام إدارة المخازن:
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {categories.map((cat) => (
+              <div
+                key={cat.id}
+                onClick={() => {
+                  handleNavigateToCategory(cat.id);
+                  setMobileDrawerOpen(false);
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  backgroundColor: cat.bgColor,
+                  border: `1px solid ${cat.borderColor}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      backgroundColor: cat.color,
+                      color: '#FFFFFF',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {cat.number}
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A' }}>
+                    {cat.title}
+                  </span>
+                </div>
+                <ChevronLeft size={14} color="#64748B" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Logout at bottom of drawer */}
+        <Button
+          danger
+          type="primary"
+          icon={<LogOut size={16} style={{ marginLeft: 6 }} />}
+          onClick={() => {
+            setMobileDrawerOpen(false);
+            onLogout();
+          }}
+          style={{
+            height: 42,
+            borderRadius: 8,
+            fontWeight: 700,
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 'auto'
+          }}
+        >
+          تسجيل الخروج
+        </Button>
+      </Drawer>
+
       {/* MAIN CONTENT AREA */}
-      <Content style={{ width: '100%', maxWidth: 1600, margin: '0 auto', boxSizing: 'border-box', padding: '16px' }}>
+      <Content style={{ width: '100%', maxWidth: 1600, margin: '0 auto', boxSizing: 'border-box', padding: isMobile ? '10px 8px 36px' : '16px' }}>
         {/* Breadcrumb Trail when not on home */}
         {activeTab !== 'home' && activeMeta && (
           <div
+            className="swm-breadcrumb-bar"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -371,25 +581,28 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
               backgroundColor: '#FFFFFF',
               border: '1px solid #E2E8F0',
               borderRadius: 10,
-              padding: '8px 16px',
-              marginBottom: 16
+              padding: isMobile ? '8px 10px' : '8px 16px',
+              marginBottom: 16,
+              flexWrap: 'wrap',
+              gap: 8
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 8, flexWrap: 'wrap', minWidth: 0 }}>
               <Button
                 type="link"
                 size="small"
+                icon={<Home size={13} style={{ marginLeft: 3 }} />}
                 onClick={() => handleNavigate('home')}
-                style={{ padding: 0, fontWeight: 700, color: '#7e22ce' }}
+                style={{ padding: 0, fontWeight: 700, color: '#7e22ce', fontSize: isMobile ? 12 : 13, display: 'inline-flex', alignItems: 'center' }}
               >
                 الرئيسية
               </Button>
               <ChevronLeft size={14} color="#94a3b8" />
-              <Text type="secondary" style={{ fontSize: 12.5 }}>
+              <Text type="secondary" style={{ fontSize: isMobile ? 11.5 : 12.5, maxWidth: isMobile ? 110 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {activeMeta.category.title}
               </Text>
               <ChevronLeft size={14} color="#94a3b8" />
-              <Text strong style={{ fontSize: 13, color: '#0f172a' }}>
+              <Text strong style={{ fontSize: isMobile ? 12 : 13, color: '#0f172a', maxWidth: isMobile ? 130 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {activeMeta.item.title}
               </Text>
             </div>
@@ -398,7 +611,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
               size="small"
               icon={<ArrowRight size={14} style={{ marginLeft: 4 }} />}
               onClick={() => handleNavigate('home')}
-              style={{ borderRadius: 6, fontWeight: 600 }}
+              style={{ borderRadius: 6, fontWeight: 600, fontSize: isMobile ? 11.5 : 12, marginRight: isMobile ? 'auto' : 0 }}
             >
               العودة للرئيسية
             </Button>

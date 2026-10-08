@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Button, Tag, Space, App } from 'antd';
+import { Button, Tag, Space, App, Dropdown } from 'antd';
 import {
   ArrowRight,
   ScanLine,
@@ -9,7 +9,8 @@ import {
   Building,
   LayoutGrid,
   Home,
-  LayoutDashboard
+  LayoutDashboard,
+  MoreVertical
 } from 'lucide-react';
 import api from '../../../api';
 import yokaLogo from '../../../assets/yokaStoreTransparent.png';
@@ -23,6 +24,16 @@ export default function SupervisorPageLayout({
 }) {
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   const branchId = currentUser?.branch_id || currentUser?.branchId || 1;
   const branchName = currentUser?.branch_name || currentUser?.branchName || 'الفرع الرئيسي';
@@ -61,6 +72,43 @@ export default function SupervisorPageLayout({
     }
   };
 
+  const mobileNavMenu = {
+    items: [
+      {
+        key: 'home',
+        icon: <Home size={15} />,
+        label: 'الرئيسية',
+        onClick: () => navigate('/')
+      },
+      {
+        key: 'dashboard',
+        icon: <LayoutDashboard size={15} />,
+        label: 'لوحة الإدارة المركزية',
+        onClick: () => navigate('/dashboard')
+      },
+      {
+        key: 'sup_dash',
+        icon: <ArrowRight size={15} />,
+        label: 'لوحة المشرف',
+        onClick: () => navigate('/supervisor-dashboard')
+      },
+      { type: 'divider' },
+      {
+        key: 'branch',
+        icon: <Building size={15} />,
+        label: `الفرع: ${branchName}`,
+        disabled: true
+      },
+      {
+        key: 'lock',
+        icon: <Lock size={15} color="#DC2626" />,
+        label: 'قفل وضع المشرف',
+        danger: true,
+        onClick: handleLockToCashier
+      }
+    ]
+  };
+
   return (
     <div
       style={{
@@ -73,138 +121,169 @@ export default function SupervisorPageLayout({
     >
       {/* ─── Sticky Header ─── */}
       <header
+        className="swm-top-header"
         style={{
           background: '#ffffff',
           borderBottom: '1px solid #e2e8f0',
-          padding: '0 24px',
-          height: 64,
+          padding: isMobile ? '0 10px' : isTablet ? '0 14px' : '0 24px',
+          height: isMobile ? 56 : isTablet ? 60 : 64,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          transition: 'all 0.2s ease'
         }}
       >
         {/* Left: Back to Hub Button & Page Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <Space size="small" wrap>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, minWidth: 0 }}>
+          {isMobile ? (
+            /* Mobile Quick Hub Back Button */
             <Button
-              icon={<Home size={15} style={{ marginLeft: 4 }} />}
-              onClick={() => navigate('/')}
-              style={{
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12.5,
-                borderColor: '#cbd5e1',
-                display: 'inline-flex',
-                alignItems: 'center'
-              }}
-            >
-              الرئيسية
-            </Button>
-
-            <Button
-              icon={<LayoutDashboard size={15} style={{ marginLeft: 4 }} />}
-              onClick={() => navigate('/dashboard')}
-              style={{
-                borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12.5,
-                background: '#0B0F17',
-                color: '#DFCA95',
-                borderColor: 'rgba(200, 164, 92, 0.4)',
-                display: 'inline-flex',
-                alignItems: 'center'
-              }}
-            >
-              لوحة الإدارة
-            </Button>
-
-            <Button
-              icon={<ArrowRight size={15} style={{ marginLeft: 4 }} />}
+              icon={<Home size={16} />}
               onClick={() => navigate('/supervisor-dashboard')}
               style={{
                 borderRadius: 8,
-                fontWeight: 700,
-                fontSize: 12.5,
-                background: '#EEF2FF',
-                color: '#4338CA',
-                borderColor: '#C7D2FE',
+                width: 36,
+                height: 36,
+                padding: 0,
                 display: 'inline-flex',
-                alignItems: 'center'
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderColor: '#cbd5e1'
               }}
-            >
-              لوحة المشرف
-            </Button>
-          </Space>
+              title="لوحة المشرف"
+            />
+          ) : (
+            <Space size="small" wrap={false}>
+              <Button
+                icon={<Home size={15} style={{ marginLeft: 4 }} />}
+                onClick={() => navigate('/')}
+                style={{
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  borderColor: '#cbd5e1',
+                  display: 'inline-flex',
+                  alignItems: 'center'
+                }}
+              >
+                الرئيسية
+              </Button>
 
-          <div style={{ width: 1, height: 24, background: '#cbd5e1' }} />
+              <Button
+                icon={<LayoutDashboard size={15} style={{ marginLeft: 4 }} />}
+                onClick={() => navigate('/dashboard')}
+                style={{
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  background: '#0B0F17',
+                  color: '#DFCA95',
+                  borderColor: 'rgba(200, 164, 92, 0.4)',
+                  display: 'inline-flex',
+                  alignItems: 'center'
+                }}
+              >
+                لوحة الإدارة
+              </Button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Button
+                icon={<ArrowRight size={15} style={{ marginLeft: 4 }} />}
+                onClick={() => navigate('/supervisor-dashboard')}
+                style={{
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  background: '#EEF2FF',
+                  color: '#4338CA',
+                  borderColor: '#C7D2FE',
+                  display: 'inline-flex',
+                  alignItems: 'center'
+                }}
+              >
+                لوحة المشرف
+              </Button>
+            </Space>
+          )}
+
+          {!isMobile && (
+            <div style={{ width: 1, height: 24, background: '#cbd5e1' }} />
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <div
               style={{
-                width: 34,
-                height: 34,
+                width: isMobile ? 28 : 34,
+                height: isMobile ? 28 : 34,
                 borderRadius: 8,
                 background: '#f1f5f9',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#4f46e5'
+                color: '#4f46e5',
+                flexShrink: 0
               }}
             >
               {pageIcon}
             </div>
-            <div>
-              <span style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontSize: isMobile ? 13.5 : 16, fontWeight: 900, color: '#0f172a', display: 'block', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {pageTitle}
               </span>
-              <span style={{ fontSize: 11, color: '#64748b' }}>
-                {pageSubtitle}
-              </span>
+              {!isMobile && (
+                <span style={{ fontSize: 11, color: '#64748b' }}>
+                  {pageSubtitle}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Right: Operational Actions & Session Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Tag
-            color="indigo"
-            style={{
-              fontWeight: 700,
-              fontSize: 11,
-              borderRadius: 6,
-              margin: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4
-            }}
-          >
-            <Building size={12} />
-            {branchName}
-          </Tag>
-
-          <Space size="small">
-            <Button
-              type="primary"
-              icon={<ScanLine size={15} style={{ marginLeft: 6 }} />}
-              onClick={handleReturnToPos}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, flexShrink: 0 }}>
+          {!isMobile && (
+            <Tag
+              color="indigo"
               style={{
-                backgroundColor: '#059669',
-                borderColor: '#059669',
-                borderRadius: 8,
                 fontWeight: 700,
-                fontSize: 12,
-                height: 36,
+                fontSize: 11,
+                borderRadius: 6,
+                margin: 0,
                 display: 'inline-flex',
-                alignItems: 'center'
+                alignItems: 'center',
+                gap: 4
               }}
             >
-              العودة للكاشير (POS)
-            </Button>
+              <Building size={12} />
+              {branchName}
+            </Tag>
+          )}
 
+          {/* Quick Return to POS Terminal */}
+          <Button
+            type="primary"
+            icon={<ScanLine size={15} style={{ marginLeft: isMobile ? 0 : 6 }} />}
+            onClick={handleReturnToPos}
+            style={{
+              backgroundColor: '#059669',
+              borderColor: '#059669',
+              borderRadius: 8,
+              fontWeight: 700,
+              fontSize: 12,
+              height: isMobile ? 34 : 36,
+              padding: isMobile ? '0 10px' : '0 14px',
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}
+            title="العودة لنظام الكاشير (POS)"
+          >
+            {isMobile ? 'POS' : 'العودة للكاشير (POS)'}
+          </Button>
+
+          {!isMobile && (
             <Button
               danger
               icon={<Lock size={14} style={{ marginLeft: 6 }} />}
@@ -219,22 +298,51 @@ export default function SupervisorPageLayout({
               }}
               title="قفل وضع المشرف والعودة لحساب كاشير آمن"
             >
-              قفل المشرف
+              {isTablet ? 'قفل' : 'قفل المشرف'}
             </Button>
-          </Space>
+          )}
+
+          {isMobile && (
+            <Dropdown menu={mobileNavMenu} trigger={['click']}>
+              <Button
+                type="text"
+                icon={<MoreVertical size={18} />}
+                style={{
+                  width: 34,
+                  height: 34,
+                  padding: 0,
+                  borderRadius: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#F1F5F9'
+                }}
+                aria-label="خيارات إضافية"
+              />
+            </Dropdown>
+          )}
 
           <Button
             type="text"
             danger
             icon={<LogOut size={16} />}
             onClick={handleLogout}
+            style={{
+              width: 34,
+              height: 34,
+              padding: 0,
+              borderRadius: 8,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
             title="خروج"
           />
         </div>
       </header>
 
       {/* ─── Main Content ─── */}
-      <main className="swm-main-content" style={{ flex: 1, padding: '24px 28px 48px', maxWidth: 1440, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <main className="swm-main-content" style={{ flex: 1, padding: isMobile ? '12px 10px 36px' : '24px 28px 48px', maxWidth: 1440, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
         {children}
       </main>
     </div>

@@ -581,6 +581,7 @@ export default function Customers({ currentUser }) {
           dataSource={customers}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 800 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
@@ -604,7 +605,7 @@ export default function Customers({ currentUser }) {
           ) : 'كشف حساب النقاط'
         }
         placement="left"
-        width={720}
+        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 720}
         open={historyDrawerOpen}
         onClose={() => setHistoryDrawerOpen(false)}
         destroyOnHidden
@@ -647,6 +648,7 @@ export default function Customers({ currentUser }) {
               dataSource={historyTransactions}
               rowKey="id"
               loading={loadingHistory}
+              scroll={{ x: 600 }}
               pagination={{ pageSize: 15 }}
               locale={{ emptyText: 'لا توجد حركات نقاط مسجلة لهذا العميل' }}
             />

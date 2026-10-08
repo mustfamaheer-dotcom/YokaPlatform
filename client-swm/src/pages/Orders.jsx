@@ -1112,6 +1112,7 @@ export default function Orders({
                   dataSource={orders}
                   rowKey="id"
                   loading={loadingOrders}
+                  scroll={{ x: 1000 }}
                   pagination={{ pageSize: 15 }}
                   bordered
                 />
@@ -1152,6 +1153,7 @@ export default function Orders({
                   dataSource={shippingRates}
                   rowKey="id"
                   loading={loadingRates}
+                  scroll={{ x: 750 }}
                   pagination={{ pageSize: 30 }}
                   bordered
                 />
@@ -1192,6 +1194,7 @@ export default function Orders({
                   dataSource={shippingCarriers}
                   rowKey="id"
                   loading={loadingCarriers}
+                  scroll={{ x: 750 }}
                   pagination={{ pageSize: 15 }}
                   bordered
                 />
@@ -1232,6 +1235,7 @@ export default function Orders({
                   dataSource={paymentMethods}
                   rowKey="id"
                   loading={loadingPayments}
+                  scroll={{ x: 700 }}
                   pagination={{ pageSize: 15 }}
                   bordered
                 />
@@ -1270,8 +1274,8 @@ export default function Orders({
       {/* ========================================================= */}
       <Modal
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '95%' }}>
-            <Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '95%', flexWrap: 'wrap', gap: 8 }}>
+            <Space wrap>
               <Text strong style={{ fontSize: 16 }}>تفاصيل الطلب: {selectedOrder?.order_number}</Text>
               {selectedOrder && getStatusTag(selectedOrder.order_status)}
             </Space>
@@ -1286,7 +1290,7 @@ export default function Orders({
           setSelectedOrder(null);
         }}
         footer={null}
-        width={750}
+        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 750}
       >
         {detailLoading ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -1868,7 +1872,7 @@ export default function Orders({
             فتح في نافذة مستقلة
           </Button>
         ]}
-        width={650}
+        width={typeof window !== 'undefined' && window.innerWidth < 650 ? '96%' : 650}
       >
         <div style={{ textAlign: 'center', background: '#0f172a', padding: 16, borderRadius: 8 }}>
           <img
@@ -1886,7 +1890,7 @@ export default function Orders({
         open={waybillModalOpen}
         onCancel={() => setWaybillModalOpen(false)}
         footer={null}
-        width={880}
+        width={typeof window !== 'undefined' && window.innerWidth < 880 ? '98%' : 880}
         destroyOnHidden
       >
         <ShippingWaybillA4

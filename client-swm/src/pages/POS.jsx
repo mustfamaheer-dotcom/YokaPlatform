@@ -948,8 +948,8 @@ export default function POS({ currentUser }) {
             </Row>
 
             {/* Invoice Items Table (Item-level discount removed completely) */}
-            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <table style={{ minWidth: 620, width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontSize: 13 }}>
                 <thead style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr style={{ borderBottom: '1.5px solid #cbd5e1', color: '#334155' }}>
                     <th style={{ padding: '10px 10px', width: 36, textAlign: 'center' }}>#</th>

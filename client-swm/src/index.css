@@ -1983,15 +1983,29 @@ html, body, #root {
 /* 4. Tablet & Small Laptop (max-width: 992px) */
 @media (max-width: 992px) {
   .swm-main-content {
-    padding: 20px 20px 40px !important;
+    padding: 16px 14px 40px !important;
   }
   .swm-entries-grid {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
   }
+  .swm-top-header {
+    padding: 0 14px !important;
+    height: 60px !important;
+  }
+  .swm-hide-tablet {
+    display: none !important;
+  }
+}
+
+.swm-show-mobile {
+  display: none !important;
 }
 
 /* 5. Mobile Landscape & Tablets (max-width: 768px) */
 @media (max-width: 768px) {
+  .swm-show-mobile {
+    display: flex !important;
+  }
   /* ── Mobile Top Header Alignment ── */
   .swm-top-header {
     padding: 0 10px !important;
@@ -2874,5 +2888,20 @@ button:has(svg.lucide-printer) svg,
   border-color: #0B0F17 !important;
   box-shadow: 0 4px 14px rgba(11, 15, 23, 0.2) !important;
 }
+
+/* ================================================= */
+/* Responsive Mobile Navigation Bar Strip            */
+/* ================================================= */
+.swm-mobile-nav-bar::-webkit-scrollbar {
+  display: none;
+  height: 0px;
+  width: 0px;
+}
+
+.swm-mobile-nav-bar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 
 
