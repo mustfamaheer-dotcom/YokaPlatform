@@ -305,6 +305,12 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             title: 'الرسوم البيانية، مقارنة الفروع، وتقييم أداء البائعين',
             subtitle: 'تحليلات المبيعات والإيرادات المركزية وتقييم الأداء',
             icon: <BarChart3 size={20} color="#0284c7" />
+          },
+          {
+            id: 'customers',
+            title: 'سجل العملاء ونقاط الولاء (Customers & Loyalty)',
+            subtitle: 'دليل العملاء، تصفية المبيعات والنقاط حسب الفرع، وتصدير شيت إكسيل',
+            icon: <Award size={20} color="#0284c7" />
           }
         ]
       }

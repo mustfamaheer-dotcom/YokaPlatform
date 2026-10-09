@@ -110,7 +110,9 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
   const validTabs = useMemo(() => new Set([
     'home', 'groups_items', 'stock_audit', 'purchases', 'suppliers',
     'inventory_counts', 'stock_adjustments', 'transfers', 'alerts',
-    'analytics', 'system_backup', 'permissions'
+    'analytics', 'system_backup', 'permissions',
+    'payroll_expenses', 'payroll', 'branches', 'users',
+    'cat_payroll', 'cat_system', 'cat_inventory', 'cat_purchases'
   ]), []);
 
   // Extract route after /warehouse-manager or /swm-admin/warehouse-manager safely
@@ -121,17 +123,36 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
 
   const activeTab = useMemo(() => {
     if (pathParts.length === 0) return 'home';
-    const first = pathParts[0];
+    let first = pathParts[0];
+    // Normalize aliases to primary tab ids
+    if (first === 'payroll' || first === 'cat_payroll') first = 'payroll_expenses';
+    if (first === 'cat_system') first = 'branches';
+    if (first === 'cat_inventory') first = 'groups_items';
+    if (first === 'cat_purchases') first = 'purchases';
+
     if (!validTabs.has(first)) return 'home';
     return first;
   }, [pathParts, validTabs]);
 
   const handleNavigate = (tab, extra = null) => {
     setTabExtra(extra);
-    if (!tab || tab === 'home') {
+    let target = tab;
+    if (target === 'payroll' || target === 'cat_payroll') target = 'payroll_expenses';
+    if (target === 'cat_system') target = 'branches';
+    if (target === 'cat_inventory') target = 'groups_items';
+    if (target === 'cat_purchases') target = 'purchases';
+
+    if (!target || target === 'home') {
       navigate('/warehouse-manager');
     } else {
-      navigate(`/warehouse-manager/${tab}`);
+      navigate(`/warehouse-manager/${target}`);
+    }
+  };
+
+  const handleNavigateToCategory = (catId) => {
+    const cat = categories.find((c) => c.id === catId);
+    if (cat && cat.children.length > 0) {
+      handleNavigate(cat.children[0].id);
     }
   };
 
@@ -292,15 +313,25 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
           zIndex: 100,
           boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
           height: isMobile ? 56 : isTablet ? 60 : 64,
-          padding: isMobile ? '0 10px' : isTablet ? '0 14px' : '0 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          padding: 0,
           transition: 'all 0.2s ease'
         }}
       >
-        {/* Right Section: Brand & Navigation Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, minWidth: 0 }}>
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 1600,
+            margin: '0 auto',
+            height: '100%',
+            padding: isMobile ? '0 10px' : isTablet ? '0 14px' : '0 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxSizing: 'border-box'
+          }}
+        >
+          {/* Right Section: Brand & Navigation Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, minWidth: 0 }}>
           <div
             onClick={() => handleNavigate('home')}
             style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}
@@ -365,6 +396,24 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
           {isMobile ? (
             /* Mobile Quick Action Buttons */
             <>
+              <Button
+                type="default"
+                icon={<Menu size={15} style={{ marginLeft: 4 }} />}
+                onClick={() => setMobileDrawerOpen(true)}
+                style={{
+                  height: 32,
+                  padding: '0 8px',
+                  borderRadius: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: 12
+                }}
+              >
+                الأقسام
+              </Button>
+
               <Avatar
                 size={32}
                 style={{ backgroundColor: '#7e22ce', border: '1px solid #6b21a8' }}
@@ -419,6 +468,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
               </Button>
             </>
           )}
+        </div>
         </div>
       </Header>
 
@@ -578,8 +628,8 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
 
       {/* MAIN CONTENT AREA */}
       <Content style={{ width: '100%', maxWidth: 1600, margin: '0 auto', boxSizing: 'border-box', padding: isMobile ? '10px 8px 36px' : '16px' }}>
-        {/* Breadcrumb Trail when not on home */}
-        {activeTab !== 'home' && activeMeta && (
+        {/* Breadcrumb Trail when not on home (Fully Clickable & Interactive) */}
+        {activeTab !== 'home' && (
           <div
             className="swm-breadcrumb-bar"
             style={{
@@ -596,30 +646,138 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 8, flexWrap: 'wrap', minWidth: 0 }}>
+              {/* 1. Clickable Home Link */}
               <Button
                 type="link"
                 size="small"
-                icon={<Home size={13} style={{ marginLeft: 3 }} />}
                 onClick={() => handleNavigate('home')}
-                style={{ padding: 0, fontWeight: 700, color: '#7e22ce', fontSize: isMobile ? 12 : 13, display: 'inline-flex', alignItems: 'center' }}
+                style={{
+                  padding: '2px 8px',
+                  fontWeight: 800,
+                  color: '#7e22ce',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  borderRadius: 6,
+                  backgroundColor: 'rgba(126, 34, 206, 0.08)',
+                  border: '1px solid rgba(126, 34, 206, 0.25)',
+                  height: 28,
+                  fontSize: isMobile ? 11.5 : 12.5,
+                  cursor: 'pointer'
+                }}
+                title="الرجوع للوحة الأقسام الرئيسية"
               >
-                الرئيسية
+                <Home size={14} color="#7e22ce" />
+                <span>الرئيسية</span>
               </Button>
-              <ChevronLeft size={14} color="#94a3b8" />
-              <Text type="secondary" style={{ fontSize: isMobile ? 11.5 : 12.5, maxWidth: isMobile ? 110 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeMeta.category.title}
-              </Text>
-              <ChevronLeft size={14} color="#94a3b8" />
-              <Text strong style={{ fontSize: isMobile ? 12 : 13, color: '#0f172a', maxWidth: isMobile ? 130 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeMeta.item.title}
-              </Text>
+
+              {activeMeta && (
+                <>
+                  <ChevronLeft size={14} color="#94a3b8" />
+
+                  {/* 2. Interactive Category Dropdown & Direct Jump (Middle of tree now fully interactive) */}
+                  <Dropdown
+                    menu={{
+                      items: activeMeta.category.children.map((child) => ({
+                        key: child.id,
+                        label: (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                            {child.icon}
+                            <span
+                              style={{
+                                fontWeight: child.id === activeTab ? 700 : 500,
+                                color: child.id === activeTab ? '#7e22ce' : '#0F172A'
+                              }}
+                            >
+                              {child.title}
+                            </span>
+                            {child.id === activeTab && (
+                              <Tag color="purple" style={{ fontSize: 10, margin: '0 4px' }}>
+                                الحالي
+                              </Tag>
+                            )}
+                          </div>
+                        ),
+                        onClick: () => {
+                          if (child.isExternalRoute) {
+                            navigate(child.isExternalRoute);
+                          } else {
+                            handleNavigate(child.id);
+                          }
+                        }
+                      }))
+                    }}
+                    trigger={['hover', 'click']}
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => handleNavigateToCategory(activeMeta.category.id)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: isMobile ? 11.5 : 12.5,
+                        fontWeight: 700,
+                        color: '#334155',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        borderRadius: 6,
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #CBD5E1',
+                        height: 28,
+                        cursor: 'pointer'
+                      }}
+                      title="انقر للانتقال للقسم في الرئيسية، أو اختر صفحة أخرى من القائمة المنسدلة"
+                    >
+                      <span style={{ maxWidth: isMobile ? 120 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {activeMeta.category.title}
+                      </span>
+                      <ChevronDown size={12} color="#64748B" />
+                    </Button>
+                  </Dropdown>
+
+                  <ChevronLeft size={14} color="#94a3b8" />
+
+                  {/* 3. Active Current Page Tag / Button */}
+                  <Tag
+                    color="purple"
+                    style={{
+                      fontSize: isMobile ? 11 : 12.5,
+                      fontWeight: 800,
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      margin: 0,
+                      border: '1px solid #E9D5FF',
+                      backgroundColor: '#FAF5FF',
+                      color: '#7E22CE',
+                      maxWidth: isMobile ? 140 : 'none',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onClick={() => handleNavigate(activeTab)}
+                    title="الصفحة الحالية — انقر لإعادة التحميل"
+                  >
+                    <span>{activeMeta.item.title}</span>
+                  </Tag>
+                </>
+              )}
             </div>
 
             <Button
               size="small"
               icon={<ArrowRight size={14} style={{ marginLeft: 4 }} />}
               onClick={() => handleNavigate('home')}
-              style={{ borderRadius: 6, fontWeight: 600, fontSize: isMobile ? 11.5 : 12, marginRight: isMobile ? 'auto' : 0 }}
+              style={{
+                borderRadius: 6,
+                fontWeight: 600,
+                fontSize: isMobile ? 11.5 : 12,
+                marginRight: isMobile ? 'auto' : 0
+              }}
             >
               العودة للرئيسية
             </Button>
@@ -686,13 +844,17 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
                   >
                     {/* Category Title Header */}
                     <div
+                      onClick={() => handleNavigateToCategory(cat.id)}
+                      title={`انتقال إلى ${cat.title}`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         paddingBottom: 14,
                         borderBottom: '1px solid #F1F5F9',
-                        marginBottom: 16
+                        marginBottom: 16,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
                       }}
                     >
                       <Space align="center" size={10}>
@@ -718,19 +880,22 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
                           {cat.title}
                         </Text>
                       </Space>
-                      <Tag
-                        style={{
-                          borderRadius: 8,
-                          fontWeight: 700,
-                          fontSize: 12,
-                          color: '#C8A45C',
-                          backgroundColor: 'rgba(200, 164, 92, 0.08)',
-                          border: '1px solid rgba(200, 164, 92, 0.35)',
-                          padding: '2px 8px'
-                        }}
-                      >
-                        {cat.children.length} أقسام
-                      </Tag>
+                      <Space size={6}>
+                        <Tag
+                          style={{
+                            borderRadius: 8,
+                            fontWeight: 700,
+                            fontSize: 12,
+                            color: '#C8A45C',
+                            backgroundColor: 'rgba(200, 164, 92, 0.08)',
+                            border: '1px solid rgba(200, 164, 92, 0.35)',
+                            padding: '2px 8px'
+                          }}
+                        >
+                          {cat.children.length} أقسام
+                        </Tag>
+                        <ChevronLeft size={16} color="#94A3B8" />
+                      </Space>
                     </div>
 
                     {/* Sub-Items List with Elevated Dark BG & Gold Text Hover */}

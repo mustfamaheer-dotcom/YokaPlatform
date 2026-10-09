@@ -59,49 +59,92 @@ const handleSalesDashboard = async (req, res) => {
       endD = `${now.toISOString().slice(0, 10)} 23:59:59`;
     }
 
-    // Branch condition
-    let branchCondition = '';
-    let expenseBranchCondition = '';
-    if (branchFilter === 'retail') {
-      branchCondition = `AND si.branch_id IN (SELECT id FROM branches WHERE branch_type = 'retail_branch')`;
-      expenseBranchCondition = `AND e.branch_id IN (SELECT id FROM branches WHERE branch_type = 'retail_branch')`;
-    } else if (branchFilter && branchFilter !== 'all') {
+    // Branch condition & E-Commerce warehouse detection
+    let isAllBranches = (branchFilter === 'all' || !branchFilter);
+    let isRetailOnly = (branchFilter === 'retail');
+    let isEcomBranch = false;
+    let targetBranch = null;
+
+    if (!isAllBranches && !isRetailOnly) {
       const bId = parseInt(branchFilter, 10);
       if (!isNaN(bId)) {
-        branchCondition = `AND si.branch_id = ${bId}`;
-        expenseBranchCondition = `AND e.branch_id = ${bId}`;
+        const bRows = await query('SELECT id, branch_name, branch_type, branch_code FROM branches WHERE id = $1', [bId]);
+        if (bRows.length > 0) {
+          targetBranch = bRows[0];
+          if (targetBranch.branch_type === 'ecom_warehouse' || targetBranch.branch_code === 'BR-ECOM' || targetBranch.id === 2) {
+            isEcomBranch = true;
+          }
+        }
+      } else if (branchFilter === 'ecom' || branchFilter === 'ecs') {
+        isEcomBranch = true;
       }
     }
 
-    // 1. Fetch Sales Invoices (Completed)
-    const salesInvoices = await query(
-      `SELECT si.id, si.invoice_number, si.branch_id, b.branch_name, si.salesperson_id,
-              u.full_name AS salesperson_name, si.customer_name, si.customer_phone,
-              si.final_amount, si.discount_amount, si.payment_breakdown, si.invoice_date
-       FROM swm_sales_invoices si
-       LEFT JOIN branches b ON b.id = si.branch_id
-       LEFT JOIN users u ON u.id = si.salesperson_id
-       WHERE si.status = 'completed'
-         AND si.invoice_date >= $1 AND si.invoice_date <= $2
-         ${branchCondition}
-       ORDER BY si.invoice_date DESC`,
-      [startD, endD]
-    );
+    let branchCondition = '';
+    let expenseBranchCondition = '';
+    if (isRetailOnly) {
+      branchCondition = `AND si.branch_id IN (SELECT id FROM branches WHERE branch_type = 'retail_branch')`;
+      expenseBranchCondition = `AND e.branch_id IN (SELECT id FROM branches WHERE branch_type = 'retail_branch')`;
+    } else if (!isAllBranches && !isEcomBranch) {
+      const bId = targetBranch ? targetBranch.id : parseInt(branchFilter, 10);
+      branchCondition = `AND si.branch_id = ${bId}`;
+      expenseBranchCondition = `AND e.branch_id = ${bId}`;
+    } else if (isEcomBranch) {
+      const bId = targetBranch ? targetBranch.id : 2;
+      expenseBranchCondition = `AND e.branch_id = ${bId}`;
+    }
 
-    // 2. Fetch Sales Returns (Returned)
-    const returnInvoices = await query(
-      `SELECT si.id, si.invoice_number, si.branch_id, b.branch_name, si.salesperson_id,
-              u.full_name AS salesperson_name, si.customer_name, si.customer_phone,
-              si.final_amount, si.payment_breakdown, si.invoice_date
-       FROM swm_sales_invoices si
-       LEFT JOIN branches b ON b.id = si.branch_id
-       LEFT JOIN users u ON u.id = si.salesperson_id
-       WHERE si.status = 'returned'
-         AND si.invoice_date >= $1 AND si.invoice_date <= $2
-         ${branchCondition}
-       ORDER BY si.invoice_date DESC`,
-      [startD, endD]
-    );
+    // 1. Fetch POS Sales Invoices (Completed) - Skip if pure ecom branch
+    let salesInvoices = [];
+    if (!isEcomBranch) {
+      salesInvoices = await query(
+        `SELECT si.id, si.invoice_number, si.branch_id, b.branch_name, si.salesperson_id,
+                u.full_name AS salesperson_name, si.customer_name, si.customer_phone,
+                si.final_amount, si.discount_amount, si.payment_breakdown, si.invoice_date
+         FROM swm_sales_invoices si
+         LEFT JOIN branches b ON b.id = si.branch_id
+         LEFT JOIN users u ON u.id = si.salesperson_id
+         WHERE si.status = 'completed'
+           AND si.invoice_date >= $1 AND si.invoice_date <= $2
+           ${branchCondition}
+         ORDER BY si.invoice_date DESC`,
+        [startD, endD]
+      );
+    }
+
+    // 1b. Fetch ECP Online Store Orders (Completed/Active) for ecom warehouse or all branches
+    let ecpOrders = [];
+    if (isAllBranches || isEcomBranch) {
+      ecpOrders = await query(
+        `SELECT o.id, o.order_number, o.total_amount, o.subtotal, o.shipping_cost,
+                o.discount_amount, o.order_status, o.payment_status, o.payment_method,
+                o.shipping_address, o.created_at, o.delivered_at, o.fulfilling_branch_id,
+                o.guest_email, o.customer_id
+         FROM ecp_orders o
+         WHERE o.order_status NOT IN ('cancelled')
+           AND o.created_at >= $1 AND o.created_at <= $2
+         ORDER BY o.created_at DESC`,
+        [startD, endD]
+      );
+    }
+
+    // 2. Fetch Sales Returns (Returned) - POS
+    let returnInvoices = [];
+    if (!isEcomBranch) {
+      returnInvoices = await query(
+        `SELECT si.id, si.invoice_number, si.branch_id, b.branch_name, si.salesperson_id,
+                u.full_name AS salesperson_name, si.customer_name, si.customer_phone,
+                si.final_amount, si.payment_breakdown, si.invoice_date
+         FROM swm_sales_invoices si
+         LEFT JOIN branches b ON b.id = si.branch_id
+         LEFT JOIN users u ON u.id = si.salesperson_id
+         WHERE si.status = 'returned'
+           AND si.invoice_date >= $1 AND si.invoice_date <= $2
+           ${branchCondition}
+         ORDER BY si.invoice_date DESC`,
+        [startD, endD]
+      );
+    }
 
     // 3. Fetch Operational Expenses for Period
     const expensesList = await query(
@@ -118,71 +161,202 @@ const handleSalesDashboard = async (req, res) => {
     );
 
     // 4. Fetch Cost of Goods Sold (COGS)
-    const cogsRow = await query(
-      `SELECT COALESCE(SUM(sii.quantity * COALESCE(sii.cost_at_sale, p.cost_price, 0)), 0) AS total_cogs
-       FROM swm_sales_invoice_items sii
-       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
-       LEFT JOIN products p ON p.id = sii.product_id
-       WHERE si.status = 'completed'
-         AND si.invoice_date >= $1 AND si.invoice_date <= $2
-         ${branchCondition}`,
-      [startD, endD]
-    );
-    const totalCogs = parseFloat(cogsRow[0]?.total_cogs || 0);
+    let totalCogs = 0;
+    if (!isEcomBranch) {
+      const cogsRow = await query(
+        `SELECT COALESCE(SUM(sii.quantity * COALESCE(sii.cost_at_sale, p.cost_price, 0)), 0) AS total_cogs
+         FROM swm_sales_invoice_items sii
+         JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+         LEFT JOIN products p ON p.id = sii.product_id
+         WHERE si.status = 'completed'
+           AND si.invoice_date >= $1 AND si.invoice_date <= $2
+           ${branchCondition}`,
+        [startD, endD]
+      );
+      totalCogs += parseFloat(cogsRow[0]?.total_cogs || 0);
+    }
+
+    if (isAllBranches || isEcomBranch) {
+      const ecpCogsRow = await query(
+        `SELECT COALESCE(SUM(oi.quantity * COALESCE(oi.unit_cost, p.cost_price, 0)), 0) AS total_cogs
+         FROM ecp_order_items oi
+         JOIN ecp_orders o ON o.id = oi.order_id
+         LEFT JOIN products p ON p.id = oi.product_id
+         WHERE o.order_status NOT IN ('cancelled')
+           AND o.created_at >= $1 AND o.created_at <= $2`,
+        [startD, endD]
+      );
+      totalCogs += parseFloat(ecpCogsRow[0]?.total_cogs || 0);
+    }
 
     // 5. Fetch Detailed Returned Items Breakdown
-    const returnItems = await query(
-      `SELECT sii.id, sii.invoice_id, si.invoice_number, si.invoice_date,
-              sii.product_id, sii.product_name, sii.product_code,
-              sii.quantity, sii.unit_price, sii.line_total,
-              u.full_name AS salesperson_name,
-              si.customer_name, si.customer_phone
-       FROM swm_sales_invoice_items sii
-       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
-       LEFT JOIN users u ON u.id = si.salesperson_id
-       WHERE si.status = 'returned'
-         AND si.invoice_date >= $1 AND si.invoice_date <= $2
-         ${branchCondition}
-       ORDER BY si.invoice_date DESC, sii.id DESC`,
-      [startD, endD]
-    );
+    let returnItems = [];
+    if (!isEcomBranch) {
+      returnItems = await query(
+        `SELECT sii.id, sii.invoice_id, si.invoice_number, si.invoice_date,
+                sii.product_id, sii.product_name, sii.product_code,
+                sii.quantity, sii.unit_price, sii.line_total,
+                u.full_name AS salesperson_name,
+                si.customer_name, si.customer_phone
+         FROM swm_sales_invoice_items sii
+         JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+         LEFT JOIN users u ON u.id = si.salesperson_id
+         WHERE si.status = 'returned'
+           AND si.invoice_date >= $1 AND si.invoice_date <= $2
+           ${branchCondition}
+         ORDER BY si.invoice_date DESC, sii.id DESC`,
+        [startD, endD]
+      );
+    }
 
     // 6. Fetch Top Products & Top Categories for Period
-    const topProducts = await query(
-      `SELECT sii.product_name,
-              MAX(sii.product_code) AS product_code,
-              COALESCE(c.category_name, 'عام') AS category_name,
-              SUM(sii.quantity)::int AS units_sold,
-              SUM(sii.line_total)::numeric(12,2) AS total_revenue
-       FROM swm_sales_invoice_items sii
-       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
-       LEFT JOIN products p ON p.id = sii.product_id
-       LEFT JOIN product_categories c ON c.id = p.category_id
-       WHERE si.status = 'completed'
-         AND si.invoice_date >= $1 AND si.invoice_date <= $2
-         ${branchCondition}
-       GROUP BY sii.product_name, c.category_name
-       ORDER BY total_revenue DESC, units_sold DESC
-       LIMIT 10`,
-      [startD, endD]
-    );
+    let topProducts = [];
+    if (isEcomBranch) {
+      topProducts = await query(
+        `SELECT oi.product_name,
+                MAX(COALESCE(oi.product_sku, p.product_code, '')) AS product_code,
+                COALESCE(c.category_name, 'عام') AS category_name,
+                SUM(oi.quantity)::int AS units_sold,
+                SUM(oi.line_total)::numeric(12,2) AS total_revenue
+         FROM ecp_order_items oi
+         JOIN ecp_orders o ON o.id = oi.order_id
+         LEFT JOIN products p ON p.id = oi.product_id
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         WHERE o.order_status NOT IN ('cancelled')
+           AND o.created_at >= $1 AND o.created_at <= $2
+         GROUP BY oi.product_name, c.category_name
+         ORDER BY total_revenue DESC, units_sold DESC
+         LIMIT 10`,
+        [startD, endD]
+      );
+    } else if (isAllBranches) {
+      topProducts = await query(
+        `WITH combined_items AS (
+           SELECT sii.product_name,
+                  sii.product_code,
+                  sii.product_id,
+                  sii.quantity,
+                  sii.line_total
+           FROM swm_sales_invoice_items sii
+           JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+           WHERE si.status = 'completed'
+             AND si.invoice_date >= $1 AND si.invoice_date <= $2
 
-    const topCategories = await query(
-      `SELECT COALESCE(c.category_name, 'عام') AS category_name,
-              SUM(sii.quantity)::int AS units_sold,
-              SUM(sii.line_total)::numeric(12,2) AS total_revenue
-       FROM swm_sales_invoice_items sii
-       JOIN swm_sales_invoices si ON si.id = sii.invoice_id
-       LEFT JOIN products p ON p.id = sii.product_id
-       LEFT JOIN product_categories c ON c.id = p.category_id
-       WHERE si.status = 'completed'
-         AND si.invoice_date >= $1 AND si.invoice_date <= $2
-         ${branchCondition}
-       GROUP BY c.category_name
-       ORDER BY total_revenue DESC
-       LIMIT 8`,
-      [startD, endD]
-    );
+           UNION ALL
+
+           SELECT oi.product_name,
+                  COALESCE(oi.product_sku, p.product_code, '') AS product_code,
+                  oi.product_id,
+                  oi.quantity,
+                  oi.line_total
+           FROM ecp_order_items oi
+           JOIN ecp_orders o ON o.id = oi.order_id
+           LEFT JOIN products p ON p.id = oi.product_id
+           WHERE o.order_status NOT IN ('cancelled')
+             AND o.created_at >= $1 AND o.created_at <= $2
+         )
+         SELECT ci.product_name,
+                MAX(ci.product_code) AS product_code,
+                COALESCE(c.category_name, 'عام') AS category_name,
+                SUM(ci.quantity)::int AS units_sold,
+                SUM(ci.line_total)::numeric(12,2) AS total_revenue
+         FROM combined_items ci
+         LEFT JOIN products p ON p.id = ci.product_id
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         GROUP BY ci.product_name, c.category_name
+         ORDER BY total_revenue DESC, units_sold DESC
+         LIMIT 10`,
+        [startD, endD]
+      );
+    } else {
+      topProducts = await query(
+        `SELECT sii.product_name,
+                MAX(sii.product_code) AS product_code,
+                COALESCE(c.category_name, 'عام') AS category_name,
+                SUM(sii.quantity)::int AS units_sold,
+                SUM(sii.line_total)::numeric(12,2) AS total_revenue
+         FROM swm_sales_invoice_items sii
+         JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+         LEFT JOIN products p ON p.id = sii.product_id
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         WHERE si.status = 'completed'
+           AND si.invoice_date >= $1 AND si.invoice_date <= $2
+           ${branchCondition}
+         GROUP BY sii.product_name, c.category_name
+         ORDER BY total_revenue DESC, units_sold DESC
+         LIMIT 10`,
+        [startD, endD]
+      );
+    }
+
+    let topCategories = [];
+    if (isEcomBranch) {
+      topCategories = await query(
+        `SELECT COALESCE(c.category_name, 'عام') AS category_name,
+                SUM(oi.quantity)::int AS units_sold,
+                SUM(oi.line_total)::numeric(12,2) AS total_revenue
+         FROM ecp_order_items oi
+         JOIN ecp_orders o ON o.id = oi.order_id
+         LEFT JOIN products p ON p.id = oi.product_id
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         WHERE o.order_status NOT IN ('cancelled')
+           AND o.created_at >= $1 AND o.created_at <= $2
+         GROUP BY c.category_name
+         ORDER BY total_revenue DESC
+         LIMIT 8`,
+        [startD, endD]
+      );
+    } else if (isAllBranches) {
+      topCategories = await query(
+        `WITH combined_items AS (
+           SELECT sii.product_id,
+                  sii.quantity,
+                  sii.line_total
+           FROM swm_sales_invoice_items sii
+           JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+           WHERE si.status = 'completed'
+             AND si.invoice_date >= $1 AND si.invoice_date <= $2
+
+           UNION ALL
+
+           SELECT oi.product_id,
+                  oi.quantity,
+                  oi.line_total
+           FROM ecp_order_items oi
+           JOIN ecp_orders o ON o.id = oi.order_id
+           LEFT JOIN products p ON p.id = oi.product_id
+           WHERE o.order_status NOT IN ('cancelled')
+             AND o.created_at >= $1 AND o.created_at <= $2
+         )
+         SELECT COALESCE(c.category_name, 'عام') AS category_name,
+                SUM(ci.quantity)::int AS units_sold,
+                SUM(ci.line_total)::numeric(12,2) AS total_revenue
+         FROM combined_items ci
+         LEFT JOIN products p ON p.id = ci.product_id
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         GROUP BY c.category_name
+         ORDER BY total_revenue DESC
+         LIMIT 8`,
+        [startD, endD]
+      );
+    } else {
+      topCategories = await query(
+        `SELECT COALESCE(c.category_name, 'عام') AS category_name,
+                SUM(sii.quantity)::int AS units_sold,
+                SUM(sii.line_total)::numeric(12,2) AS total_revenue
+         FROM swm_sales_invoice_items sii
+         JOIN swm_sales_invoices si ON si.id = sii.invoice_id
+         LEFT JOIN products p ON p.id = sii.product_id
+         LEFT JOIN product_categories c ON c.id = p.category_id
+         WHERE si.status = 'completed'
+           AND si.invoice_date >= $1 AND si.invoice_date <= $2
+           ${branchCondition}
+         GROUP BY c.category_name
+         ORDER BY total_revenue DESC
+         LIMIT 8`,
+        [startD, endD]
+      );
+    }
 
     // Helper to parse payment breakdown
     const parseBreakdown = (breakdownRaw, finalAmt) => {
@@ -277,6 +451,83 @@ const handleSalesDashboard = async (req, res) => {
       }
     }
 
+    // Process E-Commerce Orders
+    let ecomGrossSales = 0;
+    let ecomCount = 0;
+    for (const ord of ecpOrders) {
+      const amt = parseFloat(ord.total_amount || 0);
+      grossSales += amt;
+      ecomGrossSales += amt;
+      ecomCount += 1;
+
+      // Map payment methods
+      const pm = String(ord.payment_method || '').toLowerCase();
+      if (pm === 'cod' || pm.includes('cash')) {
+        salesCash += amt;
+      } else if (pm === 'card' || pm.includes('visa') || pm.includes('credit')) {
+        salesVisa += amt;
+      } else {
+        salesTransfer += amt;
+      }
+
+      // Group by day for trends
+      const dayKey = new Date(ord.created_at).toISOString().slice(0, 10);
+      if (!trendsMap[dayKey]) {
+        trendsMap[dayKey] = { date: dayKey, gross_sales: 0, returns: 0, net_sales: 0, sales_count: 0 };
+      }
+      trendsMap[dayKey].gross_sales += amt;
+      trendsMap[dayKey].net_sales += amt;
+      trendsMap[dayKey].sales_count += 1;
+
+      // Group by customer
+      let addr = ord.shipping_address;
+      if (typeof addr === 'string') {
+        try { addr = JSON.parse(addr); } catch (e) { addr = {}; }
+      }
+      addr = addr || {};
+      const cName = addr.recipient_name || ord.guest_email || 'عميل المتجر الإلكتروني';
+      const cPhone = addr.phone || addr.secondary_phone || '-';
+      const cKey = (cPhone && cPhone !== '-') ? cPhone : (ord.guest_email || `order-${ord.id}`);
+
+      if (!customerMap[cKey]) {
+        customerMap[cKey] = {
+          name: cName,
+          phone: cPhone,
+          invoices_count: 0,
+          total_spent: 0
+        };
+      }
+      customerMap[cKey].invoices_count += 1;
+      customerMap[cKey].total_spent += amt;
+    }
+
+    // If ecom sales exist, register ecom warehouse in branch comparison & team ranking
+    if (ecomCount > 0) {
+      const ecomBranchId = 2;
+      const ecomBranchName = 'مستودع المتجر الإلكتروني';
+      if (!branchMap[ecomBranchId]) {
+        branchMap[ecomBranchId] = {
+          branch_id: ecomBranchId,
+          branch_name: ecomBranchName,
+          gross_sales: ecomGrossSales,
+          returns: 0,
+          net_revenue: ecomGrossSales,
+          sales_count: ecomCount
+        };
+      } else {
+        branchMap[ecomBranchId].gross_sales += ecomGrossSales;
+        branchMap[ecomBranchId].net_revenue += ecomGrossSales;
+        branchMap[ecomBranchId].sales_count += ecomCount;
+      }
+
+      sellerMap['ecom_team'] = {
+        salesperson_id: 'ecom_team',
+        salesperson_name: 'فريق المتجر الإلكتروني (Online Store)',
+        invoices_count: ecomCount,
+        total_sales: ecomGrossSales
+      };
+    }
+
     let grossReturns = 0;
     let returnCash = 0;
     let returnVisa = 0;
@@ -319,7 +570,7 @@ const handleSalesDashboard = async (req, res) => {
     const netExpenses = Math.max(0, totalExpenseOut - totalExpenseRefunded);
 
     // Sales Metrics
-    const salesCount = salesInvoices.length;
+    const salesCount = salesInvoices.length + ecpOrders.length;
     const returnsCount = returnInvoices.length;
     const aov = salesCount > 0 ? (grossSales / salesCount) : 0;
     const netSales = Math.max(0, grossSales - grossReturns);

@@ -8,8 +8,8 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
 router.use((req, res, next) => {
-  // Allow catalog and barcode search for warehouse managers (used in purchases and receiving)
-  if (req.path === '/search') {
+  // Allow catalog, barcode search, and expense categories for warehouse managers (used in purchases, receiving, and payroll/expenses)
+  if (req.path === '/search' || req.path === '/expense-categories') {
     return next();
   }
   if (!req.user && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
@@ -1571,7 +1571,7 @@ router.get('/expense-categories', requireAuth, async (req, res) => {
  * POST /api/swm/pos/expense-categories
  * Add an expense category across all branches
  */
-router.post('/expense-categories', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.post('/expense-categories', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const { category } = req.body;
     if (!category || !category.trim()) {
@@ -1623,7 +1623,7 @@ router.post('/expense-categories', requireAuth, requireRole(['super_admin', 'adm
  * DELETE /api/swm/pos/expense-categories
  * Remove an expense category across all branches
  */
-router.delete('/expense-categories', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+router.delete('/expense-categories', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
   try {
     const { category } = req.body;
     if (!category) return res.status(400).json({ success: false, message: 'يرجى تحديد التصنيف المراد حذفه' });

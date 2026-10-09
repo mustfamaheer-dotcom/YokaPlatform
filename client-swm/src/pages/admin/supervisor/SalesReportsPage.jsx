@@ -129,6 +129,7 @@ export default function SalesReportsPage({ currentUser: propCurrentUser, isAdmin
   const [salesData, setSalesData] = useState(null);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'returns' | 'expenses'
   const [topProductView, setTopProductView] = useState('chart');
+  const [topProductMetric, setTopProductMetric] = useState('revenue'); // 'revenue' | 'quantity'
 
   // Search filters for tables
   const [returnSearch, setReturnSearch] = useState('');
@@ -867,7 +868,13 @@ export default function SalesReportsPage({ currentUser: propCurrentUser, isAdmin
               {branchesList.map((b) => (
                 <Select.Option key={b.id} value={String(b.id)}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <MapPin size={13} /> {b.branch_name}
+                    {b.branch_type === 'ecom_warehouse' ? <Package size={13} color="#2563EB" /> : <MapPin size={13} />}
+                    <span>{b.branch_name}</span>
+                    {b.branch_type === 'ecom_warehouse' && (
+                      <span style={{ fontSize: 10, background: '#EFF6FF', color: '#1D4ED8', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                        أونلاين
+                      </span>
+                    )}
                   </span>
                 </Select.Option>
               ))}
@@ -1395,162 +1402,253 @@ export default function SalesReportsPage({ currentUser: propCurrentUser, isAdmin
               
               {/* Top Products */}
               <div className="card-luxury" style={{ padding: isMobile ? '16px 14px' : '22px 24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-                  <div>
-                    <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Package size={16} /> أعلى المنتجات مبيعاً بالفرع
-                    </h2>
-                    <p style={{ fontSize: 11.5, color: '#64748B', margin: '2px 0 0' }}>
-                      مرتبة حسب إجمالي الإيرادات المحققة والكميات المباعة
-                    </p>
-                  </div>
-                  <Space size={8}>
-                    <Segmented
-                      value={topProductView}
-                      onChange={setTopProductView}
-                      options={[
-                        { label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><BarChart3 size={13} /> رسم بياني</span>, value: 'chart' },
-                        { label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ListOrdered size={13} /> قائمة الصدارة</span>, value: 'table' }
-                      ]}
-                      size="small"
-                      style={{ background: '#F1F5F9', fontWeight: 600 }}
-                    />
-                    <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#FAF5EB', color: GOLD_DARK, border: '1px solid #EADCB9' }}>
-                      أفضل {topProducts.length} أصناف
-                    </span>
-                  </Space>
-                </div>
+                {(() => {
+                  const isCurrentBranchEcom = selectedBranch === '2' || branchesList.find(b => String(b.id) === String(selectedBranch))?.branch_type === 'ecom_warehouse';
+                  const topProductsSectionTitle = isCurrentBranchEcom
+                    ? 'أعلى المنتجات مبيعاً بالمتجر الإلكتروني'
+                    : (selectedBranch === 'all' ? 'أعلى المنتجات مبيعاً (المنظومة كاملة)' : 'أعلى المنتجات مبيعاً بالفرع');
+                  const dynamicHeight = Math.max(320, topProducts.length * 48);
+                  const activeDataKey = topProductMetric === 'revenue' ? 'total_revenue' : 'units_sold';
+                  const maxMetricVal = Math.max(...topProducts.map(p => Number(p[activeDataKey] || 0)), 1);
 
-                {topProducts.length > 0 ? (
-                  topProductView === 'chart' ? (
-                    <div dir="ltr" style={{ width: '100%', minWidth: 0 }}>
-                      <SafeChartContainer height={isMobile ? Math.max(240, topProducts.length * 44) : 280}>
-                        {({ width, height }) => (
-                          <ResponsiveContainer key={`top-bar-${isMobile ? 'm' : 'd'}`} width={width} height={height} minWidth={0}>
-                            <BarChart
-                              data={topProducts}
-                              layout="vertical"
-                              margin={isMobile ? { top: 10, right: 55, left: -10, bottom: 5 } : { top: 10, right: 110, left: 10, bottom: 5 }}
-                            >
-                              <defs>
-                                <linearGradient id="topProductGrad" x1="0" y1="0" x2="1" y2="0">
-                                  <stop offset="0%" stopColor={GOLD_PRIMARY} />
-                                  <stop offset="100%" stopColor="#DFCA95" />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                              <XAxis
-                                type="number"
-                                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                                stroke="#94A3B8"
-                                tick={{ fill: '#475569', fontSize: isMobile ? 10 : 11, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
-                              />
-                              <YAxis
-                                dataKey="product_name"
-                                type="category"
-                                orientation="left"
-                                width={isMobile ? 85 : 180}
-                                stroke="#94A3B8"
-                                tick={({ x, y, payload }) => {
-                                  const full = payload?.value || '';
-                                  const maxChars = isMobile ? 9 : 22;
-                                  const label = full.length > maxChars ? `${full.substring(0, maxChars - 1)}…` : full;
-                                  return (
-                                    <g transform={`translate(${x},${y})`}>
-                                      <text x={-6} y={4} textAnchor="end" fill="#0F172A" fontSize={isMobile ? 10.5 : 12} fontWeight={700} fontFamily="'Cairo', sans-serif">
-                                        {label}
-                                      </text>
-                                    </g>
-                                  );
-                                }}
-                              />
-                              <ChartTooltip
-                                contentStyle={{
-                                  backgroundColor: '#FFFFFF',
-                                  border: '1px solid #E2E8F0',
-                                  borderRadius: 10,
-                                  boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
-                                  fontFamily: "'Cairo', sans-serif",
-                                  direction: 'rtl',
-                                  textAlign: 'right'
-                                }}
-                                formatter={(val, name, item) => [
-                                  `${Number(val).toLocaleString()} ج.م (${item?.payload?.units_sold || 0} قطعة)`,
-                                  'الإيراد'
-                                ]}
-                              />
-                              <Bar dataKey="total_revenue" fill="url(#topProductGrad)" radius={[0, 6, 6, 0]} barSize={isMobile ? 16 : 22}>
-                                <LabelList
-                                  dataKey="total_revenue"
-                                  position="right"
-                                  content={({ x, y, width, height, value }) => {
-                                    if (value === undefined || value === null) return null;
-                                    const text = isMobile ? `${(Number(value) / 1000).toFixed(1)}k` : `${Number(value).toLocaleString()} ج.م`;
-                                    return (
-                                      <text x={(x || 0) + (width || 0) + 6} y={(y || 0) + (height || 0) / 2 + 4} fill={GOLD_DARK} fontSize={11} fontWeight={800} fontFamily="'Cairo', sans-serif">
-                                        {text}
-                                      </text>
-                                    );
-                                  }}
-                                />
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        )}
-                      </SafeChartContainer>
-                    </div>
-                  ) : (
-                    <div style={{ height: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
-                      {topProducts.map((p, idx) => {
-                        const medalColors = ['#EAB308', '#94A3B8', '#B45309'];
-                        const rankBadge = idx < 3 ? <Medal size={16} color={medalColors[idx]} /> : `#${idx + 1}`;
-                        const rev = Number(p.total_revenue || 0);
+                  return (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                        <div>
+                          <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Package size={16} color={GOLD_TEXT} /> {topProductsSectionTitle}
+                          </h2>
+                          <p style={{ fontSize: 11.5, color: '#64748B', margin: '2px 0 0' }}>
+                            {topProductMetric === 'revenue' ? 'مرتبة تصاعدياً حسب القيمة المالية المحصلة' : 'مرتبة حسب حجم الطلب وعدد القطع المباعة'}
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <Segmented
+                            value={topProductMetric}
+                            onChange={setTopProductMetric}
+                            options={[
+                              { label: 'الإيرادات (ج.م)', value: 'revenue' },
+                              { label: 'الكميات (قطعة)', value: 'quantity' }
+                            ]}
+                            size="small"
+                            style={{ background: '#FAF5EB', border: '1px solid #EADCB9', fontWeight: 700 }}
+                          />
+                          <Segmented
+                            value={topProductView}
+                            onChange={setTopProductView}
+                            options={[
+                              { label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><BarChart3 size={13} /> رسم بياني</span>, value: 'chart' },
+                              { label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><ListOrdered size={13} /> قائمة الصدارة</span>, value: 'table' }
+                            ]}
+                            size="small"
+                            style={{ background: '#F1F5F9', fontWeight: 600 }}
+                          />
+                          <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: '#FAF5EB', color: GOLD_DARK, border: '1px solid #EADCB9' }}>
+                            أفضل {topProducts.length} أصناف
+                          </span>
+                        </div>
+                      </div>
 
-                        return (
-                          <div
-                            key={p.product_code || idx}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: '#F8FAFC',
-                              border: '1px solid #E2E8F0',
-                              borderRadius: 10,
-                              padding: '10px 14px'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-                              <span style={{ fontSize: 12, fontWeight: 800, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                                {rankBadge}
-                              </span>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 800, fontSize: 12.5, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {p.product_name}
-                                </div>
-                                <div style={{ fontSize: 11, color: '#64748B', display: 'flex', gap: 6 }}>
-                                  {p.product_code && <span>كود: {p.product_code}</span>}
-                                  {p.category_name && <span>• {p.category_name}</span>}
-                                </div>
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'left', minWidth: 110 }}>
-                              <div style={{ fontWeight: 900, fontSize: 13, color: GOLD_DARK }}>
-                                {rev.toLocaleString()} ج.م
-                              </div>
-                              <span style={{ fontSize: 11, color: '#16A34A', fontWeight: 700 }}>
-                                {p.units_sold} قطعة
-                              </span>
-                            </div>
+                      {topProducts.length > 0 ? (
+                        topProductView === 'chart' ? (
+                          <div dir="ltr" style={{ width: '100%', minWidth: 0 }}>
+                            <SafeChartContainer height={dynamicHeight}>
+                              {({ width, height }) => (
+                                <ResponsiveContainer key={`top-bar-${topProductMetric}-${isMobile ? 'm' : 'd'}`} width={width} height={height} minWidth={0}>
+                                  <BarChart
+                                    data={topProducts}
+                                    layout="vertical"
+                                    margin={isMobile ? { top: 10, right: 65, left: -5, bottom: 5 } : { top: 10, right: 115, left: 10, bottom: 5 }}
+                                  >
+                                    <defs>
+                                      <linearGradient id="topProductRevenueGrad" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor={GOLD_PRIMARY} />
+                                        <stop offset="100%" stopColor="#DFCA95" />
+                                      </linearGradient>
+                                      <linearGradient id="topProductQtyGrad" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#059669" />
+                                        <stop offset="100%" stopColor="#34D399" />
+                                      </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                                    <XAxis
+                                      type="number"
+                                      tickFormatter={(v) => topProductMetric === 'revenue' ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                                      stroke="#94A3B8"
+                                      tick={{ fill: '#475569', fontSize: isMobile ? 10 : 11, fontWeight: 600, fontFamily: "'Cairo', sans-serif" }}
+                                    />
+                                    <YAxis
+                                      dataKey="product_name"
+                                      type="category"
+                                      orientation="left"
+                                      width={isMobile ? 95 : 185}
+                                      stroke="#94A3B8"
+                                      tick={({ x, y, payload }) => {
+                                        const full = payload?.value || '';
+                                        const maxChars = isMobile ? 11 : 22;
+                                        const label = full.length > maxChars ? `${full.substring(0, maxChars - 1)}…` : full;
+                                        return (
+                                          <g transform={`translate(${x},${y})`}>
+                                            <text x={-8} y={4} textAnchor="end" fill="#0F172A" fontSize={isMobile ? 10.5 : 12} fontWeight={700} fontFamily="'Cairo', sans-serif">
+                                              {label}
+                                            </text>
+                                          </g>
+                                        );
+                                      }}
+                                    />
+                                    <ChartTooltip
+                                      contentStyle={{
+                                        backgroundColor: '#FFFFFF',
+                                        border: '1px solid #E2E8F0',
+                                        borderRadius: 10,
+                                        boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                                        fontFamily: "'Cairo', sans-serif",
+                                        direction: 'rtl',
+                                        textAlign: 'right'
+                                      }}
+                                      formatter={(val, name, item) => [
+                                        topProductMetric === 'revenue'
+                                          ? `${Number(val).toLocaleString()} ج.م (${item?.payload?.units_sold || 0} قطعة)`
+                                          : `${Number(val).toLocaleString()} قطعة (${Number(item?.payload?.total_revenue || 0).toLocaleString()} ج.م)`,
+                                        topProductMetric === 'revenue' ? 'إجمالي الإيراد' : 'الكمية المباعة'
+                                      ]}
+                                    />
+                                    <Bar
+                                      dataKey={activeDataKey}
+                                      fill={topProductMetric === 'revenue' ? 'url(#topProductRevenueGrad)' : 'url(#topProductQtyGrad)'}
+                                      radius={[0, 6, 6, 0]}
+                                      barSize={isMobile ? 18 : 22}
+                                    >
+                                      <LabelList
+                                        dataKey={activeDataKey}
+                                        position="right"
+                                        content={({ x, y, width, height, value }) => {
+                                          if (value === undefined || value === null) return null;
+                                          const text = topProductMetric === 'revenue'
+                                            ? `${Number(value).toLocaleString()} ج.م`
+                                            : `${Number(value).toLocaleString()} قطعة`;
+                                          return (
+                                            <text
+                                              x={(x || 0) + (width || 0) + 6}
+                                              y={(y || 0) + (height || 0) / 2 + 4}
+                                              fill={topProductMetric === 'revenue' ? GOLD_DARK : '#047857'}
+                                              fontSize={11}
+                                              fontWeight={800}
+                                              fontFamily="'Cairo', sans-serif"
+                                            >
+                                              {text}
+                                            </text>
+                                          );
+                                        }}
+                                      />
+                                    </Bar>
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              )}
+                            </SafeChartContainer>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )
-                ) : (
-                  <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 12 }}>
-                    لا توجد مبيعات أصناف في هذا النطاق
-                  </div>
-                )}
+                        ) : (
+                          <div style={{ maxHeight: dynamicHeight, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
+                            {topProducts.map((p, idx) => {
+                              const medalColors = ['#EAB308', '#94A3B8', '#B45309'];
+                              const rankBadge = idx < 3 ? <Medal size={16} color={medalColors[idx]} /> : `#${idx + 1}`;
+                              const rev = Number(p.total_revenue || 0);
+                              const qty = Number(p.units_sold || 0);
+                              const activeVal = topProductMetric === 'revenue' ? rev : qty;
+                              const pct = Math.min(100, Math.round((activeVal / maxMetricVal) * 100));
+
+                              return (
+                                <div
+                                  key={p.product_code || idx}
+                                  style={{
+                                    background: '#FFFFFF',
+                                    border: '1px solid #E2E8F0',
+                                    borderRadius: 12,
+                                    padding: '12px 16px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 8,
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                                      <span
+                                        style={{
+                                          fontSize: 12,
+                                          fontWeight: 800,
+                                          width: 28,
+                                          height: 28,
+                                          borderRadius: 8,
+                                          background: idx === 0 ? '#FEF3C7' : (idx === 1 ? '#F1F5F9' : (idx === 2 ? '#FFEDD5' : '#F8FAFC')),
+                                          border: '1px solid #E2E8F0',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: idx < 3 ? medalColors[idx] : '#64748B',
+                                          flexShrink: 0
+                                        }}
+                                      >
+                                        {rankBadge}
+                                      </span>
+                                      <div style={{ minWidth: 0, flex: 1 }}>
+                                        <div style={{ fontWeight: 800, fontSize: 13, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {p.product_name}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: '#64748B', display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                                          {p.product_code && <span style={{ fontFamily: 'monospace', background: '#F1F5F9', padding: '1px 6px', borderRadius: 4 }}>{p.product_code}</span>}
+                                          {p.category_name && <span>قسم: {p.category_name}</span>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div style={{ textAlign: 'left', minWidth: 120, flexShrink: 0 }}>
+                                      <div style={{ fontWeight: 900, fontSize: 13.5, color: topProductMetric === 'revenue' ? GOLD_DARK : '#0F172A' }}>
+                                        {rev.toLocaleString()} ج.م
+                                      </div>
+                                      <span style={{ fontSize: 11, color: '#16A34A', fontWeight: 800, background: '#DCFCE7', padding: '1px 7px', borderRadius: 6, display: 'inline-block', marginTop: 2 }}>
+                                        {qty} قطعة مباعة
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Relative Visual Progress Bar */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                                    <div style={{ flex: 1, height: 6, background: '#F1F5F9', borderRadius: 4, overflow: 'hidden' }}>
+                                      <div
+                                        style={{
+                                          width: `${pct}%`,
+                                          height: '100%',
+                                          background: topProductMetric === 'revenue'
+                                            ? `linear-gradient(90deg, ${GOLD_PRIMARY} 0%, #DFCA95 100%)`
+                                            : `linear-gradient(90deg, #059669 0%, #34D399 100%)`,
+                                          borderRadius: 4,
+                                          transition: 'width 0.4s ease'
+                                        }}
+                                      />
+                                    </div>
+                                    <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700, width: 34, textAlign: 'left' }}>
+                                      {pct}%
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )
+                      ) : (
+                        <div style={{ padding: '48px 20px', textAlign: 'center', background: '#F8FAFC', borderRadius: 14, border: '1px dashed #CBD5E1' }}>
+                          <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#FAF5EB', border: '1px solid #EADCB9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                            <Package size={24} color={GOLD_TEXT} />
+                          </div>
+                          <div style={{ fontWeight: 800, color: '#1E293B', fontSize: 13.5 }}>لا توجد مبيعات أصناف في هذا النطاق</div>
+                          <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 4 }}>
+                            {isCurrentBranchEcom ? 'لم يتم العثور على طلبات للمتجر الإلكتروني بالفترة المحددة' : 'يرجى تجربة اختيار فترة زمنية أخرى أو التحقق من فواتير الفرع'}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Top Categories */}

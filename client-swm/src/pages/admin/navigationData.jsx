@@ -158,6 +158,13 @@ export const NAVIGATION_CATEGORIES = [
         subtitle: 'سجلات التدقيق الإداري، دفتر المصروفات، والعمليات المخزنية',
         icon: <BookOpenCheck />,
         badge: 'اليوميات'
+      },
+      {
+        id: 'customers',
+        title: 'سجل العملاء ونقاط الولاء (Customers & Loyalty)',
+        subtitle: 'دليل العملاء المركزي، كشف رصيد النقاط، الفلترة حسب الفرع، وتصدير شيت إكسيل',
+        icon: <Award />,
+        badge: 'الولاء'
       }
     ]
   },

@@ -51,24 +51,48 @@ router.get('/suggest', requireAuth, async (req, res) => {
 
 /**
  * GET /api/swm/loyalty/stats
- * Summary KPIs of the loyalty system
+ * Summary KPIs of the loyalty system (supports optional branch_id filter)
  */
 router.get('/stats', requireAuth, async (req, res) => {
   try {
+    const rawBranch = req.query.branch_id;
+    const branchId = rawBranch && rawBranch !== 'all' && !isNaN(parseInt(rawBranch, 10))
+      ? parseInt(rawBranch, 10)
+      : null;
+
+    let custWhere = '';
+    let txWhere = '';
+    const custParams = [];
+    const txParams = [];
+
+    if (branchId) {
+      custWhere = `WHERE (
+        branch_id = $1 
+        OR id IN (SELECT customer_id FROM swm_sales_invoices WHERE branch_id = $1)
+        OR id IN (SELECT customer_id FROM points_transactions WHERE branch_id = $1)
+      )`;
+      custParams.push(branchId);
+
+      txWhere = `WHERE branch_id = $1`;
+      txParams.push(branchId);
+    }
+
     const [counts] = await query(`
       SELECT 
         COUNT(id) AS total_customers,
         COALESCE(SUM(total_points), 0) AS total_points,
         COALESCE(SUM(lifetime_points), 0) AS total_lifetime_points
       FROM customers
-    `);
+      ${custWhere}
+    `, custParams);
 
     const [txSummary] = await query(`
       SELECT
         COALESCE(SUM(CASE WHEN type = 'redeem' THEN ABS(points) ELSE 0 END), 0) AS total_redeemed_points,
         COALESCE(SUM(CASE WHEN type = 'redeem' THEN monetary_value ELSE 0 END), 0) AS total_redeemed_amount
       FROM points_transactions
-    `);
+      ${txWhere}
+    `, txParams);
 
     // Fetch point value from settings
     const [settingRow] = await query(`SELECT value FROM store_settings WHERE key = 'loyalty_point_value'`);
@@ -152,7 +176,7 @@ router.get('/lookup', requireAuth, async (req, res) => {
  */
 router.post('/customers', requireAuth, async (req, res) => {
   try {
-    const { full_name, phone } = req.body;
+    const { full_name, phone, branch_id } = req.body;
 
     if (!full_name || !full_name.trim()) {
       return res.status(400).json({ success: false, message: 'اسم العميل مطلوب' });
@@ -163,6 +187,9 @@ router.post('/customers', requireAuth, async (req, res) => {
 
     const cleanName = full_name.trim();
     const cleanPhone = phone.trim();
+    const targetBranchId = branch_id && !isNaN(parseInt(branch_id, 10))
+      ? parseInt(branch_id, 10)
+      : (req.user?.branch_id || req.user?.branchId || null);
 
     // Check existing phone
     const existing = await query(`SELECT * FROM customers WHERE phone = $1 LIMIT 1`, [cleanPhone]);
@@ -177,22 +204,23 @@ router.post('/customers', requireAuth, async (req, res) => {
     const customerCode = await generateCustomerCode();
 
     const [newCustomer] = await query(
-      `INSERT INTO customers (customer_code, full_name, phone, total_points, lifetime_points, created_at, updated_at)
-       VALUES ($1, $2, $3, 0, 0, NOW(), NOW())
+      `INSERT INTO customers (customer_code, full_name, phone, branch_id, total_points, lifetime_points, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 0, 0, NOW(), NOW())
        RETURNING *`,
-      [customerCode, cleanName, cleanPhone]
+      [customerCode, cleanName, cleanPhone, targetBranchId]
     );
 
     logActivity({
       userId: req.user?.id || 1,
-      branchId: req.user?.branch_id || req.user?.branchId || null,
+      branchId: targetBranchId,
       actionType: 'CUSTOMER_CREATE',
       entityType: 'customers',
       entityId: newCustomer.id,
       newValue: {
         customer_code: newCustomer.customer_code,
         full_name: newCustomer.full_name,
-        phone: newCustomer.phone
+        phone: newCustomer.phone,
+        branch_id: targetBranchId
       },
       notes: `تسجيل عميل جديد ${newCustomer.full_name} (${newCustomer.customer_code})`
     });
@@ -210,32 +238,75 @@ router.post('/customers', requireAuth, async (req, res) => {
 
 /**
  * GET /api/swm/loyalty/customers
- * Paginated list of customers
+ * Paginated list of customers with branch filter, export mode, and purchase stats
  */
 router.get('/customers', requireAuth, async (req, res) => {
   try {
+    const isExport = req.query.export === 'true';
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const offset = (page - 1) * limit;
+    const limit = isExport ? 10000 : Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = isExport ? 0 : (page - 1) * limit;
     const search = req.query.search ? req.query.search.trim() : '';
 
-    let whereClause = '';
+    const rawBranch = req.query.branch_id;
+    const branchId = rawBranch && rawBranch !== 'all' && !isNaN(parseInt(rawBranch, 10))
+      ? parseInt(rawBranch, 10)
+      : null;
+
+    const whereConditions = [];
     const params = [];
 
     if (search) {
-      whereClause = `WHERE (full_name ILIKE $1 OR phone ILIKE $1 OR customer_code ILIKE $1)`;
       params.push(`%${search}%`);
+      const sIdx = params.length;
+      whereConditions.push(`(c.full_name ILIKE $${sIdx} OR c.phone ILIKE $${sIdx} OR c.customer_code ILIKE $${sIdx})`);
     }
 
-    const countSql = `SELECT COUNT(*) AS total FROM customers ${whereClause}`;
+    if (branchId) {
+      params.push(branchId);
+      const bIdx = params.length;
+      whereConditions.push(`(
+        c.branch_id = $${bIdx}
+        OR EXISTS (SELECT 1 FROM swm_sales_invoices si WHERE si.customer_id = c.id AND si.branch_id = $${bIdx})
+        OR EXISTS (SELECT 1 FROM points_transactions pt WHERE pt.customer_id = c.id AND pt.branch_id = $${bIdx})
+      )`);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    const countSql = `SELECT COUNT(*) AS total FROM customers c ${whereClause}`;
     const [countRow] = await query(countSql, params);
     const total = parseInt(countRow?.total || 0, 10);
 
     const dataSql = `
-      SELECT id, customer_code, full_name, phone, total_points, lifetime_points, created_at
-      FROM customers
+      SELECT 
+        c.id, 
+        c.customer_code, 
+        c.full_name, 
+        c.phone, 
+        c.branch_id,
+        b.branch_name,
+        b.branch_code,
+        c.total_points, 
+        c.lifetime_points, 
+        c.created_at,
+        COALESCE(inv.total_orders, 0) AS total_orders,
+        COALESCE(inv.total_spent, 0) AS total_spent,
+        inv.last_order_date
+      FROM customers c
+      LEFT JOIN branches b ON b.id = c.branch_id
+      LEFT JOIN (
+        SELECT 
+          customer_id, 
+          COUNT(id) AS total_orders,
+          SUM(final_amount) AS total_spent,
+          MAX(created_at) AS last_order_date
+        FROM swm_sales_invoices
+        WHERE customer_id IS NOT NULL
+        GROUP BY customer_id
+      ) inv ON inv.customer_id = c.id
       ${whereClause}
-      ORDER BY id DESC
+      ORDER BY c.id DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
     const rows = await query(dataSql, [...params, limit, offset]);
@@ -245,10 +316,10 @@ router.get('/customers', requireAuth, async (req, res) => {
       data: {
         customers: rows,
         pagination: {
-          page,
+          page: isExport ? 1 : page,
           limit,
           total,
-          totalPages: Math.ceil(total / limit)
+          totalPages: isExport ? 1 : Math.ceil(total / limit)
         }
       }
     });
@@ -260,7 +331,7 @@ router.get('/customers', requireAuth, async (req, res) => {
 
 /**
  * GET /api/swm/loyalty/customers/:id
- * Customer details + history
+ * Customer details + history + invoices
  */
 router.get('/customers/:id', requireAuth, async (req, res) => {
   try {
@@ -269,7 +340,13 @@ router.get('/customers/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'معرف العميل غير صالح' });
     }
 
-    const [customer] = await query(`SELECT * FROM customers WHERE id = $1`, [customerId]);
+    const [customer] = await query(`
+      SELECT c.*, b.branch_name, b.branch_code
+      FROM customers c
+      LEFT JOIN branches b ON b.id = c.branch_id
+      WHERE c.id = $1
+    `, [customerId]);
+
     if (!customer) {
       return res.status(404).json({ success: false, message: 'العميل غير موجود' });
     }
@@ -286,11 +363,22 @@ router.get('/customers/:id', requireAuth, async (req, res) => {
       [customerId]
     );
 
+    const invoices = await query(
+      `SELECT si.id, si.invoice_number, si.branch_id, b.branch_name, si.final_amount, si.points_earned, si.points_redeemed, si.points_discount, si.created_at
+       FROM swm_sales_invoices si
+       LEFT JOIN branches b ON b.id = si.branch_id
+       WHERE si.customer_id = $1
+       ORDER BY si.id DESC
+       LIMIT 20`,
+      [customerId]
+    );
+
     return res.json({
       success: true,
       data: {
         customer,
-        history
+        history,
+        invoices
       }
     });
   } catch (err) {

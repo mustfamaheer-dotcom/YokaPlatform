@@ -1611,7 +1611,7 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={560}
       >
         <Form form={form} layout="vertical" onFinish={handleSaveSupplier} style={{ marginTop: 12 }}>
@@ -1686,7 +1686,7 @@ export default function Suppliers({ autoOpenCreate, onResetAction }) {
         open={payModalOpen}
         onCancel={() => setPayModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={620}
       >
         <Form form={payForm} layout="vertical" onFinish={handleExecutePayment} style={{ marginTop: 12 }}>

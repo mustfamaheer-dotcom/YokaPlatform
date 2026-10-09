@@ -136,8 +136,8 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
 
-  const selectedCreateType = Form.useWatch('branch_type', createForm) || 'retail_branch';
-  const selectedEditType = Form.useWatch('branch_type', editForm) || 'retail_branch';
+  const [selectedCreateType, setSelectedCreateType] = useState('retail_branch');
+  const [selectedEditType, setSelectedEditType] = useState('retail_branch');
 
   // Fetch branches and supervisors
   const fetchBranches = async () => {
@@ -201,6 +201,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
   // Open Create
   const handleOpenCreateModal = () => {
     createForm.resetFields();
+    setSelectedCreateType('retail_branch');
     createForm.setFieldsValue({
       branch_type: 'retail_branch',
       city: 'القاهرة',
@@ -230,6 +231,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
   // Open Edit
   const handleOpenEdit = (branch) => {
     setEditingBranch(branch);
+    setSelectedEditType(branch.branch_type || 'retail_branch');
     editForm.setFieldsValue({
       branch_name: branch.branch_name,
       branch_type: branch.branch_type,
@@ -798,7 +800,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
           <Empty description="لا توجد فروع تطابق خيارات البحث والتصفية" />
         </Card>
       ) : viewMode === 'table' ? (
-        <Card style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }} bodyStyle={{ padding: 0 }}>
+        <Card style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }} styles={{ body: { padding: 0 } }}>
           <Table
             columns={tableColumns}
             dataSource={filteredBranches}
@@ -826,7 +828,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
                     boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
                     transition: 'transform 0.2s ease, box-shadow 0.2s ease'
                   }}
-                  bodyStyle={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px' }}
+                  styles={{ body: { display: 'flex', flexDirection: 'column', height: '100%', padding: '16px' } }}
                 >
                   {/* Card Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -1206,7 +1208,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
         open={isCreateModalOpen}
         onCancel={() => setIsCreateModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={680}
       >
         <Form form={createForm} layout="vertical" onFinish={handleCreate} style={{ marginTop: 12 }}>
@@ -1225,6 +1227,7 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
                     <div
                       onClick={() => {
                         createForm.setFieldsValue({ branch_type: typeKey });
+                        setSelectedCreateType(typeKey);
                         fetchNextBranchCode(typeKey);
                       }}
                       style={{
@@ -1412,10 +1415,18 @@ export default function Branches({ autoOpenCreate, onResetAction, currentUser })
           setEditingBranch(null);
         }}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={680}
       >
-        <Form form={editForm} layout="vertical" onFinish={handleUpdate} style={{ marginTop: 12 }}>
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleUpdate}
+          onValuesChange={(changed) => {
+            if (changed.branch_type) setSelectedEditType(changed.branch_type);
+          }}
+          style={{ marginTop: 12 }}
+        >
           <Row gutter={12}>
             <Col xs={24} sm={12}>
               <Form.Item

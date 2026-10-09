@@ -1,0 +1,134 @@
+
+
+## 🏢 Quadfare Platform — Complete Business Feature Map
+
+---
+
+### 👤 User Roles & Access Control
+The platform has **5 distinct user roles**, each with its own dedicated interface:
+
+| Role | Arabic Title | Dedicated App |
+|:---|:---|:---|
+| `super_admin` | مدير عام النظام | Full Admin Dashboard |
+| `admin` | مدير إداري | Full Admin Dashboard |
+| `warehouse_manager` | مدير المخازن الرئيسي | Warehouse Manager App (with granular permissions) |
+| `supervisor` | مشرف فرع | Supervisor Dashboard (branch-scoped) |
+| `salesperson` | بائع / كاشير | POS Cashier App |
+
+---
+
+### 🖥️ 1. نقطة البيع (POS – Cashier Terminal)
+- **Barcode scanning** for instant product lookup
+- **Sale mode** and **Return/Refund mode** switchable from the same terminal
+- Loyalty points **lookup by phone**, points earning and redemption at checkout
+- Receipt printing (browser print)
+- **Shift open/close** with cash count and handover
+- **Expense entry** directly from cashier screen (linked to expense categories)
+- **Stock alerts badge** — cashier sees low-stock warnings on their nav
+- **Supervisor unlock** — supervisor can unlock advanced functions without logging out the cashier
+- **Exit backup modal** — safe data backup before logging out
+- Responsive design (tablet and desktop)
+
+---
+
+### 🛒 2. المتجر الإلكتروني (E-Commerce Management)
+- **Orders management** — receive, process, track, ship online orders
+- **Pending orders live counter** — auto-refreshes every 20 seconds
+- **E-commerce warehouse inventory** — dedicated stock pool for online orders, separate from retail
+- **E-commerce analytics** — visitor traffic analysis, digital sales, average basket value
+- Dedicated **Ecom Warehouse App** for staff who only handle online order fulfillment
+
+---
+
+### 📦 3. إدارة المخزون (Inventory Management)
+- **Product catalog** — full product database with attributes
+- **Groups & Items tree** — category/subcategory classification, sizes, colors, product variants
+- **Physical stock audit** — field inventory counting, real-time variance detection, deficit/surplus handling
+- **Adjustment vouchers** — approve and post stock correction entries
+- **Inter-branch transfers** — transfer stock between branches and warehouses with transfer vouchers
+- **Stock alerts** — low-stock threshold alerts per branch
+- **Multi-branch stock levels** — each branch has its own isolated stock balance
+
+---
+
+### 🏗️ 4. مدير المخازن الرئيسي (Warehouse Manager App)
+A separate role-based app with **granular permission toggles** per feature:
+- Product & category management
+- Physical stock audit
+- Inter-branch transfers
+- Purchase invoices
+- Supplier accounts
+- Payroll & expense categories
+- Branch & user management
+- Each permission independently toggleable by the super_admin
+
+---
+
+### 🧾 5. المشتريات والتوريد (Purchasing & Supply Chain)
+- **Purchase invoices** — create, review, and record supplier invoices with unit cost
+- **Supplier payments** — partial and full payment tracking, outstanding balances
+- **Supplier ledger** — detailed account statement per supplier (debits, credits, balance)
+- **Supplier directory** — full supplier contact and account registry
+
+---
+
+### 💰 6. المالية والخزائن (Finance & Treasury)
+- **Central treasury** — track cash flow across all branches centrally
+- **Bank transfers** — record bank-to-branch and branch-to-bank transfers
+- **Branch cash reset (تصفير الخزائن)** — clear branch cash after handover
+- **Payroll management** — salesperson salary and commission settlement
+- **Advances & deductions** — advance salary payments and paycheck deductions
+- **Expense categories** — custom expense types per branch (e.g., rent, cleaning, delivery)
+- **Branch daily expense tracking** — cashier-entered expenses linked to categories
+
+---
+
+### 📊 7. التقارير والتحليلات (Reports & Analytics)
+- **Central Sales Analytics Dashboard** — charts, KPIs, revenue trends
+- **Branch performance comparison** — side-by-side branch revenue and sales counts
+- **Top selling products** — best sellers by branch and system-wide
+- **Returns analysis** — return volumes and reasons
+- **Salesperson performance** — revenue and transaction count per staff member
+- **Branches daily consolidated ledger** — daily cash, sales, and expense statement per branch
+- **Admin journals** — audit log of admin-level operations and stock movements
+- **Shift monitoring** — live view of which branches are open, cashier clock-in/out history
+- **Ecom analytics** — online store visitor stats and conversion data
+
+---
+
+### 👥 8. سجل العملاء ونقاط الولاء (Customers & Loyalty CRM)
+- **Customer registry** — central directory of all registered customers
+- **Loyalty points system** — earn points per purchase, redeem at POS
+- **Lifetime points tracking** — total earned vs. currently available
+- **Manual points adjustment** — admin can credit/debit points with reason log
+- **Branch filter** — filter customers by retail branch
+- **Quick customer registration** — from POS checkout or admin panel
+- **Customer ledger drawer** — full purchase history and points transaction log per customer
+- **Excel/CSV export** — export full customer list with UTF-8 BOM for Arabic
+- **Loyalty settings configuration** — point value, earn rate, redemption rules
+
+---
+
+### ⚙️ 9. إدارة النظام (System Administration)
+- **Branch & warehouse management** — create/edit retail branches and warehouses, set branch type
+- **User accounts & roles** — create users, assign roles and branch access
+- **System backup** — export data backup before logout (ExitBackupModal)
+- **Store settings** — configure store-wide settings (invoice design, loyalty rules, etc.)
+- **Invoice settings** — customize receipt/invoice layout
+- **Supervisor unlock** — temporary role elevation without full login switch
+- **Visitor analytics** — track who accessed what and when
+
+---
+
+### 📱 10. Cross-Cutting Technical Features
+- **RTL Arabic-first UI** — entire interface is Arabic right-to-left
+- **Role-based routing** — users automatically land in their correct app upon login
+- **Multi-branch architecture** — every transaction, stock level, and report is branch-scoped
+- **JWT authentication** — stateless, secure session management
+- **Responsive design** — works on desktop, tablet, and mobile
+- **Activity audit log** — every create/update/delete action is logged with user ID and timestamp
+
+---
+
+### Summary Count
+> **9 functional modules · 5 user roles · 4 distinct interfaces (Admin, POS, Warehouse, Ecom) · 40+ individual feature screens**
