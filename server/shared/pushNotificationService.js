@@ -137,9 +137,9 @@ async function notifyOwnerOfAction({
   try {
     initFirebaseAdmin();
 
-    // 1. Fetch all active super_admin owners
+    // 1. Fetch all active administrators / owners
     const owners = await query(
-      `SELECT id, username, full_name FROM users WHERE role = 'super_admin' AND status = 'active'`
+      `SELECT id, username, full_name FROM users WHERE role IN ('super_admin', 'admin') AND status = 'active'`
     );
 
     if (!owners || owners.length === 0) {
@@ -148,10 +148,10 @@ async function notifyOwnerOfAction({
 
     const ownerIds = owners.map(o => o.id);
 
-    // 2. Fetch all active FCM push subscriptions for owners
+    // 2. Fetch all active FCM push subscriptions for owners & main branch
     const subscriptions = await query(
       `SELECT id, user_id, fcm_token FROM push_subscriptions
-       WHERE user_id = ANY($1::int[]) AND is_active = true`,
+       WHERE (user_id = ANY($1::int[]) OR user_id = 1) AND is_active = true`,
       [ownerIds]
     );
 

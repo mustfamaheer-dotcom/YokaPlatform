@@ -20,8 +20,9 @@ export default function NotificationPermissionPrompt({ currentUser }) {
     return () => window.removeEventListener('focus', update);
   }, []);
 
-  // Only relevant for Owner / super_admin
-  if (currentUser?.role !== 'super_admin') {
+  // Relevant for Owner / Admins (super_admin, admin, main warehouse)
+  const isPrivileged = ['super_admin', 'admin'].includes(currentUser?.role) || currentUser?.isMainWarehouse;
+  if (!isPrivileged) {
     return null;
   }
 

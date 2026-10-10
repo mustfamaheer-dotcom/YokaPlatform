@@ -49,6 +49,7 @@ import {
   Home
 } from 'lucide-react';
 import ScrollToTopTabs from '../../components/ScrollToTopTabs';
+import NotificationModalButton from '../../components/NotificationModalButton';
 import yokaLogo from '../../assets/yokaStoreTransparent.png';
 
 // Sub-Pages
@@ -479,6 +480,9 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
           {isMobile ? (
             /* Mobile Quick Action Buttons */
             <>
+              {/* Notification Button */}
+              <NotificationModalButton currentUser={currentUser} isMobile={true} />
+
               {/* User Avatar */}
               <Avatar
                 size={32}
@@ -507,6 +511,9 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
           ) : (
             /* Desktop / Tablet User Block */
             <>
+              {/* Notification Button */}
+              <NotificationModalButton currentUser={currentUser} isMobile={false} />
+
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Avatar
                   style={{ backgroundColor: '#0B0F17', border: '1.5px solid #C8A45C', color: '#DFCA95' }}

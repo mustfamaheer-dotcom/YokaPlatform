@@ -138,11 +138,10 @@ export default function App() {
     setCurrentUser(user);
   };
 
-  // Push Notifications Setup for System Owner (super_admin)
+  // Push Notifications Setup for System Owner & Admins
   useEffect(() => {
-    if (currentUser?.role === 'super_admin') {
-      requestNotificationPermission();
-
+    const isPrivileged = ['super_admin', 'admin'].includes(currentUser?.role) || currentUser?.isMainWarehouse;
+    if (isPrivileged) {
       const unsubscribe = onForegroundMessage((payload) => {
         const title = payload.notification?.title || payload.data?.title || 'إشعار فوري جديد';
         const description = payload.notification?.body || payload.data?.body || '';
