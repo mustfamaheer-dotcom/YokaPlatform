@@ -296,6 +296,29 @@ const serveFirebaseMessagingWorker = (req, res) => {
 app.get('/firebase-messaging-sw.js', serveFirebaseMessagingWorker);
 app.get('/swm-admin/firebase-messaging-sw.js', serveFirebaseMessagingWorker);
 
+// Dedicated handler for PWA manifest
+const serveManifest = (req, res) => {
+  const candidateManifestPaths = [
+    path.join(__dirname, 'client-swm/public/manifest.json'),
+    path.join(__dirname, '../../client-swm/public/manifest.json'),
+    path.join(process.cwd(), 'client-swm/public/manifest.json'),
+    path.join(__dirname, 'client-swm/dist/manifest.json'),
+    path.join(__dirname, '../../client-swm/dist/manifest.json'),
+    path.join(process.cwd(), 'client-swm/dist/manifest.json'),
+  ];
+  for (const mPath of candidateManifestPaths) {
+    if (fs.existsSync(mPath)) {
+      res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      return res.sendFile(path.resolve(mPath));
+    }
+  }
+  res.status(404).type('text/plain').send('Manifest not found');
+};
+
+app.get('/swm-admin/manifest.json', serveManifest);
+app.get('/manifest.json', serveManifest);
+
 if (imgDir) app.use(express.static(imgDir, uploadStaticOptions));
 if (swmPublicDir) app.use(express.static(swmPublicDir, uploadStaticOptions));
 if (ecpPublicDir) app.use(express.static(ecpPublicDir, uploadStaticOptions));

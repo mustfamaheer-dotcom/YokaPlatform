@@ -105,6 +105,16 @@ export async function requestNotificationPermission() {
       return { success: false, reason: 'المتصفح لا يدعم Service Workers' };
     }
 
+    // Early exit for iOS Safari if not running as installed PWA
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isIOS && !isStandalone) {
+      return {
+        success: false,
+        reason: 'نظام iOS يتطلب تثبيت التطبيق على الشاشة الرئيسية أولاً (Add to Home Screen) لاستقبال الإشعارات.'
+      };
+    }
+
     // 1. Explicitly trigger browser permission prompt
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
@@ -129,24 +139,19 @@ export async function requestNotificationPermission() {
       app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
     }
 
-    // 4. Register or reuse Service Worker
-    const base = import.meta.env.BASE_URL || '/';
-    let registration = await navigator.serviceWorker.getRegistration(base).catch(() => null);
+    // 4. Register or reuse Service Worker with absolute root path
+    const SW_PATH = '/firebase-messaging-sw.js';
+    let registration = await navigator.serviceWorker.getRegistration(SW_PATH).catch(() => null);
     if (!registration) {
       registration = await navigator.serviceWorker.getRegistration('/').catch(() => null);
     }
 
     if (!registration) {
-      const primarySwPath = `${base.replace(/\/$/, '')}/firebase-messaging-sw.js`;
       try {
-        registration = await navigator.serviceWorker.register(primarySwPath, {
-          scope: base
-        });
+        registration = await navigator.serviceWorker.register(SW_PATH, { scope: '/' });
       } catch (swErr) {
-        console.warn('⚠️ [Push Notifications]: Primary SW path failed, fallback to root:', swErr.message);
-        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/'
-        });
+        console.warn('⚠️ [Push Notifications]: SW registration fallback:', swErr.message);
+        registration = await navigator.serviceWorker.register('/swm-admin/firebase-messaging-sw.js', { scope: '/swm-admin/' });
       }
     }
 

@@ -201,11 +201,15 @@ async function notifyOwnerOfAction({
           actionType: String(actionType || ''),
           entityType: String(entityType || ''),
           entityId: String(entityId || ''),
-          actionUrl: String(actionUrl || '/dashboard'),
+          actionUrl: String(actionUrl || '/swm-admin/dashboard'),
           triggeredByName: String(performer),
           timestamp
         },
         webpush: {
+          headers: {
+            Urgency: 'high',
+            TTL: '86400'
+          },
           notification: {
             title: titleAr,
             body: bodyAr,
@@ -214,14 +218,31 @@ async function notifyOwnerOfAction({
             tag: `${entityType || 'swm'}-${entityId || actionType}`,
             renotify: true,
             requireInteraction: true,
+            silent: false,
             dir: 'rtl',
             lang: 'ar',
             data: {
-              actionUrl: String(actionUrl || '/dashboard')
+              actionUrl: String(actionUrl || '/swm-admin/dashboard')
             }
           },
           fcmOptions: {
-            link: actionUrl || '/dashboard'
+            link: actionUrl || '/swm-admin/dashboard'
+          }
+        },
+        apns: {
+          headers: {
+            'apns-priority': '10',
+            'apns-push-type': 'alert'
+          },
+          payload: {
+            aps: {
+              alert: {
+                title: titleAr,
+                body: bodyAr
+              },
+              sound: 'default',
+              badge: 1
+            }
           }
         }
       };
