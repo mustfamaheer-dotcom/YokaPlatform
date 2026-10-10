@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, message, Alert, Modal, Typography } from 'antd';
+import { Button, Alert, Typography, App as AntApp } from 'antd';
 import { BellOutlined, CheckCircleOutlined, SendOutlined, CloseOutlined, SyncOutlined } from '@ant-design/icons';
 import { getNotificationStatus, requestNotificationPermission } from '../utils/pushNotifications';
 import api from '../api';
@@ -7,6 +7,7 @@ import api from '../api';
 const { Text } = Typography;
 
 export default function NotificationPermissionPrompt({ currentUser }) {
+  const { message, modal } = AntApp.useApp();
   const [status, setStatus] = useState(() => getNotificationStatus());
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -56,7 +57,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
       if (result.success) {
         message.success('🎉 تم تسجيل وتفعيل إشعارات الدفع بنجاح على هذا الجهاز!');
       } else if (result.reason === 'denied') {
-        Modal.warning({
+        modal.warning({
           title: 'الإشعارات محظورة في إعدادات الهاتف',
           zIndex: 100000,
           content: (
@@ -76,7 +77,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
       } else if (result.reason === 'not_supported') {
         message.error('هذا المتصفح لا يدعم استلام إشعارات الدفع.');
       } else {
-        Modal.error({
+        modal.error({
           title: 'فشل استخراج رمز الجهاز من Firebase',
           zIndex: 100000,
           content: (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Modal, Badge, Typography, message, Tag } from 'antd';
+import { Button, Modal, Badge, Typography, Tag, App as AntApp } from 'antd';
 import { BellOutlined, CheckCircleOutlined, SendOutlined, ExclamationCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { getNotificationStatus, requestNotificationPermission } from '../utils/pushNotifications';
 import api from '../api';
@@ -7,6 +7,7 @@ import api from '../api';
 const { Text } = Typography;
 
 export default function NotificationModalButton({ currentUser, isMobile = false }) {
+  const { message, modal } = AntApp.useApp();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(() => getNotificationStatus());
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,7 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
       if (res.success) {
         message.success('🎉 تم تسجيل وتفعيل الإشعارات بنجاح على هذا الجهاز!');
       } else if (res.reason === 'denied') {
-        Modal.warning({
+        modal.warning({
           title: 'الإشعارات محظورة في إعدادات الهاتف',
           content: (
             <div style={{ textAlign: 'right', direction: 'rtl' }}>
@@ -40,7 +41,7 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
           )
         });
       } else {
-        Modal.error({
+        modal.error({
           title: 'فشل استخراج رمز الجهاز من Firebase',
           zIndex: 100000,
           content: (
@@ -113,7 +114,7 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
         open={open}
         onCancel={() => setOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         centered
         width={440}
       >

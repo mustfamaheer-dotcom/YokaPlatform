@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Spin, App as AntApp, notification } from 'antd';
+import { Spin, App as AntApp } from 'antd';
 import Login from './pages/Login';
 import SellerApp from './pages/pos/SellerApp';
 import SupervisorDashboard from './pages/admin/SupervisorDashboard';
@@ -110,6 +110,7 @@ function RoleRootRedirect({ currentUser }) {
 }
 
 export default function App() {
+  const { notification } = AntApp.useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);

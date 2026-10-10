@@ -2340,7 +2340,7 @@ export default function TreasuryAdmin({ currentUser: propUser }) {
         open={channelTransferVisible}
         onCancel={() => setChannelTransferVisible(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert
           type="info"
@@ -2480,7 +2480,7 @@ export default function TreasuryAdmin({ currentUser: propUser }) {
         onCancel={() => setBulkPayrollVisible(false)}
         width={960}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 14 }}>
           {/* Channel selector & summary */}
