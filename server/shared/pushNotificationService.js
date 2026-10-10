@@ -224,11 +224,14 @@ async function notifyOwnerOfAction({
             dir: 'rtl',
             lang: 'ar',
             data: {
-              actionUrl: String(actionUrl || '/swm-admin/dashboard')
+              actionUrl: String(actionUrl || '/swm-admin/dashboard'),
+              actionType: String(actionType || ''),
+              entityType: String(entityType || ''),
+              entityId: String(entityId || '')
             }
           },
           fcmOptions: {
-            link: actionUrl || '/swm-admin/dashboard'
+            link: String(actionUrl || '/swm-admin/dashboard')
           }
         },
         apns: {
@@ -244,7 +247,11 @@ async function notifyOwnerOfAction({
               },
               sound: 'default',
               badge: 1
-            }
+            },
+            actionUrl: String(actionUrl || '/swm-admin/dashboard'),
+            actionType: String(actionType || ''),
+            entityType: String(entityType || ''),
+            entityId: String(entityId || '')
           }
         }
       };

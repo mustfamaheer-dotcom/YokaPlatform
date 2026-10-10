@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Home as HomeIcon, Keyboard, Search, Zap } from 'lucide-react';
 import {
   Card,
@@ -53,6 +53,8 @@ const { TextArea } = Input;
 
 export default function Transfers({ currentUser, autoOpenCreate, onResetAction }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const targetDeepId = searchParams.get('id') || searchParams.get('transfer_id') || searchParams.get('code');
   const [loading, setLoading] = useState(false);
   const [transfers, setTransfers] = useState([]);
   const [metrics, setMetrics] = useState(null);
@@ -186,6 +188,14 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
     fetchMetrics();
     fetchTransfers();
   }, []);
+
+  // Deep Link Auto-Open from Push Notifications
+  useEffect(() => {
+    if (targetDeepId) {
+      handleOpenReviewModal(targetDeepId);
+      setFilterSearch(targetDeepId);
+    }
+  }, [targetDeepId]);
 
   useEffect(() => {
     fetchTransfers();

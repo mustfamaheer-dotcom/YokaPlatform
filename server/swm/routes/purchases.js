@@ -558,7 +558,7 @@ router.get('/:id', requireAuth, async (req, res) => {
        LEFT JOIN suppliers s ON s.id = pi.supplier_id
        LEFT JOIN branches b ON b.id = pi.warehouse_branch_id
        LEFT JOIN users u ON u.id = pi.created_by
-       WHERE pi.id = $1`,
+       WHERE (pi.id::text = $1 OR pi.invoice_number = $1)`,
       [id]
     );
 
@@ -586,7 +586,7 @@ router.get('/:id', requireAuth, async (req, res) => {
        LEFT JOIN product_variants pv ON pv.id = pii.variant_id
        WHERE pii.invoice_id = $1
        ORDER BY pii.id ASC`,
-      [id]
+      [invoice.id]
     );
 
     return res.json({

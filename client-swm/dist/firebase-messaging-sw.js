@@ -29,18 +29,22 @@ try {
   messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Received background message:', payload);
 
-    const notificationTitle = payload.notification?.title || payload.data?.title || 'إشعار جديد — يوكا ستور';
+    const notifData = payload.data || {};
+    const notificationTitle = payload.notification?.title || notifData.title || 'إشعار جديد — يوكا ستور';
     const notificationOptions = {
-      body: payload.notification?.body || payload.data?.body || 'لديك تحديث جديد في النظام',
+      body: payload.notification?.body || notifData.body || 'لديك تحديث جديد في النظام',
       icon: '/yokaStoreTransparent.png',
       badge: '/yokaStoreTransparent.png',
       dir: 'rtl',
       lang: 'ar',
-      tag: payload.data?.actionType || 'swm-notification',
+      tag: notifData.actionType || 'swm-notification',
       renotify: true,
       requireInteraction: true,
       data: {
-        actionUrl: payload.data?.actionUrl || '/swm-admin/dashboard',
+        actionUrl: notifData.actionUrl || payload.fcmOptions?.link || '/swm-admin/dashboard',
+        actionType: notifData.actionType,
+        entityType: notifData.entityType,
+        entityId: notifData.entityId,
         timestamp: Date.now()
       }
     };
@@ -55,19 +59,23 @@ try {
 self.addEventListener('push', (event) => {
   if (!event.data) return;
   try {
-    const data = event.data.json();
-    const notificationTitle = data.notification?.title || data.title || 'إشعار جديد — يوكا ستور';
+    const raw = event.data.json();
+    const notifData = raw.data || raw;
+    const notificationTitle = raw.notification?.title || raw.title || notifData.title || 'إشعار جديد — يوكا ستور';
     const notificationOptions = {
-      body: data.notification?.body || data.body || 'لديك تحديث جديد في النظام',
+      body: raw.notification?.body || raw.body || notifData.body || 'لديك تحديث جديد في النظام',
       icon: '/yokaStoreTransparent.png',
       badge: '/yokaStoreTransparent.png',
       dir: 'rtl',
       lang: 'ar',
-      tag: data.actionType || 'swm-notification',
+      tag: notifData.actionType || raw.actionType || 'swm-notification',
       renotify: true,
       requireInteraction: true,
       data: {
-        actionUrl: data.actionUrl || '/swm-admin/dashboard',
+        actionUrl: notifData.actionUrl || raw.actionUrl || '/swm-admin/dashboard',
+        actionType: notifData.actionType || raw.actionType,
+        entityType: notifData.entityType || raw.entityType,
+        entityId: notifData.entityId || raw.entityId,
         timestamp: Date.now()
       }
     };
@@ -87,19 +95,41 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.actionUrl || '/swm-admin/dashboard';
+  const notifData = event.notification.data || {};
+  let rawUrl = notifData.actionUrl
+    || notifData.link
+    || notifData.fcmOptions?.link
+    || '/swm-admin/dashboard';
+
+  // Ensure leading slash and proper /swm-admin prefix if relative
+  if (!rawUrl.startsWith('http')) {
+    if (!rawUrl.startsWith('/')) rawUrl = '/' + rawUrl;
+    if (!rawUrl.startsWith('/swm-admin')) rawUrl = '/swm-admin' + rawUrl;
+  }
+
+  const targetUrl = new URL(rawUrl, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // 1. If an existing window/PWA client is already open, navigate and focus it
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
         if (client.url.includes(self.location.origin) && 'focus' in client) {
+          try {
+            client.postMessage({
+              type: 'NOTIFICATION_CLICK',
+              actionUrl: targetUrl,
+              data: notifData
+            });
+          } catch (postErr) {}
+
           if ('navigate' in client) {
             client.navigate(targetUrl);
           }
           return client.focus();
         }
       }
+      // 2. Otherwise open a new window with targetUrl
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }

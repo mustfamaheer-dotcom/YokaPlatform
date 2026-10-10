@@ -359,6 +359,11 @@ if (swmStaticDir && fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
   });
 }
 
+// Automatically forward direct admin routes to /swm-admin/ to preserve deep links and PWA standalone scopes
+app.get(['/dashboard', '/dashboard/*', '/pos', '/pos/*', '/supervisor', '/supervisor/*', '/ecom', '/ecom/*'], (req, res) => {
+  return res.redirect(302, `/swm-admin${req.originalUrl}`);
+});
+
 // Serve ECP (Public Customer Store) on Root '/'
 if (ecpStaticDir && fs.existsSync(path.join(ecpStaticDir, 'index.html'))) {
   app.use('/', express.static(ecpStaticDir, staticOptions));

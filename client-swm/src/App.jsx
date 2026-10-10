@@ -143,29 +143,49 @@ export default function App() {
   useEffect(() => {
     const isPrivileged = ['super_admin', 'admin'].includes(currentUser?.role) || currentUser?.isMainWarehouse;
     if (isPrivileged) {
+      const toCleanRoute = (url) => {
+        if (!url) return '/dashboard';
+        return url.replace(/^https?:\/\/[^\/]+/, '').replace(/^\/swm-admin/, '') || '/dashboard';
+      };
+
       const unsubscribe = onForegroundMessage((payload) => {
         const title = payload.notification?.title || payload.data?.title || 'إشعار فوري جديد';
         const description = payload.notification?.body || payload.data?.body || '';
         const targetUrl = payload.data?.actionUrl || '/dashboard';
+        const cleanRoute = toCleanRoute(targetUrl);
 
         notification.open({
           message: <span style={{ fontWeight: 800, color: '#C8A45C' }}>{title}</span>,
           description: (
-            <div style={{ cursor: 'pointer' }} onClick={() => navigate(targetUrl)}>
+            <div style={{ cursor: 'pointer' }} onClick={() => navigate(cleanRoute)}>
               <div>{description}</div>
               <div style={{ marginTop: 4, fontSize: 11, color: '#0284c7', textDecoration: 'underline' }}>
-                انقر هنا للانتقال والتفاصيل
+                انقر هنا لعرض كافة تفاصيل العملية
               </div>
             </div>
           ),
           placement: 'bottomLeft',
-          duration: 6,
-          onClick: () => navigate(targetUrl)
+          duration: 8,
+          onClick: () => navigate(cleanRoute)
         });
       });
 
+      const handleSwMessage = (event) => {
+        if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.actionUrl) {
+          const cleanRoute = toCleanRoute(event.data.actionUrl);
+          navigate(cleanRoute);
+        }
+      };
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', handleSwMessage);
+      }
+
       return () => {
         if (typeof unsubscribe === 'function') unsubscribe();
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+        }
       };
     }
   }, [currentUser]);

@@ -98,7 +98,23 @@ function logActivity({
       sales: '/dashboard/sales_reports',
       pos: '/dashboard/sales_reports'
     };
-    const effectiveUrl = actionUrl || urlMap[entityType] || '/dashboard';
+    let effectiveUrl = actionUrl || urlMap[entityType] || '/dashboard';
+
+    // Auto-append entityId and document code to query parameters if not present
+    if (entityId && !effectiveUrl.includes('id=')) {
+      const sep = effectiveUrl.includes('?') ? '&' : '?';
+      effectiveUrl = `${effectiveUrl}${sep}id=${encodeURIComponent(entityId)}`;
+    }
+    const transferOrInvCode = newValue?.transfer_number || newValue?.invoice_number;
+    if (transferOrInvCode && !effectiveUrl.includes('code=')) {
+      const sep = effectiveUrl.includes('?') ? '&' : '?';
+      effectiveUrl = `${effectiveUrl}${sep}code=${encodeURIComponent(transferOrInvCode)}`;
+    }
+
+    // Ensure SWM PWA standalone route prefix
+    if (!effectiveUrl.startsWith('/swm-admin')) {
+      effectiveUrl = `/swm-admin${effectiveUrl.startsWith('/') ? '' : '/'}${effectiveUrl}`;
+    }
     const summaryDetail = notifySummary || notes || (newValue ? (newValue.product_name || newValue.invoice_number || newValue.transfer_number || null) : null);
 
     const criticalStaffActions = [

@@ -207,7 +207,7 @@ router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_
       JOIN branches fb ON fb.id = st.from_branch_id
       JOIN branches tb ON tb.id = st.to_branch_id
       LEFT JOIN users u ON u.id = st.created_by
-      WHERE st.id = $1`,
+      WHERE (st.id::text = $1 OR st.transfer_number = $1)`,
       [id]
     );
 
@@ -228,7 +228,7 @@ router.get('/:id', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_
       LEFT JOIN product_variants pv ON pv.id = sti.variant_id
       WHERE sti.transfer_id = $1
       ORDER BY sti.id ASC`,
-      [id]
+      [transfer.id]
     );
 
     return res.json({
@@ -533,7 +533,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_ma
       userId: req.user.id,
       userRole: req.user.role,
       userName: req.user.fullName || req.user.username,
-      actionUrl: '/dashboard/transfers',
+      actionUrl: `/swm-admin/dashboard/transfers?id=${result.transfer.id}&code=${transferNumber}`,
       branchId: fromId,
       actionType: 'CREATE_TRANSFER',
       entityType: 'stock_transfers',
