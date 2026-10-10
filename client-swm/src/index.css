@@ -1951,13 +1951,18 @@ html, body, #root {
   max-width: 100vw !important;
 }
 
-/* 2. Top Header & Content Layout */
+/* 2. Top Header & Content Layout with Safe Area Support for iOS / Notch / Dynamic Island */
 .swm-top-header {
-  padding: 0 24px;
-  height: 68px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: 0 !important;
+  padding-left: max(24px, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(24px, env(safe-area-inset-right, 0px)) !important;
+  height: calc(68px + env(safe-area-inset-top, 0px)) !important;
+  min-height: calc(68px + env(safe-area-inset-top, 0px)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
 }
 
 .swm-main-content {
@@ -1989,8 +1994,12 @@ html, body, #root {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
   }
   .swm-top-header {
-    padding: 0 14px !important;
-    height: 60px !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: 0 !important;
+    padding-left: max(14px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(14px, env(safe-area-inset-right, 0px)) !important;
+    height: calc(60px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(60px + env(safe-area-inset-top, 0px)) !important;
   }
   .swm-hide-tablet {
     display: none !important;
@@ -2006,16 +2015,20 @@ html, body, #root {
   .swm-show-mobile {
     display: flex !important;
   }
-  /* ── Mobile Top Header Alignment ── */
+  /* ── Mobile Top Header Alignment with Safe Area ── */
   .swm-top-header {
-    padding: 0 10px !important;
-    height: 56px !important;
-    min-height: 56px !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: 0 !important;
+    padding-left: max(10px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(10px, env(safe-area-inset-right, 0px)) !important;
+    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
     background: #ffffff !important;
+    box-sizing: border-box !important;
   }
 
   .swm-header-start {
@@ -2603,9 +2616,13 @@ html, body, #root {
 
   /* Mobile Header (< 480px) */
   .swm-top-header {
-    padding: 0 8px !important;
-    height: 52px !important;
-    min-height: 52px !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: 0 !important;
+    padding-left: max(8px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(8px, env(safe-area-inset-right, 0px)) !important;
+    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    box-sizing: border-box !important;
   }
 
   .swm-header-logo {

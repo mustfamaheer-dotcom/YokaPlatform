@@ -312,8 +312,13 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
           top: 0,
           zIndex: 100,
           boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
-          height: isMobile ? 56 : isTablet ? 60 : 64,
-          padding: 0,
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
+          minHeight: `calc(${isMobile ? '56px' : isTablet ? '60px' : '64px'} + env(safe-area-inset-top, 0px))`,
+          height: `calc(${isMobile ? '56px' : isTablet ? '60px' : '64px'} + env(safe-area-inset-top, 0px))`,
+          boxSizing: 'border-box',
           transition: 'all 0.2s ease'
         }}
       >
