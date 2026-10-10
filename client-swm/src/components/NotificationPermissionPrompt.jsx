@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Button, message, Alert, Modal, Card, Typography } from 'antd';
-import { BellOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons';
+import { Button, message, Alert, Modal, Typography } from 'antd';
+import { BellOutlined, CheckCircleOutlined, SendOutlined, CloseOutlined, SyncOutlined } from '@ant-design/icons';
 import { getNotificationStatus, requestNotificationPermission } from '../utils/pushNotifications';
 import api from '../api';
 
@@ -26,8 +26,11 @@ export default function NotificationPermissionPrompt({ currentUser }) {
     return null;
   }
 
-  // If dismissed and already granted, hide completely
-  if (dismissed && status.permission === 'granted') {
+  const isFullyActive = status.permission === 'granted' && status.hasToken;
+  const isPermissionGrantedOnly = status.permission === 'granted' && !status.hasToken;
+
+  // If dismissed and already fully active, hide completely
+  if (dismissed && isFullyActive) {
     return null;
   }
 
@@ -38,7 +41,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
       setStatus(getNotificationStatus());
 
       if (result.success) {
-        message.success('🎉 تم تفعيل إشعارات الدفع بنجاح على هذا الجهاز!');
+        message.success('🎉 تم تسجيل وتفعيل إشعارات الدفع بنجاح على هذا الجهاز!');
       } else if (result.reason === 'denied') {
         Modal.warning({
           title: 'الإشعارات محظورة في إعدادات الهاتف',
@@ -48,7 +51,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
               <p><strong>لتفعيلها على الآيفون:</strong></p>
               <ol style={{ paddingRight: 20 }}>
                 <li>افتح تطبيق <strong>الإعدادات (Settings)</strong> في جهازك.</li>
-                <li>انزل للأسفل واختر <strong>الإشعارات (Notifications)</strong> أو اختر تطبيق <strong>Yoka SWM</strong>.</li>
+                <li>انزل للأسفل واختر <strong>الإشعارات (Notifications)</strong> أو تطبيق <strong>Yoka SWM</strong>.</li>
                 <li>قم بتفعيل خيار <strong>السماح بالإشعارات (Allow Notifications)</strong>.</li>
                 <li>ثم أعد فتح التطبيق هنا.</li>
               </ol>
@@ -59,7 +62,17 @@ export default function NotificationPermissionPrompt({ currentUser }) {
       } else if (result.reason === 'not_supported') {
         message.error('هذا المتصفح لا يدعم استلام إشعارات الدفع.');
       } else {
-        message.info('لم يتم منح الإذن بعد. يرجى الضغط والموافقة على نافذة الإشعارات.');
+        Modal.error({
+          title: 'فشل استخراج رمز الجهاز من Firebase',
+          content: (
+            <div style={{ textAlign: 'right', direction: 'rtl' }}>
+              <p>حدث خطأ أثناء الاتصال بخدمة Firebase Cloud Messaging:</p>
+              <pre style={{ background: '#f8fafc', padding: 10, borderRadius: 6, fontSize: 12, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                {String(result.reason || 'Unknown error')}
+              </pre>
+            </div>
+          )
+        });
       }
     } catch (err) {
       message.error(err.message || 'حدث خطأ أثناء طلب الصلاحية');
@@ -118,8 +131,8 @@ export default function NotificationPermissionPrompt({ currentUser }) {
     );
   }
 
-  // State 2: Permission NOT granted yet ('default' or 'unsupported')
-  if (status.permission !== 'granted') {
+  // State 2: Permission NOT granted yet OR Token missing
+  if (!isFullyActive) {
     return (
       <div style={{
         position: 'fixed',
@@ -154,10 +167,12 @@ export default function NotificationPermissionPrompt({ currentUser }) {
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#C8A45C' }}>
-                تفعيل إشعارات الآيفون للمالك
+                {isPermissionGrantedOnly ? 'إكمال تسجيل إشعارات الآيفون' : 'تفعيل إشعارات الآيفون للمالك'}
               </div>
               <div style={{ fontSize: 12, color: '#94a3b8' }}>
-                مطلوب إذنك لتصلك تنبيهات العمليات المخزنية على هاتفك فوراً
+                {isPermissionGrantedOnly
+                  ? 'تم السماح بالإذن في iOS، اضغط لتسجيل رمز الجهاز في Firebase'
+                  : 'مطلوب إذنك لتصلك تنبيهات العمليات المخزنية على هاتفك فوراً'}
               </div>
             </div>
           </div>
@@ -179,7 +194,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
           <Button
             type="primary"
             size="large"
-            icon={<BellOutlined />}
+            icon={isPermissionGrantedOnly ? <SyncOutlined /> : <BellOutlined />}
             loading={loading}
             onClick={handleRequestPermission}
             style={{
@@ -191,14 +206,14 @@ export default function NotificationPermissionPrompt({ currentUser }) {
               borderRadius: 10
             }}
           >
-            تفعيل الإشعارات الآن 🔔
+            {isPermissionGrantedOnly ? 'تسجيل رمز الجهاز في Firebase الآن 🔔' : 'تفعيل الإشعارات الآن 🔔'}
           </Button>
         </div>
       </div>
     );
   }
 
-  // State 3: Granted! Show status with Test Notification trigger
+  // State 3: Fully Active! Show status with Test Notification trigger
   return (
     <div style={{
       position: 'fixed',

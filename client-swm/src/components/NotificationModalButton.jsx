@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Modal, Badge, Typography, message, Space, Tag } from 'antd';
-import { BellOutlined, CheckCircleOutlined, SendOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Button, Modal, Badge, Typography, message, Tag } from 'antd';
+import { BellOutlined, CheckCircleOutlined, SendOutlined, ExclamationCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { getNotificationStatus, requestNotificationPermission } from '../utils/pushNotifications';
 import api from '../api';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 export default function NotificationModalButton({ currentUser, isMobile = false }) {
   const [open, setOpen] = useState(false);
@@ -29,14 +29,31 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
       const res = await requestNotificationPermission();
       refreshStatus();
       if (res.success) {
-        message.success('🎉 تم تفعيل الإشعارات بنجاح على هذا الجهاز!');
+        message.success('🎉 تم تسجيل وتفعيل الإشعارات بنجاح على هذا الجهاز!');
       } else if (res.reason === 'denied') {
-        message.warning('⚠️ الإشعارات محظورة في إعدادات الهاتف. يرجى تفعيلها من إعدادات الآيفون.');
+        Modal.warning({
+          title: 'الإشعارات محظورة في إعدادات الهاتف',
+          content: (
+            <div style={{ textAlign: 'right', direction: 'rtl' }}>
+              يرجى فتح إعدادات الآيفون (Settings) &gt; الإشعارات &gt; Yoka SWM &gt; السماح بالإشعارات.
+            </div>
+          )
+        });
       } else {
-        message.info('لم يتم منح الإذن بعد.');
+        Modal.error({
+          title: 'فشل استخراج رمز الجهاز من Firebase',
+          content: (
+            <div style={{ textAlign: 'right', direction: 'rtl' }}>
+              <p>حدث خطأ أثناء الاتصال بخدمة Firebase Cloud Messaging:</p>
+              <pre style={{ background: '#f8fafc', padding: 10, borderRadius: 6, fontSize: 12, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                {String(res.reason || 'Unknown error')}
+              </pre>
+            </div>
+          )
+        });
       }
     } catch (e) {
-      message.error(e.message || 'حدث خطأ');
+      message.error(e.message || 'حدث خطأ غير متوقع');
     } finally {
       setLoading(false);
     }
@@ -56,14 +73,15 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
     }
   };
 
-  const isGranted = status.permission === 'granted';
+  const isFullyActive = status.permission === 'granted' && status.hasToken;
+  const isPermissionGrantedOnly = status.permission === 'granted' && !status.hasToken;
 
   return (
     <>
-      <Badge dot={!isGranted} offset={[-4, 4]} color="#C8A45C">
+      <Badge dot={!isFullyActive} offset={[-4, 4]} color={isFullyActive ? '#10b981' : '#C8A45C'}>
         <Button
           type="text"
-          icon={<BellOutlined style={{ fontSize: isMobile ? 18 : 17, color: isGranted ? '#10b981' : '#C8A45C' }} />}
+          icon={<BellOutlined style={{ fontSize: isMobile ? 18 : 17, color: isFullyActive ? '#10b981' : '#C8A45C' }} />}
           onClick={() => {
             refreshStatus();
             setOpen(true);
@@ -73,8 +91,8 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
             height: isMobile ? 32 : 36,
             padding: 0,
             borderRadius: 8,
-            backgroundColor: isGranted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(200, 164, 92, 0.12)',
-            border: `1px solid ${isGranted ? '#10b981' : '#C8A45C'}`,
+            backgroundColor: isFullyActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(200, 164, 92, 0.12)',
+            border: `1px solid ${isFullyActive ? '#10b981' : '#C8A45C'}`,
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -102,9 +120,13 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
             <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>
               حالة الإشعارات على هذا الجهاز:
             </Text>
-            {isGranted ? (
+            {isFullyActive ? (
               <Tag color="success" icon={<CheckCircleOutlined />} style={{ padding: '4px 10px', fontSize: 13 }}>
-                الإشعارات مفعلة ونشطة على هذا الجهاز ✅
+                الإشعارات مفعلة والجهاز مسجل بالكامل ✅
+              </Tag>
+            ) : isPermissionGrantedOnly ? (
+              <Tag color="warning" icon={<SyncOutlined spin />} style={{ padding: '4px 10px', fontSize: 13 }}>
+                الإذن مسموح، بانتظار تسجيل رمز الجهاز في Firebase ⚠️
               </Tag>
             ) : status.permission === 'denied' ? (
               <Tag color="error" icon={<ExclamationCircleOutlined />} style={{ padding: '4px 10px', fontSize: 13 }}>
@@ -127,12 +149,12 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
               color: '#92400e',
               marginBottom: 16
             }}>
-              💡 <strong>تنبيه لمستخدمي الآيفون:</strong> نظام iOS يتطلب تثبيت التطبيق على الشاشة الرئيسية أولاً لاستقبال الإشعارات (زر المشاركة ⎋ {' > '} إضافة إلى الصفحة الرئيسية).
+              💡 <strong>تنبيه لمستخدمي الآيفون:</strong> نظام iOS يتطلب تثبيت التطبيق على الشاشة الرئيسية أولاً لاستقبال الإشعارات (زر المشاركة ⎋ &gt; إضافة إلى الصفحة الرئيسية).
             </div>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
-            {!isGranted ? (
+            {!isFullyActive ? (
               <Button
                 type="primary"
                 size="large"
@@ -147,7 +169,7 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
                   borderRadius: 8
                 }}
               >
-                تفعيل الإشعارات على هذا الجهاز الآن 🔔
+                {isPermissionGrantedOnly ? 'إكمال تسجيل رمز الجهاز في Firebase 🔔' : 'تفعيل الإشعارات على هذا الجهاز الآن 🔔'}
               </Button>
             ) : (
               <Button
@@ -168,10 +190,10 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
               </Button>
             )}
 
-            {isGranted && (
+            {isFullyActive && (
               <Button
                 size="middle"
-                icon={<BellOutlined />}
+                icon={<SyncOutlined />}
                 loading={loading}
                 onClick={handleEnable}
                 style={{ borderRadius: 8 }}

@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import api from '../api';
 
 const firebaseConfig = {
@@ -16,10 +16,14 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || "BHkj5Yaub3nKoMaxB-
 let app = null;
 let messaging = null;
 
-export function initFirebaseClient() {
+export async function getMessagingInstance() {
   if (typeof window === 'undefined') return null;
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-    console.warn('⚠️ [Push Notifications]: Browser does not support Service Workers or Push Notifications.');
+    return null;
+  }
+
+  const supported = await isSupported().catch(() => false);
+  if (!supported) {
     return null;
   }
 
@@ -30,7 +34,8 @@ export function initFirebaseClient() {
     try {
       messaging = getMessaging(app);
     } catch (e) {
-      console.warn('⚠️ [Push Notifications]: Could not initialize messaging instance:', e.message);
+      console.warn('⚠️ [Push Notifications]: Could not initialize messaging:', e.message);
+      return null;
     }
   }
   return messaging;
@@ -62,7 +67,7 @@ export function detectPlatform() {
  */
 export function getNotificationStatus() {
   if (typeof window === 'undefined') {
-    return { supported: false, permission: 'unsupported', isIOS: false, isStandalone: false };
+    return { supported: false, permission: 'unsupported', isIOS: false, isStandalone: false, hasToken: false };
   }
 
   const isIOS = /ipad|iphone|ipod/i.test(navigator.userAgent);
@@ -89,30 +94,42 @@ export function getNotificationStatus() {
 export async function requestNotificationPermission() {
   try {
     if (typeof window === 'undefined') {
-      return { success: false, reason: 'unsupported' };
+      return { success: false, reason: 'نافذة المتصفح غير متوفرة (Window not defined)' };
     }
 
     if (!('Notification' in window)) {
-      return { success: false, reason: 'not_supported' };
+      return { success: false, reason: 'المتصفح لا يدعم واجهة Notifications API' };
+    }
+
+    if (!('serviceWorker' in navigator)) {
+      return { success: false, reason: 'المتصفح لا يدعم Service Workers' };
     }
 
     // 1. Explicitly trigger browser permission prompt
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      console.log('ℹ️ [Push Notifications]: Permission was not granted:', permission);
       return { success: false, reason: permission };
     }
 
-    if (!('serviceWorker' in navigator)) {
-      return { success: false, reason: 'sw_not_supported' };
+    // 2. Check if Firebase Messaging is supported in this browser environment
+    const supported = await isSupported().catch((err) => {
+      console.warn('isSupported check error:', err);
+      return false;
+    });
+
+    if (!supported) {
+      return {
+        success: false,
+        reason: 'Firebase Messaging غير مدعوم في هذا المتصفح. على الآيفون يجب فتح التطبيق كـ PWA مثبت على الشاشة الرئيسية.'
+      };
     }
 
-    const messagingInstance = initFirebaseClient();
-    if (!messagingInstance) {
-      return { success: false, reason: 'firebase_init_failed' };
+    // 3. Initialize Firebase
+    if (!app) {
+      app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
     }
 
-    // 2. Register Service Worker with robust fallback paths
+    // 4. Register Service Worker
     const base = import.meta.env.BASE_URL || '/';
     const primarySwPath = `${base.replace(/\/$/, '')}/firebase-messaging-sw.js`;
     let registration = null;
@@ -122,26 +139,40 @@ export async function requestNotificationPermission() {
         scope: base
       });
     } catch (swErr) {
-      console.warn('⚠️ [Push Notifications]: First SW path failed, trying root fallback:', swErr.message);
+      console.warn('⚠️ [Push Notifications]: Primary SW path failed, fallback to root:', swErr.message);
       registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
         scope: '/'
       });
     }
 
+    // Ensure service worker is activated
+    if (registration.installing) {
+      await new Promise((resolve) => {
+        registration.installing.addEventListener('statechange', function onStateChange() {
+          if (this.state === 'activated' || this.state === 'installed') {
+            this.removeEventListener('statechange', onStateChange);
+            resolve();
+          }
+        });
+        setTimeout(resolve, 2500);
+      });
+    }
     await navigator.serviceWorker.ready;
 
-    // 3. Get FCM Token with VAPID Key
+    // 5. Get Messaging instance
+    const messagingInstance = getMessaging(app);
+
+    // 6. Get FCM Token with VAPID Key
     const fcmToken = await getToken(messagingInstance, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: registration
     });
 
     if (!fcmToken) {
-      console.warn('⚠️ [Push Notifications]: No registration token available.');
-      return { success: false, reason: 'token_empty' };
+      return { success: false, reason: 'لم يتمكن Firebase من إنشاء رمز للجهاز (Token فارغ).' };
     }
 
-    // 4. Send token to backend
+    // 7. Send token to backend
     const deviceType = detectDeviceType();
     const platform = detectPlatform();
     const deviceName = `${platform.toUpperCase()} (${deviceType})`;
@@ -154,30 +185,30 @@ export async function requestNotificationPermission() {
     });
 
     localStorage.setItem('swm_fcm_token', fcmToken);
-    console.log('✅ [Push Notifications]: Subscribed successfully with FCM Token');
+    console.log('✅ [Push Notifications]: Subscribed successfully with FCM Token:', fcmToken);
     return { success: true, token: fcmToken };
   } catch (err) {
     console.error('❌ [Push Notifications]: Error requesting permission / token:', err);
-    return { success: false, reason: err.message };
+    return { success: false, reason: err.message || String(err) };
   }
 }
 
 /**
  * Listen for messages while the app is in the foreground
  */
-export function onForegroundMessage(callback) {
+export async function onForegroundMessage(callback) {
   try {
-    const messagingInstance = initFirebaseClient();
+    const messagingInstance = await getMessagingInstance();
     if (!messagingInstance) return () => {};
 
     return onMessage(messagingInstance, (payload) => {
-      console.log('🔔 [Push Notifications Foreground]:', payload);
+      console.log('📬 [Foreground Push]:', payload);
       if (typeof callback === 'function') {
         callback(payload);
       }
     });
-  } catch (e) {
-    console.warn('⚠️ [Push Notifications]: Could not attach foreground listener:', e.message);
+  } catch (err) {
+    console.warn('⚠️ [Push Notifications]: Failed to bind foreground listener:', err);
     return () => {};
   }
 }
