@@ -121,10 +121,13 @@ function logActivity({
       'CREATE_PURCHASE', 'VOID_PURCHASE', 'CREATE_TRANSFER', 'APPROVE_TRANSFER',
       'CREATE_STOCK_ADJUSTMENT', 'FINALIZE_STOCK_AUDIT', 'CREATE_EXPENSE',
       'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', 'CREATE_CASH_TRANSFER',
-      'POS_SALE', 'POS_RETURN'
+      'POS_RETURN'
     ];
 
     const shouldNotify = (role) => {
+      // Do not send push notifications for standard POS sales
+      if (actionType === 'POS_SALE') return false;
+
       if (role === 'warehouse_manager') return true;
       if (criticalStaffActions.includes(actionType)) return true;
       return false;
