@@ -110,7 +110,9 @@ const ACTION_TITLES_AR = {
   UPDATE_STORE_SETTINGS: 'تعديل إعدادات المتجر ⚙️',
   CREATE_USER: 'إنشاء حساب مستخدم 👤',
   UPDATE_USER: 'تعديل حساب مستخدم ✏️',
-  DELETE_USER: 'حذف مستخدم 🗑️'
+  DELETE_USER: 'حذف مستخدم 🗑️',
+  POS_SALE: 'عملية بيع جديدة في الفرع 🛒',
+  POS_RETURN: 'عملية مرتجع مبيعات 🔄'
 };
 
 /**

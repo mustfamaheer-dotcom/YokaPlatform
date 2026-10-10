@@ -93,16 +93,31 @@ function logActivity({
       treasury: '/dashboard/treasury_admin',
       expenses: '/dashboard/payroll_expenses',
       users: '/dashboard/users',
-      store_settings: '/dashboard/store_settings'
+      store_settings: '/dashboard/store_settings',
+      invoices: '/dashboard/sales_reports',
+      sales: '/dashboard/sales_reports',
+      pos: '/dashboard/sales_reports'
     };
     const effectiveUrl = actionUrl || urlMap[entityType] || '/dashboard';
     const summaryDetail = notifySummary || notes || (newValue ? (newValue.product_name || newValue.invoice_number || newValue.transfer_number || null) : null);
 
-    // If role is known to be warehouse_manager, send push immediately
-    if (effectiveRole === 'warehouse_manager') {
+    const criticalStaffActions = [
+      'CREATE_PURCHASE', 'VOID_PURCHASE', 'CREATE_TRANSFER', 'APPROVE_TRANSFER',
+      'CREATE_STOCK_ADJUSTMENT', 'FINALIZE_STOCK_AUDIT', 'CREATE_EXPENSE',
+      'CREATE_PRODUCT', 'UPDATE_PRODUCT', 'DELETE_PRODUCT', 'CREATE_CASH_TRANSFER',
+      'POS_SALE', 'POS_RETURN'
+    ];
+
+    const shouldNotify = (role) => {
+      if (role === 'warehouse_manager') return true;
+      if (criticalStaffActions.includes(actionType) && role !== 'super_admin') return true;
+      return false;
+    };
+
+    if (effectiveRole && shouldNotify(effectiveRole)) {
       notifyOwnerOfAction({
         triggeredByUserId: effectiveUserId,
-        triggeredByName: effectiveName || 'مدير المخازن',
+        triggeredByName: effectiveName || (effectiveRole === 'warehouse_manager' ? 'مدير المخازن' : 'موظف الفرع'),
         actionType,
         entityType,
         entityId,
@@ -112,13 +127,12 @@ function logActivity({
         console.error('⚠️ [ActivityLogger Push Notification Error]:', pushErr.message);
       });
     } else if (!effectiveRole && effectiveUserId) {
-      // If role was not supplied, lookup user role asynchronously to ensure warehouse_manager actions are always captured
       query('SELECT role, full_name, username FROM users WHERE id = $1', [effectiveUserId])
         .then(([u]) => {
-          if (u && u.role === 'warehouse_manager') {
+          if (u && shouldNotify(u.role)) {
             notifyOwnerOfAction({
               triggeredByUserId: effectiveUserId,
-              triggeredByName: u.full_name || u.username || 'مدير المخازن',
+              triggeredByName: u.full_name || u.username || (u.role === 'warehouse_manager' ? 'مدير المخازن' : 'موظف الفرع'),
               actionType,
               entityType,
               entityId,
