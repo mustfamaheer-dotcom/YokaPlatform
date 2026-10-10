@@ -639,13 +639,18 @@ export default function POS({ currentUser }) {
         setLastInvoice({
           ...res.data.data,
           items: res.data.items,
-          branch_name: sessionData?.register?.register_name,
+          branch_name: res.data.data?.branch_name || sessionData?.branch?.branch_name || activeUser?.branchName || 'الفرع الرئيسي',
+          register_name: sessionData?.register?.register_name,
+          cashier_name: res.data.data?.cashier_name || activeUser?.fullName || activeUser?.username || 'كاشير الفرع',
+          salesperson_name: res.data.data?.salesperson_name || activeUser?.fullName || activeUser?.username || 'كاشير الفرع',
+          customer_name: selectedCustomer?.full_name || res.data.data?.customer_name || 'عميل نقدي',
+          customer_phone: selectedCustomer?.phone || res.data.data?.customer_phone || null,
+          customer_code: selectedCustomer?.customer_code || res.data.data?.customer_code || null,
+          customer_points_balance: res.data.customer_points_balance !== undefined ? res.data.customer_points_balance : (selectedCustomer?.total_points || 0),
           isReturn: invoiceType === 'return',
-          points_earned: res.data.points_earned,
-          points_redeemed: res.data.points_redeemed,
-          points_discount: res.data.points_discount,
-          customer_points_balance: res.data.customer_points_balance,
-          customer_code: selectedCustomer?.customer_code || res.data.data?.customer_code
+          points_earned: res.data.points_earned || 0,
+          points_redeemed: res.data.points_redeemed || 0,
+          points_discount: res.data.points_discount || 0
         });
         setReceiptModalVisible(true);
         clearCart();

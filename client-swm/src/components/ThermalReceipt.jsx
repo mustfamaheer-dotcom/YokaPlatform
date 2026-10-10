@@ -1,11 +1,33 @@
 import React from 'react';
-import { Button, Typography, Space } from 'antd';
-import { PrinterOutlined, CloseOutlined, FilePdfOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Button, Typography } from 'antd';
+import { PrinterOutlined, FilePdfOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { Trophy } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { printHtmlContent } from '../utils/printUtils';
 
 const { Text } = Typography;
+
+/**
+ * Robust date and time formatter avoiding iOS Arabic locale NaN/empty slashes
+ */
+function formatReceiptDate(dateVal) {
+  if (!dateVal) dateVal = new Date();
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return new Date().toLocaleDateString('ar-EG');
+
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'م' : 'ص';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const formattedHours = String(hours).padStart(2, '0');
+
+  return `${y}/${m}/${day} - ${formattedHours}:${minutes} ${ampm}`;
+}
 
 export default function ThermalReceipt({ invoice, onClose }) {
   if (!invoice) return null;
@@ -145,7 +167,7 @@ export default function ThermalReceipt({ invoice, onClose }) {
               ? 'إيصال مرتجع مبيعات (Return)'
               : 'إيصال استلام مبيعات (Sale)'}
           </div>
-          <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: 2 }}>
+          <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
             {invoice.branch_name || 'الفرع الرئيسي'}
           </div>
           {invoice.branch_phone && (
@@ -163,17 +185,24 @@ export default function ThermalReceipt({ invoice, onClose }) {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
             <span style={{ color: '#64748b', fontWeight: 600 }}>التاريخ والوقت:</span>
-            <span style={{ fontFamily: 'monospace', fontSize: '10.5px' }}>
-              {new Date(invoice.invoice_date || invoice.created_at).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}
+            <span style={{ fontFamily: 'monospace', fontSize: '10.5px', fontWeight: 700 }}>
+              {formatReceiptDate(invoice.invoice_date || invoice.created_at)}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
-            <span style={{ color: '#64748b', fontWeight: 600 }}>الكاشير:</span>
-            <span style={{ fontWeight: 600 }}>{invoice.cashier_name || 'كاشير الفرع'}</span>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>الفرع:</span>
+            <strong style={{ color: '#0f172a', fontWeight: 800 }}>{invoice.branch_name || 'الفرع الرئيسي'}</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>البائع / الكاشير:</span>
+            <strong style={{ color: '#0f172a', fontWeight: 700 }}>{invoice.cashier_name || invoice.salesperson_name || 'كاشير الفرع'}</strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
             <span style={{ color: '#64748b', fontWeight: 600 }}>العميل:</span>
-            <span style={{ fontWeight: 600 }}>{invoice.customer_name || 'عميل نقدي'}</span>
+            <strong style={{ color: '#0f172a', fontWeight: 800 }}>
+              {invoice.customer_name || 'عميل نقدي'}
+              {invoice.customer_phone ? ` (${invoice.customer_phone})` : ''}
+            </strong>
           </div>
         </div>
 
@@ -290,37 +319,42 @@ export default function ThermalReceipt({ invoice, onClose }) {
         </div>
 
         {/* Customer Loyalty & Points Accrual Block */}
-        {((invoice.points_earned > 0) || (invoice.points_redeemed > 0) || (invoice.customer_points_balance !== undefined && invoice.customer_points_balance !== null)) && (
+        {(invoice.customer_code || (invoice.points_earned > 0) || (invoice.points_redeemed > 0) || (invoice.customer_points_balance !== undefined && invoice.customer_points_balance !== null && invoice.customer_points_balance !== '')) && (
           <div style={{
-            fontSize: '10px',
+            fontSize: '10.5px',
             background: '#fffdf5',
-            padding: '6px 8px',
+            padding: '7px 9px',
             borderRadius: 6,
             marginBottom: 8,
-            border: '1px dashed #C8A45C',
+            border: '1.5px dashed #C8A45C',
             textAlign: 'center'
           }}>
-            <div style={{ fontWeight: 800, color: '#92400e', marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <Trophy size={11} style={{ color: '#b45309' }} /> برنامج ولاء العملاء (Yoka Points)
+            <div style={{ fontWeight: 800, color: '#92400e', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: '11px' }}>
+              <Trophy size={13} style={{ color: '#b45309' }} /> برنامج ولاء العملاء (Yoka Points)
             </div>
+            {invoice.customer_name && invoice.customer_name !== 'عميل نقدي' && invoice.customer_name !== 'Walk-in Customer' && (
+              <div style={{ color: '#0f172a', fontSize: '10.5px', marginBottom: 2 }}>
+                العميل: <strong>{invoice.customer_name}</strong>
+              </div>
+            )}
             {invoice.customer_code && (
-              <div style={{ color: '#475569', fontSize: '9px' }}>
+              <div style={{ color: '#475569', fontSize: '10px', marginBottom: 2 }}>
                 كود العميل: <strong>{invoice.customer_code}</strong>
               </div>
             )}
             {invoice.points_redeemed > 0 && (
-              <div style={{ color: '#b45309' }}>
+              <div style={{ color: '#b91c1c', fontWeight: 700 }}>
                 تم استبدال: <strong>{invoice.points_redeemed}</strong> نقطة (خصم {parseFloat(invoice.points_discount || 0).toFixed(2)} ج.م)
               </div>
             )}
             {invoice.points_earned > 0 && (
-              <div style={{ color: '#15803d' }}>
+              <div style={{ color: '#15803d', fontWeight: 700 }}>
                 نقاط مكتسبة بهذه الفاتورة: <strong>+{invoice.points_earned}</strong> نقطة
               </div>
             )}
             {invoice.customer_points_balance !== undefined && invoice.customer_points_balance !== null && (
-              <div style={{ fontWeight: 700, color: '#0f172a', borderTop: '1px dashed #e2e8f0', marginTop: 3, paddingTop: 2 }}>
-                رصيد نقاطك الحالي: <strong>{invoice.customer_points_balance}</strong> نقطة
+              <div style={{ fontWeight: 800, color: '#0f172a', borderTop: '1px dashed #e2e8f0', marginTop: 4, paddingTop: 3, fontSize: '11px' }}>
+                رصيد نقاطك الحالي: <strong style={{ color: '#b45309', fontSize: '12px' }}>{invoice.customer_points_balance}</strong> نقطة
               </div>
             )}
           </div>

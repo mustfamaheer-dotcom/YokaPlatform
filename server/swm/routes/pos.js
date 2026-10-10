@@ -1077,9 +1077,30 @@ router.post('/sale', requireAuth, requireBranchScope, async (req, res) => {
         }
       }
 
+      // Resolve branch and cashier information for complete receipt details
+      const [branchInfo] = (await client.query(
+        `SELECT branch_name, branch_code, phone FROM branches WHERE id = $1`,
+        [branchId]
+      )).rows;
+
+      const [userInfo] = (await client.query(
+        `SELECT id, username, full_name FROM users WHERE id = $1`,
+        [effectiveUserId]
+      )).rows;
+
+      const sellerDisplayName = userInfo ? (userInfo.full_name || userInfo.username) : (req.user?.fullName || req.user?.username || 'كاشير الفرع');
+      const branchDisplayName = branchInfo ? branchInfo.branch_name : 'الفرع الرئيسي';
+
       return {
         invoice: {
           ...invoice,
+          branch_name: branchDisplayName,
+          branch_code: branchInfo?.branch_code || null,
+          branch_phone: branchInfo?.phone || null,
+          cashier_name: sellerDisplayName,
+          salesperson_name: sellerDisplayName,
+          customer_name: customerRow ? customerRow.full_name : (customer_name || 'عميل نقدي'),
+          customer_phone: customerRow ? customerRow.phone : (customer_phone || null),
           customer_code: customerRow?.customer_code || null,
           customer_points_balance: finalCustomerBalance
         },
@@ -1441,7 +1462,37 @@ router.post('/return', requireAuth, requireBranchScope, async (req, res) => {
         }
       }
 
-      return { invoice, items: savedItems, cashRefund, pointsReversed };
+      // Resolve branch and cashier information for return receipt
+      const [branchInfo] = (await client.query(
+        `SELECT branch_name, branch_code, phone FROM branches WHERE id = $1`,
+        [branchId]
+      )).rows;
+
+      const [userInfo] = (await client.query(
+        `SELECT id, username, full_name FROM users WHERE id = $1`,
+        [effectiveUserId]
+      )).rows;
+
+      const sellerDisplayName = userInfo ? (userInfo.full_name || userInfo.username) : (req.user?.fullName || req.user?.username || 'كاشير الفرع');
+      const branchDisplayName = branchInfo ? branchInfo.branch_name : 'الفرع الرئيسي';
+
+      return {
+        invoice: {
+          ...invoice,
+          branch_name: branchDisplayName,
+          branch_code: branchInfo?.branch_code || null,
+          branch_phone: branchInfo?.phone || null,
+          cashier_name: sellerDisplayName,
+          salesperson_name: sellerDisplayName,
+          customer_name: customerRow ? customerRow.full_name : (customer_name || 'عميل نقدي'),
+          customer_phone: customerRow ? customerRow.phone : (customer_phone || null),
+          customer_code: customerRow?.customer_code || null,
+          customer_points_balance: customerRow ? Math.max(0, parseInt(customerRow.total_points || 0, 10) - pointsReversed) : 0
+        },
+        items: savedItems,
+        cashRefund,
+        pointsReversed
+      };
     });
 
     logActivity({
