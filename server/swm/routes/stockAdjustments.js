@@ -401,6 +401,9 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/stock_audit',
       branchId: branchId,
       actionType: 'CREATE_STOCK_ADJUSTMENT',
       entityType: 'stock_adjustments',

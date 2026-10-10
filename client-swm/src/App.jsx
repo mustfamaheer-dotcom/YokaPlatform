@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Spin, App as AntApp } from 'antd';
+import { Spin, App as AntApp, notification } from 'antd';
 import Login from './pages/Login';
 import SellerApp from './pages/pos/SellerApp';
 import SupervisorDashboard from './pages/admin/SupervisorDashboard';
@@ -13,6 +13,7 @@ import AdminApp from './pages/admin/AdminApp';
 import EcomWarehouseApp from './pages/ecom/EcomWarehouseApp';
 import WarehouseManagerApp from './pages/warehouse/WarehouseManagerApp';
 import api from './api';
+import { requestNotificationPermission, onForegroundMessage } from './utils/pushNotifications';
 
 /**
  * Helper to identify if user belongs to an E-Commerce warehouse
@@ -135,6 +136,38 @@ export default function App() {
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
   };
+
+  // Push Notifications Setup for System Owner (super_admin)
+  useEffect(() => {
+    if (currentUser?.role === 'super_admin') {
+      requestNotificationPermission();
+
+      const unsubscribe = onForegroundMessage((payload) => {
+        const title = payload.notification?.title || payload.data?.title || 'إشعار فوري جديد';
+        const description = payload.notification?.body || payload.data?.body || '';
+        const targetUrl = payload.data?.actionUrl || '/dashboard';
+
+        notification.open({
+          message: <span style={{ fontWeight: 800, color: '#C8A45C' }}>{title}</span>,
+          description: (
+            <div style={{ cursor: 'pointer' }} onClick={() => navigate(targetUrl)}>
+              <div>{description}</div>
+              <div style={{ marginTop: 4, fontSize: 11, color: '#0284c7', textDecoration: 'underline' }}>
+                انقر هنا للانتقال والتفاصيل
+              </div>
+            </div>
+          ),
+          placement: 'bottomLeft',
+          duration: 6,
+          onClick: () => navigate(targetUrl)
+        });
+      });
+
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      };
+    }
+  }, [currentUser]);
 
   const handleLogout = async () => {
     try {

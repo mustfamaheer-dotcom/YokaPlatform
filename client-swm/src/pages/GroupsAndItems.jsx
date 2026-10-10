@@ -55,6 +55,7 @@ import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import BarcodeImage from '../components/BarcodeImage';
 import { generateValidEAN13 } from '../utils/barcode';
+import { canDelete } from '../utils/permissions';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -101,8 +102,11 @@ function buildVariantSku(productCode, colorName, sizeName, colorIndex = 0, sizeI
   return `${code}-${cCode}-${sCode}`;
 }
 
-export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
+export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, onResetAction }) {
   const navigate = useNavigate();
+  const currentUser = propUser || (() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch (e) { return null; }
+  })();
   const [activeTab, setActiveTab] = useState('groups'); // 'groups' | 'attributes' | 'items'
 
   // ==========================================
@@ -850,22 +854,24 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
           >
             تعديل
           </Button>
-          <Popconfirm
-            title="تأكيد حذف المجموعة"
-            description={
-              parseInt(record.products_count, 10) > 0
-                ? `هذه المجموعة تحتوي على (${record.products_count}) صنف. هل أنت متأكد من حذفها؟ (ستبقى الأصناف محفوظة في النظام ولكن بدون مجموعة مربوطة).`
-                : 'هل أنت متأكد من حذف هذه المجموعة؟'
-            }
-            onConfirm={() => handleDeleteGroup(record.id)}
-            okText="نعم، موافق واحذف"
-            cancelText="إلغاء"
-            okButtonProps={{ danger: true }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              حذف
-            </Button>
-          </Popconfirm>
+          {canDelete(currentUser) && (
+            <Popconfirm
+              title="تأكيد حذف المجموعة"
+              description={
+                parseInt(record.products_count, 10) > 0
+                  ? `هذه المجموعة تحتوي على (${record.products_count}) صنف. هل أنت متأكد من حذفها؟ (ستبقى الأصناف محفوظة في النظام ولكن بدون مجموعة مربوطة).`
+                  : 'هل أنت متأكد من حذف هذه المجموعة؟'
+              }
+              onConfirm={() => handleDeleteGroup(record.id)}
+              okText="نعم، موافق واحذف"
+              cancelText="إلغاء"
+              okButtonProps={{ danger: true }}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                حذف
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -905,15 +911,17 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       render: (_, record) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEditAttr(record)} />
-          <Popconfirm
-            title="حذف المقاس"
-            description="هل أنت متأكد من حذف هذا المقاس من القائمة؟"
-            onConfirm={() => handleDeleteAttr(record.id)}
-            okText="نعم"
-            cancelText="إلغاء"
-          >
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {canDelete(currentUser) && (
+            <Popconfirm
+              title="حذف المقاس"
+              description="هل أنت متأكد من حذف هذا المقاس من القائمة؟"
+              onConfirm={() => handleDeleteAttr(record.id)}
+              okText="نعم"
+              cancelText="إلغاء"
+            >
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -968,15 +976,17 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
       render: (_, record) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenEditAttr(record)} />
-          <Popconfirm
-            title="حذف اللون"
-            description="هل أنت متأكد من حذف هذا اللون من القائمة؟"
-            onConfirm={() => handleDeleteAttr(record.id)}
-            okText="نعم"
-            cancelText="إلغاء"
-          >
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {canDelete(currentUser) && (
+            <Popconfirm
+              title="حذف اللون"
+              description="هل أنت متأكد من حذف هذا اللون من القائمة؟"
+              onConfirm={() => handleDeleteAttr(record.id)}
+              okText="نعم"
+              cancelText="إلغاء"
+            >
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -1161,18 +1171,20 @@ export default function GroupsAndItems({ autoOpenCreate, onResetAction }) {
           >
             تعديل
           </Button>
-          <Popconfirm
-            title="حذف الصنف"
-            description="هل أنت متأكد من حذف هذا الصنف؟ (سيتم حذفه أو تعطيله إذا كان مرتبطاً بحركات سابقة)"
-            onConfirm={() => handleDeleteItem(record.id)}
-            okText="نعم، احذف"
-            cancelText="إلغاء"
-            okButtonProps={{ danger: true }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              حذف
-            </Button>
-          </Popconfirm>
+          {canDelete(currentUser) && (
+            <Popconfirm
+              title="حذف الصنف"
+              description="هل أنت متأكد من حذف هذا الصنف؟ (سيتم حذفه أو تعطيله إذا كان مرتبطاً بحركات سابقة)"
+              onConfirm={() => handleDeleteItem(record.id)}
+              okText="نعم، احذف"
+              cancelText="إلغاء"
+              okButtonProps={{ danger: true }}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                حذف
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       )
     }

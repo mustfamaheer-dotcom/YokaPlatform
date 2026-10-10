@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { query } = require('../../shared/db');
-const { requireAuth } = require('../../shared/authMiddleware');
+const { requireAuth, requireRole } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 
 /**
@@ -169,7 +169,7 @@ router.put('/shipping-rates/:id', requireAuth, async (req, res) => {
  * DELETE /api/swm/orders/shipping-rates/:id
  * Remove city from shipping table
  */
-router.delete('/shipping-rates/:id', requireAuth, async (req, res) => {
+router.delete('/shipping-rates/:id', requireAuth, requireRole(['super_admin']), async (req, res) => {
   try {
     const { id } = req.params;
     await query(`DELETE FROM ecp_shipping_rates WHERE id = $1`, [id]);
@@ -300,7 +300,7 @@ router.put('/shipping-carriers/:id', requireAuth, async (req, res) => {
  * DELETE /api/swm/orders/shipping-carriers/:id
  * Delete shipping company
  */
-router.delete('/shipping-carriers/:id', requireAuth, async (req, res) => {
+router.delete('/shipping-carriers/:id', requireAuth, requireRole(['super_admin']), async (req, res) => {
   try {
     const { id } = req.params;
     await query(`DELETE FROM ecp_shipping_carriers WHERE id = $1`, [id]);
@@ -465,7 +465,7 @@ router.put('/payment-methods/:id', requireAuth, async (req, res) => {
  * DELETE /api/swm/orders/payment-methods/:id
  * Delete a payment method
  */
-router.delete('/payment-methods/:id', requireAuth, async (req, res) => {
+router.delete('/payment-methods/:id', requireAuth, requireRole(['super_admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const [method] = await query(`SELECT method_key FROM ecp_payment_methods WHERE id = $1`, [id]);

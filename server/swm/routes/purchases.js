@@ -507,6 +507,9 @@ router.post('/returns', requireAuth, requireRole(['super_admin', 'admin', 'inven
     // 6. Log Activity
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/purchases',
       branchId: warehouse_branch_id,
       actionType: 'PURCHASE_RETURN',
       entityType: 'purchase_returns',
@@ -966,8 +969,11 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/purchases',
       branchId: warehouse_branch_id,
-      actionType: 'CREATE_PURCHASE_INVOICE',
+      actionType: 'CREATE_PURCHASE',
       entityType: 'purchase_invoices',
       entityId: invoiceResult.invoice.id,
       newValue: {

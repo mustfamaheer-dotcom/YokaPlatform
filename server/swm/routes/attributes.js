@@ -150,7 +150,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_ma
  * DELETE /api/swm/attributes/:id
  * Delete size or color
  */
-router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'warehouse_manager']), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole(['super_admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const [attr] = await query(`SELECT * FROM product_attributes WHERE id = $1`, [id]);

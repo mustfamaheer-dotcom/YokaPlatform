@@ -1,0 +1,25 @@
+{
+  "name": "Yoka Store SWM — نظام إدارة المتاجر والمستودعات",
+  "short_name": "Yoka SWM",
+  "description": "نظام إدارة المبيعات، المخزون، ونقاط البيع المركزية — يوكا ستور",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F17",
+  "theme_color": "#C8A45C",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/yokaStoreTransparent.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/yokaStoreTransparent.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

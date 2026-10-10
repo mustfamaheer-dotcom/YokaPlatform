@@ -984,6 +984,7 @@ export default function WarehouseManagerApp({ currentUser, onLogout }) {
             {/* 1. إدارة المخزون والأصناف */}
             {activeTab === 'groups_items' && (
               <GroupsAndItems
+                currentUser={currentUser}
                 autoOpenCreate={tabExtra?.autoOpenCreate}
                 onResetAction={() => setTabExtra(null)}
               />

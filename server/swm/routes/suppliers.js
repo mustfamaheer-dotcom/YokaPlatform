@@ -148,6 +148,9 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/suppliers',
       branchId: req.user.branch_id || 1,
       actionType: 'CREATE_SUPPLIER',
       entityType: 'suppliers',

@@ -303,8 +303,11 @@ router.post('/counts', requireAuth, requireRole(['super_admin', 'admin', 'invent
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/stock_audit',
       branchId,
-      actionType: 'STOCK_COUNT_SUBMITTED',
+      actionType: 'CREATE_STOCK_AUDIT',
       entityType: 'inventory_counts',
       entityId: null,
       newValue: { count_session: sessionCode, items_count: items.length },
@@ -470,8 +473,11 @@ router.post('/counts/:session/convert-to-adjustment', requireAuth, requireRole([
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/stock_audit',
       branchId,
-      actionType: 'STOCK_COUNT_CONVERTED_TO_ADJUSTMENT',
+      actionType: 'FINALIZE_STOCK_AUDIT',
       entityType: 'stock_adjustments',
       entityId: adjustmentVoucher.id,
       newValue: { session, voucherNumber: adjustmentVoucher.adjustment_number },

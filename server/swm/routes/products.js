@@ -692,6 +692,9 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/groups_items',
       branchId: req.user.branchId,
       actionType: 'CREATE_PRODUCT',
       entityType: 'products',
@@ -816,6 +819,9 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/groups_items',
       branchId: req.user.branchId,
       actionType: priceChanged ? 'UPDATE_PRICE' : 'UPDATE_PRODUCT',
       entityType: 'products',
@@ -1063,7 +1069,7 @@ router.post('/:id/variants', requireAuth, requireRole(['super_admin', 'admin', '
  * DELETE /api/swm/products/:id
  * Soft delete product (sets status to 'discontinued')
  */
-router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager']), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole(['super_admin']), async (req, res) => {
   try {
     const { id } = req.params;
 

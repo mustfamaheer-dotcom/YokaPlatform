@@ -49,6 +49,7 @@ import yokaLogo from '../assets/yokaStoreTransparent.png';
 import BarcodeImage from '../components/BarcodeImage';
 import { generateValidEAN13 } from '../utils/barcode';
 import useDebounce from '../hooks/useDebounce';
+import { canDelete } from '../utils/permissions';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -190,6 +191,8 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
     } finally {
       setLoading(false);
     }
+  };
+
   // Fetch categories
   const fetchCategories = async () => {
     try {
@@ -795,18 +798,20 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
             تعديل
           </Button>
 
-          <Popconfirm
-            title="حذف المنتج؟"
-            description="سيتم تحويل حالة المنتج إلى غير نشط (Discontinued)."
-            onConfirm={() => handleDeleteProduct(record.id)}
-            okText="نعم، احذف"
-            cancelText="إلغاء"
-            okButtonProps={{ danger: true }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              حذف
-            </Button>
-          </Popconfirm>
+          {canDelete(currentUser) && (
+            <Popconfirm
+              title="حذف المنتج؟"
+              description="سيتم تحويل حالة المنتج إلى غير نشط (Discontinued)."
+              onConfirm={() => handleDeleteProduct(record.id)}
+              okText="نعم، احذف"
+              cancelText="إلغاء"
+              okButtonProps={{ danger: true }}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                حذف
+              </Button>
+            </Popconfirm>
+          )}
         </Space>
       )
     }

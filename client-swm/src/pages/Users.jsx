@@ -48,6 +48,7 @@ import {
   PhoneOutlined
 } from '@ant-design/icons';
 import api from '../api';
+import { canDelete } from '../utils/permissions';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -682,6 +683,20 @@ export default function Users({ currentUser, autoOpenCreate, onResetAction }) {
       width: 100,
       render: (status, record) => {
         const isActive = status === 'active';
+        if (!canDelete(currentUser)) {
+          return (
+            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+              <Switch
+                checked={isActive}
+                disabled
+                checkedChildren="نشط"
+                unCheckedChildren="معطل"
+                style={{ backgroundColor: isActive ? '#16a34a' : undefined, opacity: 0.8 }}
+              />
+            </div>
+          );
+        }
+
         return (
           <Tooltip title={isActive ? 'انقر لتعطيل الحساب' : 'انقر لتفعيل الحساب'}>
             <Popconfirm

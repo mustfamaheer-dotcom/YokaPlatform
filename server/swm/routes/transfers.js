@@ -531,8 +531,11 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_ma
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/transfers',
       branchId: fromId,
-      actionType: 'STOCK_TRANSFER_COMPLETED',
+      actionType: 'CREATE_TRANSFER',
       entityType: 'stock_transfers',
       entityId: result.transfer.id,
       newValue: {

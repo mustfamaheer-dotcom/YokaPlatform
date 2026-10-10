@@ -54,6 +54,7 @@ import api from '../api';
 import ShippingWaybillA4 from '../components/ShippingWaybillA4';
 import StoreSettings from './StoreSettings';
 import VisitorAnalytics from '../components/VisitorAnalytics';
+import { canDelete } from '../utils/permissions';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -66,6 +67,9 @@ export default function Orders({
   hideHeader = false
 }) {
   const { message } = AntdApp.useApp();
+  const activeUser = currentUser || (() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch (e) { return null; }
+  })();
   const [internalActiveTab, setInternalActiveTab] = useState('orders');
 
   const currentTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
@@ -650,7 +654,7 @@ export default function Orders({
             </Button>
           </Tooltip>
 
-          {r.method_key !== 'cod' && (
+          {canDelete(activeUser) && r.method_key !== 'cod' && (
             <Popconfirm
               title="حذف طريقة الدفع؟"
               description="هل أنت متأكد من حذف طريقة الدفع هذه؟"
@@ -936,20 +940,22 @@ export default function Orders({
             </Button>
           </Tooltip>
 
-          <Popconfirm
-            title="حذف المدينة؟"
-            description="هل أنت متأكد من حذف هذه المدينة من قائمة الشحن؟"
-            onConfirm={() => handleDeleteRate(r.id)}
-            okText="نعم، حذف"
-            cancelText="إلغاء"
-            okButtonProps={{ danger: true }}
-          >
-            <Tooltip title="حذف المدينة">
-              <Button size="middle" danger ghost icon={<DeleteOutlined />}>
-                حذف
-              </Button>
-            </Tooltip>
-          </Popconfirm>
+          {canDelete(activeUser) && (
+            <Popconfirm
+              title="حذف المدينة؟"
+              description="هل أنت متأكد من حذف هذه المدينة من قائمة الشحن؟"
+              onConfirm={() => handleDeleteRate(r.id)}
+              okText="نعم، حذف"
+              cancelText="إلغاء"
+              okButtonProps={{ danger: true }}
+            >
+              <Tooltip title="حذف المدينة">
+                <Button size="middle" danger ghost icon={<DeleteOutlined />}>
+                  حذف
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       )
     }
@@ -1017,20 +1023,22 @@ export default function Orders({
             </Button>
           </Tooltip>
 
-          <Popconfirm
-            title="حذف شركة الشحن؟"
-            description="هل أنت متأكد من حذف هذه الشركة من قائمة شركات الشحن؟"
-            onConfirm={() => handleDeleteCarrier(r.id)}
-            okText="نعم، حذف"
-            cancelText="إلغاء"
-            okButtonProps={{ danger: true }}
-          >
-            <Tooltip title="حذف شركة الشحن">
-              <Button size="middle" danger ghost icon={<DeleteOutlined />}>
-                حذف
-              </Button>
-            </Tooltip>
-          </Popconfirm>
+          {canDelete(activeUser) && (
+            <Popconfirm
+              title="حذف شركة الشحن؟"
+              description="هل أنت متأكد من حذف هذه الشركة من قائمة شركات الشحن؟"
+              onConfirm={() => handleDeleteCarrier(r.id)}
+              okText="نعم، حذف"
+              cancelText="إلغاء"
+              okButtonProps={{ danger: true }}
+            >
+              <Tooltip title="حذف شركة الشحن">
+                <Button size="middle" danger ghost icon={<DeleteOutlined />}>
+                  حذف
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       )
     }

@@ -1623,7 +1623,7 @@ router.post('/expense-categories', requireAuth, requireRole(['super_admin', 'adm
  * DELETE /api/swm/pos/expense-categories
  * Remove an expense category across all branches
  */
-router.delete('/expense-categories', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
+router.delete('/expense-categories', requireAuth, requireRole(['super_admin']), async (req, res) => {
   try {
     const { category } = req.body;
     if (!category) return res.status(400).json({ success: false, message: 'يرجى تحديد التصنيف المراد حذفه' });

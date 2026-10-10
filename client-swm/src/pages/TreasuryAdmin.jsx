@@ -49,6 +49,7 @@ import {
 } from 'recharts';
 import dayjs from 'dayjs';
 import api from '../api';
+import { canDelete } from '../utils/permissions';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -96,8 +97,11 @@ const getExpenseArabicLabel = (subcat, cat) => {
   return subcat || cat || 'مصروفات تشغيلية أخرى';
 };
 
-export default function TreasuryAdmin() {
+export default function TreasuryAdmin({ currentUser: propUser }) {
   const navigate = useNavigate();
+  const currentUser = propUser || (() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch (e) { return null; }
+  })();
   const [kpis, setKpis]                         = useState(null);
   const [transfers, setTransfers]               = useState([]);
   const [ownerData, setOwnerData]               = useState(null);
@@ -847,22 +851,24 @@ export default function TreasuryAdmin() {
                 </Button>
               </Popconfirm>
 
-              <Popconfirm
-                title="رفض وإرجاع المبلغ لخزنة الفرع؟"
-                okText="رفض"
-                cancelText="إلغاء"
-                okType="danger"
-                onConfirm={() => handleCancel(record.id)}
-              >
-                <Button
-                  size="small"
-                  danger
-                  icon={<CloseCircleOutlined />}
-                  loading={cancellingId === record.id}
+              {canDelete(currentUser) && (
+                <Popconfirm
+                  title="رفض وإرجاع المبلغ لخزنة الفرع؟"
+                  okText="رفض"
+                  cancelText="إلغاء"
+                  okType="danger"
+                  onConfirm={() => handleCancel(record.id)}
                 >
-                  رفض
-                </Button>
-              </Popconfirm>
+                  <Button
+                    size="small"
+                    danger
+                    icon={<CloseCircleOutlined />}
+                    loading={cancellingId === record.id}
+                  >
+                    رفض
+                  </Button>
+                </Popconfirm>
+              )}
             </>
           )}
         </Space>
@@ -2689,13 +2695,15 @@ export default function TreasuryAdmin() {
                   تأكيد الاستلام
                 </Button>
               </Popconfirm>
-              <Popconfirm
-                title="رفض وإرجاع المبلغ للفرع؟"
-                okText="رفض" cancelText="إلغاء" okType="danger"
-                onConfirm={() => { handleCancel(detailRecord.id); setDetailVisible(false); }}
-              >
-                <Button danger icon={<CloseCircleOutlined />}>رفض الطلب</Button>
-              </Popconfirm>
+              {canDelete(currentUser) && (
+                <Popconfirm
+                  title="رفض وإرجاع المبلغ للفرع؟"
+                  okText="رفض" cancelText="إلغاء" okType="danger"
+                  onConfirm={() => { handleCancel(detailRecord.id); setDetailVisible(false); }}
+                >
+                  <Button danger icon={<CloseCircleOutlined />}>رفض الطلب</Button>
+                </Popconfirm>
+              )}
             </Space>
           ) : (
             <Button onClick={() => setDetailVisible(false)}>إغلاق</Button>

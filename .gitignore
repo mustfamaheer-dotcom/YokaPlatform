@@ -18,3 +18,5 @@ server/scripts/backup-images-*.csv
 scratch/
 __pycache__/
 *.py[cod]
+*firebase-adminsdk*.json
+*-adminsdk-*.json

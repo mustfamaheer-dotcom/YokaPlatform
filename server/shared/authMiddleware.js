@@ -43,8 +43,11 @@ function requireRole(allowedRoles = []) {
       });
     }
 
-    // super_admin & admin always bypass role restrictions with complete system authority across all functions
-    if (['super_admin', 'admin'].includes(req.user.role)) {
+    // super_admin always has full authority; admin bypasses unless route strictly requires super_admin only
+    if (req.user.role === 'super_admin') {
+      return next();
+    }
+    if (req.user.role === 'admin' && (allowedRoles.includes('admin') || !allowedRoles.includes('super_admin'))) {
       return next();
     }
 

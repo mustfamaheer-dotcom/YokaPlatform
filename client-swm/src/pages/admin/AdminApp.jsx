@@ -1079,6 +1079,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         )}
         {(activeTab === 'products' || activeTab === 'groups_items') && (
           <GroupsAndItems
+            currentUser={currentUser}
             autoOpenCreate={tabExtra?.autoOpenCreate}
             onResetAction={() => setTabExtra(null)}
           />
@@ -1112,7 +1113,7 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             <SellerPayrollAndExpenseCategoriesCards currentUser={currentUser} />
           </div>
         )}
-        {activeTab === 'treasury_admin' && <TreasuryAdmin />}
+        {activeTab === 'treasury_admin' && <TreasuryAdmin currentUser={currentUser} />}
         {activeTab === 'branches_daily' && <BranchesDaily currentUser={currentUser} />}
         {activeTab === 'admin_journals' && <AdminJournals currentUser={currentUser} />}
         {(activeTab === 'sales_reports' || activeTab === 'retail_analytics') && (

@@ -93,6 +93,10 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+// 5b. Security: Global Delete Protection Guard (Owner-Only Deletions)
+const deleteGuard = require('../shared/deleteGuard');
+app.use('/api/', deleteGuard);
+
 // 6. Security: Stricter Limiter for Authentication Endpoints (Brute Force Protection)
 const isDev = process.env.NODE_ENV !== 'production';
 const authLimiter = rateLimit({
@@ -162,6 +166,8 @@ app.use('/api/branch-shifts-monitor', branchShiftsMonitorRoutes);
 app.use('/api/branch-shifts', branchShiftsMonitorRoutes);
 const loyaltyRoutes = require('./routes/loyalty');
 app.use('/api/swm/loyalty', loyaltyRoutes);
+const pushRoutes = require('./routes/pushSubscriptions');
+app.use('/api/swm/push', pushRoutes);
 
 
 // ECP (E-Commerce Platform) Public API Routes

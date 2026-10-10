@@ -138,7 +138,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_ma
 /**
  * DELETE /api/swm/categories/:id
  */
-router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin', 'content_manager', 'inventory_manager', 'warehouse_manager']), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole(['super_admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const [cat] = await query(`SELECT * FROM product_categories WHERE id = $1`, [id]);
