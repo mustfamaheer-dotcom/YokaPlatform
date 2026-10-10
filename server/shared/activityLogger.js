@@ -110,7 +110,7 @@ function logActivity({
 
     const shouldNotify = (role) => {
       if (role === 'warehouse_manager') return true;
-      if (criticalStaffActions.includes(actionType) && role !== 'super_admin') return true;
+      if (criticalStaffActions.includes(actionType)) return true;
       return false;
     };
 
