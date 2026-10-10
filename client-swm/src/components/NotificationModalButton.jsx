@@ -42,14 +42,16 @@ export default function NotificationModalButton({ currentUser, isMobile = false 
       } else {
         Modal.error({
           title: 'فشل استخراج رمز الجهاز من Firebase',
+          zIndex: 100000,
           content: (
             <div style={{ textAlign: 'right', direction: 'rtl' }}>
               <p>حدث خطأ أثناء الاتصال بخدمة Firebase Cloud Messaging:</p>
-              <pre style={{ background: '#f8fafc', padding: 10, borderRadius: 6, fontSize: 12, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+              <pre style={{ background: '#f8fafc', color: '#0f172a', padding: 10, borderRadius: 6, fontSize: 12, wordBreak: 'break-word', whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>
                 {String(res.reason || 'Unknown error')}
               </pre>
             </div>
-          )
+          ),
+          okText: 'إغلاق'
         });
       }
     } catch (e) {

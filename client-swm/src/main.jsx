@@ -7,12 +7,15 @@ import App from './App';
 import { AntdAppBridge } from './utils/antAppBridge';
 import './index.css';
 
-// Ensure no rogue Service Worker or stale workbox cache controls /swm-admin
+// Ensure no rogue Service Worker controls /swm-admin, preserving firebase-messaging-sw
 if (typeof window !== 'undefined') {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       for (const reg of registrations) {
-        reg.unregister();
+        const scriptURL = reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '';
+        if (scriptURL && !scriptURL.includes('firebase-messaging-sw')) {
+          reg.unregister();
+        }
       }
     }).catch(() => {});
   }

@@ -10,7 +10,20 @@ export default function NotificationPermissionPrompt({ currentUser }) {
   const [status, setStatus] = useState(() => getNotificationStatus());
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem('swm_dismiss_notif_banner') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    try {
+      sessionStorage.setItem('swm_dismiss_notif_banner', 'true');
+    } catch (e) {}
+  };
 
   // Refresh status periodically and on visibility change
   useEffect(() => {
@@ -26,13 +39,13 @@ export default function NotificationPermissionPrompt({ currentUser }) {
     return null;
   }
 
-  const isFullyActive = status.permission === 'granted' && status.hasToken;
-  const isPermissionGrantedOnly = status.permission === 'granted' && !status.hasToken;
-
-  // If dismissed and already fully active, hide completely
-  if (dismissed && isFullyActive) {
+  // When dismissed by clicking 'X', hide immediately regardless of activation state
+  if (dismissed) {
     return null;
   }
+
+  const isFullyActive = status.permission === 'granted' && status.hasToken;
+  const isPermissionGrantedOnly = status.permission === 'granted' && !status.hasToken;
 
   const handleRequestPermission = async () => {
     setLoading(true);
@@ -45,6 +58,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
       } else if (result.reason === 'denied') {
         Modal.warning({
           title: 'الإشعارات محظورة في إعدادات الهاتف',
+          zIndex: 100000,
           content: (
             <div style={{ textAlign: 'right', direction: 'rtl', lineHeight: 1.8 }}>
               <p>تم رفض إذن الإشعارات سابقاً في هذا الجهاز.</p>
@@ -64,14 +78,16 @@ export default function NotificationPermissionPrompt({ currentUser }) {
       } else {
         Modal.error({
           title: 'فشل استخراج رمز الجهاز من Firebase',
+          zIndex: 100000,
           content: (
             <div style={{ textAlign: 'right', direction: 'rtl' }}>
               <p>حدث خطأ أثناء الاتصال بخدمة Firebase Cloud Messaging:</p>
-              <pre style={{ background: '#f8fafc', padding: 10, borderRadius: 6, fontSize: 12, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+              <pre style={{ background: '#f8fafc', color: '#0f172a', padding: 10, borderRadius: 6, fontSize: 12, wordBreak: 'break-word', whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>
                 {String(result.reason || 'Unknown error')}
               </pre>
             </div>
-          )
+          ),
+          okText: 'إغلاق'
         });
       }
     } catch (err) {
@@ -125,7 +141,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
             </div>
           )}
           closable
-          onClose={() => setDismissed(true)}
+          onClose={handleDismiss}
         />
       </div>
     );
@@ -139,7 +155,7 @@ export default function NotificationPermissionPrompt({ currentUser }) {
         top: 14,
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 99999,
+        zIndex: 9999,
         width: '92%',
         maxWidth: 540,
         boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
@@ -177,13 +193,23 @@ export default function NotificationPermissionPrompt({ currentUser }) {
             </div>
           </div>
           <button
-            onClick={() => setDismissed(true)}
+            type="button"
+            onClick={handleDismiss}
+            aria-label="إغلاق التنبيه"
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#64748b',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#e2e8f0',
               cursor: 'pointer',
-              fontSize: 16
+              fontSize: 18,
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              touchAction: 'manipulation',
+              flexShrink: 0
             }}
           >
             <CloseOutlined />
@@ -248,16 +274,22 @@ export default function NotificationPermissionPrompt({ currentUser }) {
             إرسال إشعار تجريبي
           </Button>
           <button
-            onClick={() => setDismissed(true)}
+            type="button"
+            onClick={handleDismiss}
+            aria-label="إغلاق التنبيه"
             style={{
               background: 'transparent',
               border: 'none',
               color: '#64748b',
               cursor: 'pointer',
-              padding: 2
+              padding: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              touchAction: 'manipulation'
             }}
           >
-            <CloseOutlined style={{ fontSize: 12 }} />
+            <CloseOutlined style={{ fontSize: 14 }} />
           </button>
         </div>
       </div>

@@ -269,6 +269,33 @@ app.use('/uploads', (req, res) => {
   res.status(404).type('text/plain').send('Image Not Found');
 });
 
+// Dedicated handler for Firebase Messaging Service Worker (both root '/' and '/swm-admin/')
+const serveFirebaseMessagingWorker = (req, res) => {
+  const candidateSwPaths = [
+    path.join(__dirname, 'client-swm/public/firebase-messaging-sw.js'),
+    path.join(__dirname, '../../client-swm/public/firebase-messaging-sw.js'),
+    path.join(process.cwd(), 'client-swm/public/firebase-messaging-sw.js'),
+    path.join(__dirname, 'client-swm/dist/firebase-messaging-sw.js'),
+    path.join(__dirname, '../../client-swm/dist/firebase-messaging-sw.js'),
+    path.join(process.cwd(), 'client-swm/dist/firebase-messaging-sw.js'),
+    path.join(process.cwd(), 'dist-deploy/client-swm/dist/firebase-messaging-sw.js'),
+    path.join(__dirname, 'client-ecp/public/firebase-messaging-sw.js'),
+    path.join(__dirname, '../../client-ecp/public/firebase-messaging-sw.js'),
+  ];
+  for (const swPath of candidateSwPaths) {
+    if (fs.existsSync(swPath)) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.setHeader('Service-Worker-Allowed', '/');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      return res.sendFile(path.resolve(swPath));
+    }
+  }
+  res.status(404).type('text/plain').send('// Service worker not found');
+};
+
+app.get('/firebase-messaging-sw.js', serveFirebaseMessagingWorker);
+app.get('/swm-admin/firebase-messaging-sw.js', serveFirebaseMessagingWorker);
+
 if (imgDir) app.use(express.static(imgDir, uploadStaticOptions));
 if (swmPublicDir) app.use(express.static(swmPublicDir, uploadStaticOptions));
 if (ecpPublicDir) app.use(express.static(ecpPublicDir, uploadStaticOptions));

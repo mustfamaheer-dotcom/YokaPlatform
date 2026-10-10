@@ -129,24 +129,29 @@ export async function requestNotificationPermission() {
       app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
     }
 
-    // 4. Register Service Worker
+    // 4. Register or reuse Service Worker
     const base = import.meta.env.BASE_URL || '/';
-    const primarySwPath = `${base.replace(/\/$/, '')}/firebase-messaging-sw.js`;
-    let registration = null;
+    let registration = await navigator.serviceWorker.getRegistration(base).catch(() => null);
+    if (!registration) {
+      registration = await navigator.serviceWorker.getRegistration('/').catch(() => null);
+    }
 
-    try {
-      registration = await navigator.serviceWorker.register(primarySwPath, {
-        scope: base
-      });
-    } catch (swErr) {
-      console.warn('⚠️ [Push Notifications]: Primary SW path failed, fallback to root:', swErr.message);
-      registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/'
-      });
+    if (!registration) {
+      const primarySwPath = `${base.replace(/\/$/, '')}/firebase-messaging-sw.js`;
+      try {
+        registration = await navigator.serviceWorker.register(primarySwPath, {
+          scope: base
+        });
+      } catch (swErr) {
+        console.warn('⚠️ [Push Notifications]: Primary SW path failed, fallback to root:', swErr.message);
+        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/'
+        });
+      }
     }
 
     // Ensure service worker is activated
-    if (registration.installing) {
+    if (registration && registration.installing) {
       await new Promise((resolve) => {
         registration.installing.addEventListener('statechange', function onStateChange() {
           if (this.state === 'activated' || this.state === 'installed') {
@@ -154,19 +159,31 @@ export async function requestNotificationPermission() {
             resolve();
           }
         });
-        setTimeout(resolve, 2500);
+        setTimeout(resolve, 3000);
       });
     }
-    await navigator.serviceWorker.ready;
+
+    await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((resolve) => setTimeout(resolve, 3000))
+    ]);
 
     // 5. Get Messaging instance
     const messagingInstance = getMessaging(app);
 
     // 6. Get FCM Token with VAPID Key
-    const fcmToken = await getToken(messagingInstance, {
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: registration
-    });
+    let fcmToken = null;
+    try {
+      fcmToken = await getToken(messagingInstance, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration
+      });
+    } catch (tokenErr) {
+      console.warn('⚠️ [Push Notifications]: getToken with explicit registration failed, trying default registration:', tokenErr);
+      fcmToken = await getToken(messagingInstance, {
+        vapidKey: VAPID_KEY
+      });
+    }
 
     if (!fcmToken) {
       return { success: false, reason: 'لم يتمكن Firebase من إنشاء رمز للجهاز (Token فارغ).' };
