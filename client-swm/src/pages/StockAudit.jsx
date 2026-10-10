@@ -18,7 +18,7 @@ import {
   Statistic,
   Badge,
   Tooltip,
-  message,
+  App as AntApp,
   Divider,
   Modal,
   Spin,
@@ -53,6 +53,7 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 export default function StockAudit({ onNavigateToAdjustments, currentUser }) {
+  const { message } = AntApp.useApp();
   const navigate = useNavigate();
   const isRetailBranch = Boolean(
     currentUser &&
