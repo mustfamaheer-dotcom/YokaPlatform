@@ -107,4 +107,27 @@ router.get('/logs', requireAuth, requireRole(['super_admin', 'admin']), async (r
   }
 });
 
+/**
+ * POST /api/swm/push/test
+ * Trigger an immediate test notification to all owner devices
+ */
+router.post('/test', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { notifyOwnerOfAction } = require('../../shared/pushNotificationService');
+    await notifyOwnerOfAction({
+      triggeredByUserId: req.user.id,
+      triggeredByName: req.user.full_name || req.user.username || 'مالك النظام',
+      actionType: 'TEST_NOTIFICATION',
+      entityType: 'system',
+      entityId: 'test-ping',
+      details: 'إشعار تجريبي لاختبار التنبيهات الفورية على الآيفون بنجاح 🔔',
+      actionUrl: '/dashboard'
+    });
+    return res.json({ success: true, message: 'تم إرسال الإشعار التجريبي بنجاح إلى هاتفك!' });
+  } catch (err) {
+    console.error('Test push notification error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

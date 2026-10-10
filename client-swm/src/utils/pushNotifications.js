@@ -58,29 +58,76 @@ export function detectPlatform() {
 }
 
 /**
+ * Returns comprehensive notification readiness status for the current device
+ */
+export function getNotificationStatus() {
+  if (typeof window === 'undefined') {
+    return { supported: false, permission: 'unsupported', isIOS: false, isStandalone: false };
+  }
+
+  const isIOS = /ipad|iphone|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const swSupported = 'serviceWorker' in navigator;
+  const notifSupported = 'Notification' in window;
+
+  const supported = swSupported && notifSupported;
+  const permission = notifSupported ? Notification.permission : 'unsupported';
+  const hasToken = Boolean(localStorage.getItem('swm_fcm_token'));
+
+  return {
+    supported,
+    permission,
+    isIOS,
+    isStandalone,
+    hasToken
+  };
+}
+
+/**
  * Requests browser push permission, retrieves FCM token, and subscribes with backend
  */
 export async function requestNotificationPermission() {
   try {
-    if (typeof window === 'undefined') return null;
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      return null;
+    if (typeof window === 'undefined') {
+      return { success: false, reason: 'unsupported' };
     }
 
-    const messagingInstance = initFirebaseClient();
-    if (!messagingInstance) return null;
+    if (!('Notification' in window)) {
+      return { success: false, reason: 'not_supported' };
+    }
 
-    // 1. Request permission
+    // 1. Explicitly trigger browser permission prompt
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
       console.log('ℹ️ [Push Notifications]: Permission was not granted:', permission);
-      return null;
+      return { success: false, reason: permission };
     }
 
-    // 2. Register Service Worker
-    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-      scope: '/'
-    });
+    if (!('serviceWorker' in navigator)) {
+      return { success: false, reason: 'sw_not_supported' };
+    }
+
+    const messagingInstance = initFirebaseClient();
+    if (!messagingInstance) {
+      return { success: false, reason: 'firebase_init_failed' };
+    }
+
+    // 2. Register Service Worker with robust fallback paths
+    const base = import.meta.env.BASE_URL || '/';
+    const primarySwPath = `${base.replace(/\/$/, '')}/firebase-messaging-sw.js`;
+    let registration = null;
+
+    try {
+      registration = await navigator.serviceWorker.register(primarySwPath, {
+        scope: base
+      });
+    } catch (swErr) {
+      console.warn('⚠️ [Push Notifications]: First SW path failed, trying root fallback:', swErr.message);
+      registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
+    }
+
     await navigator.serviceWorker.ready;
 
     // 3. Get FCM Token with VAPID Key
@@ -91,7 +138,7 @@ export async function requestNotificationPermission() {
 
     if (!fcmToken) {
       console.warn('⚠️ [Push Notifications]: No registration token available.');
-      return null;
+      return { success: false, reason: 'token_empty' };
     }
 
     // 4. Send token to backend
@@ -108,10 +155,10 @@ export async function requestNotificationPermission() {
 
     localStorage.setItem('swm_fcm_token', fcmToken);
     console.log('✅ [Push Notifications]: Subscribed successfully with FCM Token');
-    return fcmToken;
+    return { success: true, token: fcmToken };
   } catch (err) {
     console.error('❌ [Push Notifications]: Error requesting permission / token:', err);
-    return null;
+    return { success: false, reason: err.message };
   }
 }
 

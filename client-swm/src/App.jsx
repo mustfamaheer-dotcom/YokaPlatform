@@ -14,6 +14,7 @@ import EcomWarehouseApp from './pages/ecom/EcomWarehouseApp';
 import WarehouseManagerApp from './pages/warehouse/WarehouseManagerApp';
 import api from './api';
 import { requestNotificationPermission, onForegroundMessage } from './utils/pushNotifications';
+import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
 
 /**
  * Helper to identify if user belongs to an E-Commerce warehouse
@@ -203,7 +204,9 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <>
+      <NotificationPermissionPrompt currentUser={currentUser} />
+      <Routes>
       {/* Public Login Route */}
       <Route
         path="/login"
@@ -567,5 +570,6 @@ export default function App() {
       {/* Catch-all Route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+  </>
   );
 }

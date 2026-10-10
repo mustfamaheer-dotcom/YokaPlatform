@@ -80,6 +80,7 @@ function initFirebaseAdmin() {
 
 // Arabic Dictionary mapping action types to Arabic titles
 const ACTION_TITLES_AR = {
+  TEST_NOTIFICATION: '🔔 إشعار تجريبي لاختبار التنبيهات',
   CREATE_PURCHASE: 'فاتورة شراء جديدة 🧾',
   UPDATE_PURCHASE: 'تعديل فاتورة شراء ✏️',
   VOID_PURCHASE: 'إلغاء فاتورة شراء ⚠️',
