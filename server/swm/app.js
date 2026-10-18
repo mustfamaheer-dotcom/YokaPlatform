@@ -27,12 +27,17 @@ const attributeRoutes = require('./routes/attributes');
 
 const app = express();
 
+// Trust reverse proxy (Traefik / Coolify / Nginx) for accurate IP rate-limiting & SSL offloading
+app.set('trust proxy', 1);
+
 // 1. Performance: Compression middleware (Gzip/Brotli)
 app.use(compression());
 
 // 2. Security: Hardened HTTP Headers via Helmet
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: false,
+  originAgentCluster: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*"],

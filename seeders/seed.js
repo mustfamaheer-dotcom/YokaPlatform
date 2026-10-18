@@ -87,13 +87,14 @@ async function seed() {
 
     // 4. Seed Super Admin User (Associated with Main Warehouse)
     console.log('-> Seeding users...');
-    const adminUser = await knex('users').where({ username: 'admin' }).first();
+    let adminUser = await knex('users').where({ username: 'admin' }).first();
     if (!adminUser) {
       const passwordHash = await bcrypt.hash('Yoka@Admin2026!', 12);
       await knex('users').insert({
         username: 'admin',
         email: 'admin@yokastore.com',
         password_hash: passwordHash,
+        password_plain: 'Yoka@Admin2026!',
         full_name: 'مدير النظام العام (Moustafa Maher)',
         phone: '+201099999999',
         role: 'super_admin',
@@ -103,7 +104,8 @@ async function seed() {
       });
       console.log('   ✓ Super admin user created (Username: admin)');
     } else {
-      console.log('   ✓ Super admin already exists');
+      await knex('users').where({ id: adminUser.id }).update({ password_plain: 'Yoka@Admin2026!' });
+      console.log('   ✓ Super admin already exists (updated password_plain)');
     }
 
     // 5. Seed Branch Supervisor User (مشرف فرع)
@@ -114,6 +116,7 @@ async function seed() {
         username: 'supervisor1',
         email: 'supervisor1@yokastore.com',
         password_hash: supHash,
+        password_plain: 'Yoka@Branch2026!',
         full_name: 'مشرف فرع المعادي (عمر خالد)',
         phone: '+201011112222',
         role: 'supervisor',
@@ -128,6 +131,8 @@ async function seed() {
       if (supervisorUser) {
         await knex('branches').where({ id: retailBranch.id }).update({ supervisor_id: supervisorUser.id });
       }
+    } else if (supervisorUser) {
+      await knex('users').where({ id: supervisorUser.id }).update({ password_plain: 'Yoka@Branch2026!' });
     }
 
     // 6. Seed Branch Salesperson / Cashier User (بائع / كاشير)
@@ -138,6 +143,7 @@ async function seed() {
         username: 'cashier1',
         email: 'cashier1@yokastore.com',
         password_hash: cashHash,
+        password_plain: 'Yoka@Branch2026!',
         full_name: 'كاشير فرع المعادي (سارة أحمد)',
         phone: '+201033334444',
         role: 'salesperson',
