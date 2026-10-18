@@ -292,4 +292,51 @@ router.post('/submit', requireAuth, requireRole(['super_admin', 'admin', 'invent
   }
 });
 
+/**
+ * GET /api/swm/inventory-counts
+ * Retrieve inventory count history with optional branch filter
+ */
+router.get('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_manager', 'supervisor', 'warehouse_manager']), async (req, res) => {
+  try {
+    const { branch_id, limit = 50, page = 1 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
+    const offset = (pageNum - 1) * limitNum;
+
+    const whereClauses = [];
+    const params = [];
+    let pIdx = 1;
+
+    if (branch_id && branch_id !== 'all') {
+      whereClauses.push(`ic.branch_id = $${pIdx++}`);
+      params.push(parseInt(branch_id, 10));
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const [countRes] = await query(`SELECT COUNT(ic.id) AS total FROM inventory_counts ic ${whereSql}`, params);
+    const total = parseInt(countRes?.total || 0, 10);
+
+    const rows = await query(`
+      SELECT ic.*, b.branch_name, p.product_name, p.product_code, u.full_name AS counter_name
+      FROM inventory_counts ic
+      LEFT JOIN branches b ON b.id = ic.branch_id
+      LEFT JOIN products p ON p.id = ic.product_id
+      LEFT JOIN users u ON u.id = ic.counted_by
+      ${whereSql}
+      ORDER BY ic.created_at DESC
+      LIMIT ${limitNum} OFFSET ${offset}
+    `, params);
+
+    return res.json({
+      success: true,
+      data: rows,
+      meta: { page: pageNum, limit: limitNum, total }
+    });
+  } catch (err) {
+    console.error('List inventory counts error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
