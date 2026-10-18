@@ -20,9 +20,15 @@ async function getBranchRegister(branchId) {
  */
 router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supervisor', 'warehouse_manager']), requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const rawBranch = req.scopedBranchId || req.query.branch_id;
+    const isAll = !rawBranch || rawBranch === 'all';
+    const numBranch = !isAll ? parseInt(rawBranch, 10) : null;
     const { days = 14 } = req.query;
     const intervalDays = Math.max(1, Math.min(90, parseInt(days, 10)));
+
+    const branchFilter = isAll ? '' : 'AND e.branch_id = $1';
+    const filterParams = isAll ? [intervalDays] : [numBranch, intervalDays];
+    const daysParamIdx = isAll ? '$1' : '$2';
 
     // 1. Category breakdown in period
     const catRows = await query(
@@ -31,12 +37,12 @@ router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supe
               COALESCE(SUM(e.amount), 0) AS total_amount,
               COUNT(e.id) AS count
        FROM expenses e
-       WHERE e.branch_id = $1
-         AND e.expense_date >= CURRENT_DATE - ($2 || ' days')::INTERVAL
+       WHERE 1=1 ${branchFilter}
+         AND e.expense_date >= CURRENT_DATE - (${daysParamIdx} || ' days')::INTERVAL
          AND e.status = 'approved'
        GROUP BY e.category, e.subcategory
        ORDER BY total_amount DESC`,
-      [branchId, intervalDays]
+      filterParams
     );
 
     let periodTotal = 0;
@@ -81,12 +87,12 @@ router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supe
               COALESCE(SUM(CASE WHEN e.category = 'utility_bill' THEN e.amount ELSE 0 END), 0) AS bills_amount,
               COUNT(e.id) AS count
        FROM expenses e
-       WHERE e.branch_id = $1
-         AND e.expense_date >= CURRENT_DATE - ($2 || ' days')::INTERVAL
+       WHERE 1=1 ${branchFilter}
+         AND e.expense_date >= CURRENT_DATE - (${daysParamIdx} || ' days')::INTERVAL
          AND e.status = 'approved'
        GROUP BY DATE(e.expense_date)
        ORDER BY DATE(e.expense_date) ASC`,
-      [branchId, intervalDays]
+      filterParams
     );
 
     const dailyTrend = trendRows.map(r => ({
@@ -106,13 +112,13 @@ router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supe
               COUNT(e.id) AS count
        FROM expenses e
        LEFT JOIN users u ON u.id = e.recorded_by
-       WHERE e.branch_id = $1
-         AND e.expense_date >= CURRENT_DATE - ($2 || ' days')::INTERVAL
+       WHERE 1=1 ${branchFilter}
+         AND e.expense_date >= CURRENT_DATE - (${daysParamIdx} || ' days')::INTERVAL
          AND e.status = 'approved'
        GROUP BY e.recorded_by, u.full_name, u.username
        ORDER BY total_amount DESC
        LIMIT 6`,
-      [branchId, intervalDays]
+      filterParams
     );
 
     const staffBreakdown = staffRows.map(r => ({
@@ -159,15 +165,21 @@ router.get('/analytics', requireAuth, requireRole(['super_admin', 'admin', 'supe
  */
 router.get('/', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const rawBranch = req.scopedBranchId || req.query.branch_id;
+    const isAll = !rawBranch || rawBranch === 'all';
     const { category, subcategory, date, salesperson_id, page = 1, limit = 50 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10)));
     const offset = (pageNum - 1) * limitNum;
 
-    const whereClauses = ['e.branch_id = $1'];
-    const params = [branchId];
-    let pIdx = 2;
+    const whereClauses = [];
+    const params = [];
+    let pIdx = 1;
+
+    if (!isAll) {
+      whereClauses.push(`e.branch_id = $${pIdx++}`);
+      params.push(parseInt(rawBranch, 10));
+    }
 
     if (category) {
       whereClauses.push(`e.category = $${pIdx++}`);
@@ -189,7 +201,7 @@ router.get('/', requireAuth, requireBranchScope, async (req, res) => {
       params.push(parseInt(salesperson_id, 10));
     }
 
-    const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
     // Get count
     const [countRes] = await query(`SELECT COUNT(e.id) AS total FROM expenses e ${whereSql}`, params);
@@ -255,7 +267,16 @@ router.get('/', requireAuth, requireBranchScope, async (req, res) => {
  */
 router.post('/', requireAuth, requireBranchScope, async (req, res) => {
   try {
-    const branchId = req.scopedBranchId;
+    const rawBranch = req.body.branch_id || req.scopedBranchId;
+    let branchId = parseInt(rawBranch, 10);
+    if (!branchId || isNaN(branchId)) {
+      if (req.user && req.user.branchId && !isNaN(parseInt(req.user.branchId, 10))) {
+        branchId = parseInt(req.user.branchId, 10);
+      } else {
+        const [mainB] = await query(`SELECT id FROM branches WHERE status = 'active' ORDER BY is_main DESC, id ASC LIMIT 1`);
+        branchId = mainB ? mainB.id : 1;
+      }
+    }
     const {
       category, // 'sales_withdrawal', 'utility_bill', 'refunded_expense'
       subcategory, // 'water', 'electricity', 'rent', 'cleaning', 'shipping', 'other'
