@@ -3,9 +3,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS build-swm
 WORKDIR /build
+ENV NODE_ENV=development
 
 COPY client-swm/package*.json ./client-swm/
-RUN npm --prefix client-swm install
+RUN npm --prefix client-swm install --include=dev
 
 COPY client-swm/ ./client-swm/
 RUN npm --prefix client-swm run build
@@ -15,9 +16,10 @@ RUN npm --prefix client-swm run build
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS build-ecp
 WORKDIR /build
+ENV NODE_ENV=development
 
 COPY client-ecp/package*.json ./client-ecp/
-RUN npm --prefix client-ecp install
+RUN npm --prefix client-ecp install --include=dev
 
 COPY client-ecp/ ./client-ecp/
 RUN npm --prefix client-ecp run build
