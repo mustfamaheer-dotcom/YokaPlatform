@@ -41,12 +41,14 @@ import {
   ColumnWidthOutlined,
   TagsOutlined,
   FolderOpenOutlined,
-  EyeOutlined
+  EyeOutlined,
+  PrinterOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import VariantMatrix from '../components/VariantMatrix';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import BarcodeImage from '../components/BarcodeImage';
+import BarcodePrintModal from '../components/BarcodePrintModal';
 import { generateValidEAN13 } from '../utils/barcode';
 import useDebounce from '../hooks/useDebounce';
 import { canDelete } from '../utils/permissions';
@@ -101,6 +103,9 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
   const [editingProduct, setEditingProduct] = useState(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editImageUrl, setEditImageUrl] = useState('');
+
+  // Barcode Thermal Sticker Print Modal state
+  const [printProductModal, setPrintProductModal] = useState({ open: false, items: [] });
 
   // Auto-generated codes and dynamic constructed name state
   const [autoCode, setAutoCode] = useState('');
@@ -788,6 +793,45 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
             </Button>
           </Tooltip>
 
+          <Tooltip title="طباعة ملصق الباركود والسعر حرارياً">
+            <Button
+              size="small"
+              icon={<PrinterOutlined />}
+              onClick={async () => {
+                let variants = record.variants;
+                if ((!variants || variants.length === 0) && (record.variant_count > 0 || (record.color_variants && record.color_variants.length > 0))) {
+                  try {
+                    const res = await api.get(`/api/swm/products/${record.id}`);
+                    if (res.data?.success && res.data?.data?.variants) {
+                      variants = res.data.data.variants;
+                    }
+                  } catch (e) {
+                    console.warn('Could not fetch variants for barcode print', e);
+                  }
+                }
+
+                setPrintProductModal({
+                  open: true,
+                  items: [{
+                    id: record.id,
+                    product_id: record.id,
+                    product_name: record.product_name,
+                    product_code: record.product_code,
+                    color: record.base_color || record.color || '',
+                    size: record.base_size || record.size || '',
+                    barcode: record.barcode,
+                    selling_price: record.selling_price || 0,
+                    quantity: 1,
+                    variantRows: variants && variants.length > 0 ? variants : undefined
+                  }]
+                });
+              }}
+              style={{ borderColor: '#d97706', color: '#b45309' }}
+            >
+              ملصق
+            </Button>
+          </Tooltip>
+
           <Button
             type="primary"
             size="small"
@@ -923,39 +967,30 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                 label="كود الصنف (Item Code)"
                 rules={[{ required: true, message: 'يرجى إدخال أو توليد كود الصنف' }]}
               >
-                <Input
-                  placeholder="PRD-123456"
-                  addonAfter={
-                    <Tooltip title="توليد كود وباركود جديدين">
-                      <Button
-                        type="link"
-                        size="small"
-                        icon={<ReloadOutlined />}
-                        onClick={handleRegenerateCodes}
-                        style={{ padding: 0, height: 'auto', color: '#2563eb' }}
-                      />
-                    </Tooltip>
-                  }
-                />
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input placeholder="PRD-123456" />
+                  <Tooltip title="توليد كود وباركود جديدين">
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={handleRegenerateCodes}
+                    />
+                  </Tooltip>
+                </Space.Compact>
               </Form.Item>
             </Col>
             <Col xs={24} sm={8}>
               <Form.Item name="barcode" label="الباركود الدولي (Barcode EAN)">
-                <Input
-                  placeholder="622XXXXXXXXXX"
-                  addonAfter={
-                    <Tooltip title="توليد باركود EAN-13 حقيقي متوافق دولياً">
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => form.setFieldsValue({ barcode: generateValidEAN13('622') })}
-                        style={{ padding: 0, height: 'auto', fontWeight: 600, color: '#4f46e5' }}
-                      >
-                        توليد EAN
-                      </Button>
-                    </Tooltip>
-                  }
-                />
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input placeholder="622XXXXXXXXXX" />
+                  <Tooltip title="توليد باركود EAN-13 حقيقي متوافق دولياً">
+                    <Button
+                      onClick={() => form.setFieldsValue({ barcode: generateValidEAN13('622') })}
+                      style={{ fontWeight: 600 }}
+                    >
+                      توليد EAN
+                    </Button>
+                  </Tooltip>
+                </Space.Compact>
               </Form.Item>
               {watchedBarcode && (
                 <div style={{ marginTop: -4, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
@@ -1092,7 +1127,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                 showSearch
                 optionFilterProp="label"
                 filterOption={(input, opt) => String(opt?.label || opt?.children || '').toLowerCase().includes(input.toLowerCase())}
-                dropdownRender={(menu) => (
+                popupRender={(menu) => (
                   <>
                     {menu}
                     <Divider style={{ margin: '8px 0' }} />
@@ -1193,7 +1228,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                       onChange={setSelectedMultiColors}
                       size="large"
                       style={{ width: '100%' }}
-                      dropdownRender={(menu) => (
+                      popupRender={(menu) => (
                         <>
                           {menu}
                           <Divider style={{ margin: '8px 0' }} />
@@ -1265,7 +1300,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                       onChange={setSelectedMultiSizes}
                       size="large"
                       style={{ width: '100%' }}
-                      dropdownRender={(menu) => (
+                      popupRender={(menu) => (
                         <>
                           {menu}
                           <Divider style={{ margin: '8px 0' }} />
@@ -1317,7 +1352,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                     allowClear
                     showSearch
                     size="large"
-                    dropdownRender={(menu) => (
+                    popupRender={(menu) => (
                       <>
                         {menu}
                         <Divider style={{ margin: '8px 0' }} />
@@ -1386,7 +1421,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
                     allowClear
                     showSearch
                     size="large"
-                    dropdownRender={(menu) => (
+                    popupRender={(menu) => (
                       <>
                         {menu}
                         <Divider style={{ margin: '8px 0' }} />
@@ -1719,7 +1754,7 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
               <Select
                 placeholder="اختر القسم"
                 size="large"
-                dropdownRender={(menu) => (
+                popupRender={(menu) => (
                   <>
                     {menu}
                     <Divider style={{ margin: '8px 0' }} />
@@ -2003,6 +2038,13 @@ export default function Products({ currentUser, autoOpenCreate, onResetAction })
           </div>
         )}
       </Modal>
+
+      {/* Direct Barcode & Price Sticker Print Modal */}
+      <BarcodePrintModal
+        open={printProductModal.open}
+        onClose={() => setPrintProductModal({ open: false, items: [] })}
+        itemsData={printProductModal.items}
+      />
     </div>
   );
 }

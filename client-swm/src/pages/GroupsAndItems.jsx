@@ -26,7 +26,8 @@ import {
   Alert,
   Upload,
   Avatar,
-  Popover
+  Popover,
+  Switch
 } from 'antd';
 import {
   AppstoreOutlined,
@@ -172,7 +173,6 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
   const [itemSubmitting, setItemSubmitting] = useState(false);
   const [itemForm] = Form.useForm();
   const watchedItemColor = Form.useWatch('color', itemForm);
-  const watchedItemBarcode = Form.useWatch('barcode', itemForm);
 
   // Multi-variant (Multiple colors & Multiple sizes) State
   const [isMultiVariant, setIsMultiVariant] = useState(false);
@@ -182,6 +182,12 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
   // Color-specific images map (colorName -> imageUrl data URI / link)
   const [colorImages, setColorImages] = useState({});
   const [featuredImageUrl, setFeaturedImageUrl] = useState('');
+  // Image mode: 'standard' (تلقائي مع صور) vs 'custom' (مخصص بدون صور)
+  const [imageUploadMode, setImageUploadMode] = useState('standard');
+
+  // Bulk Selection for Items
+  const [selectedItemRowKeys, setSelectedItemRowKeys] = useState([]);
+  const [bulkDeletingItems, setBulkDeletingItems] = useState(false);
 
   const activeColors = isMultiVariant
     ? selectedMultiColors
@@ -548,6 +554,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
     setSelectedMultiSizes([]);
     setColorImages({});
     setFeaturedImageUrl('');
+    setImageUploadMode('standard');
     itemForm.resetFields();
     const { code, barcode } = generateCodes();
     itemForm.setFieldsValue({
@@ -561,7 +568,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
       cost_price: 0,
       selling_price: 0,
       wholesale_price: 0,
-      sale_price: undefined
+      is_ecom_listed: false
     });
     setIsItemModalOpen(true);
   };
@@ -573,8 +580,10 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
     const initialColorImages = {};
     if (item.featured_image) {
       setFeaturedImageUrl(item.featured_image);
+      setImageUploadMode('standard');
     } else {
       setFeaturedImageUrl('');
+      setImageUploadMode('custom');
     }
 
     if (item.color_variants && Array.isArray(item.color_variants)) {
@@ -637,13 +646,13 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
       cost_price: parseFloat(fullProduct.cost_price) || 0,
       selling_price: parseFloat(fullProduct.selling_price) || 0,
       wholesale_price: parseFloat(fullProduct.wholesale_price) || 0,
-      sale_price: fullProduct.sale_price ? parseFloat(fullProduct.sale_price) : undefined,
       status: fullProduct.status || 'active',
       is_ecom_listed: Boolean(fullProduct.is_ecom_listed),
       featured_image: fullProduct.featured_image || ''
     });
     setIsItemModalOpen(true);
   };
+
 
   const handleSaveItem = async () => {
     try {
@@ -658,9 +667,10 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
         activeColorsList = [values.color];
       }
 
-      // First color image or explicit featured image becomes the product's primary photo
-      const firstColorWithImg = activeColorsList.find(c => colorImages[c]);
-      const defaultFeatured = (firstColorWithImg && colorImages[firstColorWithImg]) || featuredImageUrl || values.featured_image || null;
+      // Determine featured image & images according to upload mode
+      const isCustomNoImages = imageUploadMode === 'custom';
+      const firstColorWithImg = !isCustomNoImages ? activeColorsList.find(c => colorImages[c]) : null;
+      const defaultFeatured = (!isCustomNoImages && ((firstColorWithImg && colorImages[firstColorWithImg]) || featuredImageUrl || values.featured_image)) || null;
 
       let variantsPayload = [];
       if (isMultiVariant && selectedMultiColors.length > 0 && selectedMultiSizes.length > 0) {
@@ -678,8 +688,9 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
               color: c,
               size: s,
               sku: finalSku,
+              barcode: generateValidEAN13('622'),
               price_modifier: 0,
-              image_url: colorImages[c] || defaultFeatured || null
+              image_url: (!isCustomNoImages && colorImages[c]) || defaultFeatured || null
             };
           })
         );
@@ -690,8 +701,9 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
           color: values.color || null,
           size: values.size || null,
           sku: values.product_code,
+          barcode: values.barcode || generateValidEAN13('622'),
           price_modifier: 0,
-          image_url: (values.color && colorImages[values.color]) || defaultFeatured || null
+          image_url: (!isCustomNoImages && values.color && colorImages[values.color]) || defaultFeatured || null
         }];
       }
 
@@ -700,12 +712,13 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
         cost_price: values.cost_price !== undefined ? parseFloat(values.cost_price) : (editingItem ? (parseFloat(editingItem.cost_price) || 0) : 0),
         selling_price: values.selling_price !== undefined ? parseFloat(values.selling_price) : (editingItem ? (parseFloat(editingItem.selling_price) || 0) : 0),
         wholesale_price: values.wholesale_price !== undefined ? (values.wholesale_price ? parseFloat(values.wholesale_price) : null) : (editingItem ? (parseFloat(editingItem.wholesale_price) || null) : null),
-        sale_price: values.sale_price !== undefined ? (values.sale_price ? parseFloat(values.sale_price) : null) : (editingItem ? (parseFloat(editingItem.sale_price) || null) : null),
-        is_ecom_listed: editingItem ? Boolean(editingItem.is_ecom_listed) : false,
+        sale_price: null,
+        is_ecom_listed: Boolean(values.is_ecom_listed),
         featured_image: defaultFeatured,
-        color_images: colorImages,
+        color_images: isCustomNoImages ? {} : colorImages,
         variants: variantsPayload
       };
+
 
       if (editingItem) {
         const res = await api.put(`/api/swm/products/${editingItem.id}`, payload);
@@ -741,10 +754,30 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
       const res = await api.delete(`/api/swm/products/${itemId}`);
       if (res.data.success) {
         message.success(res.data.message || 'تم حذف / تعطيل الصنف بنجاح');
+        setSelectedItemRowKeys(prev => prev.filter(k => k !== itemId));
         fetchItems(itemsPagination.current);
       }
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في حذف الصنف');
+    }
+  };
+
+  const handleBulkDeleteItems = async () => {
+    if (selectedItemRowKeys.length === 0) return;
+    setBulkDeletingItems(true);
+    try {
+      const res = await api.post('/api/swm/products/bulk-delete', {
+        ids: selectedItemRowKeys
+      });
+      if (res.data.success) {
+        message.success(res.data.message || `تمت معالجة حذف ${selectedItemRowKeys.length} صنف بنجاح`);
+        setSelectedItemRowKeys([]);
+        fetchItems(itemsPagination.current);
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في الحذف الجماعي للأصناف');
+    } finally {
+      setBulkDeletingItems(false);
     }
   };
 
@@ -1500,6 +1533,63 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                   </Row>
                 </Card>
 
+                {/* Bulk Actions Alert & Bar */}
+                {selectedItemRowKeys.length > 0 && (
+                  <div
+                    style={{
+                      marginBottom: 14,
+                      padding: '10px 16px',
+                      background: '#fff1f2',
+                      border: '1.5px solid #fecdd3',
+                      borderRadius: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 8
+                    }}
+                  >
+                    <Space align="middle">
+                      <Tag color="red" style={{ fontSize: 13, fontWeight: 700, padding: '2px 10px' }}>
+                        تم تحديد {selectedItemRowKeys.length} صنف
+                      </Tag>
+                      <Text style={{ fontSize: 13, color: '#9f1239' }}>
+                        يمكنك تنفيذ إجراء جماعي على الأصناف المحددة
+                      </Text>
+                    </Space>
+
+                    <Space>
+                      <Button
+                        size="middle"
+                        onClick={() => setSelectedItemRowKeys([])}
+                        disabled={bulkDeletingItems}
+                      >
+                        إلغاء التحديد
+                      </Button>
+                      {canDelete(currentUser) && (
+                        <Popconfirm
+                          title="حذف الأصناف المحددة دفعة واحدة"
+                          description={`هل أنت متأكد من حذف ${selectedItemRowKeys.length} صنف دفعة واحدة؟ (سيتم حذفها نهائياً أو تعطيلها إن كانت مرتبطة بحركات مالية أو فواتير)`}
+                          onConfirm={handleBulkDeleteItems}
+                          okText="نعم، حذف الكل"
+                          cancelText="تراجع"
+                          okButtonProps={{ danger: true, loading: bulkDeletingItems }}
+                        >
+                          <Button
+                            type="primary"
+                            danger
+                            icon={<DeleteOutlined />}
+                            loading={bulkDeletingItems}
+                            style={{ fontWeight: 600 }}
+                          >
+                            حذف ({selectedItemRowKeys.length}) صنف محدد
+                          </Button>
+                        </Popconfirm>
+                      )}
+                    </Space>
+                  </div>
+                )}
+
                 <Table
                   dataSource={items}
                   columns={itemColumns}
@@ -1509,6 +1599,10 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                   pagination={false}
                   bordered
                   size="middle"
+                  rowSelection={{
+                    selectedRowKeys: selectedItemRowKeys,
+                    onChange: (keys) => setSelectedItemRowKeys(keys)
+                  }}
                 />
               </div>
             )
@@ -1643,57 +1737,28 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
         <Form form={itemForm} layout="vertical" style={{ marginTop: 12 }}>
           {/* 1. ID & Barcode & Brand (matching user sketch top row) */}
           <Row gutter={16}>
-            <Col xs={24} sm={9}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="product_code"
                 label="كود الصنف (Item Code)"
                 rules={[{ required: true, message: 'يرجى إدخال أو توليد كود الصنف' }]}
               >
-                <Input
-                  placeholder="PRD-123456"
-                  addonAfter={
-                    <Tooltip title="توليد كود وباركود جديدين">
-                      <Button
-                        type="link"
-                        size="small"
-                        icon={<ReloadOutlined />}
-                        onClick={() => {
-                          const { code, barcode } = generateCodes();
-                          itemForm.setFieldsValue({ product_code: code, barcode: barcode });
-                          message.info('تم توليد كود وباركود جديدين');
-                        }}
-                        style={{ padding: 0, height: 'auto', color: '#2563eb' }}
-                      />
-                    </Tooltip>
-                  }
-                />
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input placeholder="PRD-123456" />
+                  <Tooltip title="توليد كود وباركود جديدين">
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => {
+                        const { code, barcode } = generateCodes();
+                        itemForm.setFieldsValue({ product_code: code, barcode: barcode });
+                        message.info('تم توليد كود جديد');
+                      }}
+                    />
+                  </Tooltip>
+                </Space.Compact>
               </Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="barcode" label="الباركود الدولي (Barcode EAN)">
-                <Input
-                  placeholder="622XXXXXXXXXX"
-                  addonAfter={
-                    <Tooltip title="توليد باركود EAN-13 حقيقي متوافق دولياً">
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => itemForm.setFieldsValue({ barcode: generateValidEAN13('622') })}
-                        style={{ padding: 0, height: 'auto', fontWeight: 600, color: '#4f46e5' }}
-                      >
-                        توليد EAN
-                      </Button>
-                    </Tooltip>
-                  }
-                />
-              </Form.Item>
-              {watchedItemBarcode && (
-                <div style={{ marginTop: -4, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
-                  <BarcodeImage value={watchedItemBarcode} height={38} width={1.4} />
-                </div>
-              )}
-            </Col>
-            <Col xs={24} sm={7}>
+            <Col xs={24} sm={12}>
               <Form.Item name="brand" label="الماركة / البراند (Brand)">
                 <Input placeholder="Yoka Store" />
               </Form.Item>
@@ -1724,7 +1789,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                 showSearch
                 optionFilterProp="label"
                 filterOption={(input, opt) => String(opt?.label || opt?.children || '').toLowerCase().includes(input.toLowerCase())}
-                dropdownRender={(menu) => (
+                popupRender={(menu) => (
                   <>
                     {menu}
                     <Divider style={{ margin: '8px 0' }} />
@@ -1765,86 +1830,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
             </Text>
           </div>
 
-          {/* 3.5. Item Pricing Section (تسعير الصنف) */}
-          <div style={{ backgroundColor: '#fffdf5', border: '1px solid #fde68a', padding: '14px 16px', borderRadius: 8, marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Space align="middle">
-                <DollarOutlined style={{ color: '#b45309', fontSize: 16 }} />
-                <Text strong style={{ color: '#92400e', fontSize: 14 }}>
-                  تسعير الصنف الموحد (Pricing Details):
-                </Text>
-              </Space>
-              <Tag color="gold" style={{ fontWeight: 600 }}>يُعتمد تلقائياً لجميع الفروع والمتجر</Tag>
-            </div>
 
-            <Row gutter={16}>
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item
-                  name="selling_price"
-                  label={<Text strong style={{ color: '#0F172A' }}>سعر البيع للقطاعي (ج.م) *</Text>}
-                  rules={[{ required: true, message: 'يرجى إدخال سعر البيع' }]}
-                >
-                  <InputNumber
-                    min={0}
-                    step={1}
-                    precision={2}
-                    placeholder="0.00"
-                    style={{ width: '100%' }}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item
-                  name="cost_price"
-                  label={<Text strong style={{ color: '#475569' }}>سعر التكلفة الأساسي (ج.م) *</Text>}
-                  rules={[{ required: true, message: 'يرجى إدخال سعر التكلفة' }]}
-                >
-                  <InputNumber
-                    min={0}
-                    step={1}
-                    precision={2}
-                    placeholder="0.00"
-                    style={{ width: '100%' }}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item
-                  name="wholesale_price"
-                  label={<Text style={{ color: '#475569' }}>سعر الجملة (اختياري)</Text>}
-                >
-                  <InputNumber
-                    min={0}
-                    step={1}
-                    precision={2}
-                    placeholder="0.00"
-                    style={{ width: '100%' }}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item
-                  name="sale_price"
-                  label={<Text style={{ color: '#b91c1c' }}>سعر التخفيض/العرض (اختياري)</Text>}
-                >
-                  <InputNumber
-                    min={0}
-                    step={1}
-                    precision={2}
-                    placeholder="0.00"
-                    style={{ width: '100%' }}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </div>
 
           {/* 4. Variant Mode Selection: Single Item vs Multi-variant */}
           <div style={{ marginBottom: 16, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px' }}>
@@ -1959,7 +1945,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                       onChange={setSelectedMultiColors}
                       size="large"
                       style={{ width: '100%' }}
-                      dropdownRender={(menu) => (
+                      popupRender={(menu) => (
                         <>
                           {menu}
                           <Divider style={{ margin: '8px 0' }} />
@@ -2031,7 +2017,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                       onChange={setSelectedMultiSizes}
                       size="large"
                       style={{ width: '100%' }}
-                      dropdownRender={(menu) => (
+                      popupRender={(menu) => (
                         <>
                           {menu}
                           <Divider style={{ margin: '8px 0' }} />
@@ -2084,7 +2070,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                     allowClear
                     showSearch
                     size="large"
-                    dropdownRender={(menu) => (
+                    popupRender={(menu) => (
                       <>
                         {menu}
                         <Divider style={{ margin: '8px 0' }} />
@@ -2153,7 +2139,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                     allowClear
                     showSearch
                     size="large"
-                    dropdownRender={(menu) => (
+                    popupRender={(menu) => (
                       <>
                         {menu}
                         <Divider style={{ margin: '8px 0' }} />
@@ -2190,8 +2176,42 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
             </Row>
           )}
 
-          {/* 6. DEDICATED IMAGE FOR EACH COLOR SECTION */}
+          {/* 6. IMAGE UPLOAD MODE TOGGLE & COLOR IMAGES */}
           {activeColors.length > 0 && (
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '12px 14px',
+              marginBottom: 16
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <Space align="middle">
+                  <PictureOutlined style={{ color: '#0284c7', fontSize: 16 }} />
+                  <Text strong style={{ color: '#1e293b', fontSize: 13 }}>
+                    صور الصنف (إرفاق صور للألوان):
+                  </Text>
+                </Space>
+                <Radio.Group
+                  value={imageUploadMode}
+                  onChange={(e) => setImageUploadMode(e.target.value)}
+                  buttonStyle="solid"
+                  size="small"
+                >
+                  <Radio.Button value="standard">تلقائي (مع رفع الصور)</Radio.Button>
+                  <Radio.Button value="custom">مخصص (بدون صور)</Radio.Button>
+                </Radio.Group>
+              </div>
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4, color: '#64748b' }}>
+                {imageUploadMode === 'standard'
+                  ? 'الوضع التلقائي: يتيح لك رفع أو لصق صورة لكل لون من ألوان الصنف.'
+                  : 'الوضع المخصص: صنف بدون صور — يتم حفظ الصنف وتركيباته مباشرة وتوفير مساحة التخزين على السيرفر.'}
+              </Text>
+            </div>
+          )}
+
+          {/* DEDICATED IMAGE FOR EACH COLOR (ONLY IN STANDARD MODE) */}
+          {imageUploadMode === 'standard' && activeColors.length > 0 && (
             <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '14px', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Space align="middle">
@@ -2355,7 +2375,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                     }))
                   )}
                   columns={[
-                    {
+                    ...(imageUploadMode === 'standard' ? [{
                       title: 'صورة اللون',
                       key: 'img',
                       width: 70,
@@ -2368,7 +2388,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                           style={{ background: '#f8fafc', border: '1px solid #e2e8f0', objectFit: 'contain' }}
                         />
                       )
-                    },
+                    }] : []),
                     {
                       title: 'اللون',
                       dataIndex: 'color',

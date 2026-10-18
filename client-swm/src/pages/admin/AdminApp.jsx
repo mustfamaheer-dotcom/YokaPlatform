@@ -74,6 +74,7 @@ import BranchShiftMonitor from '../BranchShiftMonitor';
 import Customers from '../Customers';
 import StoreSettings from '../StoreSettings';
 import LoyaltySettings from '../LoyaltySettings';
+import SalesInvoiceSettings from '../SalesInvoiceSettings';
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -108,7 +109,8 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
     'branches', 'users', 'payroll_expenses', 'treasury_admin', 'branches_daily',
     'admin_journals', 'sales_reports', 'retail_analytics', 'ecom_analytics',
     'ecom_inventory', 'daily_shift', 'branch_shifts', 'customers',
-    'loyalty_settings', 'loyalty', 'store_settings', 'settings', 'storefront'
+    'loyalty_settings', 'loyalty', 'store_settings', 'settings', 'storefront',
+    'sales_settings', 'invoice_settings'
   ]), []);
 
   // Extract route after /dashboard or /swm-admin/dashboard safely
@@ -312,6 +314,12 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
             title: 'سجل العملاء ونقاط الولاء (Customers & Loyalty)',
             subtitle: 'دليل العملاء، تصفية المبيعات والنقاط حسب الفرع، وتصدير شيت إكسيل',
             icon: <Award size={20} color="#0284c7" />
+          },
+          {
+            id: 'sales_settings',
+            title: 'إعدادات البيع وتخصيص الفواتير (Header & Footer)',
+            subtitle: 'تخصيص ترويسة وتذييل الفاتورة، الشعار، أرقام التواصل، وسياسة الاستبدال والاسترجاع المطبوعة',
+            icon: <Receipt size={20} color="#0284c7" />
           }
         ]
       }
@@ -1145,6 +1153,9 @@ export default function AdminApp({ currentUser, onSwitchToPos, onLogout }) {
         )}
         {(activeTab === 'store_settings' || activeTab === 'settings' || activeTab === 'storefront') && (
           <StoreSettings currentUser={currentUser} />
+        )}
+        {(activeTab === 'sales_settings' || activeTab === 'invoice_settings') && (
+          <SalesInvoiceSettings currentUser={currentUser} onNavigate={handleNavigate} />
         )}
       </Content>
     </Layout>

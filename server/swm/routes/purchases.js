@@ -3,6 +3,7 @@ const { query, transaction } = require('../../shared/db');
 const { requireAuth, requireRole, requireWarehousePermission } = require('../../shared/authMiddleware');
 const { logActivity } = require('../../shared/activityLogger');
 const { addToMainTreasury, deductFromMainTreasury } = require('../services/treasuryService');
+const { generateValidEAN13 } = require('../../shared/barcode');
 
 router.use(requireWarehousePermission('purchases'));
 
@@ -263,10 +264,10 @@ router.get('/returns/:id', requireAuth, async (req, res) => {
 
     const items = await query(
       `SELECT pri.*,
-              p.barcode, p.product_code,
+              p.barcode AS product_barcode, p.product_code, pv.variant_sku,
               COALESCE(pv.color, p.color) AS color,
               COALESCE(pv.size, p.size) AS size,
-              COALESCE(pv.variant_sku, p.barcode, p.product_code) AS barcode
+              COALESCE(pv.barcode, p.barcode, pv.variant_sku, p.product_code) AS barcode
        FROM purchase_return_items pri
        LEFT JOIN products p ON p.id = pri.product_id
        LEFT JOIN product_variants pv ON pv.id = pri.variant_id
@@ -576,10 +577,10 @@ router.get('/:id', requireAuth, async (req, res) => {
 
     const items = await query(
       `SELECT pii.*,
-              p.barcode, p.product_code,
+              p.barcode AS product_barcode, p.product_code, pv.variant_sku,
               COALESCE(pv.color, p.color) AS color,
               COALESCE(pv.size, p.size) AS size,
-              COALESCE(pv.variant_sku, p.barcode, p.product_code) AS barcode,
+              COALESCE(pv.barcode, p.barcode, pv.variant_sku, p.product_code) AS barcode,
               COALESCE((SELECT SUM(pri.quantity) FROM purchase_return_items pri WHERE pri.purchase_item_id = pii.id), 0) AS returned_quantity
        FROM purchase_invoice_items pii
        LEFT JOIN products p ON p.id = pii.product_id
@@ -778,12 +779,16 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
               vSku = `${vSku}-${Math.floor(Math.random() * 900 + 100)}`;
             }
 
+            const vBarcode = (item.barcode && /^\d{12,14}$/.test(String(item.barcode).trim()))
+              ? String(item.barcode).trim()
+              : generateValidEAN13('622');
+
             const insVar = await client.query(
               `INSERT INTO product_variants (
-                product_id, variant_sku, color, size, price_modifier, status, created_at, updated_at
-              ) VALUES ($1, $2, $3, $4, 0, 'active', NOW(), NOW())
+                product_id, variant_sku, barcode, color, size, price_modifier, status, created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())
               RETURNING id`,
-              [item.product_id, vSku, cleanColor, cleanSize]
+              [item.product_id, vSku, vBarcode, cleanColor, cleanSize]
             );
             effectiveVariantId = insVar.rows[0].id;
           }

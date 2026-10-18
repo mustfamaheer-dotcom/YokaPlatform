@@ -1,11 +1,87 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Typography } from 'antd';
 import { PrinterOutlined, FilePdfOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { Trophy } from 'lucide-react';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 import { printHtmlContent } from '../utils/printUtils';
+import api from '../api';
 
 const { Text } = Typography;
+
+const DEFAULT_RECEIPT_SETTINGS = {
+  invoice_header_title: 'شركة يوكا ستور (YOKA STORE)',
+  invoice_header_subtitle: 'للأزياء والموضة العصرية الفاخرة',
+  invoice_show_logo: true,
+  invoice_header_logo_url: '',
+  invoice_header_phone: '',
+  invoice_header_tax_number: '',
+  invoice_header_extra_text: '',
+  invoice_footer_thanks: 'شكراً لزيارتكم وتسوقكم في YOKA STORE!',
+  invoice_footer_policy_title: 'شروط وسياسة الاستبدال والاسترجاع:',
+  invoice_footer_policy_line1: 'الاستبدال والاسترجاع متاح خلال 14 يوماً من تاريخ الفاتورة',
+  invoice_footer_policy_line2: 'يشترط إحضار أصل الفاتورة وأن تكون القطع بحالتها الأصلية مع بطاقة السعر',
+  invoice_footer_policy_line3: '',
+  invoice_footer_extra_notes: '',
+  invoice_show_barcode: true
+};
+
+let settingsCache = null;
+
+export const getCachedReceiptSettings = () => {
+  try {
+    const raw = localStorage.getItem('yoka_receipt_settings');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return settingsCache || DEFAULT_RECEIPT_SETTINGS;
+};
+
+export const clearReceiptSettingsCache = () => {
+  settingsCache = null;
+  try {
+    localStorage.removeItem('yoka_receipt_settings');
+    localStorage.removeItem('yoka_receipt_settings_time');
+  } catch (e) {}
+};
+
+export const fetchReceiptSettings = async () => {
+  try {
+    const res = await api.get('/api/swm/store-settings');
+    if (res.data?.success && Array.isArray(res.data?.data)) {
+      const map = {};
+      res.data.data.forEach(item => {
+        map[item.key] = item.value;
+      });
+
+      const loaded = {
+        invoice_header_title: map['invoice_header_title'] !== undefined ? map['invoice_header_title'] : DEFAULT_RECEIPT_SETTINGS.invoice_header_title,
+        invoice_header_subtitle: map['invoice_header_subtitle'] !== undefined ? map['invoice_header_subtitle'] : '',
+        invoice_show_logo: map['invoice_show_logo'] !== undefined ? map['invoice_show_logo'] === 'true' : true,
+        invoice_header_logo_url: map['invoice_header_logo_url'] || '',
+        invoice_header_phone: map['invoice_header_phone'] !== undefined ? map['invoice_header_phone'] : '',
+        invoice_header_tax_number: map['invoice_header_tax_number'] !== undefined ? map['invoice_header_tax_number'] : '',
+        invoice_header_extra_text: map['invoice_header_extra_text'] !== undefined ? map['invoice_header_extra_text'] : '',
+
+        invoice_footer_thanks: map['invoice_footer_thanks'] !== undefined ? map['invoice_footer_thanks'] : DEFAULT_RECEIPT_SETTINGS.invoice_footer_thanks,
+        invoice_footer_policy_title: map['invoice_footer_policy_title'] !== undefined ? map['invoice_footer_policy_title'] : DEFAULT_RECEIPT_SETTINGS.invoice_footer_policy_title,
+        invoice_footer_policy_line1: map['invoice_footer_policy_line1'] !== undefined ? map['invoice_footer_policy_line1'] : DEFAULT_RECEIPT_SETTINGS.invoice_footer_policy_line1,
+        invoice_footer_policy_line2: map['invoice_footer_policy_line2'] !== undefined ? map['invoice_footer_policy_line2'] : DEFAULT_RECEIPT_SETTINGS.invoice_footer_policy_line2,
+        invoice_footer_policy_line3: map['invoice_footer_policy_line3'] !== undefined ? map['invoice_footer_policy_line3'] : '',
+        invoice_footer_extra_notes: map['invoice_footer_extra_notes'] !== undefined ? map['invoice_footer_extra_notes'] : '',
+        invoice_show_barcode: map['invoice_show_barcode'] !== undefined ? map['invoice_show_barcode'] === 'true' : true
+      };
+
+      settingsCache = loaded;
+      try {
+        localStorage.setItem('yoka_receipt_settings', JSON.stringify(loaded));
+        localStorage.setItem('yoka_receipt_settings_time', String(Date.now()));
+      } catch (e) {}
+      return loaded;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch receipt settings:', err);
+  }
+  return getCachedReceiptSettings();
+};
 
 /**
  * Robust date and time formatter avoiding iOS Arabic locale NaN/empty slashes
@@ -29,8 +105,51 @@ function formatReceiptDate(dateVal) {
   return `${y}/${m}/${day} - ${formattedHours}:${minutes} ${ampm}`;
 }
 
-export default function ThermalReceipt({ invoice, onClose }) {
+export default function ThermalReceipt({ invoice, onClose, settings: customSettings = null }) {
   if (!invoice) return null;
+
+  const [receiptSettings, setReceiptSettings] = useState(() => customSettings || getCachedReceiptSettings());
+
+  useEffect(() => {
+    if (customSettings) {
+      setReceiptSettings(customSettings);
+      return;
+    }
+
+    let isMounted = true;
+
+    // Listen to real-time custom event when admin saves settings in another tab/component
+    const onSettingsUpdated = (e) => {
+      if (isMounted && e.detail) {
+        setReceiptSettings(e.detail);
+      }
+    };
+    window.addEventListener('yoka_receipt_settings_updated', onSettingsUpdated);
+
+    // Cross-tab synchronization via storage event
+    const onStorageChange = (e) => {
+      if (e.key === 'yoka_receipt_settings' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (isMounted) setReceiptSettings(parsed);
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', onStorageChange);
+
+    // Fetch freshest settings from database
+    fetchReceiptSettings().then((fresh) => {
+      if (isMounted && fresh) {
+        setReceiptSettings(fresh);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('yoka_receipt_settings_updated', onSettingsUpdated);
+      window.removeEventListener('storage', onStorageChange);
+    };
+  }, [customSettings]);
 
   const paymentBreakdown = typeof invoice.payment_breakdown === 'string'
     ? JSON.parse(invoice.payment_breakdown || '{}')
@@ -145,14 +264,22 @@ export default function ThermalReceipt({ invoice, onClose }) {
       >
         {/* Receipt Header */}
         <div style={{ textAlign: 'center', marginBottom: 8, paddingBottom: 6, borderBottom: '1.5px dashed #334155' }}>
-          <img
-            src={yokaLogo}
-            alt="Yoka Store"
-            style={{ height: 42, maxWidth: 120, objectFit: 'contain', marginBottom: 4 }}
-          />
+          {receiptSettings.invoice_show_logo && (
+            <img
+              src={receiptSettings.invoice_header_logo_url?.trim() || yokaLogo}
+              alt="Logo"
+              style={{ height: 42, maxWidth: 120, objectFit: 'contain', marginBottom: 4 }}
+              onError={(e) => { e.target.src = yokaLogo; }}
+            />
+          )}
           <div style={{ fontSize: '15px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
-            شركة يوكا ستور (YOKA STORE)
+            {receiptSettings.invoice_header_title || 'شركة يوكا ستور (YOKA STORE)'}
           </div>
+          {receiptSettings.invoice_header_subtitle && (
+            <div style={{ fontSize: '10.5px', color: '#475569', marginTop: 1, fontWeight: 600 }}>
+              {receiptSettings.invoice_header_subtitle}
+            </div>
+          )}
           <div style={{
             display: 'inline-block',
             fontSize: '11px',
@@ -170,9 +297,19 @@ export default function ThermalReceipt({ invoice, onClose }) {
           <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
             {invoice.branch_name || 'الفرع الرئيسي'}
           </div>
-          {invoice.branch_phone && (
+          {(receiptSettings.invoice_header_phone || invoice.branch_phone) && (
             <div style={{ fontSize: '10px', color: '#64748b', marginTop: 1 }}>
-              خدمة العملاء: <span style={{ direction: 'ltr', display: 'inline-block' }}>{invoice.branch_phone}</span>
+              خدمة العملاء: <span style={{ direction: 'ltr', display: 'inline-block', fontWeight: 700 }}>{receiptSettings.invoice_header_phone || invoice.branch_phone}</span>
+            </div>
+          )}
+          {receiptSettings.invoice_header_tax_number && (
+            <div style={{ fontSize: '10px', color: '#64748b', marginTop: 1 }}>
+              الرقم الضريبي: <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{receiptSettings.invoice_header_tax_number}</span>
+            </div>
+          )}
+          {receiptSettings.invoice_header_extra_text && (
+            <div style={{ fontSize: '10px', color: '#0284c7', marginTop: 2, fontWeight: 600, fontStyle: 'italic' }}>
+              {receiptSettings.invoice_header_extra_text}
             </div>
           )}
         </div>
@@ -362,14 +499,35 @@ export default function ThermalReceipt({ invoice, onClose }) {
 
         {/* Footer & Return Policy */}
         <div style={{ textAlign: 'center', fontSize: '9.5px', color: '#64748b', borderTop: '1.5px dashed #334155', paddingTop: 6 }}>
-          <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: 2, fontSize: '10.5px' }}>
-            شكراً لزيارتكم وتسوقكم في YOKA STORE!
-          </div>
-          <div>الاستبدال والاسترجاع خلال 14 يوماً من تاريخ الفاتورة</div>
-          <div>يشترط وجود أصل الفاتورة وأن تكون البضاعة بحالتها الأصلية</div>
-          <div style={{ marginTop: 5, letterSpacing: '2px', fontWeight: 800, fontSize: '11px', color: '#0f172a', fontFamily: 'monospace' }}>
-            *{invoice.invoice_number}*
-          </div>
+          {receiptSettings.invoice_footer_thanks && (
+            <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: 2, fontSize: '10.5px' }}>
+              {receiptSettings.invoice_footer_thanks}
+            </div>
+          )}
+          {receiptSettings.invoice_footer_policy_title && (
+            <div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>
+              {receiptSettings.invoice_footer_policy_title}
+            </div>
+          )}
+          {receiptSettings.invoice_footer_policy_line1 && (
+            <div>{receiptSettings.invoice_footer_policy_line1}</div>
+          )}
+          {receiptSettings.invoice_footer_policy_line2 && (
+            <div>{receiptSettings.invoice_footer_policy_line2}</div>
+          )}
+          {receiptSettings.invoice_footer_policy_line3 && (
+            <div>{receiptSettings.invoice_footer_policy_line3}</div>
+          )}
+          {receiptSettings.invoice_footer_extra_notes && (
+            <div style={{ marginTop: 3, color: '#0284c7', fontWeight: 600, fontStyle: 'italic' }}>
+              {receiptSettings.invoice_footer_extra_notes}
+            </div>
+          )}
+          {receiptSettings.invoice_show_barcode && (
+            <div style={{ marginTop: 5, letterSpacing: '2px', fontWeight: 800, fontSize: '11px', color: '#0f172a', fontFamily: 'monospace' }}>
+              *{invoice.invoice_number}*
+            </div>
+          )}
         </div>
       </div>
     </div>

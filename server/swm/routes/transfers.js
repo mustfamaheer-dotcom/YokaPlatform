@@ -49,8 +49,20 @@ router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', '
     let pIdx = 2;
 
     if (search && search.trim()) {
-      whereClauses.push(`(p.product_name ILIKE $${pIdx} OR p.product_code ILIKE $${pIdx} OR p.barcode ILIKE $${pIdx} OR pv.variant_sku ILIKE $${pIdx})`);
-      params.push(`%${search.trim()}%`);
+      let clean = search.trim();
+      if (/^\d{26}$/.test(clean) && clean.slice(0, 13) === clean.slice(13)) {
+        clean = clean.slice(0, 13);
+      } else if (/^\d{24}$/.test(clean) && clean.slice(0, 12) === clean.slice(12)) {
+        clean = clean.slice(0, 12);
+      }
+      whereClauses.push(`(
+        p.product_name ILIKE $${pIdx}
+        OR p.product_code ILIKE $${pIdx}
+        OR p.barcode ILIKE $${pIdx}
+        OR pv.barcode ILIKE $${pIdx}
+        OR pv.variant_sku ILIKE $${pIdx}
+      )`);
+      params.push(`%${clean}%`);
       pIdx++;
     }
 
@@ -69,7 +81,9 @@ router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', '
         ib.available_qty,
         p.product_name,
         p.product_code,
-        p.barcode,
+        COALESCE(pv.barcode, p.barcode) AS barcode,
+        p.barcode AS product_barcode,
+        pv.barcode AS variant_barcode,
         p.cost_price,
         p.selling_price,
         pv.variant_sku,
@@ -98,6 +112,108 @@ router.get('/branch-stock/:branchId', requireAuth, requireRole(['super_admin', '
     return res.status(500).json({ success: false, message: err.message });
   }
 });
+
+/**
+ * GET /api/swm/transfers/lookup-barcode
+ * Lookup a product/variant by barcode across the system, checking stock in the sending branch
+ */
+router.get('/lookup-barcode', requireAuth, requireRole(['super_admin', 'admin', 'warehouse_manager']), async (req, res) => {
+  try {
+    const { code, from_branch_id } = req.query;
+    if (!code || !code.trim()) {
+      return res.status(400).json({ success: false, message: 'الكود مطلوب' });
+    }
+
+    let clean = code.trim();
+    if (/^\d{26}$/.test(clean) && clean.slice(0, 13) === clean.slice(13)) {
+      clean = clean.slice(0, 13);
+    } else if (/^\d{24}$/.test(clean) && clean.slice(0, 12) === clean.slice(12)) {
+      clean = clean.slice(0, 12);
+    }
+
+    const branchId = parseInt(from_branch_id, 10) || null;
+
+    // Search for product and variant
+    const matchedItems = await query(`
+      SELECT
+        p.id AS product_id,
+        pv.id AS variant_id,
+        p.product_name,
+        p.product_code,
+        p.cost_price,
+        p.selling_price,
+        p.category_id,
+        c.category_name,
+        COALESCE(pv.barcode, p.barcode) AS barcode,
+        p.barcode AS product_barcode,
+        pv.barcode AS variant_barcode,
+        pv.variant_sku,
+        pv.color,
+        pv.size,
+        COALESCE(pv.image_url, p.featured_image) AS image_url,
+        CASE
+          WHEN pv.id IS NOT NULL THEN CONCAT(p.product_name, ' (', COALESCE(pv.color, ''), ' - ', COALESCE(pv.size, ''), ')')
+          ELSE p.product_name
+        END AS display_name,
+        COALESCE(ib.available_qty, 0) AS available_qty,
+        ib.id AS balance_id
+      FROM products p
+      LEFT JOIN product_variants pv ON pv.product_id = p.id
+      LEFT JOIN product_categories c ON c.id = p.category_id
+      LEFT JOIN inventory_balances ib ON ib.product_id = p.id
+        AND (ib.variant_id = pv.id OR (ib.variant_id IS NULL AND pv.id IS NULL))
+        AND ib.branch_id = $1
+      WHERE p.status = 'active'
+        AND (
+          pv.barcode = $2
+          OR p.barcode = $2
+          OR pv.variant_sku = $2
+          OR p.product_code = $2
+          OR LOWER(pv.barcode) = LOWER($2)
+          OR LOWER(p.barcode) = LOWER($2)
+          OR LOWER(pv.variant_sku) = LOWER($2)
+          OR LOWER(p.product_code) = LOWER($2)
+        )
+      LIMIT 1
+    `, [branchId, clean]);
+
+    if (matchedItems.length === 0) {
+      return res.json({
+        success: true,
+        data: null,
+        exists: false,
+        message: 'الصنف غير مسجل بالنظام'
+      });
+    }
+
+    const item = matchedItems[0];
+
+    // If available_qty is 0, fetch other branches where stock exists
+    let otherBranches = [];
+    if (parseFloat(item.available_qty || 0) <= 0) {
+      otherBranches = await query(`
+        SELECT b.id, b.branch_name, ib.available_qty
+        FROM inventory_balances ib
+        JOIN branches b ON b.id = ib.branch_id
+        WHERE ib.product_id = $1
+          AND (ib.variant_id = $2 OR (ib.variant_id IS NULL AND $2 IS NULL))
+          AND ib.available_qty > 0
+        ORDER BY ib.available_qty DESC
+      `, [item.product_id, item.variant_id || null]);
+    }
+
+    return res.json({
+      success: true,
+      exists: true,
+      data: item,
+      otherBranches
+    });
+  } catch (err) {
+    console.error('Lookup barcode error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 
 /**
  * GET /api/swm/transfers

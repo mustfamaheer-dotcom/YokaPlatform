@@ -8,6 +8,7 @@ import {
   Table,
   Button,
   Modal,
+  App,
   Form,
   Input,
   InputNumber,
@@ -52,6 +53,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 export default function Transfers({ currentUser, autoOpenCreate, onResetAction }) {
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const targetDeepId = searchParams.get('id') || searchParams.get('transfer_id') || searchParams.get('code');
@@ -79,6 +81,13 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
 
   // Selected items in invoice/voucher table
   const [transferItems, setTransferItems] = useState([]);
+  const transferItemsRef = useRef(transferItems);
+  useEffect(() => {
+    transferItemsRef.current = transferItems;
+  }, [transferItems]);
+
+  const lastBarcodeScanRef = useRef({ code: '', time: 0 });
+  const lastQtyEnterRef = useRef({ key: '', time: 0 });
 
   // Active row being targeted for search or editing
   const [activeRowKey, setActiveRowKey] = useState(null);
@@ -264,6 +273,12 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
     if (!createModalVisible) return;
 
     const handleKeyDown = (e) => {
+      if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
       // If Search modal is visible, escape closes it
       if (searchModalVisible) {
         if (e.key === 'Escape') {
@@ -289,8 +304,18 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [createModalVisible, searchModalVisible, transferItems, availableStock, submitting]);
 
-  // Step 1: Add new empty row (F11)
-  const handleAddNewRow = () => {
+  // Step 1: Add new empty row (F11 or button)
+  const handleAddNewRow = (silent = false) => {
+    // If there is already an empty row, just focus it
+    const existingEmpty = transferItems.find((i) => i.isManualRow && !i.product_id);
+    if (existingEmpty) {
+      setActiveRowKey(existingEmpty.key);
+      setTimeout(() => {
+        rowBarcodeRefs.current[existingEmpty.key]?.focus?.();
+      }, 60);
+      return existingEmpty.key;
+    }
+
     const newKey = `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     setTransferItems((prev) => [
       ...prev,
@@ -312,10 +337,121 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
       }
     ]);
     setActiveRowKey(newKey);
-    message.info('سطر جديد [F11]: اكتب الباركود أو اضغط F1 للبحث عن الصنف');
+    if (!silent) {
+      message.info('سطر جديد [F11]: اكتب الباركود أو اضغط F1 للبحث عن الصنف');
+    }
     setTimeout(() => {
-      rowBarcodeRefs.current[newKey]?.focus();
+      rowBarcodeRefs.current[newKey]?.focus?.();
     }, 80);
+    return newKey;
+  };
+
+  // Ensure there is always a trailing empty row ready at the bottom
+  const ensureTrailingEmptyRow = () => {
+    let emptyKey = null;
+    setTransferItems((prev) => {
+      const existingEmpty = prev.find((i) => i.isManualRow && !i.product_id);
+      if (existingEmpty) {
+        emptyKey = existingEmpty.key;
+        return prev;
+      }
+      const newKey = `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      emptyKey = newKey;
+      return [
+        ...prev,
+        {
+          key: newKey,
+          isManualRow: true,
+          product_id: null,
+          variant_id: null,
+          barcode_input: '',
+          product_name: '',
+          display_name: '',
+          color: null,
+          size: null,
+          product_code: '',
+          barcode: '',
+          available_qty: 0,
+          quantity: 1,
+          notes: ''
+        }
+      ];
+    });
+    return emptyKey;
+  };
+
+  // Move focus to row quantity field and select all text with robust retry
+  const focusRowQuantity = (rowKey) => {
+    setActiveRowKey(rowKey);
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    const tryFocus = () => {
+      attempts++;
+      const el = rowQtyRefs.current[rowKey];
+      if (el) {
+        const wrapper = el.nativeElement || (el.nodeType ? el : null);
+        const inputEl = wrapper?.querySelector?.('input') || el.input || (el.tagName === 'INPUT' ? el : null);
+
+        if (inputEl) {
+          inputEl.focus();
+          setTimeout(() => {
+            try {
+              inputEl.select();
+            } catch (err) {}
+          }, 30);
+          return;
+        } else if (typeof el.focus === 'function') {
+          el.focus();
+          return;
+        }
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(tryFocus, 40);
+      }
+    };
+
+    setTimeout(tryFocus, 30);
+  };
+
+  // Focus the trailing empty row's barcode input with retry
+  const focusTrailingEmptyRowBarcode = () => {
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    const tryFocusBarcode = () => {
+      attempts++;
+      const items = transferItemsRef.current || [];
+      const emptyRow = items.find((i) => i.isManualRow && !i.product_id);
+
+      if (emptyRow) {
+        setActiveRowKey(emptyRow.key);
+        const el = rowBarcodeRefs.current[emptyRow.key];
+        if (el) {
+          const wrapper = el.nativeElement || (el.nodeType ? el : null);
+          const inputEl = el.input || wrapper?.querySelector?.('input') || (el.tagName === 'INPUT' ? el : null);
+          if (inputEl && typeof inputEl.focus === 'function') {
+            inputEl.focus();
+            try {
+              inputEl.select();
+            } catch (err) {}
+            return;
+          } else if (typeof el.focus === 'function') {
+            el.focus();
+            return;
+          }
+        }
+      } else {
+        ensureTrailingEmptyRow();
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(tryFocusBarcode, 40);
+      }
+    };
+
+    setTimeout(tryFocusBarcode, 30);
   };
 
   // Step 2: Open Product Search Modal (F1)
@@ -362,36 +498,14 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
     }, 150);
   };
 
-  // Populate product details into specified row
+  // Populate product details into specified row AND guarantee an empty trailing row
   const populateProductIntoRow = (rowKey, stockRow) => {
+    let targetRowKey = rowKey;
     setTransferItems((prev) => {
-      const exists = prev.some((i) => i.key === rowKey);
-      if (!exists) {
-        return [
-          ...prev,
-          {
-            key: rowKey || `row-${Date.now()}`,
-            isManualRow: false,
-            balance_id: stockRow.balance_id,
-            product_id: stockRow.product_id,
-            variant_id: stockRow.variant_id || null,
-            barcode_input: stockRow.variant_sku || stockRow.barcode || stockRow.product_code || '',
-            product_name: stockRow.product_name,
-            display_name: stockRow.display_name,
-            color: stockRow.color,
-            size: stockRow.size,
-            image_url: stockRow.image_url,
-            category_name: stockRow.category_name,
-            product_code: stockRow.product_code,
-            barcode: stockRow.variant_sku || stockRow.barcode,
-            available_qty: stockRow.available_qty,
-            quantity: 1,
-            notes: ''
-          }
-        ];
-      }
-      return prev.map((item) => {
+      let targetFound = false;
+      const nextItems = prev.map((item) => {
         if (item.key === rowKey) {
+          targetFound = true;
           return {
             ...item,
             isManualRow: false,
@@ -414,64 +528,247 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
         }
         return item;
       });
+
+      if (!targetFound) {
+        targetRowKey = rowKey || `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        nextItems.push({
+          key: targetRowKey,
+          isManualRow: false,
+          balance_id: stockRow.balance_id,
+          product_id: stockRow.product_id,
+          variant_id: stockRow.variant_id || null,
+          barcode_input: stockRow.variant_sku || stockRow.barcode || stockRow.product_code || '',
+          product_name: stockRow.product_name,
+          display_name: stockRow.display_name,
+          color: stockRow.color,
+          size: stockRow.size,
+          image_url: stockRow.image_url,
+          category_name: stockRow.category_name,
+          product_code: stockRow.product_code,
+          barcode: stockRow.variant_sku || stockRow.barcode,
+          available_qty: stockRow.available_qty,
+          quantity: 1,
+          notes: ''
+        });
+      }
+
+      // Automatically append an empty trailing row if none exists!
+      const hasEmpty = nextItems.some((i) => i.isManualRow && !i.product_id);
+      if (!hasEmpty) {
+        nextItems.push({
+          key: `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          isManualRow: true,
+          product_id: null,
+          variant_id: null,
+          barcode_input: '',
+          product_name: '',
+          display_name: '',
+          color: null,
+          size: null,
+          product_code: '',
+          barcode: '',
+          available_qty: 0,
+          quantity: 1,
+          notes: ''
+        });
+      }
+
+      return nextItems;
     });
+
+    return targetRowKey;
+  };
+
+  // Central Barcode Lookup and Insertion logic
+  const executeBarcodeLookup = async (rowKey, val) => {
+    if (!val || !val.trim()) return;
+
+    let rawVal = val.trim();
+    // Auto-deduplicate double-scanned barcode
+    if (/^\d{26}$/.test(rawVal) && rawVal.slice(0, 13) === rawVal.slice(13)) {
+      rawVal = rawVal.slice(0, 13);
+    } else if (/^\d{24}$/.test(rawVal) && rawVal.slice(0, 12) === rawVal.slice(12)) {
+      rawVal = rawVal.slice(0, 12);
+    }
+
+    const cleanVal = rawVal.toLowerCase();
+
+    // Check if sending branch is selected
+    if (!selectedFromBranch) {
+      return message.warning('يرجى اختيار المخزن / الفرع المنصرف منه أولاً');
+    }
+
+    // Exact match in available stock
+    const found = availableStock.find((s) => {
+      const b = (s.barcode || '').toLowerCase();
+      const vb = (s.variant_barcode || '').toLowerCase();
+      const pb = (s.product_barcode || '').toLowerCase();
+      const sku = (s.variant_sku || '').toLowerCase();
+      const code = (s.product_code || '').toLowerCase();
+      return b === cleanVal || vb === cleanVal || pb === cleanVal || sku === cleanVal || code === cleanVal;
+    });
+
+    if (found) {
+      // Check if already in another row
+      const alreadyInOtherRow = transferItems.find(
+        (i) => i.key !== rowKey && i.product_id === found.product_id && (i.variant_id || null) === (found.variant_id || null)
+      );
+
+      if (alreadyInOtherRow) {
+        message.warning(`الصنف "${found.display_name}" مضاف بالفعل! تم زيادة كميته.`);
+        setTransferItems((prev) => {
+          const nextItems = prev.map((i) => {
+            if (i.key === alreadyInOtherRow.key) {
+              const nq = Math.min(i.available_qty, i.quantity + 1);
+              return { ...i, quantity: nq };
+            }
+            if (i.key === rowKey && i.isManualRow) {
+              return { ...i, barcode_input: '' };
+            }
+            return i;
+          });
+          const hasEmpty = nextItems.some((i) => i.isManualRow && !i.product_id);
+          if (!hasEmpty) {
+            nextItems.push({
+              key: `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+              isManualRow: true,
+              product_id: null,
+              variant_id: null,
+              barcode_input: '',
+              product_name: '',
+              display_name: '',
+              color: null,
+              size: null,
+              product_code: '',
+              barcode: '',
+              available_qty: 0,
+              quantity: 1,
+              notes: ''
+            });
+          }
+          return nextItems;
+        });
+        focusRowQuantity(alreadyInOtherRow.key);
+        return;
+      }
+
+      populateProductIntoRow(rowKey, found);
+      message.success(`تم إدراج: ${found.display_name}`);
+      focusRowQuantity(rowKey);
+    } else {
+      // Asynchronous smart lookup across database
+      try {
+        const res = await api.get('/api/swm/transfers/lookup-barcode', {
+          params: { code: rawVal, from_branch_id: selectedFromBranch }
+        });
+
+        if (res.data?.success && res.data.exists && res.data.data) {
+          const serverItem = res.data.data;
+          const availableQty = parseFloat(serverItem.available_qty || 0);
+
+          if (availableQty > 0) {
+            setAvailableStock((prev) => [serverItem, ...prev]);
+
+            const alreadyInOtherRow = transferItems.find(
+              (i) => i.key !== rowKey && i.product_id === serverItem.product_id && (i.variant_id || null) === (serverItem.variant_id || null)
+            );
+
+            if (alreadyInOtherRow) {
+              message.warning(`الصنف "${serverItem.display_name}" مضاف بالفعل! تم زيادة كميته.`);
+              setTransferItems((prev) => {
+                const nextItems = prev.map((i) => {
+                  if (i.key === alreadyInOtherRow.key) {
+                    const nq = Math.min(serverItem.available_qty, i.quantity + 1);
+                    return { ...i, quantity: nq };
+                  }
+                  if (i.key === rowKey && i.isManualRow) {
+                    return { ...i, barcode_input: '' };
+                  }
+                  return i;
+                });
+                const hasEmpty = nextItems.some((i) => i.isManualRow && !i.product_id);
+                if (!hasEmpty) {
+                  nextItems.push({
+                    key: `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    isManualRow: true,
+                    product_id: null,
+                    variant_id: null,
+                    barcode_input: '',
+                    product_name: '',
+                    display_name: '',
+                    color: null,
+                    size: null,
+                    product_code: '',
+                    barcode: '',
+                    available_qty: 0,
+                    quantity: 1,
+                    notes: ''
+                  });
+                }
+                return nextItems;
+              });
+              focusRowQuantity(alreadyInOtherRow.key);
+              return;
+            }
+
+            populateProductIntoRow(rowKey, serverItem);
+            message.success(`تم العثور على الصنف وإدراجه: ${serverItem.display_name}`);
+            focusRowQuantity(rowKey);
+            return;
+          } else {
+            const fromBranchObj = branches.find((b) => b.id === selectedFromBranch);
+            const fromName = fromBranchObj ? fromBranchObj.branch_name : 'هذا المخزن';
+            const otherStr = res.data.otherBranches?.length > 0
+              ? ` (متوفر في: ${res.data.otherBranches.map((b) => `${b.branch_name}: ${b.available_qty} قطع`).join('، ')})`
+              : ' (رصيده منتهي بجميع الفروع)';
+
+            message.warning(
+              `الصنف "${serverItem.display_name}" مسجل بالنظام، لكن رصيده الحالي [0] في ${fromName}${otherStr}`
+            );
+            return;
+          }
+        }
+      } catch (lookupErr) {
+        console.error('Barcode server lookup error:', lookupErr);
+      }
+
+      setActiveRowKey(rowKey);
+      setModalSearchQuery(rawVal);
+      setSearchModalVisible(true);
+      message.warning(`لم يتم العثور على صنف مطابق للكود "${rawVal}" في النظام.`);
+    }
   };
 
   // Barcode / SKU typed and submitted with Enter in a row
-  const handleBarcodeKeyDown = (e, rowKey, val) => {
+  const handleBarcodeKeyDown = (e, rowKey, fallbackVal) => {
+    if (e.key === 'F12' || e.keyCode === 123) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (!val || !val.trim()) return;
-      const cleanVal = val.trim().toLowerCase();
+      e.stopPropagation();
 
-      // Check if sending branch is selected
-      if (!selectedFromBranch) {
-        return message.warning('يرجى اختيار المخزن / الفرع المنصرف منه أولاً');
+      const inputVal = (e.target?.value !== undefined ? e.target.value : fallbackVal) || '';
+      const codeVal = String(inputVal).trim();
+
+      const now = Date.now();
+      if (lastBarcodeScanRef.current.code === codeVal && now - lastBarcodeScanRef.current.time < 250) {
+        return; // debounce rapid Enter firing
       }
+      lastBarcodeScanRef.current = { code: codeVal, time: now };
 
-      // Exact match in available stock
-      const found = availableStock.find((s) => {
-        const b = (s.barcode || '').toLowerCase();
-        const sku = (s.variant_sku || '').toLowerCase();
-        const code = (s.product_code || '').toLowerCase();
-        return b === cleanVal || sku === cleanVal || code === cleanVal;
-      });
-
-      if (found) {
-        // Check if already in another row
-        const alreadyInOtherRow = transferItems.find(
-          (i) => i.key !== rowKey && i.product_id === found.product_id && (i.variant_id || null) === (found.variant_id || null)
-        );
-
-        if (alreadyInOtherRow) {
-          message.warning(`الصنف "${found.display_name}" مضاف بالفعل! تم زيادة كميته.`);
-          setTransferItems((prev) =>
-            prev.filter((i) => i.key !== rowKey || !i.isManualRow).map((i) => {
-              if (i.key === alreadyInOtherRow.key) {
-                const nq = Math.min(i.available_qty, i.quantity + 1);
-                return { ...i, quantity: nq };
-              }
-              return i;
-            })
-          );
-          return;
-        }
-
-        populateProductIntoRow(rowKey, found);
-        message.success(`تم إدراج: ${found.display_name}`);
-
-        setTimeout(() => {
-          rowQtyRefs.current[rowKey]?.focus();
-        }, 80);
-      } else {
-        // Open search modal with this query
-        setActiveRowKey(rowKey);
-        setModalSearchQuery(val.trim());
-        setSearchModalVisible(true);
-        message.warning(`لم يتم العثور على صنف مطابق للكود "${val}". جاري البحث الموسع (F1)...`);
+      if (codeVal) {
+        executeBarcodeLookup(rowKey, codeVal);
       }
-    } else if (e.key === 'F1') {
+      return;
+    }
+
+    if (e.key === 'F1') {
       e.preventDefault();
+      e.stopPropagation();
       handleOpenSearchModal(rowKey);
     }
   };
@@ -480,15 +777,14 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
   const handleSelectProductFromModal = (stockRow) => {
     if (!stockRow) return;
 
-    // Check if already added in another row
     const alreadyInOtherRow = transferItems.find(
       (i) => i.key !== activeRowKey && i.product_id === stockRow.product_id && (i.variant_id || null) === (stockRow.variant_id || null)
     );
 
     if (alreadyInOtherRow) {
       message.warning(`الصنف "${stockRow.display_name}" مضاف بالفعل في سطر آخر! تم زيادة كميته.`);
-      setTransferItems((prev) =>
-        prev
+      setTransferItems((prev) => {
+        const nextItems = prev
           .filter((item) => item.key !== activeRowKey || !item.isManualRow)
           .map((item) => {
             if (item.key === alreadyInOtherRow.key) {
@@ -496,22 +792,110 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
               return { ...item, quantity: nextQty };
             }
             return item;
-          })
-      );
+          });
+        const hasEmpty = nextItems.some((i) => i.isManualRow && !i.product_id);
+        if (!hasEmpty) {
+          nextItems.push({
+            key: `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            isManualRow: true,
+            product_id: null,
+            variant_id: null,
+            barcode_input: '',
+            product_name: '',
+            display_name: '',
+            color: null,
+            size: null,
+            product_code: '',
+            barcode: '',
+            available_qty: 0,
+            quantity: 1,
+            notes: ''
+          });
+        }
+        return nextItems;
+      });
       setSearchModalVisible(false);
+      focusRowQuantity(alreadyInOtherRow.key);
       return;
     }
 
-    populateProductIntoRow(activeRowKey, stockRow);
+    const targetKey = activeRowKey || `row-${Date.now()}`;
+    populateProductIntoRow(targetKey, stockRow);
     setSearchModalVisible(false);
     setModalSearchQuery('');
     message.success(`تم اختيار وإدراج: ${stockRow.display_name}`);
 
-    setTimeout(() => {
-      if (activeRowKey && rowQtyRefs.current[activeRowKey]) {
-        rowQtyRefs.current[activeRowKey].focus();
-      }
-    }, 80);
+    focusRowQuantity(targetKey);
+  };
+
+  // When Enter is pressed in Quantity InputNumber
+  const handleQuantityPressEnter = (e, rowKey) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    const now = Date.now();
+    if (lastQtyEnterRef.current.key === rowKey && now - lastQtyEnterRef.current.time < 250) {
+      return;
+    }
+    lastQtyEnterRef.current = { key: rowKey, time: now };
+
+    const rawVal = String(e?.target?.value || '').trim();
+    if (/^\d{8,26}$/.test(rawVal)) {
+      // Barcode gun was fired while focused in quantity input!
+      handleUpdateItemQty(rowKey, 1);
+      // Route barcode to the trailing empty row
+      setTransferItems((prev) => {
+        let emptyRow = prev.find((i) => i.isManualRow && !i.product_id);
+        let targetKey = emptyRow?.key;
+        let updatedItems = prev;
+
+        if (!emptyRow) {
+          targetKey = `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          updatedItems = [
+            ...prev,
+            {
+              key: targetKey,
+              isManualRow: true,
+              product_id: null,
+              variant_id: null,
+              barcode_input: rawVal,
+              product_name: '',
+              display_name: '',
+              color: null,
+              size: null,
+              product_code: '',
+              barcode: '',
+              available_qty: 0,
+              quantity: 1,
+              notes: ''
+            }
+          ];
+        } else {
+          updatedItems = prev.map((it) => (it.key === targetKey ? { ...it, barcode_input: rawVal } : it));
+        }
+
+        setTimeout(() => {
+          executeBarcodeLookup(targetKey, rawVal);
+        }, 50);
+
+        return updatedItems;
+      });
+      return;
+    }
+
+    // Normal quantity confirmed => focus next empty row barcode input
+    focusTrailingEmptyRowBarcode();
+  };
+
+  const handleQuantityKeyDown = (e, rowKey) => {
+    if (e.key === 'F12' || e.keyCode === 123) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (e.key === 'Enter') {
+      handleQuantityPressEnter(e, rowKey);
+    }
   };
 
   // Update item quantity
@@ -1133,26 +1517,25 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
 
                         {/* Barcode / Code Scanner Input with inline F1 picker */}
                         <td style={{ padding: '8px 10px' }}>
-                          <Input
-                            ref={(el) => (rowBarcodeRefs.current[item.key] = el)}
-                            size="middle"
-                            placeholder="امسح الباركود أو F1"
-                            prefix={<BarcodeOutlined style={{ color: '#94a3b8' }} />}
-                            value={item.barcode_input}
-                            onChange={(e) => handleUpdateItemBarcodeInput(item.key, e.target.value)}
-                            onKeyDown={(e) => handleBarcodeKeyDown(e, item.key, item.barcode_input)}
-                            addonAfter={
-                              <Tooltip title="فتح شاشة البحث عن الأصناف (F1)">
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  icon={<SearchOutlined style={{ color: '#6366f1' }} />}
-                                  onClick={() => handleOpenSearchModal(item.key)}
-                                  style={{ border: 'none', padding: 0 }}
-                                />
-                              </Tooltip>
-                            }
-                          />
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Input
+                              ref={(el) => (rowBarcodeRefs.current[item.key] = el)}
+                              size="middle"
+                              placeholder="امسح الباركود أو F1"
+                              prefix={<BarcodeOutlined style={{ color: '#94a3b8' }} />}
+                              value={item.barcode_input}
+                              onChange={(e) => handleUpdateItemBarcodeInput(item.key, e.target.value)}
+                              onKeyDown={(e) => handleBarcodeKeyDown(e, item.key, item.barcode_input)}
+                              onPressEnter={(e) => handleBarcodeKeyDown(e, item.key, item.barcode_input)}
+                            />
+                            <Tooltip title="فتح شاشة البحث عن الأصناف (F1)">
+                              <Button
+                                size="middle"
+                                icon={<SearchOutlined style={{ color: '#6366f1' }} />}
+                                onClick={() => handleOpenSearchModal(item.key)}
+                              />
+                            </Tooltip>
+                          </Space.Compact>
                         </td>
 
                         {/* Product & Variant Details */}
@@ -1232,7 +1615,8 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
                                 onChange={(qty) => handleUpdateItemQty(item.key, qty)}
                                 status={isOverStock ? 'error' : ''}
                                 style={{ width: 85, fontWeight: 'bold' }}
-                                onPressEnter={handleAddNewRow}
+                                onPressEnter={(e) => handleQuantityPressEnter(e, item.key)}
+                                onKeyDown={(e) => handleQuantityKeyDown(e, item.key)}
                               />
                               {isOverStock && (
                                 <div style={{ color: '#ef4444', fontSize: 10, marginTop: 2 }}>يتجاوز المتاح!</div>
@@ -1249,6 +1633,7 @@ export default function Transfers({ currentUser, autoOpenCreate, onResetAction }
                             placeholder="ملاحظات الصنف..."
                             value={item.notes}
                             onChange={(e) => handleUpdateItemNotes(item.key, e.target.value)}
+                            onPressEnter={() => focusTrailingEmptyRowBarcode()}
                           />
                         </td>
 

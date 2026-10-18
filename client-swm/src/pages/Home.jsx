@@ -1054,16 +1054,14 @@ export default function Home({ currentUser, onNavigate }) {
                 name="product_code"
                 rules={[{ required: true, message: 'يرجى إدخال أو توليد كود المنتج' }]}
               >
-                <Input
-                  placeholder="PRD-XXXXXX"
-                  addonAfter={
-                    <Tooltip title="توليد كود تلقائي">
-                      <Button type="link" size="small" onClick={generateCodes} style={{ padding: 0, height: 'auto' }}>
-                        توليد
-                      </Button>
-                    </Tooltip>
-                  }
-                />
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input placeholder="PRD-XXXXXX" />
+                  <Tooltip title="توليد كود تلقائي">
+                    <Button onClick={generateCodes}>
+                      توليد
+                    </Button>
+                  </Tooltip>
+                </Space.Compact>
               </Form.Item>
             </Col>
 
@@ -1072,21 +1070,17 @@ export default function Home({ currentUser, onNavigate }) {
                 label="الباركود الدولي (Barcode EAN-13)"
                 name="barcode"
               >
-                <Input
-                  placeholder="622XXXXXXXXXX"
-                  addonAfter={
-                    <Tooltip title="توليد باركود EAN-13 حقيقي متوافق دولياً">
-                      <Button
-                        type="link"
-                        size="small"
-                        onClick={() => productForm.setFieldsValue({ barcode: generateValidEAN13('622') })}
-                        style={{ padding: 0, height: 'auto', fontWeight: 600, color: '#4f46e5' }}
-                      >
-                        توليد EAN
-                      </Button>
-                    </Tooltip>
-                  }
-                />
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input placeholder="622XXXXXXXXXX" />
+                  <Tooltip title="توليد باركود EAN-13 حقيقي متوافق دولياً">
+                    <Button
+                      onClick={() => productForm.setFieldsValue({ barcode: generateValidEAN13('622') })}
+                      style={{ fontWeight: 600 }}
+                    >
+                      توليد EAN
+                    </Button>
+                  </Tooltip>
+                </Space.Compact>
               </Form.Item>
               {watchedProductBarcode && (
                 <div style={{ marginTop: -6, marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

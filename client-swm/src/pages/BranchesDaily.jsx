@@ -57,7 +57,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '../api';
-import ThermalReceipt from '../components/ThermalReceipt';
+import ThermalReceipt, { getCachedReceiptSettings } from '../components/ThermalReceipt';
 import { printHtmlContent } from '../utils/printUtils';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
 
@@ -84,6 +84,25 @@ export default function BranchesDaily({ currentUser: propCurrentUser }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [branchesList, setBranchesList] = useState([]);
+  const [receiptSettings, setReceiptSettings] = useState(() => getCachedReceiptSettings());
+
+  useEffect(() => {
+    const handleUpdate = (e) => {
+      if (e.detail) setReceiptSettings(e.detail);
+    };
+    window.addEventListener('yoka_receipt_settings_updated', handleUpdate);
+    api.get('/api/swm/store-settings').then(res => {
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        const map = {};
+        res.data.data.forEach(item => { map[item.key] = item.value; });
+        setReceiptSettings(prev => ({
+          ...prev,
+          ...map
+        }));
+      }
+    }).catch(() => {});
+    return () => window.removeEventListener('yoka_receipt_settings_updated', handleUpdate);
+  }, []);
 
   // Filter States
   const [selectedBranch, setSelectedBranch] = useState(initialBranch);
@@ -966,11 +985,31 @@ export default function BranchesDaily({ currentUser: propCurrentUser }) {
             {/* Branded Header */}
             <div className="doc-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
               <div className="doc-brand" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <img src={yokaLogo} alt="Yoka Store" style={{ height: 48, maxWidth: 115, objectFit: 'contain' }} />
+                {receiptSettings.invoice_show_logo !== false && (
+                  <img
+                    src={receiptSettings.invoice_header_logo_url?.trim() || yokaLogo}
+                    alt="Logo"
+                    style={{ height: 48, maxWidth: 115, objectFit: 'contain' }}
+                    onError={(e) => { e.target.src = yokaLogo; }}
+                  />
+                )}
                 <div>
-                  <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>شركة يوكا ستور — YOKA STORE</h1>
-                  <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>فاتورة مبيعات نقطة البيع والمعارض • قسم الحسابات</div>
-                  <div style={{ fontSize: 10.5, color: '#64748b' }}>الفرع: <strong>{selectedInvoice.branch_name || selectedInvoice.branch_code}</strong></div>
+                  <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>
+                    {receiptSettings.invoice_header_title || 'شركة يوكا ستور — YOKA STORE'}
+                  </h1>
+                  {receiptSettings.invoice_header_subtitle && (
+                    <div style={{ fontSize: 11.5, color: '#475569', fontWeight: 600 }}>
+                      {receiptSettings.invoice_header_subtitle}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 10.5, color: '#64748b' }}>
+                    الفرع: <strong>{selectedInvoice.branch_name || selectedInvoice.branch_code}</strong>
+                    {(receiptSettings.invoice_header_phone || selectedInvoice.branch_phone) && (
+                      <span style={{ marginRight: 12 }}>
+                        • خدمة العملاء: <span style={{ direction: 'ltr', display: 'inline-block', fontWeight: 700 }}>{receiptSettings.invoice_header_phone || selectedInvoice.branch_phone}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="doc-badge-box" style={{ textAlign: 'left' }}>
@@ -1073,7 +1112,15 @@ export default function BranchesDaily({ currentUser: propCurrentUser }) {
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: '#334155', marginBottom: 4 }}>تفصيل سداد الفاتورة:</div>
                   {renderPaymentTags(selectedInvoice.payment_breakdown, selectedInvoice.final_amount)}
                   <div style={{ marginTop: 8, fontSize: 10, color: '#64748b', borderTop: '1px dashed #cbd5e1', paddingTop: 6 }}>
-                    الاستبدال والاسترجاع خلال 14 يوماً مع إحضار أصل الفاتورة والباركود بحالته الأصلية.
+                    {receiptSettings.invoice_footer_policy_title && (
+                      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{receiptSettings.invoice_footer_policy_title}</div>
+                    )}
+                    {receiptSettings.invoice_footer_policy_line1 && <div>• {receiptSettings.invoice_footer_policy_line1}</div>}
+                    {receiptSettings.invoice_footer_policy_line2 && <div>• {receiptSettings.invoice_footer_policy_line2}</div>}
+                    {receiptSettings.invoice_footer_policy_line3 && <div>• {receiptSettings.invoice_footer_policy_line3}</div>}
+                    {receiptSettings.invoice_footer_extra_notes && (
+                      <div style={{ marginTop: 3, color: '#0284c7', fontWeight: 600 }}>{receiptSettings.invoice_footer_extra_notes}</div>
+                    )}
                   </div>
                 </div>
               </Col>
@@ -1099,7 +1146,7 @@ export default function BranchesDaily({ currentUser: propCurrentUser }) {
 
             {/* Footer */}
             <div style={{ marginTop: 14, textAlign: 'center', fontSize: 10, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-              <span>شكراً لزيارتكم متجر Yoka Store</span>
+              <span>{receiptSettings.invoice_footer_thanks || 'شكراً لزيارتكم متجر Yoka Store'}</span>
               <span>تاريخ الطباعة: {dayjs().format('YYYY-MM-DD HH:mm:ss')}</span>
             </div>
           </div>

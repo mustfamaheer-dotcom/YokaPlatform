@@ -4,6 +4,7 @@ const { requireAuth, requireRole, requireWarehousePermission } = require('../../
 const { logActivity } = require('../../shared/activityLogger');
 const redis = require('../../shared/redis');
 const { persistDataUri, persistGalleryImagesJson } = require('../../shared/imageStore');
+const { generateValidEAN13 } = require('../../shared/barcode');
 
 router.use(requireWarehousePermission('groups_items'));
 
@@ -569,14 +570,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
       variants = []
     } = req.body;
 
-    if (!featured_image || String(featured_image).trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: 'صورة الموديل مطلوبة كشرط أساسي ولا يمكن حفظ الصنف بدونها'
-      });
-    }
-
-    const persistedFeaturedImage = persistDataUri(featured_image);
+    const persistedFeaturedImage = featured_image ? persistDataUri(featured_image) : null;
     const persistedGalleryImages = gallery_images ? persistGalleryImagesJson(gallery_images) : null;
 
     // Auto-generate code & barcode if not explicitly supplied
@@ -584,9 +578,9 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
       ? String(product_code).trim().toUpperCase()
       : `PRD-${Date.now().toString().slice(-6)}`;
 
-    const cleanBarcode = barcode
+    const cleanBarcode = (barcode && /^\d{12,14}$/.test(String(barcode).trim()))
       ? String(barcode).trim()
-      : `622${Date.now().toString().slice(-10)}`;
+      : generateValidEAN13('622');
 
     const existing = await query(`SELECT id FROM products WHERE product_code = $1`, [cleanCode]);
     if (existing.length) {
@@ -613,7 +607,7 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
         ) RETURNING id`,
         [
           cleanCode,
-          barcode ? String(barcode).trim() : cleanCode,
+          cleanBarcode,
           product_name.trim(),
           slug,
           brand || null,
@@ -670,13 +664,18 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           // Inheritance Logic: If no variant-specific image is provided, inherit the model's featured_image
           const variantImage = (v.image_url ? persistDataUri(v.image_url) : null) || persistedFeaturedImage || null;
 
+          const variantBarcode = (v.barcode && /^\d{12,14}$/.test(String(v.barcode).trim()))
+            ? String(v.barcode).trim()
+            : generateValidEAN13('622');
+
           await client.query(
             `INSERT INTO product_variants (
-              product_id, variant_sku, color, size, material, price_modifier, image_url, status, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', NOW(), NOW())`,
+              product_id, variant_sku, barcode, color, size, material, price_modifier, image_url, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', NOW(), NOW())`,
             [
               productId,
               finalSku,
+              variantBarcode,
               v.color || null,
               v.size || null,
               v.material || null,
@@ -795,7 +794,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
       [
         product_name || null,
         product_code ? product_code.trim().toUpperCase() : null,
-        barcode ? barcode.trim() : null,
+        barcode ? (String(barcode).trim().replace(/\D/g, '') || null) : null,
         category_id || null,
         sub_category_id || null,
         brand || null,
@@ -884,12 +883,14 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
           const sClean = vSize ? vSize.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'SIZ' : 'ONE';
           let newSku = `${codePrefix}-${cClean}-${sClean}`;
           const skuDup = await query(`SELECT id FROM product_variants WHERE variant_sku = $1`, [newSku]);
-          if (skuDup.length > 0) newSku = `${newSku}-${Math.floor(Math.random() * 900 + 100)}`;
+          const vBarcode = (v.barcode && /^\d{12,14}$/.test(String(v.barcode).trim()))
+            ? String(v.barcode).trim()
+            : generateValidEAN13('622');
 
           await query(
-            `INSERT INTO product_variants (product_id, variant_sku, color, size, image_url, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, 'active', NOW(), NOW())`,
-            [id, newSku, vColor, vSize, vImg]
+            `INSERT INTO product_variants (product_id, variant_sku, barcode, color, size, image_url, status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())`,
+            [id, newSku, vBarcode, vColor, vSize, vImg]
           );
         }
       }
@@ -1033,13 +1034,16 @@ router.post('/:id/variants', requireAuth, requireRole(['super_admin', 'admin', '
     }
 
     const persistedImageUrl = image_url ? persistDataUri(image_url) : null;
+    const variantBarcode = (req.body.barcode && /^\d{12,14}$/.test(String(req.body.barcode).trim()))
+      ? String(req.body.barcode).trim()
+      : generateValidEAN13('622');
 
     const [newVariant] = await query(
       `INSERT INTO product_variants (
-        product_id, variant_sku, color, size, material, price_modifier, image_url, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, 0, $6, 'active', NOW(), NOW())
+        product_id, variant_sku, barcode, color, size, material, price_modifier, image_url, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, 'active', NOW(), NOW())
       RETURNING *`,
-      [id, finalSku, cleanColor, cleanSize, material || null, persistedImageUrl]
+      [id, finalSku, variantBarcode, cleanColor, cleanSize, material || null, persistedImageUrl]
     );
 
     logActivity({
@@ -1109,6 +1113,62 @@ router.delete('/:id', requireAuth, requireRole(['super_admin']), async (req, res
 
     return res.json({ success: true, message: 'تم حذف الصنف نهائياً بنجاح' });
   } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/swm/products/bulk-delete
+ * Bulk delete or discontinue selected products
+ */
+router.post('/bulk-delete', requireAuth, requireRole(['super_admin']), async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'يرجى تحديد الأصناف المراد حذفها' });
+    }
+
+    const numericIds = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id) && id > 0);
+    if (numericIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'معرفات الأصناف غير صحيحة' });
+    }
+
+    let deletedCount = 0;
+    let discontinuedCount = 0;
+
+    for (const prodId of numericIds) {
+      // Check for transaction history
+      const [purchaseItem] = await query(`SELECT id FROM purchase_invoice_items WHERE product_id = $1 LIMIT 1`, [prodId]);
+      const [posItem] = await query(`SELECT id FROM swm_sales_invoice_items WHERE product_id = $1 LIMIT 1`, [prodId]);
+      const [ecpItem] = await query(`SELECT id FROM ecp_order_items WHERE product_id = $1 LIMIT 1`, [prodId]);
+      const [transferItem] = await query(`SELECT id FROM stock_transfer_items WHERE product_id = $1 LIMIT 1`, [prodId]);
+
+      if (purchaseItem || posItem || ecpItem || transferItem) {
+        await query(`UPDATE products SET status = 'discontinued', updated_at = NOW() WHERE id = $1`, [prodId]);
+        discontinuedCount++;
+      } else {
+        await query(`DELETE FROM inventory_balances WHERE product_id = $1`, [prodId]);
+        await query(`DELETE FROM product_variants WHERE product_id = $1`, [prodId]);
+        await query(`DELETE FROM products WHERE id = $1`, [prodId]);
+        deletedCount++;
+      }
+    }
+
+    logActivity({
+      userId: req.user.id,
+      branchId: req.user.branchId,
+      actionType: 'BULK_DELETE_PRODUCTS',
+      entityType: 'products',
+      notes: `Bulk processed ${numericIds.length} products: ${deletedCount} deleted, ${discontinuedCount} discontinued`
+    });
+
+    return res.json({
+      success: true,
+      message: `تمت معالجة حذف ${numericIds.length} صنف: (حذف نهائي: ${deletedCount}، تعطيل وحفظ سجل الحركات: ${discontinuedCount})`,
+      data: { deletedCount, discontinuedCount, total: numericIds.length }
+    });
+  } catch (err) {
+    console.error('Bulk delete products error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });

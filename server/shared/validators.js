@@ -120,7 +120,7 @@ const createProductSchema = z.object({
   sale_price: z.coerce.number().min(0).optional().nullable(),
   reorder_level: z.coerce.number().int().min(0).default(5),
   is_ecom_listed: z.boolean().default(false),
-  featured_image: z.string().trim().min(1, 'صورة الموديل مطلوبة ولا يمكن حفظ الصنف بدونها'),
+  featured_image: z.string().trim().optional().nullable(),
   gallery_images: z.any().optional().nullable(),
   variants: z.array(z.object({
     sku: z.string().optional(),

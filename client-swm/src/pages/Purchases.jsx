@@ -41,7 +41,8 @@ import {
   Upload,
   Avatar,
   Popover,
-  Switch
+  Switch,
+  App
 } from 'antd';
 import {
   PlusOutlined,
@@ -83,6 +84,7 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function Purchases({ autoOpenCreate, onResetAction }) {
+  const { modal, message } = App.useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('invoices');
 
@@ -1259,6 +1261,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                 color: c,
                 size: s,
                 sku: `${rawCode}-${cClean}-${sClean}`,
+                barcode: generateValidEAN13('622'),
                 price_modifier: 0,
                 image_url: masterColorImages[c] || defaultFeatured || null
               };
@@ -1269,6 +1272,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
             color: values.color || null,
             size: values.size || null,
             sku: masterAutoCode || values.product_code || 'PRD',
+            barcode: masterAutoBarcode || values.barcode || generateValidEAN13('622'),
             price_modifier: 0,
             image_url: (values.color && masterColorImages[values.color]) || defaultFeatured || null
           }];
@@ -1412,7 +1416,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       product_id: it.product_id,
       product_name: it.product_name,
       product_code: it.product_code || '',
-      barcode: it.barcode || it.product_code || '',
+      sku: it.variant_sku || it.product_code || '',
+      barcode: (/^\d{12,14}$/.test(String(it.barcode || '').trim())) ? String(it.barcode).trim() : (it.product_barcode || ''),
       color: it.color || '',
       size: it.size || '',
       unit_cost: it.unit_cost,
@@ -1431,7 +1436,8 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
       product_id: it.product_id,
       product_name: it.product_name,
       product_code: it.product_code || it.variant_sku || '',
-      barcode: it.barcode || it.product_code || it.variant_sku || '',
+      sku: it.variant_sku || it.product_code || '',
+      barcode: (/^\d{12,14}$/.test(String(it.barcode || '').trim())) ? String(it.barcode).trim() : (it.product_barcode || ''),
       color: it.color || '',
       size: it.size || '',
       unit_cost: it.unit_cost,
@@ -1554,7 +1560,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
         fetchLookups();
 
         if (printItemsSnapshot.length > 0) {
-          Modal.confirm({
+          modal.confirm({
             title: 'تم اعتماد فاتورة الشراء وتوريد البضاعة بنجاح!',
             icon: <CheckCircleOutlined style={{ color: '#16a34a' }} />,
             content: (
@@ -4578,7 +4584,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                   placeholder="اختر لوناً أو اكتب جديداً..."
                   allowClear
                   showSearch
-                  dropdownRender={(menu) => (
+                  popupRender={(menu) => (
                     <>
                       {menu}
                       <Divider style={{ margin: '8px 0' }} />
@@ -4650,7 +4656,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                   placeholder="اختر مقاساً أو اكتب جديداً..."
                   allowClear
                   showSearch
-                  dropdownRender={(menu) => (
+                  popupRender={(menu) => (
                     <>
                       {menu}
                       <Divider style={{ margin: '8px 0' }} />
@@ -4782,22 +4788,19 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                   rules={[{ required: true, message: 'مطلوب' }]}
                   style={{ marginBottom: 0 }}
                 >
-                  <Input
-                    readOnly={masterProductMode === 'edit'}
-                    addonAfter={
-                      masterProductMode === 'create' ? (
-                        <Tooltip title="توليد كود تلقائي">
-                          <Button
-                            type="link"
-                            size="small"
-                            icon={<ReloadOutlined />}
-                            onClick={handleRegenerateMasterCodes}
-                            style={{ padding: 0, height: 'auto' }}
-                          />
-                        </Tooltip>
-                      ) : null
-                    }
-                  />
+                  <Space.Compact style={{ width: '100%' }}>
+                    <Input
+                      readOnly={masterProductMode === 'edit'}
+                    />
+                    {masterProductMode === 'create' && (
+                      <Tooltip title="توليد كود تلقائي">
+                        <Button
+                          icon={<ReloadOutlined />}
+                          onClick={handleRegenerateMasterCodes}
+                        />
+                      </Tooltip>
+                    )}
+                  </Space.Compact>
                 </Form.Item>
               </Col>
               <Col xs={24} sm={10}>
@@ -4806,22 +4809,19 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                   label={<Text strong style={{ fontSize: 12.5 }}>الباركود الدولي (EAN-13)</Text>}
                   style={{ marginBottom: 0 }}
                 >
-                  <Input
-                    addonAfter={
-                      masterProductMode === 'create' ? (
-                        <Tooltip title="توليد باركود EAN-13 متوافق">
-                          <Button
-                            type="link"
-                            size="small"
-                            onClick={() => masterProductForm.setFieldsValue({ barcode: generateValidEAN13('622') })}
-                            style={{ padding: 0, height: 'auto', fontWeight: 600 }}
-                          >
-                            توليد
-                          </Button>
-                        </Tooltip>
-                      ) : null
-                    }
-                  />
+                  <Space.Compact style={{ width: '100%' }}>
+                    <Input />
+                    {masterProductMode === 'create' && (
+                      <Tooltip title="توليد باركود EAN-13 متوافق">
+                        <Button
+                          onClick={() => masterProductForm.setFieldsValue({ barcode: generateValidEAN13('622') })}
+                          style={{ fontWeight: 600 }}
+                        >
+                          توليد
+                        </Button>
+                      </Tooltip>
+                    )}
+                  </Space.Compact>
                 </Form.Item>
               </Col>
               <Col xs={24} sm={4} style={{ textAlign: 'center' }}>
@@ -4867,7 +4867,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
               showSearch
               optionFilterProp="label"
               filterOption={(input, opt) => (String(opt?.label || opt?.children || '')).toLowerCase().includes(input.toLowerCase())}
-              dropdownRender={(menu) => (
+              popupRender={(menu) => (
                 <>
                   {menu}
                   <Divider style={{ margin: '8px 0' }} />
@@ -4994,7 +4994,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                       onChange={setMasterSelectedMultiColors}
                       allowClear
                       style={{ width: '100%' }}
-                      dropdownRender={(menu) => (
+                      popupRender={(menu) => (
                         <>
                           {menu}
                           <Divider style={{ margin: '8px 0' }} />
@@ -5057,7 +5057,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                       onChange={setMasterSelectedMultiSizes}
                       allowClear
                       style={{ width: '100%' }}
-                      dropdownRender={(menu) => (
+                      popupRender={(menu) => (
                         <>
                           {menu}
                           <Divider style={{ margin: '8px 0' }} />
@@ -5100,7 +5100,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                     placeholder="اختر لون الصنف..."
                     allowClear
                     showSearch
-                    dropdownRender={(menu) => (
+                    popupRender={(menu) => (
                       <>
                         {menu}
                         <Divider style={{ margin: '8px 0' }} />
@@ -5150,7 +5150,7 @@ export default function Purchases({ autoOpenCreate, onResetAction }) {
                     placeholder="اختر المقاس..."
                     allowClear
                     showSearch
-                    dropdownRender={(menu) => (
+                    popupRender={(menu) => (
                       <>
                         {menu}
                         <Divider style={{ margin: '8px 0' }} />

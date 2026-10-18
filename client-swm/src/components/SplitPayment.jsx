@@ -217,7 +217,7 @@ export default function SplitPayment({
                     step={10}
                     value={methodAmounts[methodKey] || 0}
                     onChange={(v) => handleAmountChange(methodKey, v)}
-                    addonAfter="ج.م"
+                    suffix="ج.م"
                     placeholder="المبلغ المسدد"
                   />
                 </div>

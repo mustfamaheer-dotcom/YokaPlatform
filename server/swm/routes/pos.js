@@ -595,9 +595,17 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
     }
 
     if (searchQuery && searchQuery.trim()) {
-      const clean = searchQuery.trim();
+      let clean = searchQuery.trim();
+      // Auto-deduplicate double-scanned barcode (e.g. 26-digit duplicated 13-digit EAN)
+      if (/^\d{26}$/.test(clean) && clean.slice(0, 13) === clean.slice(13)) {
+        clean = clean.slice(0, 13);
+      } else if (/^\d{24}$/.test(clean) && clean.slice(0, 12) === clean.slice(12)) {
+        clean = clean.slice(0, 12);
+      }
+
       whereClauses.push(`(
         p.barcode = $${pIdx}
+        OR pv.barcode = $${pIdx}
         OR pv.variant_sku = $${pIdx}
         OR p.product_code ILIKE $${pIdx + 1}
         OR p.product_name ILIKE $${pIdx + 1}
@@ -621,6 +629,7 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
              p.cost_price,
              pv.id AS variant_id,
              pv.variant_sku,
+             pv.barcode AS variant_barcode,
              COALESCE(pv.color, p.color) AS color,
              COALESCE(pv.size, p.size) AS size,
              pv.price_modifier,
@@ -650,7 +659,8 @@ router.get('/search', requireAuth, requireBranchScope, async (req, res) => {
         product_id: row.product_id,
         variant_id: row.variant_id || null,
         product_code: row.product_code,
-        barcode: row.variant_sku || row.product_barcode,
+        barcode: row.variant_barcode || row.product_barcode || row.variant_sku,
+        variant_sku: row.variant_sku,
         product_name: row.product_name,
         category_id: row.category_id,
         category_name: row.category_name,

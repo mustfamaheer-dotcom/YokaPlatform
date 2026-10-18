@@ -40,29 +40,30 @@ function ProtectedRoute({ currentUser, allowedRoles, requiredBranchType, childre
   const isEcom = isEcomWarehouseUser(currentUser);
   const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
   const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
+  const isAllowed = allowedRoles.includes(currentUser.role) || (isSupervisor && allowedRoles.includes('supervisor'));
 
-  // 1. Guard against E-Commerce users trying to access Retail POS / Shift screens
-  if (isEcom && !isAdmin && (location.pathname === '/pos' || location.pathname.startsWith('/supervisor'))) {
-    message.info('تم توجيهك إلى بوابة مستودع المتجر الإلكتروني المخصصة لفرعك.');
+  const shouldBounceEcom = isEcom && !isAdmin && (location.pathname === '/pos' || location.pathname.startsWith('/supervisor'));
+  const shouldBounceReqEcom = requiredBranchType === 'ecom_warehouse' && !isEcom && !isAdmin;
+  const shouldBounceWarehouse = currentUser.role === 'warehouse_manager' && !isAllowed;
+  const shouldBounceNotAllowed = !isAllowed && !shouldBounceWarehouse;
+
+  useEffect(() => {
+    if (shouldBounceEcom) {
+      message.info('تم توجيهك إلى بوابة مستودع المتجر الإلكتروني المخصصة لفرعك.');
+    } else if (shouldBounceReqEcom) {
+      message.warning('هذه البوابة مخصصة لمستودع المتجر الإلكتروني فقط.');
+    } else if (shouldBounceWarehouse) {
+      message.warning('غير مصرح لك بالوصول إلى هذه الشاشة. تم توجيهك إلى بوابة مدير المخازن.');
+    } else if (shouldBounceNotAllowed) {
+      message.warning('غير مصرح لك بالوصول إلى هذه الصفحة. تم توجيهك إلى شاشتك المخصصة.');
+    }
+  }, [shouldBounceEcom, shouldBounceReqEcom, shouldBounceWarehouse, shouldBounceNotAllowed]);
+
+  if (shouldBounceEcom) {
     return <Navigate to="/ecom" replace />;
   }
 
-  // 2. Guard for routes specifically requiring ecom_warehouse (unless admin)
-  if (requiredBranchType === 'ecom_warehouse' && !isEcom && !isAdmin) {
-    message.warning('هذه البوابة مخصصة لمستودع المتجر الإلكتروني فقط.');
-    return <RoleRootRedirect currentUser={currentUser} />;
-  }
-
-  const isAllowed = allowedRoles.includes(currentUser.role) || (isSupervisor && allowedRoles.includes('supervisor'));
-
-  // Guard for warehouse manager attempting to access non-authorized portals like /dashboard or /supervisor
-  if (currentUser.role === 'warehouse_manager' && !isAllowed) {
-    message.warning('غير مصرح لك بالوصول إلى هذه الشاشة. تم توجيهك إلى بوابة مدير المخازن.');
-    return <RoleRootRedirect currentUser={currentUser} />;
-  }
-
-  if (!isAllowed) {
-    message.warning('غير مصرح لك بالوصول إلى هذه الصفحة. تم توجيهك إلى شاشتك المخصصة.');
+  if (shouldBounceReqEcom || shouldBounceWarehouse || shouldBounceNotAllowed) {
     return <RoleRootRedirect currentUser={currentUser} />;
   }
 
@@ -133,6 +134,22 @@ export default function App() {
     };
 
     initAuth();
+  }, []);
+
+  // Prevent DevTools console from opening on hardware barcode scanner burst (F12, Ctrl+Shift+I/J/C)
+  useEffect(() => {
+    const handleScannerDevToolsBlock = (e) => {
+      if (
+        e.key === 'F12' ||
+        e.keyCode === 123 ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', handleScannerDevToolsBlock, true);
+    return () => window.removeEventListener('keydown', handleScannerDevToolsBlock, true);
   }, []);
 
   const handleLoginSuccess = (user) => {
@@ -580,6 +597,28 @@ export default function App() {
             allowedRoles={['admin', 'super_admin']}
           >
             <Navigate to="/dashboard/loyalty_settings" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sales-settings"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/sales_settings" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoice-settings"
+        element={
+          <ProtectedRoute
+            currentUser={currentUser}
+            allowedRoles={['admin', 'super_admin']}
+          >
+            <Navigate to="/dashboard/sales_settings" replace />
           </ProtectedRoute>
         }
       />

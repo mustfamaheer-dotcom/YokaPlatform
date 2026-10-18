@@ -96,7 +96,27 @@ export default function POS({ currentUser }) {
 
   // Cart / Invoice Items State
   // Item structure: { key, product_id, variant_id, product_name, product_code, barcode, unit_price, available_qty, quantity, line_total, isManualRow }
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => [
+    {
+      key: `empty-${Date.now()}`,
+      isManualRow: true,
+      product_id: null,
+      variant_id: null,
+      product_name: '',
+      product_code: '',
+      barcode: '',
+      unit_price: 0,
+      available_qty: 0,
+      quantity: 1,
+      discount_amount: 0,
+      line_total: 0
+    }
+  ]);
+  const cartRef = useRef(cart);
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
   const [invoiceDiscount, setInvoiceDiscount] = useState(0); // Global Invoice Discount
   const [taxAmount, setTaxAmount] = useState(0);
 
@@ -121,8 +141,11 @@ export default function POS({ currentUser }) {
   const [modalLoading, setModalLoading] = useState(false);
   const modalSearchInputRef = useRef(null);
 
-  // Refs for manual empty rows
+  // Refs for manual empty rows and quantity inputs
   const manualRowInputRefs = useRef({});
+  const cartQtyRefs = useRef({});
+  const lastBarcodeScanRef = useRef({ code: '', time: 0 });
+  const lastQtyEnterRef = useRef({ key: '', time: 0 });
 
   // Drawer & Cash Session Modals
   const [openModalVisible, setOpenModalVisible] = useState(false);
@@ -220,6 +243,29 @@ export default function POS({ currentUser }) {
             : 5,
           pos_allow_salesperson_return: map['pos_allow_salesperson_return'] === 'true'
         });
+
+        // Cache freshest receipt settings for POS thermal receipts
+        const receiptMap = {
+          invoice_header_title: map['invoice_header_title'] !== undefined ? map['invoice_header_title'] : 'شركة يوكا ستور (YOKA STORE)',
+          invoice_header_subtitle: map['invoice_header_subtitle'] !== undefined ? map['invoice_header_subtitle'] : '',
+          invoice_show_logo: map['invoice_show_logo'] !== undefined ? map['invoice_show_logo'] === 'true' : true,
+          invoice_header_logo_url: map['invoice_header_logo_url'] || '',
+          invoice_header_phone: map['invoice_header_phone'] !== undefined ? map['invoice_header_phone'] : '',
+          invoice_header_tax_number: map['invoice_header_tax_number'] !== undefined ? map['invoice_header_tax_number'] : '',
+          invoice_header_extra_text: map['invoice_header_extra_text'] !== undefined ? map['invoice_header_extra_text'] : '',
+
+          invoice_footer_thanks: map['invoice_footer_thanks'] !== undefined ? map['invoice_footer_thanks'] : 'شكراً لزيارتكم وتسوقكم في YOKA STORE!',
+          invoice_footer_policy_title: map['invoice_footer_policy_title'] !== undefined ? map['invoice_footer_policy_title'] : 'شروط وسياسة الاستبدال والاسترجاع:',
+          invoice_footer_policy_line1: map['invoice_footer_policy_line1'] !== undefined ? map['invoice_footer_policy_line1'] : 'الاستبدال والاسترجاع متاح خلال 14 يوماً من تاريخ الفاتورة',
+          invoice_footer_policy_line2: map['invoice_footer_policy_line2'] !== undefined ? map['invoice_footer_policy_line2'] : 'يشترط إحضار أصل الفاتورة وأن تكون القطع بحالتها الأصلية مع بطاقة السعر',
+          invoice_footer_policy_line3: map['invoice_footer_policy_line3'] !== undefined ? map['invoice_footer_policy_line3'] : '',
+          invoice_footer_extra_notes: map['invoice_footer_extra_notes'] !== undefined ? map['invoice_footer_extra_notes'] : '',
+          invoice_show_barcode: map['invoice_show_barcode'] !== undefined ? map['invoice_show_barcode'] === 'true' : true
+        };
+        try {
+          localStorage.setItem('yoka_receipt_settings', JSON.stringify(receiptMap));
+          window.dispatchEvent(new CustomEvent('yoka_receipt_settings_updated', { detail: receiptMap }));
+        } catch (e) {}
       }
     } catch (err) {
       console.error('Fetch supervisor settings error:', err);
@@ -261,14 +307,137 @@ export default function POS({ currentUser }) {
     fetchCategories();
     fetchSupervisorSettings();
     fetchLoyaltySettings();
+
+    // Auto-focus the initial empty row's barcode input
+    setTimeout(() => {
+      focusTrailingEmptyRowBarcode();
+    }, 250);
   }, []);
 
+  // Ensure a trailing empty row is always available in cart
+  const ensureTrailingEmptyRow = () => {
+    let emptyKey = null;
+    setCart((prev) => {
+      const existingEmpty = prev.find((i) => i.isManualRow && !i.product_id);
+      if (existingEmpty) {
+        emptyKey = existingEmpty.key;
+        return prev;
+      }
+      const newKey = `empty-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      emptyKey = newKey;
+      return [
+        ...prev,
+        {
+          key: newKey,
+          isManualRow: true,
+          product_id: null,
+          variant_id: null,
+          product_name: '',
+          product_code: '',
+          barcode: '',
+          unit_price: 0,
+          available_qty: 0,
+          quantity: 1,
+          discount_amount: 0,
+          line_total: 0
+        }
+      ];
+    });
+    return emptyKey;
+  };
+
+  // Move focus to cart item quantity field and select all text with robust retry
+  const focusRowQuantity = (rowKey) => {
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    const tryFocus = () => {
+      attempts++;
+      const el = cartQtyRefs.current[rowKey];
+      if (el) {
+        const wrapper = el.nativeElement || (el.nodeType ? el : null);
+        const inputEl = wrapper?.querySelector?.('input') || el.input || (el.tagName === 'INPUT' ? el : null);
+
+        if (inputEl) {
+          inputEl.focus();
+          setTimeout(() => {
+            try {
+              inputEl.select();
+            } catch (err) {}
+          }, 30);
+          return;
+        } else if (typeof el.focus === 'function') {
+          el.focus();
+          return;
+        }
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(tryFocus, 40);
+      }
+    };
+
+    setTimeout(tryFocus, 30);
+  };
+
+  // Focus the trailing empty row's barcode input with retry
+  const focusTrailingEmptyRowBarcode = () => {
+    let attempts = 0;
+    const maxAttempts = 12;
+
+    const tryFocusBarcode = () => {
+      attempts++;
+      const items = cartRef.current || [];
+      const emptyRow = items.find((i) => i.isManualRow && !i.product_id);
+
+      if (emptyRow) {
+        const el = manualRowInputRefs.current[emptyRow.key];
+        if (el) {
+          const wrapper = el.nativeElement || (el.nodeType ? el : null);
+          const inputEl = el.input || wrapper?.querySelector?.('input') || (el.tagName === 'INPUT' ? el : null);
+          if (inputEl && typeof inputEl.focus === 'function') {
+            inputEl.focus();
+            try {
+              inputEl.select();
+            } catch (err) {}
+            return;
+          } else if (typeof el.focus === 'function') {
+            el.focus();
+            return;
+          }
+        }
+      } else {
+        ensureTrailingEmptyRow();
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(tryFocusBarcode, 40);
+      }
+    };
+
+    setTimeout(tryFocusBarcode, 30);
+  };
+
   // Strict Keyboard Workflow:
-  // Step 1: F11 => Add empty row
+  // Step 1: F11 => Add / Focus empty row
   // Step 2: F1  => Open Product Search Modal
   // Step 3: F4  => Execute Complete Sale / Return
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      if (searchModalVisible) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setSearchModalVisible(false);
+        }
+        return;
+      }
+
       if (e.key === 'F11') {
         e.preventDefault();
         handleStep1AddEmptyRow();
@@ -282,34 +451,19 @@ export default function POS({ currentUser }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  });
+  }, [searchModalVisible, cart, isSubmittingSale]);
 
-  // Step 1: Pressing F11 dynamically appends a new empty row
+  // Step 1: Pressing F11 dynamically focuses or appends an empty row
   const handleStep1AddEmptyRow = () => {
-    const tempKey = `empty-${Date.now()}`;
-    setCart((prev) => [
-      ...prev,
-      {
-        key: tempKey,
-        isManualRow: true,
-        product_id: null,
-        variant_id: null,
-        product_name: '',
-        product_code: '',
-        barcode: '',
-        unit_price: 0,
-        available_qty: 0,
-        quantity: 1,
-        discount_amount: 0,
-        line_total: 0
-      }
-    ]);
-    message.info('خطوة 1 [F11]: تمت إضافة سطر جديد للإدخال اليدوي. اضغط F1 للبحث أو امسح الباركود.');
+    const existingEmpty = cart.find((i) => i.isManualRow && !i.product_id);
+    if (existingEmpty) {
+      focusTrailingEmptyRowBarcode();
+      return;
+    }
+    ensureTrailingEmptyRow();
     setTimeout(() => {
-      if (manualRowInputRefs.current[tempKey]) {
-        manualRowInputRefs.current[tempKey].focus();
-      }
-    }, 100);
+      focusTrailingEmptyRowBarcode();
+    }, 60);
   };
 
   // Step 2: Pressing F1 opens the Product Search Modal
@@ -358,37 +512,54 @@ export default function POS({ currentUser }) {
       return message.warning(`الصنف "${product.display_name}" غير متوفر في مخزون الفرع!`);
     }
 
-    // Check if there is an empty manual row to fill
-    const emptyRow = cart.find((item) => item.isManualRow);
-    if (emptyRow) {
-      populateProductIntoRow(emptyRow.key, product);
-    } else {
-      addToCart(product);
-    }
+    const emptyRow = cart.find((item) => item.isManualRow && !item.product_id);
+    const targetKey = emptyRow ? emptyRow.key : `empty-${Date.now()}`;
+    populateProductIntoRow(targetKey, product);
 
     setSearchModalVisible(false);
     setModalSearchQuery('');
     message.success(`تم اختيار الصنف: ${product.display_name}`);
   };
 
-  // Populate product into a specific row
+  // Populate product into a specific row AND automatically ensure trailing empty row
   const populateProductIntoRow = (rowKey, product) => {
     const unitPrice = parseFloat(product.unit_price) || 0;
     const finalKey = `${product.product_id}-${product.variant_id || 'base'}`;
 
     setCart((prev) => {
       const existingOther = prev.find((item) => item.key === finalKey && item.key !== rowKey);
+      let nextCart;
+
       if (existingOther) {
         const newQty = existingOther.quantity + 1;
         const lineTotal = newQty * existingOther.unit_price;
-        return prev
-          .filter((item) => item.key !== rowKey)
+        nextCart = prev
+          .filter((item) => item.key !== rowKey || !item.isManualRow)
           .map((item) => (item.key === finalKey ? { ...item, quantity: newQty, line_total: lineTotal } : item));
-      }
+      } else {
+        let found = false;
+        nextCart = prev.map((item) => {
+          if (item.key === rowKey) {
+            found = true;
+            return {
+              key: finalKey,
+              isManualRow: false,
+              product_id: product.product_id,
+              variant_id: product.variant_id,
+              product_name: product.display_name,
+              product_code: product.product_code,
+              barcode: product.barcode,
+              unit_price: unitPrice,
+              available_qty: product.available_qty,
+              quantity: 1,
+              line_total: unitPrice
+            };
+          }
+          return item;
+        });
 
-      return prev.map((item) => {
-        if (item.key === rowKey) {
-          return {
+        if (!found) {
+          nextCart.push({
             key: finalKey,
             isManualRow: false,
             product_id: product.product_id,
@@ -400,28 +571,87 @@ export default function POS({ currentUser }) {
             available_qty: product.available_qty,
             quantity: 1,
             line_total: unitPrice
-          };
+          });
         }
-        return item;
-      });
+      }
+
+      // Automatically append trailing empty row if none exists
+      const hasEmpty = nextCart.some((i) => i.isManualRow && !i.product_id);
+      if (!hasEmpty) {
+        nextCart.push({
+          key: `empty-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          isManualRow: true,
+          product_id: null,
+          variant_id: null,
+          product_name: '',
+          product_code: '',
+          barcode: '',
+          unit_price: 0,
+          available_qty: 0,
+          quantity: 1,
+          discount_amount: 0,
+          line_total: 0
+        });
+      }
+
+      return nextCart;
     });
+
+    focusRowQuantity(finalKey);
   };
 
   // Manual barcode/code entered directly in empty row
-  const handleManualRowBarcodeSubmit = async (rowKey, inputCode) => {
-    if (!inputCode || !inputCode.trim()) return;
+  const handleManualRowBarcodeKeyDown = async (e, rowKey, fallbackVal) => {
+    if (e.key === 'F12' || e.keyCode === 123) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
 
-    try {
-      const res = await api.get('/api/swm/pos/search', { params: { query: inputCode.trim() } });
-      if (res.data.success && res.data.data.length > 0) {
-        const product = res.data.data[0];
-        populateProductIntoRow(rowKey, product);
-        message.success(`تم إدراج: ${product.display_name}`);
-      } else {
-        message.warning(`لم يتم العثور على صنف بالباركود أو الكود: ${inputCode}`);
+    if (e.key === 'F1') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleStep2OpenSearchModal();
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const inputVal = (e.target?.value !== undefined ? e.target.value : fallbackVal) || '';
+      let cleanCode = String(inputVal).trim();
+      if (!cleanCode) return;
+
+      const now = Date.now();
+      if (lastBarcodeScanRef.current.code === cleanCode && now - lastBarcodeScanRef.current.time < 250) {
+        return;
       }
-    } catch (err) {
-      message.error('خطأ أثناء البحث عن الصنف');
+      lastBarcodeScanRef.current = { code: cleanCode, time: now };
+
+      // Auto-detect and fix double-scanned barcode buffer (e.g. 13-digit EAN duplicated to 26 digits)
+      if (/^\d{26}$/.test(cleanCode) && cleanCode.slice(0, 13) === cleanCode.slice(13)) {
+        cleanCode = cleanCode.slice(0, 13);
+      } else if (/^\d{24}$/.test(cleanCode) && cleanCode.slice(0, 12) === cleanCode.slice(12)) {
+        cleanCode = cleanCode.slice(0, 12);
+      }
+
+      try {
+        const res = await api.get('/api/swm/pos/search', { params: { query: cleanCode } });
+        if (res.data.success && res.data.data.length > 0) {
+          const product = res.data.data[0];
+          if (invoiceType === 'sale' && product.available_qty <= 0) {
+            message.warning(`الصنف "${product.display_name}" رصيده [0] في هذا الفرع!`);
+            return;
+          }
+          populateProductIntoRow(rowKey, product);
+          message.success(`تم إدراج: ${product.display_name}`);
+        } else {
+          message.warning(`لم يتم العثور على صنف بالباركود أو الكود: ${cleanCode} في هذا الفرع`);
+        }
+      } catch (err) {
+        message.error('خطأ أثناء البحث عن الصنف');
+      }
     }
   };
 
@@ -431,43 +661,9 @@ export default function POS({ currentUser }) {
       return message.warning(`عذراً، الصنف "${product.display_name}" غير متوفر في مخزون الفرع حالياً!`);
     }
 
-    setCart((prev) => {
-      const itemKey = `${product.product_id}-${product.variant_id || 'base'}`;
-      const existing = prev.find((item) => item.key === itemKey);
-
-      if (existing) {
-        if (invoiceType === 'sale' && existing.quantity >= product.available_qty) {
-          message.warning(`الكمية المتاحة في المخزون (${product.available_qty}) فقط!`);
-          return prev;
-        }
-        return prev.map((item) => {
-          if (item.key === itemKey) {
-            const newQty = item.quantity + 1;
-            const lineTotal = newQty * item.unit_price;
-            return { ...item, quantity: newQty, line_total: lineTotal };
-          }
-          return item;
-        });
-      }
-
-      const unitPrice = parseFloat(product.unit_price) || 0;
-      return [
-        ...prev,
-        {
-          key: itemKey,
-          isManualRow: false,
-          product_id: product.product_id,
-          variant_id: product.variant_id,
-          product_name: product.display_name,
-          product_code: product.product_code,
-          barcode: product.barcode,
-          unit_price: unitPrice,
-          available_qty: product.available_qty,
-          quantity: 1,
-          line_total: unitPrice
-        }
-      ];
-    });
+    const emptyRow = cart.find((item) => item.isManualRow && !item.product_id);
+    const targetKey = emptyRow ? emptyRow.key : `empty-${Date.now()}`;
+    populateProductIntoRow(targetKey, product);
   };
 
   // Update item quantity
@@ -507,12 +703,122 @@ export default function POS({ currentUser }) {
     );
   };
 
+  // When Enter is pressed in Quantity InputNumber
+  const handleQuantityPressEnter = (e, rowKey) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    const now = Date.now();
+    if (lastQtyEnterRef.current.key === rowKey && now - lastQtyEnterRef.current.time < 250) {
+      return;
+    }
+    lastQtyEnterRef.current = { key: rowKey, time: now };
+
+    const rawVal = String(e?.target?.value || '').trim();
+    if (/^\d{8,26}$/.test(rawVal)) {
+      // Barcode gun was fired while focused in quantity input!
+      // Restore valid quantity to 1 if it got corrupted with the barcode
+      setCartQtyDirect(rowKey, 1);
+
+      // Route barcode to the trailing empty row and search it
+      setCart((prev) => {
+        let emptyRow = prev.find((i) => i.isManualRow && !i.product_id);
+        let targetKey = emptyRow?.key;
+        let updatedCart = prev;
+
+        if (!emptyRow) {
+          targetKey = `empty-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          updatedCart = [
+            ...prev,
+            {
+              key: targetKey,
+              isManualRow: true,
+              product_id: null,
+              variant_id: null,
+              product_name: '',
+              product_code: '',
+              barcode: '',
+              unit_price: 0,
+              available_qty: 0,
+              quantity: 1,
+              discount_amount: 0,
+              line_total: 0
+            }
+          ];
+        }
+
+        setTimeout(() => {
+          handleManualRowBarcodeKeyDown({ key: 'Enter', preventDefault: () => {}, stopPropagation: () => {} }, targetKey, rawVal);
+        }, 50);
+
+        return updatedCart;
+      });
+      return;
+    }
+
+    // Normal quantity confirmed => focus next empty row barcode input
+    focusTrailingEmptyRowBarcode();
+  };
+
+  const handleQuantityKeyDown = (e, rowKey) => {
+    if (e.key === 'F12' || e.keyCode === 123) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (e.key === 'Enter') {
+      handleQuantityPressEnter(e, rowKey);
+    }
+  };
+
   const removeFromCart = (key) => {
-    setCart((prev) => prev.filter((item) => item.key !== key));
+    setCart((prev) => {
+      const filtered = prev.filter((item) => item.key !== key);
+      const hasEmpty = filtered.some((i) => i.isManualRow && !i.product_id);
+      if (!hasEmpty) {
+        return [
+          ...filtered,
+          {
+            key: `empty-${Date.now()}`,
+            isManualRow: true,
+            product_id: null,
+            variant_id: null,
+            product_name: '',
+            product_code: '',
+            barcode: '',
+            unit_price: 0,
+            available_qty: 0,
+            quantity: 1,
+            discount_amount: 0,
+            line_total: 0
+          }
+        ];
+      }
+      return filtered;
+    });
   };
 
   const clearCart = () => {
-    setCart([]);
+    const firstKey = `empty-${Date.now()}`;
+    setCart([
+      {
+        key: firstKey,
+        isManualRow: true,
+        product_id: null,
+        variant_id: null,
+        product_name: '',
+        product_code: '',
+        barcode: '',
+        unit_price: 0,
+        available_qty: 0,
+        quantity: 1,
+        discount_amount: 0,
+        line_total: 0
+      }
+    ]);
+    setTimeout(() => {
+      focusTrailingEmptyRowBarcode();
+    }, 100);
     setInvoiceDiscount(0);
     setTaxAmount(0);
     setCashTendered(0);
@@ -976,22 +1282,35 @@ export default function POS({ currentUser }) {
                             {index + 1}
                           </td>
                           <td colSpan={6} style={{ padding: '8px 10px' }}>
-                            <Input
-                              ref={(el) => (manualRowInputRefs.current[item.key] = el)}
-                              size="middle"
-                              placeholder="أدخل باركود أو كود الصنف واضغط Enter، أو اضغط F1 لاختيار الصنف..."
-                              prefix={<BarcodeOutlined style={{ color: '#ca8a04', fontSize: 16 }} />}
-                              onPressEnter={(e) => handleManualRowBarcodeSubmit(item.key, e.target.value)}
-                              style={{ width: '100%', borderRadius: 6 }}
-                            />
+                            <Space.Compact style={{ width: '100%' }}>
+                              <Input
+                                ref={(el) => (manualRowInputRefs.current[item.key] = el)}
+                                size="middle"
+                                placeholder="امسح الباركود أو اكتب الكود واضغط Enter، أو اضغط F1 لاختيار الصنف..."
+                                prefix={<BarcodeOutlined style={{ color: '#ca8a04', fontSize: 16 }} />}
+                                onKeyDown={(e) => handleManualRowBarcodeKeyDown(e, item.key, e.target.value)}
+                                onPressEnter={(e) => handleManualRowBarcodeKeyDown(e, item.key, e.target.value)}
+                                style={{ borderRadius: '6px 0 0 6px' }}
+                              />
+                              <Tooltip title="فتح نافذة اختيار الصنف (F1)">
+                                <Button
+                                  size="middle"
+                                  icon={<SearchOutlined style={{ color: '#ca8a04' }} />}
+                                  onClick={handleStep2OpenSearchModal}
+                                  style={{ borderRadius: '0 6px 6px 0' }}
+                                />
+                              </Tooltip>
+                            </Space.Compact>
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <Button
-                              type="text"
-                              danger
-                              icon={<DeleteOutlined />}
-                              onClick={() => removeFromCart(item.key)}
-                            />
+                            {cart.length > 1 && (
+                              <Button
+                                type="text"
+                                danger
+                                icon={<DeleteOutlined />}
+                                onClick={() => removeFromCart(item.key)}
+                              />
+                            )}
                           </td>
                         </tr>
                       );
@@ -1026,12 +1345,15 @@ export default function POS({ currentUser }) {
                               onClick={() => updateCartQty(item.key, -1)}
                             />
                             <InputNumber
+                              ref={(el) => (cartQtyRefs.current[item.key] = el)}
                               size="small"
                               min={1}
                               max={invoiceType === 'sale' ? item.available_qty : 9999}
                               value={item.quantity}
                               onChange={(val) => setCartQtyDirect(item.key, val)}
-                              style={{ width: 50, textAlign: 'center' }}
+                              onPressEnter={(e) => handleQuantityPressEnter(e, item.key)}
+                              onKeyDown={(e) => handleQuantityKeyDown(e, item.key)}
+                              style={{ width: 55, textAlign: 'center', fontWeight: 'bold' }}
                             />
                             <Button
                               size="small"
