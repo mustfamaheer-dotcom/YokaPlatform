@@ -38,27 +38,47 @@ function initFirebaseAdmin() {
   if (!admin) return null;
 
   try {
-    const rawPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './yokastore-firebase-adminsdk-fbsvc-078eaa4267.json';
-    const candidatePaths = [
-      path.isAbsolute(rawPath) ? rawPath : path.resolve(process.cwd(), rawPath),
-      path.resolve(__dirname, '../../', path.basename(rawPath)),
-      path.resolve(process.cwd(), 'yokastore-firebase-adminsdk-fbsvc-078eaa4267.json')
-    ];
+    let serviceAccount = null;
 
-    let resolvedPath = null;
-    for (const p of candidatePaths) {
-      if (fs.existsSync(p)) {
-        resolvedPath = p;
-        break;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+      try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+      } catch (e) {
+        console.error('❌ [Push Notifications]: Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:', e.message);
+      }
+    } else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+      serviceAccount = {
+        project_id: process.env.FIREBASE_PROJECT_ID,
+        client_email: process.env.FIREBASE_CLIENT_EMAIL,
+        private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      };
+    }
+
+    if (!serviceAccount) {
+      const rawPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './yokastore-firebase-adminsdk-fbsvc-078eaa4267.json';
+      const candidatePaths = [
+        path.isAbsolute(rawPath) ? rawPath : path.resolve(process.cwd(), rawPath),
+        path.resolve(__dirname, '../../', path.basename(rawPath)),
+        path.resolve(process.cwd(), 'yokastore-firebase-adminsdk-fbsvc-078eaa4267.json')
+      ];
+
+      let resolvedPath = null;
+      for (const p of candidatePaths) {
+        if (fs.existsSync(p)) {
+          resolvedPath = p;
+          break;
+        }
+      }
+
+      if (resolvedPath) {
+        serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
       }
     }
 
-    if (!resolvedPath) {
-      console.warn('⚠️ [Push Notifications]: Firebase service account file not found. Push notifications will be mocked/logged.');
+    if (!serviceAccount) {
+      console.warn('⚠️ [Push Notifications]: Firebase credentials not found (checked env and local file). Push notifications will be logged/mocked.');
       return null;
     }
-
-    const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
 
     const existingApps = typeof admin.getApps === 'function' ? admin.getApps() : (admin.apps || []);
     if (existingApps.length > 0) {

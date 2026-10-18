@@ -1,0 +1,9 @@
+root pass: 5jjE'MQ'wa7T;KC@
+SSH username:
+root
+IPv4:
+187.7.72.245
+Forgot root password?
+Reset password
+Root access:
+ssh root@187.7.72.245

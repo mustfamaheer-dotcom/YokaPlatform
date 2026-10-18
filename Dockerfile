@@ -42,8 +42,6 @@ COPY seeders/ ./seeders/
 COPY knexfile.js ./
 COPY ecosystem.config.js ./
 
-# Copy Firebase admin SDK (if committed — otherwise use env vars)
-COPY yokastore-firebase-adminsdk-fbsvc-078eaa4267.json ./
 
 # Copy built frontend assets from build stages
 COPY --from=build-swm /build/client-swm/dist ./client-swm/dist
