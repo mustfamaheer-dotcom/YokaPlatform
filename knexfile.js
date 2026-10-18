@@ -22,15 +22,16 @@ module.exports = {
     seeds: { directory: './seeders' }
   },
   production: {
-    client: 'mysql2',
+    client: 'pg',
     connection: {
       host: process.env.DB_HOST || '127.0.0.1',
-      port: parseInt(process.env.DB_PORT || '3306'),
+      port: parseInt(process.env.DB_PORT || '5432'),
       database: process.env.DB_NAME,
       user: process.env.DB_USER,
-      password: process.env.DB_PASS
+      password: process.env.DB_PASS,
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
     },
-    pool: { min: 2, max: 50 },
+    pool: { min: 2, max: 20 },
     migrations: { directory: './migrations' },
     seeds: { directory: './seeders' }
   }

@@ -1,79 +1,47 @@
-name: Yoka Platform CI/CD & Automated Deployment
+name: 🚀 Deploy to Coolify
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [main]
+  workflow_dispatch:          # Allow manual trigger from GitHub UI
 
 jobs:
-  # ==========================================================
-  # 1. Continuous Integration & Quality Gates
-  # ==========================================================
-  build_and_test:
-    name: Build & Verify Architecture
-    runs-on: windows-latest
+  deploy:
+    name: Trigger Coolify Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20 LTS
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Monorepo Dependencies
+      - name: 📣 Trigger Coolify Webhook
         run: |
-          npm install
-          npm --prefix client-swm install
-          npm --prefix client-ecp install
+          echo "🚀 Triggering Coolify deployment..."
+          RESPONSE=$(curl --silent --show-error \
+            --max-time 30 \
+            -X GET \
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -w "\nHTTP_STATUS:%{http_code}")
 
-      - name: Verify Code Quality & Automated Test Suite
-        env:
-          NODE_ENV: development
-          DB_CLIENT: pg
-          DB_HOST: db69837.public.databaseasp.net
-          DB_PORT: 5432
-          DB_NAME: db69837
-          DB_USER: db69837
-          DB_PASS: "5Tq#_o3L9Zx!"
-          DB_SSL: "true"
-          PORT_SWM: 3009
-          JWT_SECRET: yoka_jwt_secret_dev_key_2026_moustafa_maher
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS")
+
+          echo "📡 Response: $BODY"
+          echo "📊 HTTP Status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Deployment triggered successfully!"
+          else
+            echo "❌ Deployment trigger failed with status $HTTP_STATUS"
+            exit 1
+          fi
+
+      - name: 📝 Deployment Summary
         run: |
-          node scripts/test_bulk1.js
-
-      - name: Package Full-Stack Deployment (Frontend + Bundled Node.js + web.config)
-        shell: powershell
-        run: |
-          powershell -ExecutionPolicy Bypass -File scripts/package_monster.ps1
-
-      - name: Upload Full-Stack Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: fullstack-deploy
-          path: dist-deploy/
-
-  # ==========================================================
-  # 2. Automated Full-Stack MSDeploy to Live Monster Server
-  # ==========================================================
-  deploy_testing_server:
-    name: Deploy to Monster Test Server (http://yokastore.runasp.net)
-    needs: build_and_test
-    runs-on: windows-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Download Full-Stack Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: fullstack-deploy
-          path: dist-deploy
-
-      - name: Deploy Full-Stack to IIS via Web Deploy (MSDeploy)
-        shell: cmd
-        run: |
-          "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" -verb:sync -source:contentPath="%GITHUB_WORKSPACE%\dist-deploy" -dest:contentPath="site93498",computerName="https://site93498.siteasp.net:8172/msdeploy.axd?site=site93498",userName="site93498",password="2Wp@-q8SeE=7",authType="Basic" -enableRule:AppOffline -enableRule:DoNotDeleteRule -skip:objectName=filePath,absolutePath=".*\\logs\\.*" -skip:objectName=dirPath,absolutePath=".*\\logs.*" -allowUntrusted
-
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  🏪 Yoka Platform — Deployment Triggered"
+          echo "  📅 Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  🌿 Branch: ${{ github.ref_name }}"
+          echo "  📝 Commit: ${{ github.sha }}"
+          echo "  👤 Author: ${{ github.actor }}"
+          echo "  💬 Message: ${{ github.event.head_commit.message }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -1,0 +1,46 @@
+# ─── Development & build artifacts ───────────────────────
+node_modules
+client-swm/node_modules
+client-ecp/node_modules
+design-system/node_modules
+dist-deploy
+dist-server
+.npm
+
+# ─── Git & IDE ────────────────────────────────────────────
+.git
+.gitignore
+.github
+.agents
+.claude
+.gemini
+
+# ─── Environment & Secrets ───────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Logs ────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ─── OS & Editor ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ─── Documentation (not needed in production image) ──────
+Docs/
+scratch/
+img/
+uploads/
+
+# ─── Windows-only scripts ────────────────────────────────
+start-dev.bat
+
+# ─── Large files & data ──────────────────────────────────
+*.sql
+*.zip
+*.tar.gz
