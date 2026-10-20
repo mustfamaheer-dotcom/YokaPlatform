@@ -10,6 +10,7 @@ import api from './api';
 import { trackPageView, trackAddToCart } from './services/tracker';
 import { Check } from 'lucide-react';
 import ScrollToTop from './components/ScrollToTop';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const Home = lazy(() => import('./pages/Home'));
 const Catalog = lazy(() => import('./pages/Catalog'));
@@ -179,7 +180,8 @@ export default function App() {
       />
 
       <Content className="page-content" style={{ maxWidth: 1280, width: '100%', margin: '16px auto', flex: 1 }}>
-        <Suspense
+        <ErrorBoundary>
+          <Suspense
           fallback={
             <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Spin size="large" />
@@ -197,6 +199,7 @@ export default function App() {
             <Route path="*" element={<Home onAddToCart={handleAddToCart} storeSettings={storeSettings} />} />
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </Content>
 
       <CartDrawer

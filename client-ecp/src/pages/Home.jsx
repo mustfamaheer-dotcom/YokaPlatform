@@ -268,7 +268,7 @@ export default function Home({ onAddToCart }) {
               alt="حقيبة جلدية فاخرة يوكا ستور"
               className="hero-3d-bag"
               loading="eager"
-              fetchPriority="high"
+              fetchpriority="high"
               decoding="async"
               width={380}
               height={380}

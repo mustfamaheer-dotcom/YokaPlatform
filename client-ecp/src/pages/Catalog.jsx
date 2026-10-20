@@ -147,6 +147,19 @@ export default function Catalog({ onAddToCart }) {
     }
   };
 
+  const handleApplyFilters = () => {
+    fetchProducts(1, {
+      search,
+      brand,
+      category_id: categoryId,
+      color,
+      size,
+      priceRange,
+      sort
+    });
+    setFilterDrawerVisible(false);
+  };
+
   const handleResetFilters = () => {
     setSearch('');
     setCategoryId('');
