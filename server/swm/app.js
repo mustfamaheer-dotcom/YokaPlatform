@@ -364,9 +364,42 @@ if (swmStaticDir && fs.existsSync(path.join(swmStaticDir, 'index.html'))) {
   });
 }
 
-// Automatically forward direct admin routes to /swm-admin/ to preserve deep links and PWA standalone scopes
-app.get(['/dashboard', '/dashboard/*', '/pos', '/pos/*', '/supervisor', '/supervisor/*', '/ecom', '/ecom/*'], (req, res) => {
-  return res.redirect(302, `/swm-admin${req.originalUrl}`);
+// Automatically forward direct admin and login routes to /swm-admin/ to preserve deep links and PWA standalone scopes
+const adminRedirectRoutes = [
+  '/admin', '/admin/*',
+  '/login', '/login/*',
+  '/swm', '/swm/*',
+  '/dashboard', '/dashboard/*',
+  '/pos', '/pos/*',
+  '/supervisor', '/supervisor/*',
+  '/supervisor-dashboard', '/supervisor-dashboard/*',
+  '/warehouse-manager', '/warehouse-manager/*',
+  '/ecom', '/ecom/*',
+  '/sales-reports', '/sales-reports/*',
+  '/alerts', '/alerts/*',
+  '/low-stock', '/low-stock/*',
+  '/customers', '/customers/*',
+  '/clients', '/clients/*',
+  '/loyalty-settings',
+  '/storefront',
+  '/store-settings',
+  '/sales-settings',
+  '/invoice-settings'
+];
+
+app.get(adminRedirectRoutes, (req, res) => {
+  const url = req.originalUrl || req.url;
+  if (url === '/admin' || url === '/admin/' || url === '/login' || url === '/login/') {
+    return res.redirect(302, '/swm-admin/login');
+  }
+  if (url.startsWith('/admin/login')) {
+    return res.redirect(302, '/swm-admin/login');
+  }
+  if (url.startsWith('/admin/')) {
+    const sub = url.slice(6);
+    return res.redirect(302, `/swm-admin${sub}`);
+  }
+  return res.redirect(302, `/swm-admin${url}`);
 });
 
 // Serve ECP (Public Customer Store) on Root '/'

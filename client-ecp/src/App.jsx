@@ -150,15 +150,30 @@ export default function App() {
     }
   };
 
-  if (location.pathname.startsWith('/swm-admin')) {
+  const isAdminRoute = (pathname) => {
+    return (
+      pathname.startsWith('/swm-admin') ||
+      pathname === '/admin' ||
+      pathname.startsWith('/admin/') ||
+      pathname === '/login' ||
+      pathname.startsWith('/login/') ||
+      pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/pos') ||
+      pathname.startsWith('/supervisor') ||
+      pathname.startsWith('/warehouse-manager') ||
+      pathname.startsWith('/ecom')
+    );
+  };
+
+  if (isAdminRoute(location.pathname)) {
     if (typeof window !== 'undefined') {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then((regs) => {
           for (const r of regs) r.unregister();
-          window.location.reload();
+          window.location.href = '/swm-admin/login';
         });
       } else {
-        window.location.reload();
+        window.location.href = '/swm-admin/login';
       }
     }
     return (

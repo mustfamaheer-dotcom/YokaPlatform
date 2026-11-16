@@ -118,22 +118,46 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initAuth = () => {
+    let isMounted = true;
+    const initAuth = async () => {
       const storedUser = localStorage.getItem('user');
       const token = localStorage.getItem('accessToken');
       if (storedUser && token) {
         try {
           const user = JSON.parse(storedUser);
-          setCurrentUser(user);
+          if (isMounted) setCurrentUser(user);
+
+          // Verify token and session freshness with backend
+          try {
+            const res = await api.get('/api/auth/me');
+            if (res.data?.success && res.data?.data) {
+              const freshUser = { ...user, ...res.data.data };
+              if (isMounted) setCurrentUser(freshUser);
+              localStorage.setItem('user', JSON.stringify(freshUser));
+            } else {
+              throw new Error('Invalid user session');
+            }
+          } catch (authErr) {
+            if (authErr.response?.status === 401 || authErr.response?.status === 403) {
+              localStorage.clear();
+              if (isMounted) setCurrentUser(null);
+            }
+          }
         } catch (e) {
           localStorage.clear();
-          setCurrentUser(null);
+          if (isMounted) setCurrentUser(null);
         }
+      } else {
+        localStorage.clear();
+        if (isMounted) setCurrentUser(null);
       }
-      setLoading(false);
+      if (isMounted) setLoading(false);
     };
 
     initAuth();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Prevent DevTools console from opening on hardware barcode scanner burst (F12, Ctrl+Shift+I/J/C)

@@ -6,9 +6,19 @@ import arEG from 'antd/locale/ar_EG';
 import App from './App';
 import { registerSW } from 'virtual:pwa-register';
 
-// Self-healing check: If a stale service worker incorrectly served ECP on /swm-admin,
-// unregister all service workers immediately, purge caches, and force a hard reload from the network.
-if (typeof window !== 'undefined' && window.location.pathname.startsWith('/swm-admin')) {
+// Self-healing check: If a stale service worker incorrectly served ECP on /swm-admin or /admin or /login,
+// unregister all service workers immediately, purge caches, and redirect to /swm-admin/login.
+const isAdminAccess =
+  typeof window !== 'undefined' &&
+  (window.location.pathname.startsWith('/swm-admin') ||
+   window.location.pathname === '/admin' ||
+   window.location.pathname.startsWith('/admin/') ||
+   window.location.pathname === '/login' ||
+   window.location.pathname.startsWith('/login/') ||
+   window.location.pathname.startsWith('/dashboard') ||
+   window.location.pathname.startsWith('/pos'));
+
+if (isAdminAccess) {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       for (const reg of registrations) {
@@ -19,18 +29,18 @@ if (typeof window !== 'undefined' && window.location.pathname.startsWith('/swm-a
           for (const name of names) {
             caches.delete(name);
           }
-          window.location.replace('/swm-admin/');
+          window.location.replace('/swm-admin/login');
         });
       } else {
-        window.location.replace('/swm-admin/');
+        window.location.replace('/swm-admin/login');
       }
     });
   } else {
-    window.location.replace('/swm-admin/');
+    window.location.replace('/swm-admin/login');
   }
 }
 
-if (import.meta.env.PROD && typeof window !== 'undefined' && !window.location.pathname.startsWith('/swm-admin')) {
+if (import.meta.env.PROD && typeof window !== 'undefined' && !isAdminAccess) {
   registerSW({ immediate: true });
 }
 import './index.css';
