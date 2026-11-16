@@ -56,7 +56,7 @@ export default function Login({ onLoginSuccess }) {
         // Evaluate branch type & user role for dedicated portal navigation
         const isEcom = user.branchType === 'ecom_warehouse' || user.branchCode === 'BR-ECOM';
         const isSupervisor = user.role === 'supervisor' || user.isSupervisor === true;
-        const isAdmin = ['admin', 'super_admin'].includes(user.role);
+        const isAdmin = ['admin', 'super_admin'].includes(user.role) || user.isMainWarehouse === true;
         const isWarehouseManager = user.role === 'warehouse_manager';
 
         let targetRoute = '/pos';

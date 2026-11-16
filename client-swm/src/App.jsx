@@ -38,9 +38,9 @@ function ProtectedRoute({ currentUser, allowedRoles, requiredBranchType, childre
   }
 
   const isEcom = isEcomWarehouseUser(currentUser);
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role) || currentUser?.isMainWarehouse === true;
   const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
-  const isAllowed = allowedRoles.includes(currentUser.role) || (isSupervisor && allowedRoles.includes('supervisor'));
+  const isAllowed = allowedRoles.includes(currentUser.role) || (isSupervisor && allowedRoles.includes('supervisor')) || (isAdmin && allowedRoles.includes('admin'));
 
   const shouldBounceEcom = isEcom && !isAdmin && (location.pathname === '/pos' || location.pathname.startsWith('/supervisor'));
   const shouldBounceReqEcom = requiredBranchType === 'ecom_warehouse' && !isEcom && !isAdmin;
@@ -84,7 +84,7 @@ function RoleRootRedirect({ currentUser }) {
   }
 
   const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role) || currentUser?.isMainWarehouse === true;
   const isWarehouseManager = currentUser.role === 'warehouse_manager';
 
   // Dedicated Warehouse Manager Portal
@@ -331,10 +331,12 @@ export default function App() {
               onSwitchToAdmin={() => {
                 if (currentUser.role === 'warehouse_manager') {
                   navigate('/warehouse-manager');
-                } else if (currentUser.role === 'supervisor') {
+                } else if (currentUser.role === 'supervisor' || currentUser.isSupervisor) {
                   navigate('/supervisor-dashboard');
-                } else {
+                } else if (['admin', 'super_admin'].includes(currentUser.role) || currentUser.isMainWarehouse) {
                   navigate('/dashboard');
+                } else {
+                  navigate('/pos');
                 }
               }}
               onLogout={handleLogout}

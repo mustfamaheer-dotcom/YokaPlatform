@@ -38,6 +38,14 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginOpenerPolicy: false,
   originAgentCluster: false,
+  permissionsPolicy: {
+    features: {
+      camera: ["'none'"],
+      microphone: ["'none'"],
+      geolocation: ["'none'"],
+      payment: ["'self'"]
+    }
+  },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*"],
@@ -66,6 +74,12 @@ app.use(helmet({
     }
   }
 }));
+
+// 2b. Sanitize Permissions-Policy header to eliminate browser console errors for unrecognized experimental features
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(self)');
+  next();
+});
 
 // 3. Security: CORS configuration
 const allowedOrigins = [
