@@ -287,7 +287,7 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (re
            google_maps_url = $6,
            show_in_store = CASE WHEN $7::boolean IS NOT NULL THEN $7::boolean ELSE show_in_store END,
            display_order = CASE WHEN $8::integer IS NOT NULL THEN $8::integer ELSE display_order END,
-           working_hours = CASE WHEN $9::json IS NOT NULL THEN $9::json ELSE working_hours END,
+           working_hours = CASE WHEN $9::text IS NOT NULL THEN $9::text ELSE working_hours END,
            supervisor_id = $10,
            status = COALESCE($11, status),
            login_username = $12,
