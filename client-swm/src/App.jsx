@@ -38,7 +38,7 @@ function ProtectedRoute({ currentUser, allowedRoles, requiredBranchType, childre
   }
 
   const isEcom = isEcomWarehouseUser(currentUser);
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role) || currentUser?.isMainWarehouse === true;
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
   const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
   const isAllowed = allowedRoles.includes(currentUser.role) || (isSupervisor && allowedRoles.includes('supervisor')) || (isAdmin && allowedRoles.includes('admin'));
 
@@ -84,7 +84,7 @@ function RoleRootRedirect({ currentUser }) {
   }
 
   const isSupervisor = currentUser.role === 'supervisor' || currentUser.isSupervisor === true;
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role) || currentUser?.isMainWarehouse === true;
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
   const isWarehouseManager = currentUser.role === 'warehouse_manager';
 
   // Dedicated Warehouse Manager Portal
@@ -333,7 +333,7 @@ export default function App() {
                   navigate('/warehouse-manager');
                 } else if (currentUser.role === 'supervisor' || currentUser.isSupervisor) {
                   navigate('/supervisor-dashboard');
-                } else if (['admin', 'super_admin'].includes(currentUser.role) || currentUser.isMainWarehouse) {
+                } else if (['admin', 'super_admin'].includes(currentUser.role)) {
                   navigate('/dashboard');
                 } else {
                   navigate('/pos');
