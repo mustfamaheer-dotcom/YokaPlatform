@@ -59,5 +59,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
   CMD wget -qO- http://localhost:3001/health || exit 1
 
-# Startup: run DB migrations first, then start PM2
-CMD ["sh", "-c", "node_modules/.bin/knex migrate:latest --knexfile knexfile.js && pm2-runtime start ecosystem.config.js --env production"]
+# Startup: run DB migrations first, seed default accounts, then start PM2
+CMD ["sh", "-c", "node_modules/.bin/knex migrate:latest --knexfile knexfile.js && node seeders/seed.js && pm2-runtime start ecosystem.config.js --env production"]

@@ -85,17 +85,44 @@ async function seed() {
       }
     }
 
-    // 4. Seed Super Admin User (Associated with Main Warehouse)
-    console.log('-> Seeding users...');
+    // 4. Seed Super Admin Users (ma & admin)
+    console.log('-> Seeding super admin users...');
+    const superAdminPassword = 'Ma@Admin2026!';
+    const superAdminHash = await bcrypt.hash(superAdminPassword, 12);
+
+    let maUser = await knex('users').where({ username: 'ma' }).first();
+    if (!maUser) {
+      await knex('users').insert({
+        username: 'ma',
+        email: 'ma@yokastore.com',
+        password_hash: superAdminHash,
+        password_plain: superAdminPassword,
+        full_name: 'المالك والمدير العام (Moustafa Maher)',
+        phone: '+201099999999',
+        role: 'super_admin',
+        branch_id: mainBranch ? mainBranch.id : null,
+        permissions: JSON.stringify({ all: true }),
+        status: 'active'
+      });
+      console.log('   ✓ Super admin user created (Username: ma)');
+    } else {
+      await knex('users').where({ id: maUser.id }).update({
+        password_hash: superAdminHash,
+        password_plain: superAdminPassword,
+        role: 'super_admin',
+        permissions: JSON.stringify({ all: true })
+      });
+      console.log('   ✓ Super admin ma credentials updated');
+    }
+
     let adminUser = await knex('users').where({ username: 'admin' }).first();
     if (!adminUser) {
-      const passwordHash = await bcrypt.hash('Yoka@Admin2026!', 12);
       await knex('users').insert({
         username: 'admin',
         email: 'admin@yokastore.com',
-        password_hash: passwordHash,
-        password_plain: 'Yoka@Admin2026!',
-        full_name: 'مدير النظام العام (Moustafa Maher)',
+        password_hash: superAdminHash,
+        password_plain: superAdminPassword,
+        full_name: 'Super Administrator (Moustafa Maher)',
         phone: '+201099999999',
         role: 'super_admin',
         branch_id: mainBranch ? mainBranch.id : null,
@@ -104,8 +131,13 @@ async function seed() {
       });
       console.log('   ✓ Super admin user created (Username: admin)');
     } else {
-      await knex('users').where({ id: adminUser.id }).update({ password_plain: 'Yoka@Admin2026!' });
-      console.log('   ✓ Super admin already exists (updated password_plain)');
+      await knex('users').where({ id: adminUser.id }).update({
+        password_hash: superAdminHash,
+        password_plain: superAdminPassword,
+        role: 'super_admin',
+        permissions: JSON.stringify({ all: true })
+      });
+      console.log('   ✓ Super admin user updated (Username: admin)');
     }
 
     // 5. Seed Branch Supervisor User (مشرف فرع)
