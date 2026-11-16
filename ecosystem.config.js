@@ -9,9 +9,6 @@ module.exports = {
       // Restart on failure with exponential backoff
       exp_backoff_restart_delay: 100,
       max_restarts: 10,
-      // Logging
-      out_file: '/dev/stdout',
-      error_file: '/dev/stderr',
       merge_logs: true,
       env_production: {
         NODE_ENV: 'production',
