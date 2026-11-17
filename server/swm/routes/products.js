@@ -5,6 +5,72 @@ const { logActivity } = require('../../shared/activityLogger');
 const redis = require('../../shared/redis');
 const { persistDataUri, persistGalleryImagesJson } = require('../../shared/imageStore');
 const { generateValidEAN13 } = require('../../shared/barcode');
+const {
+  getSafeColorCode,
+  getSafeSizeCode,
+  buildVariantSku,
+  ensureUniqueVariantSku
+} = require('../../shared/skuHelper');
+
+/**
+ * Checks if a product is referenced in historical transaction records or positive balances
+ */
+async function checkProductHistory(productId, executeQuery = query) {
+  const checks = [
+    `SELECT 1 FROM purchase_invoice_items WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM swm_sales_invoice_items WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM ecp_order_items WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM stock_transfer_items WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM stock_adjustment_items WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM purchase_return_items WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM inventory_movements WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM inventory_counts WHERE product_id = $1 LIMIT 1`,
+    `SELECT 1 FROM inventory_balances WHERE product_id = $1 AND (available_qty > 0 OR reserved_qty > 0) LIMIT 1`
+  ];
+
+  for (const sql of checks) {
+    try {
+      const res = await executeQuery(sql, [productId]);
+      const rows = res.rows || res;
+      if (rows && rows.length > 0) {
+        return true;
+      }
+    } catch (e) {
+      // Table or column might not exist or error, continue checking
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks if a variant is referenced in historical transaction records or positive balances
+ */
+async function checkVariantHistory(variantId, executeQuery = query) {
+  const checks = [
+    `SELECT 1 FROM purchase_invoice_items WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM swm_sales_invoice_items WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM ecp_order_items WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM stock_transfer_items WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM stock_adjustment_items WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM purchase_return_items WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM inventory_movements WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM inventory_counts WHERE variant_id = $1 LIMIT 1`,
+    `SELECT 1 FROM inventory_balances WHERE variant_id = $1 AND (available_qty > 0 OR reserved_qty > 0) LIMIT 1`
+  ];
+
+  for (const sql of checks) {
+    try {
+      const res = await executeQuery(sql, [variantId]);
+      const rows = res.rows || res;
+      if (rows && rows.length > 0) {
+        return true;
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+  return false;
+}
 
 router.use(requireWarehousePermission('groups_items'));
 
@@ -36,12 +102,16 @@ router.get('/', requireAuth, async (req, res) => {
     }
 
     if (status && status !== 'all') {
-      whereClauses.push(`p.status = $${pIdx}`);
-      params.push(status);
-      pIdx++;
+      if (status === 'archived' || status === 'discontinued') {
+        whereClauses.push(`p.status IN ('archived', 'discontinued')`);
+      } else {
+        whereClauses.push(`p.status = $${pIdx}`);
+        params.push(status);
+        pIdx++;
+      }
     } else if (!status) {
-      // By default exclude discontinued/deleted products unless explicitly asked for (status='all' or status='discontinued')
-      whereClauses.push(`(p.status != 'discontinued' OR p.status IS NULL)`);
+      // By default exclude discontinued/archived products unless explicitly asked for (status='all' or status='archived')
+      whereClauses.push(`(p.status NOT IN ('discontinued', 'archived') OR p.status IS NULL)`);
     }
 
     if (req.query.has_category === 'true') {
@@ -636,30 +706,9 @@ router.post('/', requireAuth, requireRole(['super_admin', 'admin', 'inventory_ma
           const v = variants[i];
           let candidateSku = v.sku ? String(v.sku).trim().toUpperCase() : null;
           if (!candidateSku) {
-            const rawColor = String(v.color || '').trim();
-            const rawSize = String(v.size || '').trim();
-            const cClean = rawColor.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || `C${i + 1}`;
-            const sClean = rawSize.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || `S${i + 1}`;
-            candidateSku = `${cleanCode}-${cClean}-${sClean}`;
+            candidateSku = buildVariantSku(cleanCode, v.color, v.size, i, i);
           }
-
-          // Ensure unique within current batch
-          let finalSku = candidateSku;
-          let counter = 1;
-          while (usedSkusInBatch.has(finalSku)) {
-            finalSku = `${candidateSku}-${++counter}`;
-          }
-
-          // Check if already exists in product_variants table across the entire database
-          const existingVariant = await client.query(
-            `SELECT id FROM product_variants WHERE variant_sku = $1 LIMIT 1`,
-            [finalSku]
-          );
-          if (existingVariant.rows.length > 0) {
-            finalSku = `${finalSku}-${Math.floor(Math.random() * 900 + 100)}`;
-          }
-
-          usedSkusInBatch.add(finalSku);
+          const finalSku = await ensureUniqueVariantSku(client, candidateSku, usedSkusInBatch);
 
           // Inheritance Logic: If no variant-specific image is provided, inherit the model's featured_image
           const variantImage = (v.image_url ? persistDataUri(v.image_url) : null) || persistedFeaturedImage || null;
@@ -761,58 +810,202 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
     const persistedGalleryImages = gallery_images !== undefined ? (persistGalleryImagesJson(gallery_images) || null) : undefined;
 
     // Check code uniqueness if changed
-    if (product_code && product_code.trim().toUpperCase() !== old.product_code) {
-      const cleanCode = product_code.trim().toUpperCase();
+    const cleanCode = product_code ? product_code.trim().toUpperCase() : old.product_code;
+    if (product_code && cleanCode !== old.product_code) {
       const existing = await query(`SELECT id FROM products WHERE product_code = $1 AND id != $2`, [cleanCode, id]);
       if (existing.length > 0) {
         return res.status(409).json({ success: false, message: 'كود الصنف مسجل مسبقاً لصنف آخر' });
       }
     }
 
-    await query(
-      `UPDATE products SET
-        product_name = COALESCE($1, product_name),
-        product_code = COALESCE($2, product_code),
-        barcode = COALESCE($3, barcode),
-        category_id = COALESCE($4, category_id),
-        sub_category_id = COALESCE($5, sub_category_id),
-        brand = COALESCE($6, brand),
-        color = COALESCE($7, color),
-        size = COALESCE($8, size),
-        material = COALESCE($9, material),
-        cost_price = COALESCE($10, cost_price),
-        selling_price = COALESCE($11, selling_price),
-        wholesale_price = COALESCE($12, wholesale_price),
-        sale_price = COALESCE($13, sale_price),
-        status = COALESCE($14, status),
-        is_ecom_listed = COALESCE($15, is_ecom_listed),
-        reorder_level = COALESCE($16, reorder_level),
-        featured_image = COALESCE($17, featured_image),
-        gallery_images = COALESCE($18, gallery_images),
-        updated_at = NOW()
-       WHERE id = $19`,
-      [
-        product_name || null,
-        product_code ? product_code.trim().toUpperCase() : null,
-        barcode ? (String(barcode).trim().replace(/\D/g, '') || null) : null,
-        category_id || null,
-        sub_category_id || null,
-        brand || null,
-        color || null,
-        size || null,
-        material || null,
-        cost_price !== undefined ? parseFloat(cost_price) : null,
-        selling_price !== undefined ? parseFloat(selling_price) : null,
-        wholesale_price !== undefined ? parseFloat(wholesale_price) : null,
-        sale_price !== undefined ? parseFloat(sale_price) : null,
-        status || null,
-        is_ecom_listed !== undefined ? Boolean(is_ecom_listed) : null,
-        reorder_level !== undefined ? parseInt(reorder_level, 10) : null,
-        persistedFeaturedImage !== undefined ? persistedFeaturedImage : null,
-        persistedGalleryImages !== undefined ? persistedGalleryImages : null,
-        id
-      ]
-    );
+    // Execute master product and variant synchronization inside a single database transaction
+    await transaction(async (client) => {
+      // 1. Update product master row
+      await client.query(
+        `UPDATE products SET
+          product_name = COALESCE($1, product_name),
+          product_code = COALESCE($2, product_code),
+          barcode = COALESCE($3, barcode),
+          category_id = COALESCE($4, category_id),
+          sub_category_id = COALESCE($5, sub_category_id),
+          brand = COALESCE($6, brand),
+          color = COALESCE($7, color),
+          size = COALESCE($8, size),
+          material = COALESCE($9, material),
+          cost_price = COALESCE($10, cost_price),
+          selling_price = COALESCE($11, selling_price),
+          wholesale_price = COALESCE($12, wholesale_price),
+          sale_price = COALESCE($13, sale_price),
+          status = COALESCE($14, status),
+          is_ecom_listed = COALESCE($15, is_ecom_listed),
+          reorder_level = COALESCE($16, reorder_level),
+          featured_image = COALESCE($17, featured_image),
+          gallery_images = COALESCE($18, gallery_images),
+          updated_at = NOW()
+         WHERE id = $19`,
+        [
+          product_name || null,
+          cleanCode || null,
+          barcode ? (String(barcode).trim().replace(/\D/g, '') || null) : null,
+          category_id || null,
+          sub_category_id || null,
+          brand || null,
+          color || null,
+          size || null,
+          material || null,
+          cost_price !== undefined ? parseFloat(cost_price) : null,
+          selling_price !== undefined ? parseFloat(selling_price) : null,
+          wholesale_price !== undefined ? parseFloat(wholesale_price) : null,
+          sale_price !== undefined ? parseFloat(sale_price) : null,
+          status || null,
+          is_ecom_listed !== undefined ? Boolean(is_ecom_listed) : null,
+          reorder_level !== undefined ? parseInt(reorder_level, 10) : null,
+          persistedFeaturedImage !== undefined ? persistedFeaturedImage : null,
+          persistedGalleryImages !== undefined ? persistedGalleryImages : null,
+          id
+        ]
+      );
+
+      // Update variant color images if explicitly supplied
+      if (color_images && typeof color_images === 'object') {
+        for (const [colorName, img] of Object.entries(color_images)) {
+          if (img) {
+            const persistedImg = persistDataUri(img);
+            await client.query(
+              `UPDATE product_variants SET image_url = $1, updated_at = NOW() WHERE product_id = $2 AND color = $3`,
+              [persistedImg, id, colorName]
+            );
+          }
+        }
+      }
+
+      // 2. Synchronize product variants if variants array was provided
+      if (Array.isArray(variants)) {
+        const existingVarsRes = await client.query(
+          `SELECT * FROM product_variants WHERE product_id = $1`,
+          [id]
+        );
+        const existingVariants = existingVarsRes.rows || [];
+        const usedSkusInBatch = new Set();
+        const matchedExistingIds = new Set();
+
+        // Process each incoming variant
+        for (let i = 0; i < variants.length; i++) {
+          const v = variants[i];
+          const vColor = v.color ? String(v.color).trim() : null;
+          const vSize = v.size ? String(v.size).trim() : null;
+          const rawImg = v.image_url || (vColor && color_images?.[vColor]) || null;
+          const vImg = rawImg ? persistDataUri(rawImg) : null;
+          const vPriceMod = v.price_modifier !== undefined ? parseFloat(v.price_modifier) : 0;
+
+          // Attempt match with existing variants
+          // Priority 1: by variant ID
+          let matchedVar = null;
+          if (v.id) {
+            matchedVar = existingVariants.find(ev => ev.id === parseInt(v.id, 10));
+          }
+          // Priority 2: by exact color and size match
+          if (!matchedVar) {
+            matchedVar = existingVariants.find(
+              ev => !matchedExistingIds.has(ev.id) &&
+                    (ev.color || null) === vColor &&
+                    (ev.size || null) === vSize
+            );
+          }
+
+          if (matchedVar) {
+            matchedExistingIds.add(matchedVar.id);
+            usedSkusInBatch.add(matchedVar.variant_sku);
+
+            // Update matched existing variant - preserve existing ID & SKU!
+            await client.query(
+              `UPDATE product_variants SET
+                color = $1,
+                size = $2,
+                material = COALESCE($3, material),
+                price_modifier = $4,
+                image_url = COALESCE($5, image_url),
+                status = 'active',
+                updated_at = NOW()
+               WHERE id = $6`,
+              [
+                vColor,
+                vSize,
+                v.material || null,
+                vPriceMod,
+                vImg,
+                matchedVar.id
+              ]
+            );
+          } else {
+            // New variant: generate unique SKU using skuHelper
+            let candidateSku = v.sku ? String(v.sku).trim().toUpperCase() : null;
+            if (!candidateSku) {
+              candidateSku = buildVariantSku(cleanCode, vColor, vSize, i, i);
+            }
+            const finalSku = await ensureUniqueVariantSku(client, candidateSku, usedSkusInBatch);
+
+            const vBarcode = (v.barcode && /^\d{12,14}$/.test(String(v.barcode).trim()))
+              ? String(v.barcode).trim()
+              : generateValidEAN13('622');
+
+            await client.query(
+              `INSERT INTO product_variants (
+                product_id, variant_sku, barcode, color, size, material, price_modifier, image_url, status, created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', NOW(), NOW())`,
+              [
+                id,
+                finalSku,
+                vBarcode,
+                vColor,
+                vSize,
+                v.material || null,
+                vPriceMod,
+                vImg || persistedFeaturedImage || null
+              ]
+            );
+          }
+        }
+
+        // Handle variants that were removed by the user
+        const removedVariants = existingVariants.filter(ev => !matchedExistingIds.has(ev.id));
+        for (const remVar of removedVariants) {
+          const hasHistory = await checkVariantHistory(remVar.id, (sql, p) => client.query(sql, p));
+          if (hasHistory) {
+            // Soft-archive variant: keep record to preserve historical transactions and accounting integrity
+            await client.query(
+              `UPDATE product_variants SET status = 'inactive', updated_at = NOW() WHERE id = $1`,
+              [remVar.id]
+            );
+          } else {
+            // Completely safe to delete permanently
+            await client.query(`DELETE FROM inventory_balances WHERE variant_id = $1`, [remVar.id]);
+            await client.query(`DELETE FROM product_variants WHERE id = $1`, [remVar.id]);
+          }
+        }
+
+        // Synchronize master product color and size summary
+        const activeVariantsRes = await client.query(
+          `SELECT DISTINCT color, size FROM product_variants WHERE product_id = $1 AND status = 'active'`,
+          [id]
+        );
+        const activeRows = activeVariantsRes.rows || [];
+        const activeColors = [...new Set(activeRows.map(r => r.color).filter(Boolean))].join(' / ');
+        const activeSizes = [...new Set(activeRows.map(r => r.size).filter(Boolean))].join(' / ');
+
+        await client.query(
+          `UPDATE products SET color = $1, size = $2 WHERE id = $3`,
+          [activeColors || color || null, activeSizes || size || null, id]
+        );
+      }
+    });
+
+    // Invalidate Redis caches
+    try {
+      const keys = await redis.keys('ecp:cache:*');
+      if (keys && keys.length > 0) await redis.del(...keys);
+      if (old.slug) await redis.del(`ecp:seo:product:${old.slug}`);
+    } catch (e) {}
 
     const priceChanged = selling_price !== undefined && parseFloat(selling_price) !== parseFloat(old.selling_price);
 
@@ -839,64 +1032,10 @@ router.put('/:id', requireAuth, requireRole(['super_admin', 'admin', 'inventory_
       userAgent: req.headers['user-agent'],
       notes: priceChanged
         ? `Selling price modified from ${old.selling_price} to ${selling_price}`
-        : `Product ${id} updated`
+        : `Product ${id} updated with atomic variant synchronization`
     });
 
-    // Update variant color images
-    if (color_images && typeof color_images === 'object') {
-      for (const [colorName, img] of Object.entries(color_images)) {
-        if (img) {
-          const persistedImg = persistDataUri(img);
-          await query(
-            `UPDATE product_variants SET image_url = $1, updated_at = NOW() WHERE product_id = $2 AND color = $3`,
-            [persistedImg, id, colorName]
-          );
-        }
-      }
-    }
-
-    // Sync and insert new variants if provided
-    if (Array.isArray(variants) && variants.length > 0) {
-      for (const v of variants) {
-        const vColor = v.color ? String(v.color).trim() : null;
-        const vSize = v.size ? String(v.size).trim() : null;
-        const rawImg = v.image_url || (vColor && color_images?.[vColor]) || null;
-        const vImg = rawImg ? persistDataUri(rawImg) : null;
-
-        const existingVar = v.id
-          ? await query(`SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`, [v.id, id])
-          : await query(
-              `SELECT id FROM product_variants 
-               WHERE product_id = $1 
-                 AND (color = $2 OR (color IS NULL AND $2 IS NULL))
-                 AND (size = $3 OR (size IS NULL AND $3 IS NULL))`,
-              [id, vColor, vSize]
-            );
-
-        if (existingVar.length > 0) {
-          if (vImg) {
-            await query(`UPDATE product_variants SET image_url = $1, updated_at = NOW() WHERE id = $2`, [vImg, existingVar[0].id]);
-          }
-        } else {
-          const codePrefix = product_code || old.product_code;
-          const cClean = vColor ? vColor.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || 'COL' : 'GEN';
-          const sClean = vSize ? vSize.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || 'SIZ' : 'ONE';
-          let newSku = `${codePrefix}-${cClean}-${sClean}`;
-          const skuDup = await query(`SELECT id FROM product_variants WHERE variant_sku = $1`, [newSku]);
-          const vBarcode = (v.barcode && /^\d{12,14}$/.test(String(v.barcode).trim()))
-            ? String(v.barcode).trim()
-            : generateValidEAN13('622');
-
-          await query(
-            `INSERT INTO product_variants (product_id, variant_sku, barcode, color, size, image_url, status, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())`,
-            [id, newSku, vBarcode, vColor, vSize, vImg]
-          );
-        }
-      }
-    }
-
-    return res.json({ success: true, message: 'تم تحديث بيانات الصنف والمتغيرات والصور بنجاح' });
+    return res.json({ success: true, message: 'تم تحديث بيانات الصنف والمتغيرات بنجاح' });
   } catch (err) {
     console.error('Update product error:', err);
     return res.status(500).json({ success: false, message: err.message });
@@ -1022,16 +1161,9 @@ router.post('/:id/variants', requireAuth, requireRole(['super_admin', 'admin', '
       });
     }
 
-    // Generate SKU
-    const cClean = cleanColor ? cleanColor.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase() || `C${Date.now().toString().slice(-3)}` : 'GEN';
-    const sClean = cleanSize ? cleanSize.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || `S${Date.now().toString().slice(-2)}` : 'ONE';
-    let baseSku = `${prod.product_code}-${cClean}-${sClean}`;
-    let finalSku = baseSku;
-
-    const skuCheck = await query(`SELECT id FROM product_variants WHERE variant_sku = $1`, [finalSku]);
-    if (skuCheck.length > 0) {
-      finalSku = `${finalSku}-${Math.floor(Math.random() * 900 + 100)}`;
-    }
+    // Generate SKU using skuHelper
+    const baseCandidate = buildVariantSku(prod.product_code, cleanColor, cleanSize);
+    const finalSku = await ensureUniqueVariantSku({ query }, baseCandidate, new Set());
 
     const persistedImageUrl = image_url ? persistDataUri(image_url) : null;
     const variantBarcode = (req.body.barcode && /^\d{12,14}$/.test(String(req.body.barcode).trim()))
@@ -1071,57 +1203,140 @@ router.post('/:id/variants', requireAuth, requireRole(['super_admin', 'admin', '
 
 /**
  * DELETE /api/swm/products/:id
- * Soft delete product (sets status to 'discontinued')
+ * Delete product permanently if no history, or archive if transaction history exists
  */
-router.delete('/:id', requireAuth, requireRole(['super_admin']), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Check if product is referenced in actual sales or purchase transactions
-    const [purchaseItem] = await query(`SELECT id FROM purchase_invoice_items WHERE product_id = $1 LIMIT 1`, [id]);
-    const [posItem] = await query(`SELECT id FROM swm_sales_invoice_items WHERE product_id = $1 LIMIT 1`, [id]);
-    const [ecpItem] = await query(`SELECT id FROM ecp_order_items WHERE product_id = $1 LIMIT 1`, [id]);
-    const [transferItem] = await query(`SELECT id FROM stock_transfer_items WHERE product_id = $1 LIMIT 1`, [id]);
-
-    if (purchaseItem || posItem || ecpItem || transferItem) {
-      // Soft-delete to preserve accounting integrity
-      await query(`UPDATE products SET status = 'discontinued', updated_at = NOW() WHERE id = $1`, [id]);
-      logActivity({
-        userId: req.user.id,
-        branchId: req.user.branchId,
-        actionType: 'DELETE_PRODUCT',
-        entityType: 'products',
-        entityId: id,
-        notes: `Product ${id} marked as discontinued (has transaction history)`
-      });
-      return res.json({ success: true, message: 'تم تعطيل الصنف بنجاح لحفظ سجل الحركات المالية والمبيعات' });
+    const [product] = await query(`SELECT id, product_name, status FROM products WHERE id = $1`, [id]);
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'الصنف غير موجود' });
     }
 
-    // Completely safe to delete
-    await query(`DELETE FROM inventory_balances WHERE product_id = $1`, [id]);
-    await query(`DELETE FROM product_variants WHERE product_id = $1`, [id]);
-    await query(`DELETE FROM products WHERE id = $1`, [id]);
+    const hasHistory = await checkProductHistory(id);
+
+    if (hasHistory) {
+      // Soft-delete / Archive to preserve financial and inventory records
+      await transaction(async (client) => {
+        await client.query(`UPDATE products SET status = 'archived', updated_at = NOW() WHERE id = $1`, [id]);
+        await client.query(`UPDATE product_variants SET status = 'inactive', updated_at = NOW() WHERE product_id = $1`, [id]);
+      });
+
+      // Invalidate caches
+      try {
+        const keys = await redis.keys('ecp:cache:*');
+        if (keys && keys.length > 0) await redis.del(...keys);
+      } catch (e) {}
+
+      logActivity({
+        userId: req.user.id,
+        userRole: req.user.role,
+        userName: req.user.fullName || req.user.username,
+        actionUrl: '/dashboard/groups_items',
+        branchId: req.user.branchId,
+        actionType: 'ARCHIVE_PRODUCT',
+        entityType: 'products',
+        entityId: id,
+        notes: `Product ${id} (${product.product_name}) archived due to transaction history`
+      });
+
+      return res.json({
+        success: true,
+        action: 'archived',
+        message: `تم أرشفة وتعطيل الصنف "${product.product_name}" بنجاح لحفظ سجلات الحركات المالية والمبيعات`
+      });
+    }
+
+    // Completely safe to delete permanently
+    await transaction(async (client) => {
+      await client.query(`DELETE FROM inventory_balances WHERE product_id = $1`, [id]);
+      await client.query(`DELETE FROM product_variants WHERE product_id = $1`, [id]);
+      await client.query(`DELETE FROM products WHERE id = $1`, [id]);
+    });
+
+    // Invalidate caches
+    try {
+      const keys = await redis.keys('ecp:cache:*');
+      if (keys && keys.length > 0) await redis.del(...keys);
+    } catch (e) {}
 
     logActivity({
       userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/groups_items',
       branchId: req.user.branchId,
       actionType: 'DELETE_PRODUCT',
       entityType: 'products',
       entityId: id,
-      notes: `Product ${id} permanently deleted`
+      notes: `Product ${id} (${product.product_name}) permanently deleted`
     });
 
-    return res.json({ success: true, message: 'تم حذف الصنف نهائياً بنجاح' });
+    return res.json({
+      success: true,
+      action: 'deleted',
+      message: `تم حذف الصنف "${product.product_name}" نهائياً بنجاح لعدم وجود حركات أو أرصدة سابقة`
+    });
   } catch (err) {
+    console.error('Delete product error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/swm/products/:id/restore
+ * Restore archived product and its variants to active status
+ */
+router.post('/:id/restore', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [product] = await query(`SELECT id, product_name, status FROM products WHERE id = $1`, [id]);
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'الصنف غير موجود' });
+    }
+
+    if (product.status === 'active') {
+      return res.json({ success: true, message: 'الصنف نشط بالفعل' });
+    }
+
+    await transaction(async (client) => {
+      await client.query(`UPDATE products SET status = 'active', updated_at = NOW() WHERE id = $1`, [id]);
+      await client.query(`UPDATE product_variants SET status = 'active', updated_at = NOW() WHERE product_id = $1`, [id]);
+    });
+
+    // Invalidate caches
+    try {
+      const keys = await redis.keys('ecp:cache:*');
+      if (keys && keys.length > 0) await redis.del(...keys);
+    } catch (e) {}
+
+    logActivity({
+      userId: req.user.id,
+      userRole: req.user.role,
+      userName: req.user.fullName || req.user.username,
+      actionUrl: '/dashboard/groups_items',
+      branchId: req.user.branchId,
+      actionType: 'RESTORE_PRODUCT',
+      entityType: 'products',
+      entityId: id,
+      notes: `Product ${id} (${product.product_name}) restored to active status`
+    });
+
+    return res.json({
+      success: true,
+      message: `تمت استعادة وتنشيط الصنف "${product.product_name}" بنجاح وإتاحته للعمليات`
+    });
+  } catch (err) {
+    console.error('Restore product error:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
 /**
  * POST /api/swm/products/bulk-delete
- * Bulk delete or discontinue selected products
+ * Bulk delete or archive selected products safely
  */
-router.post('/bulk-delete', requireAuth, requireRole(['super_admin']), async (req, res) => {
+router.post('/bulk-delete', requireAuth, requireRole(['super_admin', 'admin']), async (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -1134,38 +1349,42 @@ router.post('/bulk-delete', requireAuth, requireRole(['super_admin']), async (re
     }
 
     let deletedCount = 0;
-    let discontinuedCount = 0;
+    let archivedCount = 0;
 
-    for (const prodId of numericIds) {
-      // Check for transaction history
-      const [purchaseItem] = await query(`SELECT id FROM purchase_invoice_items WHERE product_id = $1 LIMIT 1`, [prodId]);
-      const [posItem] = await query(`SELECT id FROM swm_sales_invoice_items WHERE product_id = $1 LIMIT 1`, [prodId]);
-      const [ecpItem] = await query(`SELECT id FROM ecp_order_items WHERE product_id = $1 LIMIT 1`, [prodId]);
-      const [transferItem] = await query(`SELECT id FROM stock_transfer_items WHERE product_id = $1 LIMIT 1`, [prodId]);
-
-      if (purchaseItem || posItem || ecpItem || transferItem) {
-        await query(`UPDATE products SET status = 'discontinued', updated_at = NOW() WHERE id = $1`, [prodId]);
-        discontinuedCount++;
-      } else {
-        await query(`DELETE FROM inventory_balances WHERE product_id = $1`, [prodId]);
-        await query(`DELETE FROM product_variants WHERE product_id = $1`, [prodId]);
-        await query(`DELETE FROM products WHERE id = $1`, [prodId]);
-        deletedCount++;
+    await transaction(async (client) => {
+      for (const prodId of numericIds) {
+        const hasHistory = await checkProductHistory(prodId, (sql, p) => client.query(sql, p));
+        if (hasHistory) {
+          await client.query(`UPDATE products SET status = 'archived', updated_at = NOW() WHERE id = $1`, [prodId]);
+          await client.query(`UPDATE product_variants SET status = 'inactive', updated_at = NOW() WHERE product_id = $1`, [prodId]);
+          archivedCount++;
+        } else {
+          await client.query(`DELETE FROM inventory_balances WHERE product_id = $1`, [prodId]);
+          await client.query(`DELETE FROM product_variants WHERE product_id = $1`, [prodId]);
+          await client.query(`DELETE FROM products WHERE id = $1`, [prodId]);
+          deletedCount++;
+        }
       }
-    }
+    });
+
+    // Invalidate caches
+    try {
+      const keys = await redis.keys('ecp:cache:*');
+      if (keys && keys.length > 0) await redis.del(...keys);
+    } catch (e) {}
 
     logActivity({
       userId: req.user.id,
       branchId: req.user.branchId,
       actionType: 'BULK_DELETE_PRODUCTS',
       entityType: 'products',
-      notes: `Bulk processed ${numericIds.length} products: ${deletedCount} deleted, ${discontinuedCount} discontinued`
+      notes: `Bulk processed ${numericIds.length} products: ${deletedCount} deleted, ${archivedCount} archived`
     });
 
     return res.json({
       success: true,
-      message: `تمت معالجة حذف ${numericIds.length} صنف: (حذف نهائي: ${deletedCount}، تعطيل وحفظ سجل الحركات: ${discontinuedCount})`,
-      data: { deletedCount, discontinuedCount, total: numericIds.length }
+      message: `تمت معالجة حذف ${numericIds.length} صنف: (حذف نهائي: ${deletedCount}، أرشفة وتعطيل: ${archivedCount})`,
+      data: { deletedCount, archivedCount, total: numericIds.length }
     });
   } catch (err) {
     console.error('Bulk delete products error:', err);

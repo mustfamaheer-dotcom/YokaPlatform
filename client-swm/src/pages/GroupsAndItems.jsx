@@ -50,7 +50,8 @@ import {
   UploadOutlined,
   PictureOutlined,
   CameraOutlined,
-  EyeOutlined
+  EyeOutlined,
+  UndoOutlined
 } from '@ant-design/icons';
 import api from '../api';
 import yokaLogo from '../assets/yokaStoreTransparent.png';
@@ -170,6 +171,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
   // Item Create/Edit Modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [existingVariants, setExistingVariants] = useState([]);
   const [itemSubmitting, setItemSubmitting] = useState(false);
   const [itemForm] = Form.useForm();
   const watchedItemColor = Form.useWatch('color', itemForm);
@@ -192,6 +194,8 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
   const activeColors = isMultiVariant
     ? selectedMultiColors
     : (watchedItemColor ? [watchedItemColor] : []);
+
+  const canManageItem = canDelete(currentUser) || ['super_admin', 'admin', 'warehouse_manager'].includes(currentUser?.role);
 
 
   // ==========================================
@@ -549,6 +553,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
 
   const handleOpenCreateItem = () => {
     setEditingItem(null);
+    setExistingVariants([]);
     setIsMultiVariant(false);
     setSelectedMultiColors([]);
     setSelectedMultiSizes([]);
@@ -612,6 +617,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
     }
 
     setColorImages(initialColorImages);
+    setExistingVariants(variants);
 
     // Determine colors and sizes from variants first, or fallback to product item
     const loadedColors = [...new Set(variants.map(v => v.color).filter(Boolean))];
@@ -677,6 +683,25 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
         const usedSkus = new Set();
         variantsPayload = selectedMultiColors.flatMap((c, cIdx) =>
           selectedMultiSizes.map((s, sIdx) => {
+            // Match with existing variant to preserve its database ID and SKU
+            const existingMatch = existingVariants.find(
+              ev => (ev.color || '').trim() === c.trim() && (ev.size || '').trim() === s.trim()
+            );
+
+            if (existingMatch) {
+              usedSkus.add(existingMatch.variant_sku);
+              return {
+                id: existingMatch.id,
+                color: c,
+                size: s,
+                sku: existingMatch.variant_sku, // PRESERVE EXISTING SKU!
+                barcode: existingMatch.barcode || generateValidEAN13('622'),
+                price_modifier: existingMatch.price_modifier || 0,
+                image_url: (!isCustomNoImages && colorImages[c]) || defaultFeatured || existingMatch.image_url || null
+              };
+            }
+
+            // Brand new combination: generate clean, unique candidate SKU
             const baseSku = buildVariantSku(values.product_code, c, s, cIdx, sIdx);
             let finalSku = baseSku;
             let counter = 2;
@@ -697,13 +722,18 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
         values.color = selectedMultiColors.join(' / ');
         values.size = selectedMultiSizes.join(' / ');
       } else if (values.color || values.size) {
+        const existingMatch = existingVariants.find(
+          ev => (ev.color || '').trim() === (values.color || '').trim() && (ev.size || '').trim() === (values.size || '').trim()
+        ) || existingVariants[0];
+
         variantsPayload = [{
+          id: existingMatch?.id || undefined,
           color: values.color || null,
           size: values.size || null,
-          sku: values.product_code,
-          barcode: values.barcode || generateValidEAN13('622'),
-          price_modifier: 0,
-          image_url: (!isCustomNoImages && values.color && colorImages[values.color]) || defaultFeatured || null
+          sku: existingMatch?.variant_sku || values.product_code,
+          barcode: values.barcode || existingMatch?.barcode || generateValidEAN13('622'),
+          price_modifier: existingMatch?.price_modifier || 0,
+          image_url: (!isCustomNoImages && values.color && colorImages[values.color]) || defaultFeatured || existingMatch?.image_url || null
         }];
       }
 
@@ -753,12 +783,26 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
     try {
       const res = await api.delete(`/api/swm/products/${itemId}`);
       if (res.data.success) {
-        message.success(res.data.message || 'تم حذف / تعطيل الصنف بنجاح');
+        message.success(res.data.message || 'تم حذف / أرشفة الصنف بنجاح');
         setSelectedItemRowKeys(prev => prev.filter(k => k !== itemId));
         fetchItems(itemsPagination.current);
+        fetchCategories();
       }
     } catch (err) {
       message.error(err.response?.data?.message || 'فشل في حذف الصنف');
+    }
+  };
+
+  const handleRestoreItem = async (item) => {
+    try {
+      const res = await api.post(`/api/swm/products/${item.id}/restore`);
+      if (res.data.success) {
+        message.success(res.data.message || `تمت استعادة وتنشيط الصنف "${item.product_name}" بنجاح!`);
+        fetchItems(itemsPagination.current);
+        fetchCategories();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'فشل في استعادة الصنف');
     }
   };
 
@@ -1178,48 +1222,128 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
     },
 
     {
+      title: 'الحالة',
+      key: 'status',
+      width: 110,
+      align: 'center',
+      render: (_, record) => {
+        const isArchived = record.status === 'archived' || record.status === 'discontinued';
+        return isArchived ? (
+          <Tag color="default" icon={<StopOutlined />}>
+            مؤرشف
+          </Tag>
+        ) : (
+          <Tag color="success" icon={<CheckCircleOutlined />}>
+            نشط
+          </Tag>
+        );
+      }
+    },
+    {
       title: 'إجراءات',
       key: 'actions',
-      width: 210,
+      width: 250,
       fixed: 'left',
       align: 'center',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="معاينة ومراجعة بطاقة الصنف">
-            <Button
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => handleViewProductReview(record)}
-              style={{ borderColor: '#6366f1', color: '#6366f1' }}
-            >
-              معاينة
-            </Button>
-          </Tooltip>
-          <Button
-            type="primary"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleOpenEditItem(record)}
-            className="swm-btn-cobalt"
-          >
-            تعديل
-          </Button>
-          {canDelete(currentUser) && (
-            <Popconfirm
-              title="حذف الصنف"
-              description="هل أنت متأكد من حذف هذا الصنف؟ (سيتم حذفه أو تعطيله إذا كان مرتبطاً بحركات سابقة)"
-              onConfirm={() => handleDeleteItem(record.id)}
-              okText="نعم، احذف"
-              cancelText="إلغاء"
-              okButtonProps={{ danger: true }}
-            >
-              <Button size="small" danger icon={<DeleteOutlined />}>
-                حذف
+      render: (_, record) => {
+        const isArchived = record.status === 'archived' || record.status === 'discontinued';
+
+        return (
+          <Space size="small">
+            <Tooltip title="معاينة ومراجعة بطاقة الصنف">
+              <Button
+                size="small"
+                icon={<EyeOutlined />}
+                onClick={() => handleViewProductReview(record)}
+                style={{ borderColor: '#6366f1', color: '#6366f1' }}
+              >
+                معاينة
               </Button>
-            </Popconfirm>
-          )}
-        </Space>
-      )
+            </Tooltip>
+
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEditItem(record)}
+              className="swm-btn-cobalt"
+            >
+              تعديل
+            </Button>
+
+            {isArchived ? (
+              <>
+                {canManageItem && (
+                  <Popconfirm
+                    title="استعادة الصنف وإعادة تنشيطه"
+                    description={
+                      <div>
+                        هل ترغب في استعادة الصنف <strong>"{record.product_name}"</strong> وتنشيطه لعمليات البيع والشراء؟
+                      </div>
+                    }
+                    onConfirm={() => handleRestoreItem(record)}
+                    okText="نعم، استعادة الصنف"
+                    cancelText="إلغاء"
+                    okButtonProps={{ style: { backgroundColor: '#16a34a', borderColor: '#16a34a' } }}
+                  >
+                    <Button
+                      size="small"
+                      icon={<UndoOutlined />}
+                      style={{ borderColor: '#16a34a', color: '#16a34a', fontWeight: 600 }}
+                    >
+                      استعادة
+                    </Button>
+                  </Popconfirm>
+                )}
+
+                {canManageItem && (
+                  <Popconfirm
+                    title="تأكيد الحذف النهائي للصنف"
+                    description={
+                      <div style={{ maxWidth: 280 }}>
+                        هل أنت متأكد من حذف الصنف <strong>"{record.product_name}"</strong> نهائياً من قاعدة البيانات؟
+                        <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>
+                          ملاحظة: سيتم الحذف فقط إذا لم تكن هناك حركات مسجلة تعتمد عليه.
+                        </div>
+                      </div>
+                    }
+                    onConfirm={() => handleDeleteItem(record.id)}
+                    okText="نعم، حذف نهائي"
+                    cancelText="إلغاء"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button size="small" danger icon={<DeleteOutlined />}>
+                      حذف نهائي
+                    </Button>
+                  </Popconfirm>
+                )}
+              </>
+            ) : (
+              canManageItem && (
+                <Popconfirm
+                  title="تأكيد حذف / أرشفة الصنف"
+                  description={
+                    <div style={{ maxWidth: 280 }}>
+                      هل أنت متأكد من حذف الصنف <strong>"{record.product_name}"</strong>؟
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                        سيتم حذفه نهائياً إذا لم تكن هناك حركات مسجلة، أو أرشفته تلقائياً للحفاظ على السجلات المحاسبية والمبيعات.
+                      </div>
+                    </div>
+                  }
+                  onConfirm={() => handleDeleteItem(record.id)}
+                  okText="نعم، احذف"
+                  cancelText="إلغاء"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button size="small" danger icon={<DeleteOutlined />}>
+                    حذف
+                  </Button>
+                </Popconfirm>
+              )
+            )}
+          </Space>
+        );
+      }
     }
   ];
 
@@ -1490,8 +1614,8 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
             children: (
               <div>
                 <Card style={{ marginBottom: 16 }}>
-                  <Row gutter={[16, 16]} align="middle">
-                    <Col xs={24} md={10}>
+                  <Row gutter={[12, 12]} align="middle">
+                    <Col xs={24} md={8}>
                       <Input
                         prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
                         placeholder="ابحث باسم الصنف، الكود، الباركود، أو الماركة..."
@@ -1501,7 +1625,7 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                         size="large"
                       />
                     </Col>
-                    <Col xs={24} md={10}>
+                    <Col xs={24} md={7}>
                       <Select
                         placeholder="تصفية حسب المجموعة (Category Filter)..."
                         value={selectedCategoryFilter}
@@ -1518,15 +1642,34 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                         ))}
                       </Select>
                     </Col>
-                    <Col xs={24} md={4} style={{ textAlign: 'left' }}>
-                      {selectedCategoryFilter && (
+                    <Col xs={24} md={6}>
+                      <Select
+                        placeholder="حالة الصنف..."
+                        value={selectedStatusFilter}
+                        onChange={setSelectedStatusFilter}
+                        allowClear
+                        size="large"
+                        style={{ width: '100%' }}
+                      >
+                        <Option value={undefined}>الأصناف النشطة (الافتراضي)</Option>
+                        <Option value="all">جميع الأصناف (النشطة والمؤرشفة)</Option>
+                        <Option value="archived">الأصناف المؤرشفة فقط</Option>
+                        <Option value="active">الأصناف النشطة فقط</Option>
+                      </Select>
+                    </Col>
+                    <Col xs={24} md={3} style={{ textAlign: 'left' }}>
+                      {(selectedCategoryFilter || selectedStatusFilter || itemSearch) && (
                         <Button
                           type="link"
-                          onClick={() => setSelectedCategoryFilter(undefined)}
+                          onClick={() => {
+                            setSelectedCategoryFilter(undefined);
+                            setSelectedStatusFilter(undefined);
+                            setItemSearch('');
+                          }}
                           icon={<X size={12} />}
                           style={{ padding: 0 }}
                         >
-                          إلغاء فلتر المجموعة
+                          إلغاء الفلاتر
                         </Button>
                       )}
                     </Col>
@@ -1566,10 +1709,10 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                       >
                         إلغاء التحديد
                       </Button>
-                      {canDelete(currentUser) && (
+                      {canManageItem && (
                         <Popconfirm
                           title="حذف الأصناف المحددة دفعة واحدة"
-                          description={`هل أنت متأكد من حذف ${selectedItemRowKeys.length} صنف دفعة واحدة؟ (سيتم حذفها نهائياً أو تعطيلها إن كانت مرتبطة بحركات مالية أو فواتير)`}
+                          description={`هل أنت متأكد من حذف ${selectedItemRowKeys.length} صنف دفعة واحدة؟ (سيتم حذف الأصناف التي لا تحتوي على حركات نهائياً، وأرشفة الأصناف المرتبطة بفواتير أو حركات للحفاظ على السجلات المالية)`}
                           onConfirm={handleBulkDeleteItems}
                           okText="نعم، حذف الكل"
                           cancelText="تراجع"
@@ -2367,12 +2510,18 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                   size="small"
                   pagination={false}
                   dataSource={selectedMultiColors.flatMap((c, cIdx) =>
-                    selectedMultiSizes.map((s, sIdx) => ({
-                      key: `${c}-${s}`,
-                      color: c,
-                      size: s,
-                      sku: buildVariantSku(itemForm.getFieldValue('product_code'), c, s, cIdx, sIdx)
-                    }))
+                    selectedMultiSizes.map((s, sIdx) => {
+                      const match = existingVariants.find(
+                        ev => (ev.color || '').trim() === c.trim() && (ev.size || '').trim() === s.trim()
+                      );
+                      return {
+                        key: `${c}-${s}`,
+                        color: c,
+                        size: s,
+                        sku: match ? match.variant_sku : buildVariantSku(itemForm.getFieldValue('product_code'), c, s, cIdx, sIdx),
+                        isExisting: Boolean(match)
+                      };
+                    })
                   )}
                   columns={[
                     ...(imageUploadMode === 'standard' ? [{
@@ -2413,7 +2562,14 @@ export default function GroupsAndItems({ currentUser: propUser, autoOpenCreate, 
                       title: 'كود الصنف الفرعي (SKU)',
                       dataIndex: 'sku',
                       key: 'sku',
-                      render: (sku) => <code style={{ fontSize: 11 }}>{sku}</code>
+                      render: (sku, row) => (
+                        <Space>
+                          <code style={{ fontSize: 11 }}>{sku}</code>
+                          <Tag color={row.isExisting ? 'cyan' : 'green'} style={{ fontSize: 10 }}>
+                            {row.isExisting ? 'قائم' : 'جديد'}
+                          </Tag>
+                        </Space>
+                      )
                     }
                   ]}
                 />
